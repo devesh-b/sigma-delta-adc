@@ -12,13 +12,14 @@ import params as P  # noqa: E402
 
 
 def test_coefficients_from_spec_3_4():
-    # option B, SPEC §1/§3.4 at 668fab0 (D17): Cs1 1 pF, Cint1 8 pF, Cs2 1 pF, Cint2 2 pF; written, not computed
-    assert math.isclose(P.CS1 / P.CINT1, 0.125)
+    # option B + D22 (SPEC §1/§3.4): Cs1 0.5 pF, Cint1 4 pF; stage 2 0.5/1 pF (S3 item 3); written, not computed
+    assert math.isclose(0.5e-12 / 4e-12, 0.125) and math.isclose(P.CS1 / P.CINT1, 0.125)
     assert math.isclose(P.C1, 0.125)
     assert math.isclose(P.C2, 0.5)
     assert math.isclose(P.K, 0.5) and math.isclose(P.K / P.C1, 4.0)
-    assert math.isclose(P.CS1, 1e-12) and math.isclose(P.CINT1, 8e-12)
-    assert math.isclose(P.CS2, 1e-12) and math.isclose(P.CINT2, 2e-12)
+    assert math.isclose(P.CS1, 0.5e-12) and math.isclose(P.CINT1, 4e-12)
+    assert math.isclose(P.CS2 / P.CINT2, 0.5)             # c2 = 0.5 whatever Cs2 is chosen
+    assert P.CS2 > 0 and P.CINT2 > 0
     assert math.isclose(P.VREF_NOM, 2.048) and P.VREF_OPTION == "B"
     assert P.VREF_OPTIONS["B_2p048V"]["vref"] == P.VREF_NOM
     assert P.VREF_OPTIONS["B_2p048V"]["c1"] == P.C1
@@ -52,6 +53,23 @@ def test_vref_options_k_over_c1_is_4():
     assert P.VREF_OPTIONS["A_1p2V"] == {"vref": 1.2, "c1": 0.25, "c2": 0.5, "k": 1.0}
     assert P.VREF_OPTIONS["A2_1p2V"] == {"vref": 1.2, "c1": 0.25, "c2": 0.25, "k": 1.0}
     assert P.VREF_OPTIONS["B_2p048V"] == {"vref": 2.048, "c1": 0.125, "c2": 0.5, "k": 0.5}
+
+
+def test_n_pins_offsets():
+    assert P.N_PRECISION == 4096 and P.N_FAST == (64, 256, 1024)
+    assert set(P.N_SET) == {P.N_PRECISION, *P.N_FAST}
+    assert P.PINS == {"ua0": "VIN+", "ua1": "VIN-", "ua2": "VREF+", "ua3": "VREF-"}   # D24
+    assert math.isclose(P.VOS_3SIGMA, 9e-3)                                           # D21
+    assert P.OVERLOAD_RANGE == (1.0, 1.1)
+    assert math.isclose(P.PAD_R, 500.0) and math.isclose(P.PAD_C, 5e-12)
+
+
+def test_cint1_2pF_copy_is_rejected():
+    # non-vacuity: the coefficient rule (c1 == 0.125, k/c1 == 4) fails for CINT1 = 2 pF
+    def ok(cs1, cint1, k):
+        return math.isclose(cs1 / cint1, 0.125) and math.isclose(k / (cs1 / cint1), 4.0)
+    assert ok(0.5e-12, 4e-12, 0.5)
+    assert not ok(0.5e-12, 2e-12, 0.5)
 
 
 def test_a0_and_fs():
@@ -107,9 +125,9 @@ def test_spice_has_every_scalar():
 def test_agrees_with_model_defaults():
     import iadc
     m = iadc.Params()
-    # iadc.Params defaults are the old option C (fs 1 MHz, c1 0.25, k 1.0); model/ is not edited here.
+    # iadc.Params defaults are the old option C (fs 1 MHz, c1 0.25, k 1.0); model/ is not edited here. cs: model default 1 pF, D22 is 0.5 pF.
     # Listed explicitly. vref 2.048 is the same in both (the WO expected a vref mismatch; it is not one).
-    known_diff = {"fs", "c1", "k"}
+    known_diff = {"fs", "c1", "k", "cs"}
     mine = {"order": P.ORDER, "c1": P.C1, "c2": P.C2, "k": P.K, "cs": P.CS1,
             "fs": P.FS_NOM, "vref": P.VREF_NOM}
     bad = {k for k, v in mine.items()

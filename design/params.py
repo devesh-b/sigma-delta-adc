@@ -14,13 +14,15 @@ FS_RANGE = (0.25e6, 4e6)           # Hz
 FS_PRECISION = (0.25e6, 2e6)       # Hz, precision mode (SPEC §1)
 FS_FAST = 4e6                      # Hz, fast / low-resolution mode (D13)
 N_SET = (64, 256, 1024, 4096)      # cycles per conversion
+N_PRECISION = 4096                 # precision modes, 3.75-60 SPS (D23)
+N_FAST = (64, 256, 1024)           # fast / low-resolution modes
 K = 0.5                            # stage-2 feedback coefficient (option B, D17)
 
 # ---- SPEC §3.4 capacitors (F) ----------------------------------------------
-CS1 = 1e-12
-CINT1 = 8e-12                      # option B: c1 = 1p/8p = 0.125 (D17)
-CS2 = 1e-12
-CINT2 = 2e-12
+CS1 = 0.5e-12                      # D22: shared Cs (input = DAC cap)
+CINT1 = 4e-12                      # option B: c1 = 0.5p/4p = 0.125 (D17, D22)
+CS2 = 0.5e-12                      # stage 2: see work/v1-design/results/s3_budget.md item 3
+CINT2 = 1e-12                      # c2 = 0.5
 
 # c1 = Cs1/Cint1 ; c2 = Cs2/Cint2
 C1 = CS1 / CINT1
@@ -34,6 +36,11 @@ VREF_OPTIONS = {
     "A2_1p2V": {"vref": 1.2, "c1": 0.25, "c2": 0.25, "k": 1.0},
     "B_2p048V": {"vref": 2.048, "c1": 0.125, "c2": 0.5, "k": 0.5},  # swing halved via c1, k
 }
+# Pads (D24): ua0 VIN+, ua1 VIN-, ua2 VREF+, ua3 VREF- (Kelvin to sensor ground)
+PINS = {"ua0": "VIN+", "ua1": "VIN-", "ua2": "VREF+", "ua3": "VREF-"}
+PAD_R = 500.0                      # ohm, each pad path
+PAD_C = 5e-12                      # F
+OVERLOAD_RANGE = (1.0, 1.1)        # x VREF; must recover on the next conversion (D21)
 # PGA: none in v1 (D14); any PGA gain is a stretch goal and has no entry here.
 
 # ---- Chopping (D17/D18) ------------------------------------------------------
@@ -46,6 +53,9 @@ CHOP_OTA = True
 def chop_config_valid(system, ota, n):
     return (not ota or system) and n % 2 == 0
 
+
+# ---- Offsets (D21) -----------------------------------------------------------
+VOS_3SIGMA = 9e-3                  # V, budgeting value for OTA1 and OTA2 input offset
 
 # ---- Supplies ---------------------------------------------------------------
 VAPWR = 3.3
@@ -79,7 +89,7 @@ FS_SET = (0.25e6, 2e6, 4e6)
 # ---- Derived ----------------------------------------------------------------
 T_HALF = 1.0 / (2.0 * FS_NOM)            # t_half = 1/(2 fs) = 250 ns at 2 MHz
 TAU_REF_MAX = TAU_REF_FRAC * T_HALF
-ZIN = 1.0 / (FS_NOM * CS1)               # Zin ~ 1/(fs*Cs) = 500 kOhm at 2 MHz
+ZIN = 1.0 / (FS_NOM * CS1)               # Zin ~ 1/(fs*Cs) = 1 MOhm at 2 MHz
 # Analog PVT list (SPEC §6): (5 MOS + 2 RC corners) x 3 temp x 3 VAPWR = 63 points
 PVT_LIST_ANALOG = [
     {"proc": p, "temp": t, "vapwr": va}
@@ -98,7 +108,8 @@ def scalars():
     """Name -> scalar value, written to params.spice."""
     return {
         "fs_nom": FS_NOM, "fs_min": FS_RANGE[0], "fs_max": FS_RANGE[1],
-        "order": ORDER, "k": K,
+        "order": ORDER, "k": K, "n_precision": N_PRECISION, "vos_3sigma": VOS_3SIGMA,
+        "overload_max": OVERLOAD_RANGE[1], "pad_r": PAD_R, "pad_c": PAD_C,
         "cs1": CS1, "cint1": CINT1, "cs2": CS2, "cint2": CINT2,
         "c1": C1, "c2": C2,
         "vref": VREF_NOM, "fs_fast": FS_FAST, "fs_prec_min": FS_PRECISION[0], "fs_prec_max": FS_PRECISION[1], "vapwr": VAPWR, "vdpwr": VDPWR, "cm": CM,
