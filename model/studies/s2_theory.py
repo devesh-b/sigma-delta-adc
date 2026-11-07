@@ -46,6 +46,28 @@ def kernel_closed(order, N):
     return 0.0 if N % 2 == 0 else 1.0 / N
 
 
+def e2_error(N, c1, e2_v):
+    """Input-referred output error [V] of a constant offset e2_v [V] at the
+    input of integrator 2 (OTA2 input offset, or a constant offset on x1).
+    Order 2, x2 += c2 (x1 - k y + e2/vref): zeroing x2[N] gives
+      sum w y + (k/c1) sum y = sum w u + N e2/c1  ->  u_err = N e2 / (c1 N(N-1)/2)
+    = 2 e2 / (c1 (N-1)) (in volts, independent of VREF). Not cancelled by OTA
+    chop (constant); cancelled by system chop (same sign in both polarities
+    after the output sign flip, so it averages out in a pair)."""
+    return 2.0 * e2_v / (c1 * (N - 1))
+
+
+def order1_residue(N, vos, lf):
+    """Order 1, OTA chop only [V]: lf*Vos/N for N even, 0 for N odd.
+    u_hat = sum(y)/N = u + mean(e) - x1[N]/(c1 N). The equal-weight mean of the
+    chopped offset is 0 (N even) or Vos/N (N odd). The final-state term
+    -x1[N]/(c1 N) ~ -e_{N-1}/N: the last cycle's chopped offset (-Vos for N even,
+    +Vos for N odd) is not yet integrated out, the same effect as a comparator
+    offset of c1*Vos. Even: 0 + Vos/N. Odd: Vos/N - Vos/N = 0.
+    (The chip has no x1[N]; this is NOT corrected in the output.)"""
+    return lf * vos / N if N % 2 == 0 else 0.0
+
+
 def predict(order, N, mode, vos, vres, lf):
     """Expected mean input-referred offset [V] for a mode in
     {none, ota, sys, ota+sys}. vos, vres in volts."""

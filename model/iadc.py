@@ -81,6 +81,12 @@ class Params:
                                  # never switches, so ~1. Set to noise_gain
                                  # (1 + Cf/Cs + Cp/Cs) for a pessimistic bound.
 
+    vos2: float = 0.0            # OTA2 input offset [V]; adds vos2/vref to the
+                                 # x2 integrator input (constant, not chopped)
+    x1_offset: float = 0.0       # constant offset on x1 as seen by stage 2 [V]
+                                 # (OTA1 output-referred offset). Same effect as
+                                 # vos2 on u_hat: 2*e2/(c1(N-1)) input-referred.
+
     comp_offset: float = 0.0     # comparator offset (units of vref)
     comp_noise: float = 0.0      # comparator rms noise (units of vref)
 
@@ -172,6 +178,7 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False):
     sumS = np.zeros(B)
     xm1 = xm2 = 0.0
     xsw = p.vlin_diff / p.vref if p.vlin_diff > 0 else p.xswing
+    e2_off = (p.vos2 + p.x1_offset) / p.vref      # 0.0 => skipped (bit-identical)
 
     for n in range(N):
         q = x2 if p.order == 2 else x1
@@ -216,7 +223,10 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False):
         x1 = np.clip(p1 * x1 + g1 * p.c1 * (u_s - y * r + e), -p.xmax, p.xmax)
         xm1 = max(xm1, float(np.max(np.abs(x1))))
         if p.order == 2:
-            x2 = np.clip(p2 * x2 + g2 * p.c2 * (x1_old - p.k * y), -p.xmax * 2, p.xmax * 2)
+            x2in = x1_old - p.k * y
+            if e2_off:
+                x2in = x2in + e2_off
+            x2 = np.clip(p2 * x2 + g2 * p.c2 * x2in, -p.xmax * 2, p.xmax * 2)
             xm2 = max(xm2, float(np.max(np.abs(x2))))
 
     if p.order == 1:
@@ -228,7 +238,8 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False):
         # units of vref (differential); per-side volts = 0.5 * x * vref
         return u_hat, {"x1max": xm1, "x2max": xm2,
                        "x1max_v_side": 0.5 * xm1 * p.vref,
-                       "x2max_v_side": 0.5 * xm2 * p.vref}
+                       "x2max_v_side": 0.5 * xm2 * p.vref,
+                       "x1_final": x1, "x2_final": x2}
     return u_hat
 
 
