@@ -18,6 +18,7 @@ Persistent memory for this project lives in `memory/` (index: `memory/MEMORY.md`
 - `CONTEXT.md` — **single-file snapshot of all context, decisions, learnings, corrections, model results, next steps. Read first in a new session.**
 - `SPEC.md` — design spec, authoritative block targets + corner set (§6)
 - `PUBLICATION_PLAN.md` — characterization paper plan
+- `work/v1-design/RESUME.md` — **after an interruption, read this first: exact pickup steps.**
 - `work/v1-design/PLAN.md` — **gated design plan (system → component → verification, all corners, Paul Thomas style). RESUME HERE.**
 - `NOTES.md` — survey of prior TT shuttles, specs of key repos, applications, TT PCB / analog constraints. **Start here.**
 - `ROADMAP.md` — draft tapeout direction: fs trade-offs, comparison with Paul Thomas, research angle, v1 spec, phases 0–5
