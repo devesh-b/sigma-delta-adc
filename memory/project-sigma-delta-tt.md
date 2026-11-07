@@ -19,5 +19,7 @@ Key evidence (`ACHIEVABILITY.md`): Paul measured sky130 OTA 1/f corner at ~631 k
 
 **Update 2026-11-07b:** `SPEC.md` (authoritative design spec, corner set §6) and `PUBLICATION_PLAN.md` (framing A: method + measured-vs-model) exist and were reviewed/fixed (VREF 1.2 V provisional pending study S1 since the model ran at 2.048 V; PGA x1/x2 v1; TG input switch; GBW ≥10 MHz req / 20 target; raw accumulator output; CJC off-chip; entropy section optional). The user chose a **gated flow like Paul Thomas**: system → component → verification suite, and proceed to the next stage **only if every spec passes at every corner**. Plan: `work/v1-design/PLAN.md` (RESUME HERE).
 
+**Decisions 2026-11-07 (work/v1-design/DECISIONS.md):** VREF 2.048 V with c1 0.125 / k 0.5 (option B), OTA chop kept paired with system chop (N even), CM-rejecting input switching, 4 MHz = fast low-res mode, shared Cs / no PGA in v1, OTA A0 ≥ 80 dB. S0–S2 done; S3 (error budget) next. Open: REF− pin, order-1 mode coverage.
+
 **Why:** It's a learning exercise in mixed-signal design on an open PDK.
 **How to apply:** Frame suggestions as learning steps (theory → behavioral sim → schematic → layout). Point to the reference repos under `repos/` and the survey in `NOTES.md`. See [[reference-tt-workspace]].

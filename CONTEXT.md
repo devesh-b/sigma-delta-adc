@@ -202,7 +202,7 @@ Also:
   - Chopping switchable: OTA chop plus system chop.
   - Raw bitstream pin.
 - **fs:** 2 MHz nominal (0.25–4 MHz). N ∈ {64, 256, 1024, 4096} (counter value, digital-only cost). K averaging in firmware.
-- **VREF:** 1.2 V provisional vs 2.048 V with c1 = 0.125; decided by study S1. Model numbers were run at 2.048 V (µV noise and ppm INL carry over; −0.77 b effective at 1.2 V).
+- **VREF (decided 2026-11-07, D17):** 2.048 V, c1 = 0.125, c2 = 0.5, k = 0.5 (option B; bit-identical to 0.25/1 at half swing, 0.61 V/side, INL 12 ppm at 75 dB; Cint1 8 pF). **Chop (D18):** OTA chop kept as config bit, always paired with system chop; N even. Other user decisions: CM-rejecting input switching, 4 MHz = fast mode, shared Cs/no PGA, A0 ≥ 80 dB. Status: `work/v1-design/` (S0–S2 done, S3 next).
 - **Targets:**
   - Noise: ≤50 µV @ 15 SPS (v1); ≤5 µV stretch. The model says ~0.5 µV intrinsic.
   - INL: ≤100 ppm; ≤30 ppm stretch.
