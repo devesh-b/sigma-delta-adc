@@ -11,12 +11,14 @@ import os
 ORDER = 2
 FS_NOM = 2e6                       # Hz, nominal
 FS_RANGE = (0.25e6, 4e6)           # Hz
+FS_PRECISION = (0.25e6, 2e6)       # Hz, precision mode (SPEC §1)
+FS_FAST = 4e6                      # Hz, fast / low-resolution mode (D13)
 N_SET = (64, 256, 1024, 4096)      # cycles per conversion
-K = 1.0                            # stage-2 feedback coefficient
+K = 0.5                            # stage-2 feedback coefficient (option B, D17)
 
 # ---- SPEC §3.4 capacitors (F) ----------------------------------------------
 CS1 = 1e-12
-CINT1 = 4e-12
+CINT1 = 8e-12                      # option B: c1 = 1p/8p = 0.125 (D17)
 CS2 = 1e-12
 CINT2 = 2e-12
 
@@ -25,11 +27,25 @@ C1 = CS1 / CINT1
 C2 = CS2 / CINT2
 
 # ---- Reference (SPEC §1 VREF row) ------------------------------------------
-VREF_NOM = 1.2                     # V, provisional
+VREF_OPTION = "B"                  # v1 nominal = option B (D17/D18); A/A2 kept for reference
+VREF_NOM = 2.048                   # V (option B)
 VREF_OPTIONS = {
-    "A_1p2V": {"vref": 1.2, "c1": 0.25},
-    "B_2p048V": {"vref": 2.048, "c1": 0.125},   # swing halved via c1
+    "A_1p2V": {"vref": 1.2, "c1": 0.25, "c2": 0.5, "k": 1.0},
+    "A2_1p2V": {"vref": 1.2, "c1": 0.25, "c2": 0.25, "k": 1.0},
+    "B_2p048V": {"vref": 2.048, "c1": 0.125, "c2": 0.5, "k": 0.5},  # swing halved via c1, k
 }
+# PGA: none in v1 (D14); any PGA gain is a stretch goal and has no entry here.
+
+# ---- Chopping (D17/D18) ------------------------------------------------------
+# OTA chop is a config bit valid only together with system chop; N must be even
+# (chop phase restarts at every reset, so a conversion holds whole chop periods).
+CHOP_SYSTEM = True
+CHOP_OTA = True
+
+
+def chop_config_valid(system, ota, n):
+    return (not ota or system) and n % 2 == 0
+
 
 # ---- Supplies ---------------------------------------------------------------
 VAPWR = 3.3
@@ -37,7 +53,7 @@ VDPWR = 1.8
 CM = VAPWR / 2                     # common mode
 
 # ---- OTA targets (SPEC §3.1) ------------------------------------------------
-OTA_A0_DB_MIN = 75.0
+OTA_A0_DB_MIN = 80.0               # SPEC §3.1 (user Q6)
 OTA_GBW_MIN = 10e6                 # Hz required
 OTA_GBW_TARGET = 20e6              # Hz design target
 OTA_PM_MIN = 60.0                  # deg
@@ -52,18 +68,29 @@ CORNERS_PROCESS = ("tt", "ss", "ff", "sf", "fs")
 TEMPS = (-40, 27, 125)             # C
 VAPWR_SET = (3.0, 3.3, 3.6)
 VDPWR_SET = (1.62, 1.8, 1.98)
-MC_RUNS = {"nominal_tt_27": 200, "worst_pvt": 50}
+CORNERS_RC = ("ss_hh", "ff_ll")    # RC-only corners (R and C extremes, MOS typical)
+# Monte Carlo: key = .lib section, value = runs. "<worst>_mm" is a PLACEHOLDER key: replace it with the actual
+# worst-case MOS corner's mismatch section (e.g. "ss_mm") once S3/C10 identify it. The tests only
+# accept it because the placeholder is listed in MC_PLACEHOLDERS.
+MC_RUNS = {"tt_mm": 200, "<worst>_mm": 50}
+MC_PLACEHOLDERS = ("<worst>_mm",)
 FS_SET = (0.25e6, 2e6, 4e6)
 
 # ---- Derived ----------------------------------------------------------------
 T_HALF = 1.0 / (2.0 * FS_NOM)            # t_half = 1/(2 fs) = 250 ns at 2 MHz
 TAU_REF_MAX = TAU_REF_FRAC * T_HALF
 ZIN = 1.0 / (FS_NOM * CS1)               # Zin ~ 1/(fs*Cs) = 500 kOhm at 2 MHz
-# 45-point PVT list: 5 process x 3 temp x 3 VAPWR (VDPWR tracks VAPWR index)
-PVT_LIST = [
+# Analog PVT list (SPEC §6): (5 MOS + 2 RC corners) x 3 temp x 3 VAPWR = 63 points
+PVT_LIST_ANALOG = [
+    {"proc": p, "temp": t, "vapwr": va}
+    for p, t, va in itertools.product(
+        CORNERS_PROCESS + CORNERS_RC, TEMPS, VAPWR_SET)
+]
+# Digital PVT list: 5 MOS x 3 temp x 3 VAPWR x 3 VDPWR (own axis) = 135 points
+PVT_LIST_DIGITAL = [
     {"proc": p, "temp": t, "vapwr": va, "vdpwr": vd}
-    for p, t, (va, vd) in itertools.product(
-        CORNERS_PROCESS, TEMPS, zip(VAPWR_SET, VDPWR_SET))
+    for p, t, va, vd in itertools.product(
+        CORNERS_PROCESS, TEMPS, VAPWR_SET, VDPWR_SET)
 ]
 
 
@@ -74,7 +101,7 @@ def scalars():
         "order": ORDER, "k": K,
         "cs1": CS1, "cint1": CINT1, "cs2": CS2, "cint2": CINT2,
         "c1": C1, "c2": C2,
-        "vref": VREF_NOM, "vapwr": VAPWR, "vdpwr": VDPWR, "cm": CM,
+        "vref": VREF_NOM, "fs_fast": FS_FAST, "fs_prec_min": FS_PRECISION[0], "fs_prec_max": FS_PRECISION[1], "vapwr": VAPWR, "vdpwr": VDPWR, "cm": CM,
         "ota_a0_db_min": OTA_A0_DB_MIN, "ota_gbw_min": OTA_GBW_MIN,
         "ota_gbw_target": OTA_GBW_TARGET, "ota_pm_min": OTA_PM_MIN,
         "ota_sr_min": OTA_SR_MIN,
