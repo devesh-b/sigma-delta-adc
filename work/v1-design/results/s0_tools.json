@@ -12,7 +12,7 @@
   "numpy": "2.5.4",
   "cocotb": "2.1.0",
   "PDK_ROOT": "/foss/pdks-tt",
-  "open_pdks": "open_pdks d56f8a8ea0f9171cbdc5273035907b93f3f3bed7",
+  "open_pdks": "d56f8a8ea0f9171cbdc5273035907b93f3f3bed7",
   "smoke_id": "4.679873e-05",
   "smoke_ok": true
  },
@@ -29,7 +29,7 @@
   "numpy": "2.5.4",
   "cocotb": "ModuleNotFoundError: No module named 'cocotb'",
   "PDK_ROOT": "/home/mempool/.ciel",
-  "open_pdks": "open_pdks d56f8a8ea0f9171cbdc5273035907b93f3f3bed7",
+  "open_pdks": "d56f8a8ea0f9171cbdc5273035907b93f3f3bed7",
   "smoke_id": "4.679873e-05",
   "smoke_ok": true
  },
