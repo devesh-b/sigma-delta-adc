@@ -11,4 +11,4 @@
 | coder WO-04 (Sonnet) | model ext: OTA2/x1 offset, order-1 residue, S1 v2 INL @D17, ref-decap sweep, quant floor, noise @D17 | RUNNING, budget 70 | Haiku acceptance + review |
 | Haiku tester | acceptance WO-01 + WO-02 @ d6a86b2 | DONE 11/11 PASS → results/ACCEPT-WO01-WO02-d6a86b2.md; found hard-coded paths | — |
 | pd-expert (Opus) | review of WO-01 precheck flow | DONE → REVIEW-WO01-pd-2026-11-07.md (B-1, S-1..S-6) | WO-01a |
-| coder WO-01a (Sonnet) | S0 fixes (A0 80, corners 63/135, DRC/pin broken copies, TT nix-shell precheck, GDS tie, no hard-coded paths) | RUNNING, budget 70 | Haiku re-acceptance → S0 closes |
+| coder WO-01a (Sonnet) | S0 fixes + option B nominal + chop config | DONE: c682804, d0d5d3e, cd6ff13; 9 tests; precheck under TT nix-shell (magic 8.3.568, klayout 0.30.8); 5 broken variants each fail own rows; CI PDK 0536d02 also 15/15 | Haiku re-acceptance (running) → S0 closes |
