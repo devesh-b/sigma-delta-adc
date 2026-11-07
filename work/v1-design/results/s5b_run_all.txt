@@ -1,0 +1,89 @@
+### --xcheck
+xcheck A60_base: deck gain -5.589e-04 INL 3.993 | model gain -5.471e-04 INL 3.090 | reviewer deck -0.000559 / 3.99 model -0.000547 / 3.09 -> ok [True, True, True, True]
+xcheck A60_k025: deck gain -2.931e-04 INL 6.979 | model gain -2.882e-04 INL 5.897 | reviewer deck -0.000293 / 6.98 model -0.000288 / 5.9 -> ok [True, True, True, True]
+xcheck A60_c1_025: deck gain -5.507e-04 INL 10.049 | model gain -5.430e-04 INL 7.431 | reviewer deck -0.000551 / 10.05 model -0.000543 / 7.43 -> ok [True, True, True, True]
+xcheck A80_base: deck gain -5.630e-05 INL 0.413 | model gain -5.470e-05 INL 0.295 | reviewer deck None / 0.29 model None / 0.295 -> ok [True, True]
+xcheck noise: sigma_in 2.011 mV rms (set 2.0 mV), 32 conv; deck rms 7.460e-05 u, theory 7.095e-05 (ratio 1.052); deck-vs-model per-conversion slope -1.043 corr -1.000; model rms 7.149e-05 ok=True []
+ACCEPT
+### --av
+A(v) static table (vo_diff V -> dB, A0 80): [(0.0, 80.0), (0.4, 79.68), (0.8, 78.65), (1.2, 76.6), (1.4, 74.95), (1.6, 72.55), (2.0, 60.0)]
+A(v): deck flat-A0 INL 0.546 ppm; deck A(v) drop 0.9 vsw 2.0 INL 3.175 ppm gain -6.626e-05; model INL 3.648 gain -6.063e-05; rel diff 13.9 % (limit 30)
+ACCEPT
+### --knees2
+2M/gbw=5M (N 256, target 8 ppm): INL 21.05 ppm gain -2.13e-04 pass=False ok=True []
+2M/gbw=7M (N 256, target 8 ppm): INL 6.10 ppm gain -8.41e-05 pass=True ok=True []
+2M/gbw=10M (N 256, target 8 ppm): INL 1.69 ppm gain -6.39e-05 pass=True ok=True []
+2M/gbw=20M (N 256, target 8 ppm): INL 0.56 ppm gain -5.58e-05 pass=True ok=True []
+2M/gbw=30M (N 256, target 8 ppm): INL 0.54 ppm gain -5.58e-05 pass=True ok=True []
+2M/sr=6M (N 256, target 8 ppm): INL 1665.41 ppm gain -1.06e-02 pass=False ok=True []
+2M/sr=8M (N 256, target 8 ppm): INL 133.21 ppm gain -3.02e-04 pass=False ok=True []
+2M/sr=10M (N 256, target 8 ppm): INL 3.08 ppm gain -6.94e-05 pass=True ok=True []
+2M/sr=12M (N 256, target 8 ppm): INL 1.69 ppm gain -6.39e-05 pass=True ok=True []
+2M/sr=25M (N 256, target 8 ppm): INL 0.35 ppm gain -5.69e-05 pass=True ok=True []
+4M_boost/gbw=5M (N 256, target 20 ppm): INL 42.47 ppm gain -5.55e-04 pass=False ok=True []
+4M_boost/gbw=7.5M (N 256, target 20 ppm): INL 7.11 ppm gain -8.63e-05 pass=True ok=True []
+4M_boost/gbw=10M (N 256, target 20 ppm): INL 6.99 ppm gain -7.51e-05 pass=True ok=True []
+4M_boost/gbw=20M (N 256, target 20 ppm): INL 1.35 ppm gain -5.39e-05 pass=True ok=True []
+4M_boost/sr=6M (N 256, target 20 ppm): INL 5146.27 ppm gain -2.34e-02 pass=False ok=True []
+4M_boost/sr=9M (N 256, target 20 ppm): INL 265.12 ppm gain -5.58e-04 pass=False ok=True []
+4M_boost/sr=12M (N 256, target 20 ppm): INL 6.99 ppm gain -7.51e-05 pass=True ok=True []
+4M_boost/sr=25M (N 256, target 20 ppm): INL 1.07 ppm gain -6.10e-05 pass=True ok=True []
+4M_noboost_spec (N 256, target 20 ppm): INL 6251.70 ppm gain -2.76e-02 pass=False ok=True []
+4M_boost_spec_N1024 (N 1024, target 5 ppm): INL 4.23 ppm gain -5.27e-05 pass=True ok=True []
+2M_spec_with_Av (N 256, target 8 ppm): INL 1.01 ppm gain -7.32e-05 pass=True ok=True []
+2M_spec_asym_sr0.5 (N 256, target 8 ppm): INL 2814.77 ppm gain -5.35e-03 pass=False ok=True []
+knees: {'2M/gbw': 7000000.0, '2M/sr': 10000000.0, '4M_boost/gbw': 7500000.0, '4M_boost/sr': 12000000.0}
+FLAG 4M_noboost_spec: INL 6251.70 ppm > target 20
+FLAG 2M_spec_asym_sr0.5: INL 2814.77 ppm > target 8
+ACCEPT
+### --cm
+cm vin_cm 0.2 mm 0.00% d12=1 dem=0: off +0.0 uV (expect +0.0), pair resid -10.970 uV, vg1 CM [1.650,1.727] (all [1.649,1.728]) vg2 [1.630,1.652] outCM dev max 82.5 mV @0.2th 1.8 mV CMRR off nan dB on nan dB ok=True
+cm vin_cm 0.2 mm 0.25% d12=1 dem=0: off +0.0 uV (expect +0.0), pair resid -10.979 uV, vg1 CM [1.649,1.727] (all [1.649,1.728]) vg2 [1.630,1.652] outCM dev max 82.5 mV @0.2th 1.8 mV CMRR off 151.5 dB on 159.9 dB ok=True
+cm vin_cm 0.2 mm 0.75% d12=1 dem=0: off +0.2 uV (expect +0.0), pair resid -11.054 uV, vg1 CM [1.648,1.727] (all [1.648,1.728]) vg2 [1.630,1.652] outCM dev max 82.5 mV @0.2th 1.8 mV CMRR off 132.4 dB on 139.9 dB ok=True
+cm vin_cm 1.0 mm 0.00% d12=1 dem=0: off +0.0 uV (expect +0.0), pair resid -10.970 uV, vg1 CM [1.650,1.727] (all [1.647,1.728]) vg2 [1.630,1.652] outCM dev max 82.5 mV @0.2th 1.8 mV CMRR off nan dB on nan dB ok=True
+cm vin_cm 1.0 mm 0.25% d12=1 dem=0: off +0.0 uV (expect +0.0), pair resid -10.979 uV, vg1 CM [1.649,1.727] (all [1.647,1.728]) vg2 [1.630,1.652] outCM dev max 82.5 mV @0.2th 1.8 mV CMRR off nan dB on nan dB ok=True
+cm vin_cm 1.0 mm 0.75% d12=1 dem=0: off +0.2 uV (expect +0.0), pair resid -11.054 uV, vg1 CM [1.648,1.727] (all [1.648,1.728]) vg2 [1.630,1.652] outCM dev max 82.5 mV @0.2th 1.8 mV CMRR off nan dB on nan dB ok=True
+cm vin_cm 2.0 mm 0.00% d12=1 dem=0: off +0.0 uV (expect +0.0), pair resid -10.970 uV, vg1 CM [1.650,1.727] (all [1.554,1.728]) vg2 [1.630,1.652] outCM dev max 82.5 mV @0.2th 1.8 mV CMRR off nan dB on nan dB ok=True
+cm vin_cm 2.0 mm 0.25% d12=1 dem=0: off +0.0 uV (expect +0.0), pair resid -10.979 uV, vg1 CM [1.649,1.727] (all [1.554,1.728]) vg2 [1.630,1.652] outCM dev max 82.5 mV @0.2th 1.8 mV CMRR off 152.1 dB on 161.3 dB ok=True
+cm vin_cm 2.0 mm 0.75% d12=1 dem=0: off +0.2 uV (expect +0.0), pair resid -11.054 uV, vg1 CM [1.648,1.727] (all [1.554,1.728]) vg2 [1.630,1.652] outCM dev max 82.5 mV @0.2th 1.8 mV CMRR off 133.6 dB on 141.4 dB ok=True
+cm vin_cm 0.2 mm 0.00% d12=0 dem=0: off +0.0 uV (expect -0.0), pair resid -10.953 uV, vg1 CM [1.648,2.538] (all [1.648,2.538]) vg2 [1.421,1.650] outCM dev max 211.9 mV @0.2th 8.2 mV CMRR off nan dB on nan dB ok=True
+cm vin_cm 0.2 mm 0.25% d12=0 dem=0: off -132.6 uV (expect -2060.0), pair resid -11.105 uV, vg1 CM [1.648,2.538] (all [1.648,2.538]) vg2 [1.421,1.650] outCM dev max 212.1 mV @0.2th 8.2 mV CMRR off 75.9 dB on 134.7 dB ok=True
+cm vin_cm 0.2 mm 0.75% d12=0 dem=0: off -397.9 uV (expect -6180.0), pair resid -11.110 uV, vg1 CM [1.648,2.538] (all [1.648,2.538]) vg2 [1.421,1.650] outCM dev max 212.5 mV @0.2th 8.1 mV CMRR off 66.3 dB on 134.4 dB ok=True
+cm vin_cm 1.0 mm 0.00% d12=0 dem=0: off +0.0 uV (expect -0.0), pair resid -10.957 uV, vg1 CM [1.648,1.738] (all [1.648,1.738]) vg2 [1.421,1.650] outCM dev max 101.7 mV @0.2th 3.7 mV CMRR off nan dB on nan dB ok=True
+cm vin_cm 1.0 mm 0.25% d12=0 dem=0: off -3.8 uV (expect -60.0), pair resid -10.975 uV, vg1 CM [1.648,1.738] (all [1.648,1.738]) vg2 [1.421,1.650] outCM dev max 101.7 mV @0.2th 3.7 mV CMRR off nan dB on nan dB ok=True
+cm vin_cm 1.0 mm 0.75% d12=0 dem=0: off -11.6 uV (expect -180.0), pair resid -11.100 uV, vg1 CM [1.648,1.738] (all [1.648,1.738]) vg2 [1.421,1.650] outCM dev max 101.7 mV @0.2th 3.7 mV CMRR off nan dB on nan dB ok=True
+cm vin_cm 2.0 mm 0.00% d12=0 dem=0: off +0.0 uV (expect +0.0), pair resid -10.956 uV, vg1 CM [0.674,1.682] (all [0.674,1.682]) vg2 [1.421,1.650] outCM dev max 243.4 mV @0.2th 9.9 mV CMRR off nan dB on nan dB ok=True
+cm vin_cm 2.0 mm 0.25% d12=0 dem=0: off +157.0 uV (expect +2440.0), pair resid -11.111 uV, vg1 CM [0.673,1.682] (all [0.673,1.682]) vg2 [1.421,1.650] outCM dev max 243.3 mV @0.2th 9.9 mV CMRR off 75.9 dB on 136.0 dB ok=True
+cm vin_cm 2.0 mm 0.75% d12=0 dem=0: off +471.2 uV (expect +7320.0), pair resid -11.028 uV, vg1 CM [0.673,1.682] (all [0.673,1.682]) vg2 [1.421,1.650] outCM dev max 243.0 mV @0.2th 10.0 mV CMRR off 66.3 dB on 142.7 dB ok=True
+cm vin_cm 0.2 mm 0.25% d12=1 dem=1: off -0.0 uV (expect +0.0), pair resid -11.449 uV, vg1 CM [1.649,1.728] (all [1.649,1.731]) vg2 [1.630,1.652] outCM dev max 82.5 mV @0.2th 1.8 mV CMRR off 151.3 dB on 124.7 dB ok=True
+cm vin_cm 0.2 mm 0.75% d12=1 dem=1: off -0.2 uV (expect +0.0), pair resid -15.040 uV, vg1 CM [1.649,1.728] (all [1.648,1.731]) vg2 [1.630,1.652] outCM dev max 82.5 mV @0.2th 1.8 mV CMRR off 132.3 dB on 106.1 dB ok=True
+cm vin_cm 1.0 mm 0.25% d12=1 dem=1: off -0.0 uV (expect +0.0), pair resid -11.449 uV, vg1 CM [1.649,1.728] (all [1.649,1.728]) vg2 [1.630,1.652] outCM dev max 82.5 mV @0.2th 1.8 mV CMRR off nan dB on nan dB ok=True
+cm vin_cm 1.0 mm 0.75% d12=1 dem=1: off -0.2 uV (expect +0.0), pair resid -15.040 uV, vg1 CM [1.649,1.728] (all [1.648,1.728]) vg2 [1.630,1.652] outCM dev max 82.5 mV @0.2th 1.8 mV CMRR off nan dB on nan dB ok=True
+cm vin_cm 2.0 mm 0.25% d12=1 dem=1: off -0.0 uV (expect +0.0), pair resid -11.449 uV, vg1 CM [1.649,1.728] (all [1.555,1.728]) vg2 [1.630,1.652] outCM dev max 82.5 mV @0.2th 1.8 mV CMRR off 152.8 dB on 126.2 dB ok=True
+cm vin_cm 2.0 mm 0.75% d12=1 dem=1: off -0.2 uV (expect +0.0), pair resid -15.040 uV, vg1 CM [1.649,1.728] (all [1.554,1.728]) vg2 [1.630,1.652] outCM dev max 82.5 mV @0.2th 1.8 mV CMRR off 133.8 dB on 107.6 dB ok=True
+REQUIRED PMOS-pair CM range (D12 on): whole run [1.554, 1.731] V; inside conversions [1.630, 1.728] V; assumed available [0.2, 2.0]
+checks: {'runs_ok': True, 'ideal_match_floor': True, 'closed_form_nod12': True, 'd12_rejects_cm': True, 'd12_in_range': True, 'sys_on_100': True}
+ACCEPT
+### --offsets
+offsets baseline (roff 1e14, no offsets): |err| mean 0.0025 uV
+offsets Vos2=9mV unchopped: measured -851.474 uV, expected |847.059| uV (S2 form 2*Vos2/(c1(N-1)) = 564.7 uV x geometry factor 1.5 for the separate Ck) -> ok []
+offsets Vos1=9mV unchopped: measured -9564.718 uV, expected |9564.706| uV (lf*Vos 9000 uV + S2 x1_offset path 2*Vos/(c1(N-1)) 564.7 uV, lf=1) -> ok []
+offsets Vos1=9mV OTA-chop: measured -35.297 uV, expected |35.294| uV (lf*Vos/(N-1)) -> ok []
+offsets identity mean(y) = u - x1[N]/(c1 N) (mean(e)=0, N even): raw residual 1.373e-04, equals the readout-offset term Vos/(VREF c1 N) = 1.373e-04 (leftover 2.4e-09) -> ok; the S2 order-1 path lf*Vos/N = 35.2 uV is c1 x that readout term (true state x1[N] = c1 e); not separately testable in an order-2 deck
+offsets comp 20 mV: bits changed vs no-offset run 260 (offset is active); residue-reconstructed |err| max 0.0126 uV (loop-suppressed, must be ~0), plain CoI (no x2 term) 301.18 uV -> ok
+offsets sys-chop pair u=0.05: single-conversion error -30.88 uV, pair residual -0.0008 uV (limit 0.5) -> ok
+offsets sys-chop pair u=0.3: single-conversion error -30.89 uV, pair residual -0.0049 uV (limit 0.5) -> ok
+ACCEPT
+### --rsrc
+rsrc none: INL 1.69 ppm gain -6.335e-05 offset +0.1 uV tau_in(no cap) 8.2 ns (t_half 250 ns) ok=True []
+rsrc 1k: INL 1.69 ppm gain -6.335e-05 offset +0.1 uV tau_in(no cap) 13.7 ns (t_half 250 ns) ok=True []
+rsrc 10k: INL 2.18 ppm gain -1.413e-04 offset +31.9 uV tau_in(no cap) 63.2 ns (t_half 250 ns) ok=True []
+rsrc 10k+10nF: INL 1.53 ppm gain -3.218e-04 offset +208.3 uV tau_in(no cap) 63.2 ns (t_half 250 ns) ok=True []
+SPEC input-source row (1 kohm without board cap): INL delta +0.00 ppm vs 2 ppm line -> consistent
+ACCEPT
+### --nonvac2
+nonvac2 A(v) vsw 0.8: deck INL 535.76 vs model 3.65 rel 197 % -> REJECT (as required)
+nonvac2 sys pair: on-time residual -0.0049 uV, one cycle late -4800.005 uV (limit 0.5) -> REJECT (as required)
+nonvac2 no-D12 Vin_cm 2.0: vg CM [0.674,1.682] vs [0.2,2.0] -> stays in range (reported, not a rejection)
+nonvac2 no-D12 Vin_cm 0.2: vg CM [1.421,2.538] vs [0.2,2.0] -> REJECT (leaves range)
+REJECT-as-required for all broken decks

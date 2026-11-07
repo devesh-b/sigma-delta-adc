@@ -74,7 +74,7 @@ def test_dac_flip_swaps_steering():
 
 
 def test_frozen_options_present():
-    o = P.SPICE_OPTIONS
+    o = P.SPICE_OPTIONS_TIER1
     assert o["method"] in ("trap", "gear") and 0 < o["reltol"] <= 1e-3 and o["chgtol"] > 0
 
 
@@ -94,7 +94,64 @@ def test_ngspice_null_and_broken(tmp_path):
 def test_truncated_run_is_caught(tmp_path):
     # trap + reltol 1e-5 ends with "timestep too small" on the spec deck: the run checks must flag it
     # (final time != tstop and a log error), not return numbers as if the run were good.
-    opts = dict(P.SPICE_OPTIONS, method="trap", reltol=1e-5)
+    opts = dict(P.SPICE_OPTIONS_TIER1, method="trap", reltol=1e-5)
     r = TB.dc_metrics(TB.spec_cfg(dict(options=opts), n=256, m=2), "t_trunc", str(tmp_path))
     assert not r["ok"]
     assert any("final time" in p for p in r["problems"]) and any("timestep" in p.lower() for p in r["problems"])
+
+
+# ---------------------------------------------------------------- WO-08 additions
+def test_closed_forms_match_brute_force_sums():
+    for n in (64, 256, 1024):
+        w = np.arange(n - 1, -1, -1, dtype=float)
+        assert abs(TB.noise_gain_u(n) - np.sqrt(np.sum(w ** 2)) / np.sum(w)) < 1e-12
+        alt = np.sum(w * (-1.0) ** np.arange(n)) / np.sum(w)
+        assert abs(TB.chop_resid_V(1.0, n) - alt) < 1e-12              # lf*Vos/(N-1), N even
+        assert abs(TB.e2_closed_V(1.0, 0.125, n) - 2.0 / (0.125 * (n - 1))) < 1e-9
+
+
+def test_rel_sym_rejects_factor_two():
+    assert TB.rel_sym(1.0, 1.1) < 0.1 and TB.rel_sym(1.0, 2.0) > 0.30 and TB.rel_sym(0.0, 0.0) == 0.0
+
+
+def test_v2_deck_options_present_and_audited():
+    deck, meta = G.build_deck(TB.v2_cfg(dict(avdrop=0.9, boost=True, cs1_mm=0.0025, rsrc=1e3, cext=1e-8, chop=True, nrst=4, noise1=1e-3), n=8, m=2))
+    ok, counts, msgs = TB.audit_netlist(deck)
+    assert ok, msgs
+    low = deck.lower()
+    for tok in ("stp1d tp1p tp1n", "rsrc_vinp", "cext_vinp", "vchp chp", "vnz1 nz1 0 pwl", "cpv1p vg1p 0", "max(0.02,1-0.9"):
+        assert tok in low, tok
+    assert "stp1p tp1p cm" not in low                               # D12: no top-plate tie to cm
+    assert "cs1p b1p tp1p 5.00625e-13" in low and "cs1n b1n tp1n 4.99375e-13" in low
+    assert abs(P.TIER1_CP_VG - 0.2619e-12) < 1e-15
+
+
+def test_boost_doubles_gm_and_tail():
+    a, _ = G.build_deck(TB.v2_cfg(dict(), n=8, m=2))
+    b, _ = G.build_deck(TB.v2_cfg(dict(boost=True), n=8, m=2))
+    ga = float(a.split("Bgp1 0 o1p I = -0.5*(u(")[1].split("*V(f1)")[0])
+    gb = float(b.split("Bgp1 0 o1p I = -0.5*(u(")[1].split("*V(f1)")[0])
+    assert abs(gb / ga - 2.0) < 1e-6
+
+
+def test_chop_requires_even_cycles():
+    with pytest.raises(ValueError):
+        G.build_deck({"chop": True, "nrst": 3, "n": 256})
+
+
+@pytest.mark.skipif(not HAVE_NGSPICE, reason="ngspice not installed")
+def test_late_swap_breaks_pair_residual(tmp_path):
+    base = dict(TB.NULL_CFG, roff=1e14, nrst=4, n=64, u_list=(0.3, -0.3), vos1=9e-3, chop=True)
+    res = []
+    for late in (False, True):
+        r = TB.run_deck(dict(base, late=late), f"t_late{int(late)}", str(tmp_path))
+        assert r["ok"], r["problems"]
+        uh = TB.u_hat_of(r)
+        res.append(abs((uh[0] - uh[1]) / 2 - 0.3) * P.VREF_NOM)
+    assert res[0] < P.TIER1_PAIR_RESID_V < res[1]
+
+
+def test_nod12_settle_ratio_limits():
+    r = TB.nod12_settle_ratio(256)
+    assert 0.05 < r < 0.09                                  # about 2*tau/N with tau 9.5 cycles
+    assert TB.nod12_settle_ratio(4096) < r / 10             # falls as 1/N

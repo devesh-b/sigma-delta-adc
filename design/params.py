@@ -92,10 +92,28 @@ TIER1_VCL = 1.4                    # V diff, OTA output swing clamp (SPEC 3.0)
 TIER1_RON = 1000.0                 # ohm, behavioural sampling-switch Ron (SPEC 3.0 bound 1.5 k)
 TIER1_INL_BUDGET_PPM = 8.0         # OTA INL line, SPEC 3.0
 TIER1_NULL_TOL = 2e-6              # null test, in u (ppm of VREF): 1/10 of the 20 ppm INL budget
-# ngspice options frozen by `tier1_tb.py --options` (WO-07 item 2); see results/s5_tier1.md
+# ngspice options frozen by `tier1_tb.py --options` (WO-07 item 2); see results/s5_tier1.md.
+# SCOPE: tier 1 only (linear switched-cap deck, behavioural parts). Tier 2 (transistor switches/OTA) must requalify
+# (README: reltol {1e-3,1e-4,1e-5} x chgtol {1e-14,1e-16} null test; INL change < 0.1x budget).
 # Frozen = loosest of 18 (method x reltol x chgtol) settings that pass the null test and run the spec deck cleanly.
-SPICE_OPTIONS = {"method": "gear", "reltol": 1e-3, "chgtol": 1e-14,
+SPICE_OPTIONS_TIER1 = {"method": "gear", "reltol": 1e-3, "chgtol": 1e-14,
                  "vntol": 1e-6, "abstol": 1e-12, "trtol": 7.0, "tmax_ns": 10.0}
+
+# ---- Tier-1 extensions (WO-08 / S5b) ---------------------------------------
+TIER1_BETA1 = 0.84                 # SPEC 3.0 OTA1 feedback factor
+TIER1_CP_VG = CINT1 * (1.0 / TIER1_BETA1 - 1.0) - CS1   # F, virtual-ground parasitic per side giving beta 0.84 (0.262 pF)
+TIER1_CL1 = 1.4e-12                # F per side, OTA1 loaded C_L incl. feedback network + CMFB caps (SPEC 3.0)
+TIER1_CL2 = 0.7e-12                # F per side, OTA2 loaded C_L (SPEC 3.0 "about 0.7 pF")
+TIER1_FP2_MULT = 3.0               # second pole = 3 x GBW (PM about 74 deg at beta 0.84)
+TIER1_CMFB_DB = 40.0               # CMFB DC loop gain
+TIER1_CMFB_BW = 10e6               # CMFB unity-gain frequency
+TIER1_AV_DROP = 0.9                # S3 point: A(v) = A0*max(0.02, 1 - drop*(v/vsw)^2)
+TIER1_AV_VSW = 2.0                 # V diff (vlin_diff of the S3 model run)
+TIER1_VIN_CM = VREF_NOM / 2        # V, default input common mode
+TIER1_VG_CM_RANGE = (0.2, 2.0)     # V, ASSUMED PMOS-pair virtual-ground CM range (SPEC gives none); C1 to confirm
+TIER1_INL_FAST = {256: 20.0, 1024: 5.0}   # ppm FSR, fast-mode targets at 4 MHz (D28/D30)
+TIER1_CMRR_TARGET_DB = {"sys_off": 60.0, "sys_on": 100.0}   # D32
+TIER1_PAIR_RESID_V = 0.5e-6        # V, sys-chop pair residual budget
 
 # ---- Derived ----------------------------------------------------------------
 T_HALF = 1.0 / (2.0 * FS_NOM)            # t_half = 1/(2 fs) = 250 ns at 2 MHz
