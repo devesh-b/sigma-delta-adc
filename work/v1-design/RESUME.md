@@ -33,6 +33,15 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - m9: knees exit code.
   - S4 ε_eff term.
 
+## Update 2026-11-08 ~01:40
+- Acceptance done (667605b): WO-08 8/8. WO-06a only REJECTs on CMRR sys-off, which D33 covers.
+- D33 (ε_eff CMRR term) and D34 (no freeze of the SR/CM/CMRR rows before WO-09) are in DECISIONS.
+- Dispatched (Sonnet, background):
+  - WO-09: S5c tier-1 follow-ups, outputs in /home/mempool/regr/tt/WO-09.
+  - WO-10: S4 ε_eff, outputs in /home/mempool/regr/tt/WO-10.
+- If they died: check `git log` for their commits and the sandbox output directories, then re-dispatch from the WO file.
+- After both: Haiku acceptance (direct ssh, not rta-tt), then a reviewer pass. S4 then closes; S5 closes with D34. Then S6.
+
 ## Resume procedure
 1. `git log --oneline -5`; `git status --short`.
 2. For each of the three outputs above, check whether its file exists.
