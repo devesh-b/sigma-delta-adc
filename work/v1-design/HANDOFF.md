@@ -19,6 +19,14 @@
   - Never kill a PID you did not start.
 - Bring results back with `scripts/sync-to-sandbox.sh --pull` into `sandbox-out/`. Copy durable numbers plus the exact command into `work/v1-design/results/`.
 
+**Sandbox runs without the rta-tt lock (added 2026-11-08).** rta-tt holds a local lock for the whole command. A long wait loop inside it blocks every other agent (exit 75). For any run longer than a minute, use direct ssh with nohup and the env:
+```
+ssh sandbox 'cd <dir> && nohup setsid bash -c ". /home/mempool/tt-sd/.venv-sbx/bin/activate; export PATH=$HOME/.nix-profile/bin:$PATH; export PDK_ROOT=/home/mempool/.ciel PDK=sky130A; nice -n 10 timeout <s> <cmd> > <log> 2>&1; echo EXIT=\$? >> <log>" </dev/null >/dev/null 2>&1 &'
+```
+- Check progress with short `ssh sandbox 'tail ...; grep EXIT= ...'` calls.
+- Never put a sleep or poll loop inside rta-tt.
+- rta-tt is fine for quick commands (under a minute).
+
 **Git.** The local repo is `~/projects/tt`.
 - Commit atomically with explicit-path staging: `git add <paths>`, never `-A` or `-a`.
 - No stash, **no attribution trailer, no push**.

@@ -19,3 +19,7 @@ Next after WO-05: Haiku acceptance + design review, then SPEC §3 update, then S
 | coder WO-06a (Sonnet) | S4 re-gate D27–D32 + CMRR axis | DONE e2915a0: all gates ACCEPT except CMRR sys-off 42.5 dB vs 60 (needs ε 0.1 %, have 0.75 % 3σ) — finding, owned by C4 topology; sys-on 143–166 dB (model hypothesis, WO-08 checks in SPICE) | wait WO-08, then S4 acceptance + review |
 | Haiku testers | acceptance WO-06a @c686d16, WO-08 @c686d16 | DISPATCHED |
 | reviewer (Opus) | design review of S4 re-gate + S5b | DISPATCHED |
+| Haiku/coordinator | acceptance WO-06a, WO-08 @b990304 | DONE 667605b: WO-08 8/8; WO-06a rows 1,3 PASS, row 2 only CMRR sys-off REJECT (known, D33) |
+| reviewer (Opus) | S4+S5b review | DONE 6137e42: S5 closable w/ conditions, S4 after ε_eff (D33) |
+| coder WO-09 (Sonnet) | S5c tier-1 follow-ups | RUNNING, budget 100 |
+| coder WO-10 (Sonnet) | S4 ε_eff | RUNNING, budget 40 |
