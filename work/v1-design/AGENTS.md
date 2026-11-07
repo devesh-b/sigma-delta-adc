@@ -16,4 +16,4 @@ Next after WO-05: Haiku acceptance + design review, then SPEC §3 update, then S
 | Haiku tester | acceptance WO-07 @d826660 | DONE 5/5 PASS |
 | reviewer (Opus) | design review of S5 | DONE → REVIEW-S5-2026-11-07.md; closable after S5b |
 | coder WO-08 (Sonnet) | S5b tier-1 extensions (xcheck, A(v), loaded 2-pole OTA, real ref pins + D12 + CM, offsets + sys chop, R_src) | RUNNING, budget 100 |
-| coder WO-06a (Sonnet) | S4 re-gate with D27–D30 limits + CMRR axis | RUNNING, budget 40 |
+| coder WO-06a (Sonnet) | S4 re-gate D27–D32 + CMRR axis | DONE e2915a0: all gates ACCEPT except CMRR sys-off 42.5 dB vs 60 (needs ε 0.1 %, have 0.75 % 3σ) — finding, owned by C4 topology; sys-on 143–166 dB (model hypothesis, WO-08 checks in SPICE) | wait WO-08, then S4 acceptance + review |
