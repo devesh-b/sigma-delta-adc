@@ -14,6 +14,25 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - (c) Boost more than 2×.
   - The user said they will answer soon. Don't decide it for them.
 
+## Update 2026-11-08 ~01:45
+- Haiku testers stalled on the rta-tt lock and were stopped. The coordinator now runs rows directly with `ssh sandbox` and nohup.
+  - The env must be sourced: `.venv-sbx` and `~/.nix-profile/bin` on PATH.
+  - S4 row1 PASS (54 tests).
+  - S4 row2 exit 1. Every gate ACCEPTs except CMRR sys-off: 44.0 dB vs 60 at 16 points. This is the known finding.
+  - S4 row3 (`--nonvac`): log `acc06a-b990304/row3.log`.
+  - WO-08 rows 2–8: runner `acc08-b990304/run_rows.sh`, logs `rowN.log`. `rows.done` appears when all are finished.
+- Review done: `REVIEW-S4S5b-2026-11-08.md` (6137e42).
+  - S5 can close with conditions. S4 can close once the CMRR term is corrected to ε_eff (ΔCp,top). Expect about 65 dB.
+  - The earlier 132–152 dB SPICE CMRR was overstated. The deck had Cp,top = 0 and the metric was wrong.
+  - Symmetric slew is costly: precision mode about 145–170 µA. Boost ×2 on both OTAs gives 260–320 µA, which breaks 200 µA.
+- **New user questions (asked 2026-11-08):** slew spec; the 200 µA cap (hard?) and fast-mode option; reset CM / input pair.
+- Follow-ups to write as WOs:
+  - C-M1: OTA1-only vs OTA2-only SR/GBW sweep, about 40 runs.
+  - m1: CMRR metric fix.
+  - m3: xcheck A0-80 row at Roff 1e14.
+  - m9: knees exit code.
+  - S4 ε_eff term.
+
 ## Resume procedure
 1. `git log --oneline -5`; `git status --short`.
 2. For each of the three outputs above, check whether its file exists.
