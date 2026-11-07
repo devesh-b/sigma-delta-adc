@@ -17,12 +17,12 @@ All targets are v1 (commit) unless marked (stretch). "Confirm in model/PDK" = no
 | Fallback | 1st-order mode (bypass 2nd integrator) | high-confidence safety net |
 | Loop coefficients | **c1 = 0.125, c2 = 0.5, k = 0.5** (user D3, option B) | bit-identical to c1 0.25/k 1 (k/c1 = 4); both integrators at half swing: S1 peak 0.61 V/side at VREF 2.048 V. Note (review M1): B's INL edge over A comes from c1 halving, not VREF; at N 4096/A0 80 dB, B ≈ 3.7 ppm. Area option E1: Cs 0.5 pF/Cint1 4 pF keeps ratios (INL unchanged), saves ≈4000 µm², kT/C 0.54→0.76 µV @15 SPS. c2 stays free for x2 sizing (0.25 halves x2) |
 | Clock fs | 0.25–4 MHz, nominal **2 MHz** | SC ⇒ jitter-immune; OTA power ∝ fs·C |
-| N (cycles/conversion) | 64 / 256 / 1024 / 4096 | res ≈ 2·log2(N) − 4 (order 2): N=64→~8 b, N=1024→~16 b, N=4096→~20 b. N is a counter value (digital-only cost), so all four stay in v1 |
+| N (cycles/conversion) | 64 / 256 / 1024 / 4096; **precision modes (3.75–60 SPS) use N = 4096** (D23: N 1024 leaves ≈33 µV non-averaging quant error, N 4096 ≈2 µV) | res ≈ 2·log2(N) − 4 (order 2): N=64→~8 b, N=1024→~16 b, N=4096→~20 b. N is a counter value (digital-only cost), so all four stay in v1 |
 | Output rate | fs/N: e.g. 2 MHz/1024 ≈ 1.95 kSPS; firmware averages K sub-conversions to reach 3.75–240 SPS | slow precision via averaging + system chop |
 | Reference | **External / ratiometric only**, no bandgap in v1 | VREF choice constrained by swing — see §2.1 |
 | VREF nominal | **2.048 V** (user D3, option B, 2026-11-07; ratiometric, range 1.0–2.048 V) | keeps the MCP3421 FSR; swing handled by c1 = 0.125/k = 0.5. S1 (results/s1_vref.md): noise 0.54 µV @15 SPS (lf 5.3), INL 12.4 ppm at A0 75 dB / vlin 2.0 V diff, peak 0.61 V/side. Costs: Cint1 8 pF/side (+4000 µm² total), white-noise gain 9.3 |
 | Supply | VAPWR 3.3 V (analog), VDPWR 1.8 V (digital) | uses_3v3 template |
-| Sampling cap Cs | 1 pF (MIM `cap_mim_m3_1` only) | kT/C averages over N ⇒ 1 pF ample |
+| Sampling cap Cs | **0.5 pF** (MIM `cap_mim_m3_1` only; user D22) | kT/C averages over N; INL set by ratios (unchanged); noise ota+sys 0.71 µV @15 SPS |
 | PGA | **none in v1 (user Q3: shared Cs)**; ×2 / ×4 / ×8 stretch via a separate Cs:Cref ratio | ×8 needs 8 pF input Cs per side (area, Zin ≈ 125 kΩ) or a 125 fF ref cap (kT/C). Separate input/ref caps add mismatch gain error (calibratable) |
 | Power (analog) | ≤ 200 µA | OTA dominates |
 | Area | 2×2 tile (~334×225 µm, ~75k µm²) | met5 forbidden; power on met4 |
@@ -122,12 +122,12 @@ Second integrator: same topology, relaxed gain/noise (its noise divides by first
 ### 3.4 Capacitors (MIM `cap_mim_m3_1` only; no MOS caps in signal path)
 | Cap | Value | Note |
 |---|---|---|
-| Cs1 (sample, int1) | 1 pF | = DAC cap (1-bit DAC reuses Cs) |
-| Cint1 | **8 pF** | c1 = Cs1/Cint1 = 0.125 (option B) |
+| Cs1 (sample, int1) | **0.5 pF** (D22) | = DAC cap (1-bit DAC reuses Cs) |
+| Cint1 | **4 pF** | c1 = Cs1/Cint1 = 0.125 (option B, Cs 0.5 pF) |
 | Cs2 (sample, int2) | 1 pF | |
 | Cint2 | 2 pF | c2 = Cs2/Cint2 = 0.5 |
 | PGA caps | none in v1 (shared Cs); stretch: binary Cs for ×2/4/8 | matching-limited gain error |
-| Density | ~2 fF/µm² (confirm in PDK) | total core caps ×2 (diff) ≈ (1+8+1+2)·2 = 24 pF ≈ 12,000 µm² (~16 % of tile) |
+| Density | ~2 fF/µm² (confirm in PDK) | total core caps ×2 (diff) ≈ (0.5+4+Cs2+Cint2)·2; with stage 2 at 1/2 pF ≈ 15 pF ≈ 7,500 µm² (~10 % of tile); stage-2 sizing in S3 |
 | Layout | common-centroid, guard-ringed | matching + substrate isolation |
 
 ### 3.5 Reference / 1-bit DAC
@@ -242,5 +242,5 @@ digital→analog substrate coupling inside the tile is not simulated.
 User decisions 2026-11-07 (review questions): **Q1 → CM-rejecting input switching** (only differential charge
 transferred; input CM anywhere in 0…VREF); REF− pin choice still open (chip ground vs ua3). **Q2 → 4 MHz is a
 fast / low-resolution mode** with its own INL target; precision specs gated at 0.25–2 MHz. **Q3 → shared Cs, no
-PGA in v1** (PGA ×2 moves to stretch). **Q6 → OTA A0 ≥ 80 dB.** **D3 → option B (VREF 2.048 V, c1 0.125, k 0.5). D4 → keep OTA chop paired with system chop.** Still open:
-Q5 order-1 mode coverage; REF− pin.
+PGA in v1** (PGA ×2 moves to stretch). **Q6 → OTA A0 ≥ 80 dB.** **D3 → option B (VREF 2.048 V, c1 0.125, k 0.5). D4 → keep OTA chop paired with system chop.** Defaults accepted (D21): Vos 9 mV, order-1 characterization only, overload recovery.
+Cs 0.5 pF (D22), N 4096 precision (D23). REF− on ua3 proposed (D24), awaiting OK.
