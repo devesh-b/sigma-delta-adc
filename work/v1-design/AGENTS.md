@@ -12,4 +12,6 @@
 
 Next after WO-05: Haiku acceptance + design review, then SPEC §3 update, then S4 (corner-aware tier 0).
 | coder WO-06 (Sonnet) | S4 corner model + hooks | RUNNING, budget 90 |
-| coder WO-07 (Sonnet) | S5 tier-1 ngspice | RUNNING, budget 90 |
+| coder WO-07 (Sonnet) | S5 tier-1 ngspice | DONE: f668cb4, 1c7655a, d826660 (committed by coordinator after 1Password unlock); null 4.6e-7, INL 0.29 ppm at spec OTA, 4 MHz needs GBW 20 MHz |
+| Haiku tester | acceptance WO-07 | RUNNING |
+| reviewer (Opus) | design review of S5 | RUNNING |
