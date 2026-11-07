@@ -15,5 +15,7 @@ Next after WO-05: Haiku acceptance + design review, then SPEC §3 update, then S
 | coder WO-07 (Sonnet) | S5 tier-1 ngspice | DONE: f668cb4, 1c7655a, d826660 (committed by coordinator after 1Password unlock); null 4.6e-7, INL 0.29 ppm at spec OTA, 4 MHz needs GBW 20 MHz |
 | Haiku tester | acceptance WO-07 @d826660 | DONE 5/5 PASS |
 | reviewer (Opus) | design review of S5 | DONE → REVIEW-S5-2026-11-07.md; closable after S5b |
-| coder WO-08 (Sonnet) | S5b tier-1 extensions (xcheck, A(v), loaded 2-pole OTA, real ref pins + D12 + CM, offsets + sys chop, R_src) | RUNNING, budget 100 |
+| coder WO-08 (Sonnet) | S5b tier-1 extensions (xcheck, A(v), loaded 2-pole OTA, real ref pins + D12 + CM, offsets + sys chop, R_src) | DONE c686d16 (committed by coordinator after 1Password unlock): 9/9; xcheck gain ≤2.9 %/INL ≤33 %; D12 CMRR 132–152 dB sys-off, 140–161 dB sys-on (ideal); PMOS CM 1.45–1.85 V; SR cliff (12 V/µs ~20 % margin @2 MHz, 0 % @4 MHz boost) → user decision pending |
 | coder WO-06a (Sonnet) | S4 re-gate D27–D32 + CMRR axis | DONE e2915a0: all gates ACCEPT except CMRR sys-off 42.5 dB vs 60 (needs ε 0.1 %, have 0.75 % 3σ) — finding, owned by C4 topology; sys-on 143–166 dB (model hypothesis, WO-08 checks in SPICE) | wait WO-08, then S4 acceptance + review |
+| Haiku testers | acceptance WO-06a @c686d16, WO-08 @c686d16 | DISPATCHED |
+| reviewer (Opus) | design review of S4 re-gate + S5b | DISPATCHED |
