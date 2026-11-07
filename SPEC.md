@@ -112,7 +112,10 @@ Budget (all blocks): noise ≤ 2.5 µV @15 SPS, INL ≤ 20 ppm, offset ≤ 5 µV
 **User decisions after S4/S5 (D27–D30):**
 - Noise @15 SPS ≤ 2.5 µV at all corners for fs ≥ 2 MHz; at fs 0.25 MHz ≤ 2.5 µV up to 85 °C and ≤ 3.0 µV at 125 °C (D27).
 - **Noise @240 SPS ≤ 5 µV rms** (D29).
-- **OTA1/OTA2 loaded GBW ≥ 20 MHz** (was 10; D28) — supersedes the GBW rows above; analog total estimate ≈ 157 µA.
+- **Bias-boost config bit (D31, supersedes D28's always-on 20 MHz):** boost=0 (precision, fs ≤ 2 MHz): loaded GBW ≥ 10 MHz
+  (20 MHz design target), analog ≈ 112 µA. boost=1 (fast mode, fs 4 MHz): OTA1/OTA2 tail currents doubled ⇒ loaded GBW ≥ 20 MHz,
+  SR ×2, analog ≈ 198 µA. **Analog current ≤ 200 µA in every mode.** OTA input pairs in weak/moderate inversion so that
+  GBW(boost)/GBW(nom) ≥ 1.9 at every corner (C1 gate). Boost latched only at a pair boundary (C9); one switched bias leg (C6).
 - Fast mode (4 MHz) INL: N 64 ≤ 200 ppm, N 256 ≤ 20 ppm, N 1024 ≤ 5 ppm (D28).
 - **CMRR ≥ 100 dB DC** (precision, sys chop on; input CM 0…VREF), ≥ 40 dB with sys chop off (D30).
 
