@@ -18,3 +18,5 @@
 | D14 | USER Q3: shared Cs (input = DAC cap), no PGA in v1; PGA ×2 → stretch | separate caps far more settling-sensitive; anchor app (RTD) needs no gain | separate caps + PGA ×2 | cheap now, costly after layout |
 | D15 | USER Q6: OTA A0 ≥ 80 dB | INL margin (review F5) | decide after S1 | cheap now |
 | D16 | Note: S1 (WO-02) ran with the legacy design-point settings (separate caps). Per D14 the design point must be re-run with shared caps in S3 | consistency | — | — |
+| D17 | USER D3 (2026-11-07): VREF option B = 2.048 V, c1 0.125, c2 0.5, k 0.5 | S1: most INL margin (12.4 vs 22.4 ppm), keeps MCP3421 FSR, 0.61 V/side swing | A (1.2 V, smaller caps) | cheap now; caps fixed at layout |
+| D18 | USER D4 (2026-11-07): keep OTA chop as a config bit, always paired with system chop; N even; chop phase restarts each reset | S2: ota-only leaves lf·Vos/(N−1); ota+sys same offset as sys, 1.2–14× lower 240 SPS noise | drop OTA chop | cheap |
