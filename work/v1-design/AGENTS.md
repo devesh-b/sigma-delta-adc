@@ -11,7 +11,8 @@
 | reviewer (Opus) | design review of S3 | DONE → REVIEW-S3-2026-11-07.md; corrected table in SPEC §3.0 |
 
 Next after WO-05: Haiku acceptance + design review, then SPEC §3 update, then S4 (corner-aware tier 0).
-| coder WO-06 (Sonnet) | S4 corner model + hooks | RUNNING, budget 90 |
+| coder WO-06 (Sonnet) | S4 corner model + hooks | DONE: 88a4341, af85d1e, 7a822ab, d037e9d; REJECT: noise @15 SPS at fs 0.25 MHz/125 °C (2.98 vs 2.5 µV); all else passes, MC passes | user decision (0.25 MHz noise), then Haiku acceptance + review |
 | coder WO-07 (Sonnet) | S5 tier-1 ngspice | DONE: f668cb4, 1c7655a, d826660 (committed by coordinator after 1Password unlock); null 4.6e-7, INL 0.29 ppm at spec OTA, 4 MHz needs GBW 20 MHz |
-| Haiku tester | acceptance WO-07 | RUNNING |
-| reviewer (Opus) | design review of S5 | RUNNING |
+| Haiku tester | acceptance WO-07 @d826660 | DONE 5/5 PASS |
+| reviewer (Opus) | design review of S5 | DONE → REVIEW-S5-2026-11-07.md; closable after S5b |
+| coder WO-08 (Sonnet) | S5b tier-1 extensions (xcheck, A(v), loaded 2-pole OTA, real ref pins + D12 + CM, offsets + sys chop, R_src) | RUNNING, budget 100 |

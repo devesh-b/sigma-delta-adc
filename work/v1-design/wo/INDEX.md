@@ -11,5 +11,6 @@
 | WO-05 | S3 | error budget → per-block specs; params at decided point | design/params.py, design/tests/, model/studies/s3_budget.py, model/tests/test_s3_budget.py, results/s3_budget.* | review | ACCEPTED 4/4 (acc5-446cc9c), reviewed — S3 closed |
 | WO-06 | S4 | corner-aware tier 0 + iadc hooks (OTA2 gain, A(v) table, ref R_ext, reset memory) + s3_budget fixes | model/ | review | dispatched 2026-11-07 |
 | WO-07 | S5 | tier-1 ngspice SC modulator, simulator null test, OTA requirement sweep | design/tier1/, design/params.py (SPICE options), design/tests/test_tier1.py | review | dispatched 2026-11-07 |
+| WO-08 | S5b | tier-1 extensions from S5 review | design/tier1/, design/params.py, design/tests/test_tier1.py, results/s5* | review | dispatched 2026-11-07 |
 
 WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjoint: WO-02 alone owns `iadc.py` and creates `model/studies/__init__.py`.
