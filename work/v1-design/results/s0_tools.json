@@ -1,0 +1,43 @@
+{
+ "iic": {
+  "ngspice": "ngspice-47 : Circuit level simulation program",
+  "xschem": "XSCHEM V3.4.8RC",
+  "magic": "8.3.685",
+  "netgen": "Netgen 1.5.324 compiled on Thu Oct 15 02:24:51 PM CEST 2026",
+  "klayout": "KLayout 0.30.12",
+  "yosys": "Yosys 0.70 (git sha1 28ba3cb92, Release, GNU /usr/bin/c++ 13.3.0)",
+  "iverilog": "Icarus Verilog version 14.0 (devel) (s20260301-579-g15d870a5-dirty)",
+  "verilator": "Verilator 5.052 2026-09-05 rev v5.052",
+  "python": "Python 3.12.3",
+  "numpy": "2.5.4",
+  "cocotb": "2.1.0",
+  "PDK_ROOT": "/foss/pdks-tt",
+  "open_pdks": "open_pdks d56f8a8ea0f9171cbdc5273035907b93f3f3bed7",
+  "smoke_id": "4.679873e-05",
+  "smoke_ok": true
+ },
+ "nix": {
+  "ngspice": "ngspice-45 : Circuit level simulation program",
+  "xschem": "XSCHEM V3.4.7",
+  "magic": "8.3.693",
+  "netgen": "Netgen 1.5.325 compiled on Wed Oct 21 09:49:14 UTC 2026",
+  "klayout": "KLayout 0.30.13",
+  "yosys": "Yosys 0.70+post (git sha1 v0.70, Release, GNU /nix/store/r5ri78axx1qggkjq3vawywlzglg70b5w-gcc-wrapper-16.2.0/bin/g++ 16.2.0)",
+  "iverilog": "Icarus Verilog version 12.0 (stable) ()",
+  "verilator": "Verilator 5.052 2026-09-05 rev v5.052",
+  "python": "Python 3.13.5",
+  "numpy": "2.5.4",
+  "cocotb": "ModuleNotFoundError: No module named 'cocotb'",
+  "PDK_ROOT": "/home/mempool/.ciel",
+  "open_pdks": "open_pdks d56f8a8ea0f9171cbdc5273035907b93f3f3bed7",
+  "smoke_id": "4.679873e-05",
+  "smoke_ok": true
+ },
+ "host": {
+  "docker_tags": "hpretl/iic-osic-tools:2026.10,ghcr.io/librelane/librelane:3.0.5,ghcr.io/librelane/librelane:3.0.14",
+  "open_pdks_hash": "d56f8a8ea0f9171cbdc5273035907b93f3f3bed7"
+ },
+ "smoke_corner": "tt",
+ "expected_id_A": 4.68e-05,
+ "tol": 0.01
+}
