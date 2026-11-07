@@ -109,6 +109,13 @@ Budget (all blocks): noise ≤ 2.5 µV @15 SPS, INL ≤ 20 ppm, offset ≤ 5 µV
 | Clock | Phases | t_half ≥ 225 ns at 2 MHz after non-overlap; bottom-plate early phases | hand |
 | Noise spec | Condition | at u = 0 (shorted input); reference noise is a board requirement | — |
 
+**User decisions after S4/S5 (D27–D30):**
+- Noise @15 SPS ≤ 2.5 µV at all corners for fs ≥ 2 MHz; at fs 0.25 MHz ≤ 2.5 µV up to 85 °C and ≤ 3.0 µV at 125 °C (D27).
+- **Noise @240 SPS ≤ 5 µV rms** (D29).
+- **OTA1/OTA2 loaded GBW ≥ 20 MHz** (was 10; D28) — supersedes the GBW rows above; analog total estimate ≈ 157 µA.
+- Fast mode (4 MHz) INL: N 64 ≤ 200 ppm, N 256 ≤ 20 ppm, N 1024 ≤ 5 ppm (D28).
+- **CMRR ≥ 100 dB DC** (precision, sys chop on; input CM 0…VREF), ≥ 40 dB with sys chop off (D30).
+
 Allocation after review: INL 8 (OTA) + 2 (input settling) + 2 (ref settling) + 1 (comparator) + 1 (quant floor) + 2 (ref
 current) + 4 (reserve: MIM VCC, charge injection, substrate) = 20 ppm. Gain: A0 300, settling 500, k/c1 50, reserve 4150 ppm.
 Noise and offset allocations unchanged from s3_budget.md. MIM total ≈ 9,000 µm² (12 % of 2×2 tile).
