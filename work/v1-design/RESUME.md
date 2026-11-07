@@ -42,6 +42,22 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - If they died: check `git log` for their commits and the sandbox output directories, then re-dispatch from the WO file.
 - After both: Haiku acceptance (direct ssh, not rta-tt), then a reviewer pass. S4 then closes; S5 closes with D34. Then S6.
 
+## Update 2026-11-08 ~01:50: SANDBOX DOWN
+- mempool.lan does not answer ping or ssh, so nothing can run. Never run locally.
+- **WO-10:** code committed as d54d8f3 (WIP, unrun). Once the sandbox is back:
+  1. sync;
+  2. `pytest model/tests`;
+  3. full s4_corners run to /home/mempool/regr/tt/WO-10/s4;
+  4. `--nonvac`;
+  5. results md/json, then commit.
+- **WO-10 finding (my D33 error):**
+  - D33's linear worst-case sum gives 5e-4 + 3e-4 + 2.8e-4 = 1.08e-3, i.e. 59.3 dB. That REJECTs 60 dB.
+  - The review's ≈ 65 dB was an RSS that dropped one term.
+  - The terms are independent, so the statistically correct form is RSS(ΔCp/Cs, (Cp/Cs)·ε_Cs) + |inj|: 5.8e-4 + 2.8e-4 = 8.6e-4, i.e. 61.3 dB.
+  - Signed sum per MC draw once WO-09 gives the signs.
+  - Decide after WO-09's sign result. Options: tighter ΔCp allocation (≤ 0.15 fF), larger Cs, or RSS amendment to D33.
+- **WO-09:** running at dispatch time. It will hit the same outage, so check what it committed.
+
 ## Resume procedure
 1. `git log --oneline -5`; `git status --short`.
 2. For each of the three outputs above, check whether its file exists.
