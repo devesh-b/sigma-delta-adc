@@ -1,0 +1,923 @@
+{
+ "command": "python3 design/tier1/tier1_tb.py --{null,options,dc,sweep,nonvac}  (sandbox tt-sd, nix ngspice 45, nice -n 10)",
+ "ngspice": "nix ngspice-45 (host /home/mempool/.nix-profile/bin/ngspice), not the IIC image",
+ "frozen_spice_options": {
+  "method": "gear",
+  "reltol": 0.001,
+  "chgtol": 1e-14,
+  "vntol": 1e-06,
+  "abstol": 1e-12,
+  "trtol": 7.0,
+  "tmax_ns": 10.0
+ },
+ "null": {
+  "tag": "null",
+  "runtime_s": 5.676334619522095,
+  "netlist_ok": true,
+  "problems": [],
+  "tfinal": 0.0006475,
+  "npts": 227251,
+  "ok": true,
+  "u_in": [
+   -0.9,
+   -0.45,
+   0.0,
+   0.45000000000000007,
+   0.9
+  ],
+  "u_hat": [
+   -0.8999995357881434,
+   -0.44999977213541664,
+   2.565870098017334e-09,
+   0.4499997724561504,
+   0.8999995361088772
+  ],
+  "err": [
+   4.6421185662115505e-07,
+   2.2786458336865323e-07,
+   2.565870098017334e-09,
+   -2.2754384965129049e-07,
+   -4.6389112284828116e-07
+  ],
+  "max_abs_err": 4.6421185662115505e-07,
+  "inl_ep_ppm": 0.0021607642342047484,
+  "inl_bf_ppm": 0.0019691616948147583,
+  "gain_err": -5.136920870896233e-07,
+  "offset": 6.414675665189084e-10
+ },
+ "options_sweep": [
+  {
+   "opts": {
+    "method": "trap",
+    "reltol": 0.001,
+    "chgtol": 1e-14
+   },
+   "null_err": 6.54581442440258e-05,
+   "spec_inl": 0.17355287724987498,
+   "spec_gain": -5.7433262690920195e-05,
+   "runtime_null_s": 5.645732402801514,
+   "runtime_spec_s": 6.880483627319336,
+   "ok": false,
+   "problems": []
+  },
+  {
+   "opts": {
+    "method": "gear",
+    "reltol": 0.001,
+    "chgtol": 1e-14
+   },
+   "null_err": 4.6421185662115505e-07,
+   "spec_inl": 0.1755313862601525,
+   "spec_gain": -5.720515129048476e-05,
+   "runtime_null_s": 7.635460138320923,
+   "runtime_spec_s": 7.2698094844818115,
+   "ok": true,
+   "problems": []
+  },
+  {
+   "opts": {
+    "method": "trap",
+    "reltol": 0.001,
+    "chgtol": 1e-15
+   },
+   "null_err": 3.3038791591888383e-05,
+   "spec_inl": 0.17338895753873693,
+   "spec_gain": -5.7432217751784975e-05,
+   "runtime_null_s": 7.307692050933838,
+   "runtime_spec_s": 6.610625743865967,
+   "ok": false,
+   "problems": []
+  },
+  {
+   "opts": {
+    "method": "gear",
+    "reltol": 0.001,
+    "chgtol": 1e-15
+   },
+   "null_err": 4.6421185662115505e-07,
+   "spec_inl": 0.1751951961833157,
+   "spec_gain": -5.720560358957183e-05,
+   "runtime_null_s": 7.401256799697876,
+   "runtime_spec_s": 7.223431825637817,
+   "ok": true,
+   "problems": []
+  },
+  {
+   "opts": {
+    "method": "trap",
+    "reltol": 0.001,
+    "chgtol": 1e-16
+   },
+   "null_err": 1.8219093023574828e-05,
+   "spec_inl": 0.17253653272285,
+   "spec_gain": -5.743212179087909e-05,
+   "runtime_null_s": 6.948907136917114,
+   "runtime_spec_s": 6.995810270309448,
+   "ok": false,
+   "problems": []
+  },
+  {
+   "opts": {
+    "method": "gear",
+    "reltol": 0.001,
+    "chgtol": 1e-16
+   },
+   "null_err": 4.6421185662115505e-07,
+   "spec_inl": 0.17342263357033108,
+   "spec_gain": -5.720563443922799e-05,
+   "runtime_null_s": 7.502371788024902,
+   "runtime_spec_s": 7.5619306564331055,
+   "ok": true,
+   "problems": []
+  },
+  {
+   "opts": {
+    "method": "trap",
+    "reltol": 0.0001,
+    "chgtol": 1e-14
+   },
+   "null_err": 4.6418792132296716e-07,
+   "spec_inl": 0.1737507179642232,
+   "spec_gain": -5.743413429859512e-05,
+   "runtime_null_s": 8.192744493484497,
+   "runtime_spec_s": 7.479917526245117,
+   "ok": true,
+   "problems": []
+  },
+  {
+   "opts": {
+    "method": "gear",
+    "reltol": 0.0001,
+    "chgtol": 1e-14
+   },
+   "null_err": 4.6421185662115505e-07,
+   "spec_inl": 0.19338781360126509,
+   "spec_gain": -5.724030532250346e-05,
+   "runtime_null_s": 10.49326777458191,
+   "runtime_spec_s": 9.975236892700195,
+   "ok": true,
+   "problems": []
+  },
+  {
+   "opts": {
+    "method": "trap",
+    "reltol": 0.0001,
+    "chgtol": 1e-15
+   },
+   "null_err": 4.635177314193939e-07,
+   "spec_inl": 0.17401681176931869,
+   "spec_gain": -5.7433554881858306e-05,
+   "runtime_null_s": 10.902868509292603,
+   "runtime_spec_s": 8.533622026443481,
+   "ok": true,
+   "problems": []
+  },
+  {
+   "opts": {
+    "method": "gear",
+    "reltol": 0.0001,
+    "chgtol": 1e-15
+   },
+   "null_err": 4.6421185662115505e-07,
+   "spec_inl": 0.20697538668815949,
+   "spec_gain": -5.73597510891144e-05,
+   "runtime_null_s": 11.635740041732788,
+   "runtime_spec_s": 10.427277088165283,
+   "ok": true,
+   "problems": []
+  },
+  {
+   "opts": {
+    "method": "trap",
+    "reltol": 0.0001,
+    "chgtol": 1e-16
+   },
+   "null_err": 4.641735600330321e-07,
+   "spec_inl": 0.17474844830975655,
+   "spec_gain": -5.743306040173479e-05,
+   "runtime_null_s": 10.952739238739014,
+   "runtime_spec_s": 9.83449649810791,
+   "ok": true,
+   "problems": []
+  },
+  {
+   "opts": {
+    "method": "gear",
+    "reltol": 0.0001,
+    "chgtol": 1e-16
+   },
+   "null_err": 1.931372549019608,
+   "spec_inl": 0.17377146121676004,
+   "spec_gain": -5.73617624980427e-05,
+   "runtime_null_s": 0.027280330657958984,
+   "runtime_spec_s": 10.152656078338623,
+   "ok": false,
+   "problems": [
+    "log: Warning: singular matrix:  check nodes bkn and bkp",
+    "log: Warning: singular matrix:  check nodes bkn and bkp",
+    "log: Warning: singular matrix:  check nodes bkn and bkp",
+    "log: Warning: singular matrix:  check nodes bkn and bkp",
+    "log: doAnalyses: TRAN:  Timestep too small; time = 1.51275e-06, timestep = 1.25e-20: trouble with node \"b2p\"",
+    "final time 1.512750e-06 != tstop 6.475000e-04"
+   ]
+  },
+  {
+   "opts": {
+    "method": "trap",
+    "reltol": 1e-05,
+    "chgtol": 1e-14
+   },
+   "null_err": 1.931372549019608,
+   "spec_inl": 5951.28676470591,
+   "spec_gain": -1.0070533769063181,
+   "runtime_null_s": 0.08851218223571777,
+   "runtime_spec_s": 0.09727025032043457,
+   "ok": false,
+   "problems": [
+    "log: doAnalyses: TRAN:  Timestep too small; time = 1.01275e-06, timestep = 1.04367e-20: trouble with node \"b1p\"",
+    "final time 1.012750e-06 != tstop 6.475000e-04",
+    "log: Warning: singular matrix:  check nodes bkn and bkp",
+    "log: Warning: singular matrix:  check nodes bkn and bkp",
+    "log: doAnalyses: TRAN:  Timestep too small; time = 2.98975e-06, timestep = 4.58023e-21: trouble with node \"vinp\"",
+    "final time 2.989751e-06 != tstop 6.475000e-04",
+    "conv 0: comparator bits not +-1 (max dev 0.113)",
+    "conv 1: comparator bits not +-1 (max dev 0.113)",
+    "conv 2: comparator bits not +-1 (max dev 0.113)",
+    "conv 3: comparator bits not +-1 (max dev 0.113)",
+    "conv 4: comparator bits not +-1 (max dev 0.113)"
+   ]
+  },
+  {
+   "opts": {
+    "method": "gear",
+    "reltol": 1e-05,
+    "chgtol": 1e-14
+   },
+   "null_err": 4.6421185662115505e-07,
+   "spec_inl": 0.250963371426616,
+   "spec_gain": -5.74510243114279e-05,
+   "runtime_null_s": 15.844085931777954,
+   "runtime_spec_s": 11.982114315032959,
+   "ok": true,
+   "problems": []
+  },
+  {
+   "opts": {
+    "method": "trap",
+    "reltol": 1e-05,
+    "chgtol": 1e-15
+   },
+   "null_err": 1.9313725489956726,
+   "spec_inl": 5951.28676470591,
+   "spec_gain": -1.007053376906318,
+   "runtime_null_s": 0.015947341918945312,
+   "runtime_spec_s": 0.05862784385681152,
+   "ok": false,
+   "problems": [
+    "log: Warning: singular matrix:  check nodes bkn and bkp",
+    "log: Warning: singular matrix:  check nodes bkn and bkp",
+    "log: doAnalyses: TRAN:  Timestep too small; time = 2.6275e-07, timestep = 1.25e-20: trouble with node \"vinp\"",
+    "final time 2.627500e-07 != tstop 6.475000e-04",
+    "log: doAnalyses: TRAN:  Timestep too small; time = 2.51275e-06, timestep = 4.73403e-21: trouble with node \"cmpo\"",
+    "final time 2.512749e-06 != tstop 6.475000e-04"
+   ]
+  },
+  {
+   "opts": {
+    "method": "gear",
+    "reltol": 1e-05,
+    "chgtol": 1e-15
+   },
+   "null_err": 1.931372549019608,
+   "spec_inl": 0.20735347086307257,
+   "spec_gain": -5.755256573314327e-05,
+   "runtime_null_s": 0.01607370376586914,
+   "runtime_spec_s": 14.316121816635132,
+   "ok": false,
+   "problems": [
+    "log: Warning: singular matrix:  check nodes bkn and bkp",
+    "log: doAnalyses: TRAN:  Timestep too small; time = 5.1275e-07, timestep = 1.25e-20: trouble with node \"bo1n#branch\"",
+    "final time 5.127500e-07 != tstop 6.475000e-04"
+   ]
+  },
+  {
+   "opts": {
+    "method": "trap",
+    "reltol": 1e-05,
+    "chgtol": 1e-16
+   },
+   "null_err": 1.9313725489956726,
+   "spec_inl": 5951.28676470591,
+   "spec_gain": -1.007053376906318,
+   "runtime_null_s": 0.018834829330444336,
+   "runtime_spec_s": 0.04587745666503906,
+   "ok": false,
+   "problems": [
+    "log: Warning: singular matrix:  check nodes bkn and bkp",
+    "log: Warning: singular matrix:  check nodes bkn and bkp",
+    "log: Warning: singular matrix:  check nodes bkn and bkp",
+    "log: doAnalyses: TRAN:  Timestep too small; time = 2.6275e-07, timestep = 1.25e-20: trouble with node \"vinp\"",
+    "final time 2.627500e-07 != tstop 6.475000e-04",
+    "log: doAnalyses: TRAN:  Timestep too small; time = 2.98975e-06, timestep = 4.73359e-21: trouble with node \"o2p\"",
+    "final time 2.989748e-06 != tstop 6.475000e-04"
+   ]
+  },
+  {
+   "opts": {
+    "method": "gear",
+    "reltol": 1e-05,
+    "chgtol": 1e-16
+   },
+   "null_err": 1.9313725489525888,
+   "spec_inl": 0.19489707950227028,
+   "spec_gain": -5.755259478279484e-05,
+   "runtime_null_s": 0.01209878921508789,
+   "runtime_spec_s": 16.31360173225403,
+   "ok": false,
+   "problems": [
+    "log: Warning: singular matrix:  check nodes bkn and bkp",
+    "log: doAnalyses: TRAN:  Timestep too small; time = 2.6275e-07, timestep = 1.25e-20: trouble with node \"vinp\"",
+    "final time 2.627500e-07 != tstop 6.475000e-04"
+   ]
+  }
+ ],
+ "dc_spec": {
+  "tag": "dc_spec",
+  "runtime_s": 10.171693801879883,
+  "netlist_ok": true,
+  "problems": [],
+  "tfinal": 0.0014245,
+  "npts": 508220,
+  "ok": true,
+  "u_in": [
+   -0.9,
+   -0.72,
+   -0.54,
+   -0.36,
+   -0.18000000000000005,
+   -1.1102230246251565e-16,
+   0.18000000000000005,
+   0.36,
+   0.5399999999999999,
+   0.7199999999999999,
+   0.9
+  ],
+  "u_hat": [
+   -0.8999484275837318,
+   -0.7199593257332596,
+   -0.5399693922720517,
+   -0.3599793265830347,
+   -0.1799898368368154,
+   3.521223490829008e-07,
+   0.17998984788409042,
+   0.35997933606393895,
+   0.5399694025997994,
+   0.7199593400848987,
+   0.8999484438328942
+  ],
+  "err": [
+   5.1572416268186316e-05,
+   4.0674266740370335e-05,
+   3.060772794838407e-05,
+   2.06734169652667e-05,
+   1.0163163184639945e-05,
+   3.521223491939231e-07,
+   -1.01521159096285e-05,
+   -2.0663936061038335e-05,
+   -3.059740020050494e-05,
+   -4.065991510115996e-05,
+   -5.1556167105837325e-05
+  ],
+  "max_abs_err": 5.1572416268186316e-05,
+  "inl_ep_ppm": 0.29264559520125744,
+  "inl_bf_ppm": 0.1832113847854977,
+  "gain_err": -5.6948738072160054e-05,
+  "offset": 3.7598097980345807e-08
+ },
+ "sweep": {
+  "rows": [
+   {
+    "base": "2M",
+    "fs": 2000000.0,
+    "param": "a0_db",
+    "value": 50.0,
+    "ok": true,
+    "inl_ep_ppm": 14.047885156714957,
+    "gain_err": -0.0017668830741676134,
+    "runtime_s": 5.4735376834869385,
+    "problems": []
+   },
+   {
+    "base": "2M",
+    "fs": 2000000.0,
+    "param": "a0_db",
+    "value": 60.0,
+    "ok": true,
+    "inl_ep_ppm": 3.708706626637248,
+    "gain_err": -0.0005597120505289599,
+    "runtime_s": 9.04113507270813,
+    "problems": []
+   },
+   {
+    "base": "2M",
+    "fs": 2000000.0,
+    "param": "a0_db",
+    "value": 70.0,
+    "ok": true,
+    "inl_ep_ppm": 1.0227222487502186,
+    "gain_err": -0.00017805436429596533,
+    "runtime_s": 7.212426662445068,
+    "problems": []
+   },
+   {
+    "base": "2M",
+    "fs": 2000000.0,
+    "param": "a0_db",
+    "value": 80.0,
+    "ok": true,
+    "inl_ep_ppm": 0.1755313862601525,
+    "gain_err": -5.720515129048476e-05,
+    "runtime_s": 6.830093145370483,
+    "problems": []
+   },
+   {
+    "base": "2M",
+    "fs": 2000000.0,
+    "param": "gbw",
+    "value": 2000000.0,
+    "ok": true,
+    "inl_ep_ppm": 18.988079598158958,
+    "gain_err": -0.0004252686545391793,
+    "runtime_s": 7.946991682052612,
+    "problems": []
+   },
+   {
+    "base": "2M",
+    "fs": 2000000.0,
+    "param": "gbw",
+    "value": 5000000.0,
+    "ok": true,
+    "inl_ep_ppm": 6.5426528736978184,
+    "gain_err": -8.32734229028187e-05,
+    "runtime_s": 6.918327808380127,
+    "problems": []
+   },
+   {
+    "base": "2M",
+    "fs": 2000000.0,
+    "param": "gbw",
+    "value": 10000000.0,
+    "ok": true,
+    "inl_ep_ppm": 0.1755313862601525,
+    "gain_err": -5.720515129048476e-05,
+    "runtime_s": 8.025516986846924,
+    "problems": []
+   },
+   {
+    "base": "2M",
+    "fs": 2000000.0,
+    "param": "gbw",
+    "value": 20000000.0,
+    "ok": true,
+    "inl_ep_ppm": 0.41271793144170843,
+    "gain_err": -5.630018945879112e-05,
+    "runtime_s": 6.872681140899658,
+    "problems": []
+   },
+   {
+    "base": "2M",
+    "fs": 2000000.0,
+    "param": "sr",
+    "value": 3000000.0,
+    "ok": true,
+    "inl_ep_ppm": 59.11148590156956,
+    "gain_err": -0.0004126110436799557,
+    "runtime_s": 5.844921350479126,
+    "problems": []
+   },
+   {
+    "base": "2M",
+    "fs": 2000000.0,
+    "param": "sr",
+    "value": 6000000.0,
+    "ok": true,
+    "inl_ep_ppm": 1.6527397651566744,
+    "gain_err": -6.450252226208875e-05,
+    "runtime_s": 6.983944416046143,
+    "problems": []
+   },
+   {
+    "base": "2M",
+    "fs": 2000000.0,
+    "param": "sr",
+    "value": 12000000.0,
+    "ok": true,
+    "inl_ep_ppm": 0.1755313862601525,
+    "gain_err": -5.720515129048476e-05,
+    "runtime_s": 7.420809507369995,
+    "problems": []
+   },
+   {
+    "base": "2M",
+    "fs": 2000000.0,
+    "param": "sr",
+    "value": 25000000.0,
+    "ok": true,
+    "inl_ep_ppm": 0.3596603833366796,
+    "gain_err": -5.6491366505428964e-05,
+    "runtime_s": 7.063719034194946,
+    "problems": []
+   },
+   {
+    "base": "4M_specbase",
+    "fs": 4000000.0,
+    "param": "a0_db",
+    "value": 50.0,
+    "ok": true,
+    "inl_ep_ppm": 51.58479063599452,
+    "gain_err": -0.0019623305397153956,
+    "runtime_s": 6.1963441371917725,
+    "problems": []
+   },
+   {
+    "base": "4M_specbase",
+    "fs": 4000000.0,
+    "param": "a0_db",
+    "value": 60.0,
+    "ok": true,
+    "inl_ep_ppm": 60.35749329985629,
+    "gain_err": -0.0007507329768052795,
+    "runtime_s": 7.6804358959198,
+    "problems": []
+   },
+   {
+    "base": "4M_specbase",
+    "fs": 4000000.0,
+    "param": "a0_db",
+    "value": 70.0,
+    "ok": true,
+    "inl_ep_ppm": 62.6339096273798,
+    "gain_err": -0.0003681450790467,
+    "runtime_s": 6.0079264640808105,
+    "problems": []
+   },
+   {
+    "base": "4M_specbase",
+    "fs": 4000000.0,
+    "param": "a0_db",
+    "value": 80.0,
+    "ok": true,
+    "inl_ep_ppm": 63.36356091632411,
+    "gain_err": -0.0002468880614535651,
+    "runtime_s": 6.2357704639434814,
+    "problems": []
+   },
+   {
+    "base": "4M_specbase",
+    "fs": 4000000.0,
+    "param": "gbw",
+    "value": 2000000.0,
+    "ok": true,
+    "inl_ep_ppm": 70.62381578196164,
+    "gain_err": -0.0015805109001960638,
+    "runtime_s": 5.440255165100098,
+    "problems": []
+   },
+   {
+    "base": "4M_specbase",
+    "fs": 4000000.0,
+    "param": "gbw",
+    "value": 5000000.0,
+    "ok": true,
+    "inl_ep_ppm": 157.4174993511368,
+    "gain_err": -0.0007121367637606957,
+    "runtime_s": 6.6751625537872314,
+    "problems": []
+   },
+   {
+    "base": "4M_specbase",
+    "fs": 4000000.0,
+    "param": "gbw",
+    "value": 10000000.0,
+    "ok": true,
+    "inl_ep_ppm": 63.36356091632411,
+    "gain_err": -0.0002468880614535651,
+    "runtime_s": 6.439025163650513,
+    "problems": []
+   },
+   {
+    "base": "4M_specbase",
+    "fs": 4000000.0,
+    "param": "gbw",
+    "value": 20000000.0,
+    "ok": true,
+    "inl_ep_ppm": 2.9547525813855557,
+    "gain_err": -5.720796766450764e-05,
+    "runtime_s": 4.633556365966797,
+    "problems": []
+   },
+   {
+    "base": "4M_specbase",
+    "fs": 4000000.0,
+    "param": "sr",
+    "value": 3000000.0,
+    "ok": true,
+    "inl_ep_ppm": 4392.936378171342,
+    "gain_err": -0.010918378591438738,
+    "runtime_s": 7.420063495635986,
+    "problems": []
+   },
+   {
+    "base": "4M_specbase",
+    "fs": 4000000.0,
+    "param": "sr",
+    "value": 6000000.0,
+    "ok": true,
+    "inl_ep_ppm": 426.9056555007977,
+    "gain_err": -0.001437778162578951,
+    "runtime_s": 6.617000341415405,
+    "problems": []
+   },
+   {
+    "base": "4M_specbase",
+    "fs": 4000000.0,
+    "param": "sr",
+    "value": 12000000.0,
+    "ok": true,
+    "inl_ep_ppm": 63.36356091632411,
+    "gain_err": -0.0002468880614535651,
+    "runtime_s": 6.976690292358398,
+    "problems": []
+   },
+   {
+    "base": "4M_specbase",
+    "fs": 4000000.0,
+    "param": "sr",
+    "value": 25000000.0,
+    "ok": true,
+    "inl_ep_ppm": 10.985993084078327,
+    "gain_err": -9.720310341632121e-05,
+    "runtime_s": 5.154677629470825,
+    "problems": []
+   },
+   {
+    "base": "4M_gbw20base",
+    "fs": 4000000.0,
+    "param": "a0_db",
+    "value": 50.0,
+    "ok": true,
+    "inl_ep_ppm": 15.974626748904708,
+    "gain_err": -0.0017690399076509822,
+    "runtime_s": 6.452378749847412,
+    "problems": []
+   },
+   {
+    "base": "4M_gbw20base",
+    "fs": 4000000.0,
+    "param": "a0_db",
+    "value": 60.0,
+    "ok": true,
+    "inl_ep_ppm": 6.721355992139744,
+    "gain_err": -0.0005590481460120422,
+    "runtime_s": 6.479895830154419,
+    "problems": []
+   },
+   {
+    "base": "4M_gbw20base",
+    "fs": 4000000.0,
+    "param": "a0_db",
+    "value": 70.0,
+    "ok": true,
+    "inl_ep_ppm": 3.824394600671077,
+    "gain_err": -0.00017792420035156464,
+    "runtime_s": 5.6698009967803955,
+    "problems": []
+   },
+   {
+    "base": "4M_gbw20base",
+    "fs": 4000000.0,
+    "param": "a0_db",
+    "value": 80.0,
+    "ok": true,
+    "inl_ep_ppm": 2.9547525813855557,
+    "gain_err": -5.720796766450764e-05,
+    "runtime_s": 5.8656182289123535,
+    "problems": []
+   },
+   {
+    "base": "4M_gbw20base",
+    "fs": 4000000.0,
+    "param": "gbw",
+    "value": 2000000.0,
+    "ok": true,
+    "inl_ep_ppm": 70.62381578196164,
+    "gain_err": -0.0015805109001960638,
+    "runtime_s": 5.849618673324585,
+    "problems": []
+   },
+   {
+    "base": "4M_gbw20base",
+    "fs": 4000000.0,
+    "param": "gbw",
+    "value": 5000000.0,
+    "ok": true,
+    "inl_ep_ppm": 157.4174993511368,
+    "gain_err": -0.0007121367637606957,
+    "runtime_s": 4.2644572257995605,
+    "problems": []
+   },
+   {
+    "base": "4M_gbw20base",
+    "fs": 4000000.0,
+    "param": "gbw",
+    "value": 10000000.0,
+    "ok": true,
+    "inl_ep_ppm": 63.36356091632411,
+    "gain_err": -0.0002468880614535651,
+    "runtime_s": 7.0817201137542725,
+    "problems": []
+   },
+   {
+    "base": "4M_gbw20base",
+    "fs": 4000000.0,
+    "param": "gbw",
+    "value": 20000000.0,
+    "ok": true,
+    "inl_ep_ppm": 2.9547525813855557,
+    "gain_err": -5.720796766450764e-05,
+    "runtime_s": 5.815668344497681,
+    "problems": []
+   },
+   {
+    "base": "4M_gbw20base",
+    "fs": 4000000.0,
+    "param": "sr",
+    "value": 3000000.0,
+    "ok": true,
+    "inl_ep_ppm": 4501.073740018152,
+    "gain_err": -0.011085669219617178,
+    "runtime_s": 6.2491981983184814,
+    "problems": []
+   },
+   {
+    "base": "4M_gbw20base",
+    "fs": 4000000.0,
+    "param": "sr",
+    "value": 6000000.0,
+    "ok": true,
+    "inl_ep_ppm": 153.6999193770261,
+    "gain_err": -0.0007024636248900151,
+    "runtime_s": 6.2729527950286865,
+    "problems": []
+   },
+   {
+    "base": "4M_gbw20base",
+    "fs": 4000000.0,
+    "param": "sr",
+    "value": 12000000.0,
+    "ok": true,
+    "inl_ep_ppm": 2.9547525813855557,
+    "gain_err": -5.720796766450764e-05,
+    "runtime_s": 6.613425970077515,
+    "problems": []
+   },
+   {
+    "base": "4M_gbw20base",
+    "fs": 4000000.0,
+    "param": "sr",
+    "value": 25000000.0,
+    "ok": true,
+    "inl_ep_ppm": 0.6086334212717879,
+    "gain_err": -5.5323439580812206e-05,
+    "runtime_s": 6.801158428192139,
+    "problems": []
+   }
+  ],
+  "knees": {
+   "2M/a0_db": 60.0,
+   "2M/gbw": 5000000.0,
+   "2M/sr": 6000000.0,
+   "4M_specbase/a0_db": null,
+   "4M_specbase/gbw": 20000000.0,
+   "4M_specbase/sr": null,
+   "4M_gbw20base/a0_db": 60.0,
+   "4M_gbw20base/gbw": 20000000.0,
+   "4M_gbw20base/sr": 12000000.0
+  }
+ },
+ "nonvac": {
+  "dac_flip": {
+   "tag": "nv_dacflip",
+   "runtime_s": 6.247960329055786,
+   "netlist_ok": true,
+   "problems": [],
+   "tfinal": 0.0006475,
+   "npts": 224690,
+   "ok": true,
+   "u_in": [
+    -0.9,
+    -0.45,
+    0.0,
+    0.45000000000000007,
+    0.9
+   ],
+   "u_hat": [
+    1.1627377609103333,
+    1.2707261029411765,
+    1.2707261029411765,
+    1.2707261029411765,
+    1.2707261029411765
+   ],
+   "err": [
+    2.0627377609103332,
+    1.7207261029411764,
+    1.2707261029411765,
+    0.8207261029411764,
+    0.37072610294117647
+   ],
+   "max_abs_err": 2.0627377609103332,
+   "inl_ep_ppm": 40495.62826156616,
+   "inl_bf_ppm": 21597.668406168723,
+   "gain_err": -0.9520051813196253,
+   "offset": 1.249128434535008
+  },
+  "c1x2": {
+   "tag": "nv_c1x2",
+   "runtime_s": 4.938140869140625,
+   "netlist_ok": true,
+   "problems": [],
+   "tfinal": 0.0006475,
+   "npts": 229162,
+   "ok": true,
+   "u_in": [
+    -0.9,
+    -0.45,
+    0.0,
+    0.45000000000000007,
+    0.9
+   ],
+   "u_hat": [
+    -0.9142764633653603,
+    -0.45704634020263074,
+    5.016850490159641e-09,
+    0.4570463406001072,
+    0.9142764536579757
+   ],
+   "err": [
+    -0.014276463365360259,
+    -0.00704634020263073,
+    5.016850490159641e-09,
+    0.007046340600107115,
+    0.014276453657975696
+   ],
+   "max_abs_err": 0.014276463365360259,
+   "inl_ep_ppm": 45.94695344775634,
+   "inl_bf_ppm": 36.756070460830514,
+   "gain_err": 0.015821892188757625,
+   "offset": -8.58611471079289e-10
+  },
+  "a050": {
+   "tag": "nv_a050",
+   "runtime_s": 4.515048027038574,
+   "netlist_ok": true,
+   "problems": [],
+   "tfinal": 0.0006475,
+   "npts": 229617,
+   "ok": true,
+   "u_in": [
+    -0.9,
+    -0.45,
+    0.0,
+    0.45000000000000007,
+    0.9
+   ],
+   "u_hat": [
+    -0.8983990995408601,
+    -0.4492244829766354,
+    7.941458907781829e-06,
+    0.4492277817640415,
+    0.8983992811719238
+   ],
+   "err": [
+    0.0016009004591399645,
+    0.0007755170233645914,
+    7.941458907781829e-06,
+    -0.0007722182359585772,
+    -0.0016007188280762197
+   ],
+   "max_abs_err": 0.0016009004591399645,
+   "inl_ep_ppm": 14.047885156714957,
+   "inl_bf_ppm": 10.932367743188287,
+   "gain_err": -0.0017668830741676134,
+   "offset": 2.2843754755506436e-06
+  },
+  "no_residue_err": 0.00018382352941181956
+ },
+ "netlist_counts": {
+  "V": 10,
+  "R": 20,
+  "C": 17,
+  "B": 12,
+  "S": 29
+ }
+}
