@@ -179,3 +179,4 @@ Total ≈ 18–22 weeks. Check the next sky130 shuttle date at tinytapeout.com/r
   - ground-bounce injection if REF− is chip ground (F7)
   - PGA ×2 in V4
 - **V9:** lists the un-simulated risks: MIM VCC and bottom-plate parasitic, substrate coupling.
+- **V8 additions (pd-expert, REVIEW-WO01-pd-2026-11-07.md):** GDS digital tie + Verilog-vs-GDS consistency; LVS with device-parameter matching; antenna via magic antennacheck (TT precheck antenna is gf180-only); 3.3 V SOA ERC (CVC); latch-up tap/guard rules; floating well/gate ERC; fill vs matched MIM (ask TT); ESD clamp + series R on ua pins; IR drop on the met4 VAPWR stripe. Precheck runs under TT's own `tools/precheck/default.nix` nix-shell (magic 8.3.568, klayout 0.30.8) and is re-run on tt-support-tools main before submission.
