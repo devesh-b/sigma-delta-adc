@@ -48,12 +48,25 @@ class Params:
     a0_db: float = np.inf        # OTA DC gain (both stages)
     a0_drop: float = 0.0         # fractional gain loss at |x| = xswing
     xswing: float = 1.2          # swing at which gain has dropped by a0_drop
+                                 # (units of vref; legacy, scales with VREF)
+    vlin_diff: float = 0.0       # [V] if > 0: differential output voltage at
+                                 # which gain has dropped by a0_drop. Overrides
+                                 # xswing (= vlin_diff / vref) so the OTA
+                                 # linear range is fixed in volts, not VREF.
     cp_ratio: float = 0.3        # parasitic at OTA input / Cs (noise gain)
 
     cs: float = 1e-12            # sampling cap per side [F]
     temp_k: float = 300.0
     ktc_events: float = 2.0      # sampling events per cycle (input + ref)
     ktc_excess: float = 1.5      # OTA thermal contribution factor
+    # White-noise accounting (do not double count): sampled white noise is
+    # sqrt(events * 2kT/Cs * ktc_excess); ktc_excess = 1 (switch kT/C) + 0.5
+    # (OTA white, referred through noise gain ng_ref = 5.3, i.e. c1=0.25,
+    # cp_ratio=0.3). flicker_series is pure 1/f (no white floor), so OTA white
+    # is counted ONLY via ktc_excess. If white_ng_ref > 0 the OTA part scales
+    # with the actual noise_gain: excess = 1 + (ktc_excess-1)*noise_gain/ng_ref.
+    # At c1=0.25 this is identical to the legacy value; 0 = legacy behaviour.
+    white_ng_ref: float = 0.0
     ktc_on: bool = False
 
     ota_white: float = 6.9e-9    # OTA input white noise [V/rtHz] (pthomas)
@@ -145,7 +158,10 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False):
 
     sig_ktc = 0.0
     if p.ktc_on:
-        sig_ktc = np.sqrt(p.ktc_events * 2 * K_B * p.temp_k / p.cs * p.ktc_excess) / p.vref
+        exc = p.ktc_excess
+        if p.white_ng_ref > 0:
+            exc = 1.0 + (p.ktc_excess - 1.0) * p.noise_gain / p.white_ng_ref
+        sig_ktc = np.sqrt(p.ktc_events * 2 * K_B * p.temp_k / p.cs * exc) / p.vref
     ng = p.lf_gain / p.vref
 
     x1 = np.zeros(B)
@@ -155,6 +171,7 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False):
     S = np.zeros(B)
     sumS = np.zeros(B)
     xm1 = xm2 = 0.0
+    xsw = p.vlin_diff / p.vref if p.vlin_diff > 0 else p.xswing
 
     for n in range(N):
         q = x2 if p.order == 2 else x1
@@ -193,8 +210,8 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False):
             e = e + ng * p.vres
 
         if p.a0_drop:
-            p1, g1 = _leaky(p.a0_db, p.c1, x1, p.a0_drop, p.xswing)
-            p2, g2 = _leaky(p.a0_db, p.c2, x2, p.a0_drop, p.xswing)
+            p1, g1 = _leaky(p.a0_db, p.c1, x1, p.a0_drop, xsw)
+            p2, g2 = _leaky(p.a0_db, p.c2, x2, p.a0_drop, xsw)
         x1_old = x1
         x1 = np.clip(p1 * x1 + g1 * p.c1 * (u_s - y * r + e), -p.xmax, p.xmax)
         xm1 = max(xm1, float(np.max(np.abs(x1))))
@@ -208,7 +225,10 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False):
         u_hat = (sumS + (p.k / p.c1) * S) / (N * (N - 1) / 2)
     u_hat = u_hat * s
     if return_state:
-        return u_hat, {"x1max": xm1, "x2max": xm2}
+        # units of vref (differential); per-side volts = 0.5 * x * vref
+        return u_hat, {"x1max": xm1, "x2max": xm2,
+                       "x1max_v_side": 0.5 * xm1 * p.vref,
+                       "x2max_v_side": 0.5 * xm2 * p.vref}
     return u_hat
 
 
