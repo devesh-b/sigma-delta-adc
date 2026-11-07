@@ -28,6 +28,7 @@ x1[N]/(c1 N) for order 1 and x2[N]/(c1 c2 N(N-1)/2) for order 2.
 """
 
 from dataclasses import dataclass, replace
+from typing import Optional, Tuple
 
 import numpy as np
 
@@ -53,6 +54,19 @@ class Params:
                                  # which gain has dropped by a0_drop. Overrides
                                  # xswing (= vlin_diff / vref) so the OTA
                                  # linear range is fixed in volts, not VREF.
+    # S4 hooks (all default off => legacy behaviour, bit-identical)
+    a0_db2: Optional[float] = None    # OTA2 DC gain [dB]; None = same as a0_db
+    a0_drop2: Optional[float] = None  # OTA2 quadratic drop; None = same as a0_drop
+    av_table1: Optional[Tuple[Tuple[float, float], ...]] = None
+    av_table2: Optional[Tuple[Tuple[float, float], ...]] = None
+                                 # tabulated gain: ((|Vout,diff| [V], gain [dB]), ...), V ascending. Replaces
+                                 # a0_db/a0_drop for that stage; a stage with no table uses a0_db(2)/a0_drop(2).
+                                 # Gain is held at the end values outside the table range. x [vref] * vref = V diff.
+    r_ext_ref: float = 0.0       # external DC resistance per reference pin [ohm]. Reference current per pin
+                                 # I = fs*Cs*(vref/2)*u^2, so delivered ref = 1 - 2*R*I/vref = 1 - R*fs*Cs*u_s^2
+    reset_r: float = 0.0         # fraction of final x1/x2 left after reset; carried across consecutive
+                                 # conversions of a batch (batch = one chain, in order). See convert_chain.
+
     cp_ratio: float = 0.3        # parasitic at OTA input / Cs (noise gain)
 
     cs: float = 1e-12            # sampling cap per side [F]
@@ -110,13 +124,21 @@ def with_(p, **kw):
     return replace(p, **kw)
 
 
-def _leaky(a0_db, c, x=None, drop=0.0, xswing=1.0):
+def _leaky(a0_db, c, x=None, drop=0.0, xswing=1.0, table=None, vref=1.0):
     """Pole p and gain g of an SC integrator with finite OTA gain.
 
     With drop > 0 the gain falls quadratically with the output state x,
     A(x) = A0 * max(0.02, 1 - drop * (x / xswing)^2): the usual source of
     INL in a real OTA (output stage leaving saturation).
     """
+    if table is not None:
+        tv = np.array([t[0] for t in table], dtype=float)
+        td = np.array([t[1] for t in table], dtype=float)
+        xv = 0.0 if x is None else np.abs(x) * vref
+        a = 10 ** (np.interp(xv, tv, td) / 20)
+        g = 1.0 / (1.0 + (1.0 + c) / a)
+        p = (1.0 + 1.0 / a) * g
+        return p, g
     if not np.isfinite(a0_db):
         return 1.0, 1.0
     a = 10 ** (a0_db / 20)
@@ -140,7 +162,30 @@ def flicker_series(n, fs, white, fc, rng):
     return np.fft.irfft(spec, n=n)
 
 
-def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False):
+def convert_chain(p, U, rng=None, sys_sign=None, ota_noise=None, return_state=False):
+    """C independent chains of L consecutive conversions, U shape (C, L). Conversion l of a chain starts with
+    x1, x2 = reset_r * (final x1, x2 of conversion l-1 of the same chain) (zero for l = 0). Returns (C, L)."""
+    U = np.asarray(U, dtype=float)
+    C, L = U.shape
+    rng = rng or np.random.default_rng(0)
+    q = replace(p, reset_r=0.0)
+    x1i = x2i = None
+    out = np.zeros((C, L))
+    states = []
+    for l in range(L):
+        init = None if x1i is None else (p.reset_r * x1i, p.reset_r * x2i)
+        sg = None if sys_sign is None else np.asarray(sys_sign)[:, l]
+        on = None if ota_noise is None else ota_noise[:, l]
+        uh, st = convert(q, U[:, l], rng=rng, ota_noise=on, sys_sign=sg, return_state=True, x_init=init)
+        out[:, l] = uh
+        x1i, x2i = st["x1_final"], st["x2_final"]
+        states.append(st)
+    if return_state:
+        return out, states
+    return out
+
+
+def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False, x_init=None):
     """Run one conversion per batch element.
 
     u          : (B,) normalised DC inputs
@@ -151,12 +196,28 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False):
     """
     rng = rng or np.random.default_rng(0)
     u = np.asarray(u, dtype=float)
+    if p.reset_r and x_init is None:
+        # batch = one chain of consecutive conversions
+        ss = None if sys_sign is None else np.asarray(sys_sign, dtype=float)[None, :]
+        on = None if ota_noise is None else np.asarray(ota_noise)[None]
+        # ota_noise rows are per conversion: reshape (B, N) -> (1, B, N); convert_chain wants (C, L, N)
+        res, sts = convert_chain(p, u[None, :], rng=rng, sys_sign=ss, ota_noise=on, return_state=True)
+        uh = res[0]
+        if return_state:
+            return uh, {"x1max": max(s_["x1max"] for s_ in sts), "x2max": max(s_["x2max"] for s_ in sts),
+                        "x1_final": np.concatenate([s_["x1_final"] for s_ in sts]),
+                        "x2_final": np.concatenate([s_["x2_final"] for s_ in sts])}
+        return uh
     B, N = u.size, p.N
     s = np.ones(B) if sys_sign is None else np.asarray(sys_sign, dtype=float)
     u_in = u * s
 
-    p1, g1 = _leaky(p.a0_db, p.c1)
-    p2, g2 = _leaky(p.a0_db, p.c2)
+    a0_2 = p.a0_db if p.a0_db2 is None else p.a0_db2
+    drop2 = p.a0_drop if p.a0_drop2 is None else p.a0_drop2
+    dyn1 = bool(p.a0_drop) or p.av_table1 is not None
+    dyn2 = bool(drop2) or p.av_table2 is not None
+    p1, g1 = _leaky(p.a0_db, p.c1, table=p.av_table1, vref=p.vref)
+    p2, g2 = _leaky(a0_2, p.c2, table=p.av_table2, vref=p.vref)
 
     e_in = np.exp(-p.t_half / p.tau_in) if p.tau_in > 0 else 0.0
     e_ref = np.exp(-p.t_half / p.tau_ref) if p.tau_ref > 0 else 0.0
@@ -172,6 +233,9 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False):
 
     x1 = np.zeros(B)
     x2 = np.zeros(B)
+    if x_init is not None:
+        x1 = x1 + x_init[0]
+        x2 = x2 + x_init[1]
     vnode = np.ones(B)           # reference node (normalised)
     cap_prev = np.zeros(B)       # shared Cs bottom-plate state after transfer
     S = np.zeros(B)
@@ -205,26 +269,29 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False):
         vnode = 1.0 + (v_end - 1.0) * e_ref     # recovers again during phase 1
         cap_prev = y * v_end
 
+        if p.r_ext_ref:
+            r = r * (1.0 - p.r_ext_ref * p.fs * p.cs * u_s ** 2)
         e = 0.0
         if p.ktc_on:
             e = sig_ktc * rng.standard_normal(B)
         if ota_noise is not None:
-            v_ota = ota_noise[:, n]
+            v_ota = ota_noise[:, n if ota_noise.shape[1] > 1 else 0]
             if p.chop:
                 v_ota = v_ota * (1.0 if n % 2 == 0 else -1.0)
             e = e + ng * v_ota
         if p.vres:
             e = e + ng * p.vres
 
-        if p.a0_drop:
-            p1, g1 = _leaky(p.a0_db, p.c1, x1, p.a0_drop, xsw)
-            p2, g2 = _leaky(p.a0_db, p.c2, x2, p.a0_drop, xsw)
+        if dyn1:
+            p1, g1 = _leaky(p.a0_db, p.c1, x1, p.a0_drop, xsw, p.av_table1, p.vref)
+        if dyn2:
+            p2, g2 = _leaky(a0_2, p.c2, x2, drop2, xsw, p.av_table2, p.vref)
         x1_old = x1
         x1 = np.clip(p1 * x1 + g1 * p.c1 * (u_s - y * r + e), -p.xmax, p.xmax)
         xm1 = max(xm1, float(np.max(np.abs(x1))))
         if p.order == 2:
             x2in = x1_old - p.k * y
-            if e2_off:
+            if np.any(e2_off):
                 x2in = x2in + e2_off
             x2 = np.clip(p2 * x2 + g2 * p.c2 * x2in, -p.xmax * 2, p.xmax * 2)
             xm2 = max(xm2, float(np.max(np.abs(x2))))
