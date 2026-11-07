@@ -33,6 +33,7 @@ FS = 2e6
 N_PREC = 4096
 LF = 9.3                       # pessimistic bound (noise gain at c1 0.125); SPEC 2.2 nominal is ~1
 X1MAX_V = 2 * 0.61             # differential peak of x1 [V] (SPEC 1, S1: 0.61 V/side)
+M_OUT = 64                     # outputs per noise estimate (statistical error ~ 1/sqrt(2*64) = 9 %)
 OFF_FIELDS = ("vos", "vos2", "vres", "x1_offset", "comp_offset")
 
 # budgets (WO-05 table; stretch targets with margin: noise 2x under 5 uV, INL 1.5x under 30 ppm)
@@ -40,7 +41,7 @@ BUDGET = {"noise_uv": 2.5, "inl_ppm": 20.0, "offset_uv": 5.0, "gain_ppm": 5000.0
 
 # ----------------------------------------------------------------------------------------- spec candidates
 SPEC_BLK = {"a0_db": 80.0, "a0_drop": 0.9, "vlin": 2.0, "ota_en": 10.0, "fc": 631e3, "lf": LF, "vres": 5e-6,
-            "vos": 9e-3, "vos2": 9e-3, "comp_off": 20e-3, "comp_noise": 1e-3, "tau_in": 10e-9, "tau_ref": 2.5e-9,
+            "vos": 9e-3, "vos2": 9e-3, "comp_off": 20e-3, "comp_noise": 5e-3, "tau_in": 18.75e-9, "tau_ref": 10e-9,
             "r_reset": 1e-4, "i_leak": 100e-12}
 RHO_LEAK = 1e-3                # ASSUMPTION: fraction of the leakage offset that does not cancel in sys pairs
 
@@ -74,7 +75,7 @@ def spec_point(**ov):
 def noise_uv(p, rate, N):
     pl = m.with_(p, N=N)
     k = max(1, round(pl.fs / (rate * N)))
-    return m.measure_noise(pl, k, m_out=24)["rms_v"] * 1e6
+    return m.measure_noise(pl, k, m_out=M_OUT)["rms_v"] * 1e6
 
 
 def static_err_uv(p, sys, B=512):
@@ -276,6 +277,12 @@ def hand_calcs():
                     "gbw_MHz": gm / (2 * math.pi * cl1) / 1e6,
                     "sr_diff_V_per_us": itail / cl1 / 1e6}
     rows["gm_noise"] = gm_p
+    gm2 = 2 * math.pi * 10e6 * 0.3e-12                              # OTA2 at GBW 10 MHz, 0.3 pF load (comparator + wiring)
+    i_ota2 = 2 * (gm2 / 15.0) * 2 * 1.1 * 1e6
+    other = {"ota2_uA": i_ota2, "comparator_uA": 6.0, "bias_cmfb_refs_uA": 20.0}
+    for en, d in gm_p.items():
+        d["total_uA"] = d["i_ota1_uA"] + sum(other.values())
+    rows["power_other"] = other
     # TG on-resistance, ss/-40/3.0 V, mid-range input (both devices weakest): W/L 20/0.5 each. ASSUMED device numbers.
     vt_n, vt_p, mun, mup = 0.95, 1.05, 45e-6, 16e-6
     vov = 3.0 / 2 - 0.5 * (vt_n + vt_p)
@@ -287,6 +294,10 @@ def hand_calcs():
     rows["tau_in_ns_rsrc0"] = (rows["ron_ohm"] + 500) * c_node * 1e9
     rows["rsrc_max_tau10_ohm"] = 10e-9 / c_node - 500 - rows["ron_ohm"]
     rows["rsrc_max_tau45_ohm"] = 45e-9 / c_node - 500 - rows["ron_ohm"]
+    rows["rsrc_max_tau18_ohm"] = 18.75e-9 / c_node - 500 - rows["ron_ohm"]
+    t4 = 0.45 / 4e6
+    rows["fast_4MHz"] = {"t_half_ns": t4 * 1e9, "gbw_lin_MHz": 1 / (2 * math.pi * beta1 * 0.2 * t4) / 1e6,
+                         "gbw_full_MHz": 1 / (2 * math.pi * beta1 * t4 / 10) / 1e6, "sr_min_V_per_us": step / (0.2 * t4) / 1e6}
     rows["tau_in_budget_t12_ns"] = T_HALF / 12 * 1e9
     rows["t_reset_15tau_ns"] = 15 * 1e3 * 4e-12 * 1e9
     rows["r_after_15tau"] = math.exp(-15)
@@ -336,13 +347,14 @@ def alloc_rows(spec=None):
 
     # --- noise (RSS)
     add("sampling switches kT/C (Cs 0.5 pF)", "noise_uv", 1.2, "Cs 0.5 pF, 2 events", nb)
-    m_en = metrics(ideal_base(ktc_excess=excess_from_en(s["ota_en"])))
-    add("OTA1 thermal", "noise_uv", 1.2, f"en <= {s['ota_en']:g} nV/rtHz", contrib_noise(m_en["n15"], nb))
-    m_f = metrics(ideal_base(flicker_on=True, ota_fc=s["fc"], lf_gain=s["lf"], vres=s["vres"]))
-    add("OTA1 1/f + chopper residue", "noise_uv", 1.0, f"fc <= {s['fc']/1e3:g} kHz, lf <= {s['lf']:g}, vres <= {s['vres']*1e6:g} uV",
-        contrib_noise(m_f["n15"], nb))
-    m_cn = metrics(ideal_base(comp_noise=s["comp_noise"] / VREF))
-    add("comparator noise", "noise_uv", 0.3, f"<= {s['comp_noise']*1e3:g} mV rms (input-ref)", contrib_noise(m_cn["n15"], nb))
+    # same random draws in base and excess runs (ktc scales), so the RSS difference is clean
+    n_en = noise_uv(ideal_base(ktc_excess=excess_from_en(s["ota_en"])), 15, N_PREC)
+    add("OTA1 thermal", "noise_uv", 1.2, f"en <= {s['ota_en']:g} nV/rtHz", contrib_noise(n_en, nb))
+    # 1/f and comparator noise measured alone (switch kT/C off): independent sources add in quadrature
+    n_f = noise_uv(ideal_base(ktc_on=False, flicker_on=True, ota_fc=s["fc"], lf_gain=s["lf"], vres=s["vres"]), 15, N_PREC)
+    add("OTA1 1/f + chopper residue", "noise_uv", 1.0, f"fc <= {s['fc']/1e3:g} kHz, lf <= {s['lf']:g}, vres <= {s['vres']*1e6:g} uV", n_f)
+    n_cn = noise_uv(ideal_base(ktc_on=False, comp_noise=s["comp_noise"] / VREF), 15, N_PREC)
+    add("comparator noise", "noise_uv", 0.3, f"<= {s['comp_noise']*1e3:g} mV rms (input-ref)", n_cn)
     sig2 = math.sqrt(2 * 2 * K_B * 300 / 0.5e-12) * 1.5
     w = N_PREC - 1 - np.arange(N_PREC, dtype=float)
     n2 = math.sqrt(N_PREC) * sig2 / (C1 * np.sum(w)) * 1e6 / math.sqrt(34 / 2)    # per conversion -> 17 pairs averaged
@@ -351,15 +363,15 @@ def alloc_rows(spec=None):
     # --- INL
     m_o = metrics(ideal_base(a0_db=s["a0_db"], a0_drop=s["a0_drop"], vlin_diff=s["vlin"]), noise=False)
     add("OTA1+OTA2 gain and swing linearity", "inl_ppm", 8.0,
-        f"A >= {s['a0_db']:g} dB, <= {s['a0_drop']*100:g} % drop at |Vout,diff| <= {s['vlin']:g} V", max(0.0, m_o["inl"] - floor))
+        f"A >= {s['a0_db']:g} dB, <= {s['a0_drop']*100:g} % drop at |Vout,diff| <= {s['vlin']:g} V", m_o["inl"])
     m_ti = metrics(ideal_base(tau_in=s["tau_in"]), noise=False)
-    add("input sampling settling", "inl_ppm", 3.0, f"tau_in <= {s['tau_in']*1e9:g} ns", max(0.0, m_ti["inl"] - floor))
+    add("input sampling settling", "inl_ppm", 2.0, f"tau_in <= {s['tau_in']*1e9:g} ns", m_ti["inl"])
     m_tr = metrics(ideal_base(tau_ref=s["tau_ref"], cd_ref=5e-12), noise=False)
-    add("reference path settling", "inl_ppm", 3.0, f"tau_ref <= {s['tau_ref']*1e9:g} ns (500 ohm + 5 pF pad)", max(0.0, m_tr["inl"] - floor))
+    add("reference path settling", "inl_ppm", 2.0, f"tau_ref <= {s['tau_ref']*1e9:g} ns (500 ohm + 5 pF pad)", m_tr["inl"])
     m_co = metrics(ideal_base(comp_offset=s["comp_off"] / VREF, c2=0.5), noise=False)
-    add("comparator offset", "inl_ppm", 1.0, f"<= {s['comp_off']*1e3:g} mV", max(0.0, m_co["inl"] - floor))
-    add("quantization floor (N 4096)", "inl_ppm", 0.5, "N = 4096", floor)
-    add("reserve: MIM VCC, charge-inj. nonlinearity, substrate", "inl_ppm", 4.5, "unmodelled", 0.0, "reserve")
+    add("comparator offset", "inl_ppm", 1.0, f"<= {s['comp_off']*1e3:g} mV", m_co["inl"])
+    add("quantization floor (N 4096, raw accumulators)", "inl_ppm", 1.0, "N = 4096", floor)
+    add("reserve: MIM VCC, charge-inj. nonlinearity, substrate", "inl_ppm", 6.0, "unmodelled", 0.0, "reserve")
     # --- offset after sys chop (|residual|, uV)
     m_v1 = metrics(ideal_base(vos=s["vos"], vres=s["vres"], lf_gain=s["lf"]), noise=False)
     m_v2 = metrics(ideal_base(vos2=s["vos2"]), noise=False)
@@ -378,7 +390,7 @@ def alloc_rows(spec=None):
     add("finite A0 and swing (model)", "gain_ppm", 300.0, f"A >= {s['a0_db']:g} dB", abs(m_o["gain"]))
     ms = metrics(ideal_base(tau_in=s["tau_in"], tau_ref=s["tau_ref"], cd_ref=5e-12), noise=False)
     add("input + reference settling (model)", "gain_ppm", 500.0, "tau_in, tau_ref as above", abs(ms["gain"]))
-    add("cap ratio mismatch Cs/Cint (hand)", "gain_ppm", 3000.0, "3 sigma ratio mismatch <= 0.3 %; verify by MC in C10", 3000.0, "hand")
+    add("cap ratio mismatch Cs/Cint (hand)", "gain_ppm", 3000.0, "3 sigma ratio mismatch <= 0.3 %; verify by MC in C10", 3000.0, "requirement")
     add("reserve: pad/bond droop, 5 mV kickback", "gain_ppm", 1200.0, "calibratable", hc["kick_gain_ppm_per_mV"] * 5, "hand")
     return rows, {"nom_base": base, "floor": floor}
 
@@ -431,7 +443,7 @@ def write_report(out, sw, checks, hc, rows, joint, fails):
           "fs 2 MHz (0.25-2 precision, 4 MHz fast); precision N 4096 with K sys-chop pairs, ota+sys chop; fast N 64/256/1024; "
           "A0 >= 80 dB, vlin in volts; Vos1 = Vos2 = 9 mV (3 sigma); overload 1.0-1.1 VREF. "
           "Sweeps: one parameter at a time on an otherwise ideal loop (switch kT/C only, shared Cs, chop+sys on). "
-          "Noise: rms of 24 outputs at 15 SPS (N 4096, K 34) and 240 SPS (N 1024, K 8). INL: endpoint, +-0.9 FS, N 4096, residue-corrected, ppm of FSR. "
+          "Noise: rms of 64 outputs at 15 SPS (statistical error ~9 %) (N 4096, K 34) and 240 SPS (N 1024, K 8). INL: endpoint, +-0.9 FS, N 4096, residue-corrected, ppm of FSR. "
           "Offset: paired difference (offset sources on minus zeroed), noise-free, mean over 512 DC points; `sys` = pair of opposite input polarities. "
           "lf = 9.3 is the pessimistic input-referral bound (SPEC 2.2 nominal ~1).", ""]
     L += ["## Theory checks", "", "```"]
@@ -453,14 +465,113 @@ def write_report(out, sw, checks, hc, rows, joint, fails):
           "Reset-residue rows inject x1[0] = r x1max, equivalent to a constant stage-2 offset (verified against a local x1-init simulation); x1max = 1.22 V differential (S1). "
           "Reset residue tracks the previous conversion's final x1, so it is not guaranteed to cancel in a sys pair and is budgeted as non-cancelling.", ""]
     L += ["## Allocation table", "", "Noise: RSS of values and of shares. INL, offset, gain: linear sums. Margin = share / value (>= 1 required).", ""]
-    body = [[r["block"], r["metric"], g(r["share"]), r["spec"], g(r["value"]), f"{r['margin']:.2f}" if np.isfinite(r["margin"]) else "inf", r["kind"]] for r in rows]
+    body = [[r["block"], r["metric"], g(r["share"]), r["spec"], g(r["value"]), (">1000" if r["margin"] > 1000 else f"{r['margin']:.2f}") if np.isfinite(r["margin"]) else "inf", r["kind"]] for r in rows]
     L.append(fmt_table(["block", "metric", "share", "per-block spec", "measured/hand value", "margin", "kind"], body))
     tot = combine(rows)
     L.append(fmt_table(["metric", "budget", "sum of shares", "sum of values"], [[k, g(BUDGET[k]), g(v[0]), g(v[1])] for k, v in tot.items()]))
     L += ["Joint run (all blocks at spec together): " + ", ".join(f"{k} {g(v)}" for k, v in joint.items()), ""]
+    L += findings(sw, hc)
+    L += stage2_and_power_sections(hc)
+    L += spec_table(hc, rows)
     L += ["## Hand calculations (marked hand; not model results)", "", "```", json.dumps(hc, indent=1, default=float), "```", ""]
     L += ["## Verdict", "", "ACCEPT" if not fails else "REJECT", ""] + [f"- {f}" for f in fails]
     (out / "s3_budget.md").write_text("\n".join(L) + "\n")
+
+
+def _row(sw, name, value):
+    for r in sw:
+        if r["sweep"] == name and r["value"] == value:
+            return r
+    raise KeyError((name, value))
+
+
+def findings(sw, hc):
+    a = "A0 x a0_drop (vlin 2 V)"
+    v = "vlin_diff (A0 80, drop 0.9)"
+    en = "OTA thermal en"
+    L = ["## Findings from the sweeps", "",
+         f"- OTA linearity: INL {g(_row(sw, a, [80, 0.9])['inl'])} ppm at 80 dB / 90 % drop / 2 V (share 8 ppm, margin {8/_row(sw, a, [80, 0.9])['inl']:.1f}). "
+         f"75 dB / 0.9 gives {g(_row(sw, a, [75, 0.9])['inl'])} ppm (still inside the share), 70 dB / 0.9 gives {g(_row(sw, a, [70, 0.9])['inl'])} ppm (outside). "
+         f"The linear range matters more than A0: vlin 1.5 V gives {g(_row(sw, v, 1.5)['inl'])} ppm, 1.0 V gives {g(_row(sw, v, 1.0)['inl'])} ppm, 0.8 V gives {g(_row(sw, v, 0.8)['inl'])} ppm. "
+         "Spec the swing in volts (m4): the x1 peak is 1.22 V diff, so 2.0 V keeps the gain-drop region away from the signal.",
+         f"- OTA thermal noise: total noise @15 SPS {g(_row(sw, en, 5)['n15'])}/{g(_row(sw, en, 7)['n15'])}/{g(_row(sw, en, 10)['n15'])}/{g(_row(sw, en, 14)['n15'])}/{g(_row(sw, en, 20)['n15'])} uV for 5/7/10/14/20 nV/rtHz "
+         "(12 % of statistical scatter). Even 20 nV/rtHz stays inside the 2.5 uV budget alone; the limit is set by current (see power table), not by noise.",
+         "- Sampling kT/C of the switches at Cs 0.5 pF is the floor (0.56 uV @15 SPS) and not reducible without a larger Cs.",
+         "- tau_in and tau_ref (shared Cs): INL stays below 0.01 ppm and gain error below 17 ppm up to 45 ns; the shared-Cs error is a gain error (review F6/m6). "
+         "The binding limit on the input is the pad/source recharge (hand row), not the model's tau.",
+         "- Comparator: noise up to 5 mV rms and offset up to 50 mV produce < 0.2 uV noise and < 0.2 uV offset. The comparator is not budget-limiting; "
+         "its offset only matters through x2 swing (c2 0.25 makes 50 mV 0.2 uV instead of 0.02 uV).",
+         "- The model's constant offsets (Vos1, Vos2, vres, comparator offset, reset residue, leakage) cancel exactly in a sys pair (residual 0.000 uV, numerical). "
+         "The offset budget is therefore carried by the non-cancelling mechanisms: reset residue (worst case), leakage fraction (assumed) and pair drift (reserve).",
+         f"- Leakage raw offsets I/(fs Cs): 100 pA gives {g(_row(sw, 'leakage at fs 0.25 MHz', 100e-12)['off_nosys'])} uV at 0.25 MHz and {g(_row(sw, 'leakage at fs 2 MHz', 100e-12)['off_nosys'])} uV at 2 MHz; "
+         "1 nA gives 8 mV at 0.25 MHz (1 mV at 2 MHz). Without cancellation the leakage spec would be ~1 pA.",
+         f"- Raw (sys-off) offsets at the SPEC values: lf*Vos1/(N-1) {g(9.3*9e-3/4095*1e6)} uV, 2*Vos2/(c1(N-1)) 35.2 uV, vres 5 uV x lf 9.3 = 46 uV: characterization-only modes carry these (SPEC 3.6).",
+         f"- 4 MHz fast mode (hand): t_half {g(hc['fast_4MHz']['t_half_ns'])} ns needs GBW {g(hc['fast_4MHz']['gbw_lin_MHz'])}-{g(hc['fast_4MHz']['gbw_full_MHz'])} MHz and SR >= {g(hc['fast_4MHz']['sr_min_V_per_us'])} V/us; "
+         "both are met by the noise-set OTA1 design (gm/GBW/SR columns in the power table).", ""]
+    return L
+
+
+def stage2_and_power_sections(hc):
+    L = ["## Stage-2 sizing (item 3)", "",
+         "Stage-2 white sampling error referred to the input is u_err = sqrt(N) sigma / (c1 sum w) (unit weights, because it enters x2 per cycle), "
+         "with sigma = sqrt(2 events * 2kT/Cs2). (a) kT/C of stage 2 divided by the stage-1 gain is negligible at any plausible Cs2; "
+         "(b) area is the only cost of larger Cs2; (c) x2 swing and comparator: c2 0.5 gives a feedback step c2 k VREF = 0.512 V (c2 0.25: 0.256 V), "
+         "see the comp_offset (c2 0.5) and (c2 0.25) sweeps.", ""]
+    body = [[k, g(v["ktc2_in_uV_per_conv"]), g(v["mim_um2_diff_x1.5"]), g(v["x2_step_V"])] for k, v in hc["stage2"].items()]
+    L.append(fmt_table(["option", "stage-2 kT/C at input [uV/conv]", "MIM um2 (diff, x1.5)", "x2 min step [V]"], body))
+    L += ["Proposal: **Cs2 0.5 pF, Cint2 1 pF (c2 0.5)**. The kT/C term is orders of magnitude under the stage-1 floor, so the choice is set by area, "
+          "by keeping Cs2 well above the OTA1 load parasitics (0.25 pF would be dominated by wiring) and by matching. "
+          "c2 = 0.25 (Cs2 0.5 / Cint2 2 pF) is allowed if the comparator offset sweep for c2 0.25 stays inside its share; it costs 1 pF more MIM per side and "
+          "halves the x2 swing, so it is an option for OTA2 swing only (review E3: no INL benefit).", ""]
+    L += ["## Area and power estimate (item 4b)", "", "All hand estimates, no simulation.", "",
+          f"MIM (2 fF/um2, x1.5 overhead, differential): " + ", ".join(f"{k} {g(v)} um2" for k, v in hc["mim_um2"].items()) +
+          f"; total {g(hc['mim_total_um2'])} um2 = {100*hc['mim_total_um2']/hc['tile_um2']:.1f} % of the 2x2 tile ({g(hc['tile_um2'])} um2).", ""]
+    body = [[f"{en} nV/rtHz", g(d["gm_uS"]), g(d["i_tail_uA"]), g(d["i_ota1_uA"]), g(d["gbw_MHz"]), g(d["sr_diff_V_per_us"]), g(d["total_uA"]),
+             "OK" if d["total_uA"] <= 200 else "OVER 200 uA"] for en, d in hc["gm_noise"].items()]
+    L.append(fmt_table(["OTA1 en", "gm needed [uS]", "input tail [uA]", "OTA1 total [uA] (fold x2, +10 %)", "GBW at gm, CL1 [MHz]", "SR [V/us]", "chip analog total [uA]", "vs 200 uA"], body))
+    L += [f"Assumptions: thermal en^2 = 4kT (2 gamma/gm)(1 + gm_load/gm_in), gamma 2/3, gm_load/gm_in 0.5; gm/Id 15 /V; folded cascode doubles the branch current. "
+          f"Other consumers: {hc['power_other']}. Noise, not GBW or slew, sets the OTA1 current: GBW needed {g(hc['gbw_lin_MHz'])} MHz (tau <= 0.2 t_half) to {g(hc['gbw_full_MHz'])} MHz "
+          f"(10 tau), slew needed {g(hc['sr_min_V_per_us'])} V/us diff (max step {g(hc['step_diff_V'])} V in 0.2 t_half), beta1 = {g(hc['beta1'])}, OTA1 load {g(hc['cl1_pF'])} pF. "
+          "The 7 nV/rtHz inherited from the continuous-time spec does not fit the 200 uA budget with this estimate; 10-14 nV/rtHz does (review E2).", ""]
+    return L
+
+
+def spec_table(hc, rows):
+    s = SPEC_BLK
+    v = {r["block"]: r for r in rows}
+    L = ["## Per-block spec table (paste-ready for SPEC section 3)", "",
+         "All entries are limits at every corner of SPEC section 6. Margin = allocation share / value at the spec.", ""]
+    T = [
+        ["OTA1 (and OTA2 until separated)", "DC gain / linearity", f"A >= {s['a0_db']:g} dB with <= {s['a0_drop']*100:g} % gain drop at |Vout,diff| <= {s['vlin']:g} V", "INL share 8 ppm"],
+        ["OTA1", "input white noise", f"<= {s['ota_en']:g} nV/rtHz (mapping in sweeps)", "noise share 1.2 uV"],
+        ["OTA1", "1/f corner (with chop + sys)", f"<= {s['fc']/1e3:g} kHz, residual chopper offset vres <= {s['vres']*1e6:g} uV", "noise share 1.0 uV"],
+        ["OTA1", "GBW / slew (hand)", f">= 10 MHz (needs {g(hc['gbw_lin_MHz'])}-{g(hc['gbw_full_MHz'])}), SR >= {max(10, math.ceil(hc['sr_min_V_per_us']))} V/us diff at beta {g(hc['beta1'])}, CL {g(hc['cl1_pF'])} pF", "hand"],
+        ["OTA1/OTA2", "input offset", f"<= {s['vos']*1e3:g} mV (3 sigma); cancels with sys chop (constant)", "offset"],
+        ["Comparator", "offset", f"<= {s['comp_off']*1e3:g} mV (3 sigma)", "INL share 1 ppm"],
+        ["Comparator", "input-referred noise", f"<= {s['comp_noise']*1e3:g} mV rms (1 mV or less has no measurable effect: decisions never flip)", "noise share 0.3 uV"],
+        ["Comparator", "decision time", f"< 0.3 t_half = {0.3*T_HALF*1e9:.0f} ns at 2 MHz ({0.3*0.45/4e6*1e9:.0f} ns at 4 MHz)", "hand"],
+        ["Comparator", "kickback on x2", f"<= 1 % of the minimum x2 step ({0.01*hc['x2_min_step_V']*1e3:.1f} mV of {hc['x2_min_step_V']:.3f} V); "
+                                         f"signal-dependent kickback gives {g(hc['kick_gain_ppm_per_mV'])} ppm gain error per mV", "hand"],
+        ["Input switches", "settling tau_in (Ron + 500 ohm + source) x (5 pF + Cs)", f"<= {s['tau_in']*1e9:g} ns, i.e. source <= {max(0, hc['rsrc_max_tau18_ohm']):.0f} ohm (+ the 500 ohm pad); "
+                                                                                      f"tau <= {g(hc['tau_in_budget_t12_ns'])} ns (t_half/12) is the outer limit", "INL share 2 ppm"],
+        ["TG Ron (hand, ASSUMED device numbers)", "ss/-40 C/3.0 V mid-range", f"Ron ~ {hc['ron_ohm']:.0f} ohm at W/L 20/0.5 each; spec Ron <= 1.5 kohm", "hand"],
+        ["Reference path", "tau_ref (500 ohm, 5 pF pad)", f"<= {s['tau_ref']*1e9:g} ns, pad path < 500 ohm and < 5 pF", "INL share 2 ppm"],
+        ["Reset", "residue r on x1 at conversion start", f"<= {s['r_reset']:g}; window >= 15 tau = {hc['t_reset_15tau_ns']:.0f} ns (1 kohm x 4 pF), residue at 15 tau {hc['r_after_15tau']:.1e}", "offset share 1 uV"],
+        ["Virtual ground", "leakage (125 C)", f"<= {s['i_leak']*1e12:g} pA total at the integrator input; non-cancelling fraction <= {RHO_LEAK*100:g} % (ASSUMED)", "offset share 1 uV"],
+        ["Capacitors", "ratio mismatch Cs/Cint", "<= 0.3 % (3 sigma), gain error only; verify by MC (C10)", "gain share 3000 ppm"],
+        ["Clock", "t_half / non-overlap", f"t_half {T_HALF*1e9:.0f} ns at 2 MHz, 0.45/fs after non-overlap; jitter-immune (SC)", "hand"],
+    ]
+    L.append(fmt_table(["block", "parameter", "spec", "budget line"], T))
+    L += ["## Open risks (not modelled)", "",
+          "- Substrate coupling from the decimator and clock drivers into the integrator virtual ground.",
+          "- MIM voltage coefficient and bottom-plate parasitic (the sky130 MIM model has none): Cint VCC INL and Cp appear only in PEX/silicon.",
+          "- Chopper charge-injection spikes and OTA settling with the chopper in place, chopping and parked.",
+          "- OTA1 and OTA2 gain/linearity are applied together in the model (one `a0_db`); OTA2 cannot be relaxed on evidence until iadc.py has a separate a0_db2.",
+          "- Leakage cancellation in sys pairs assumes a signal-independent leakage (rho = 0.1 % non-cancelling is an assumption).",
+          "- Reset residue is budgeted as non-cancelling; a +--+ pair order and a >= 15 tau reset window make it negligible.",
+          "- Shared-Cs input: the source must settle a 5 pF pad plus Cs every half period; a 10 kohm source is not supported without an external buffer or decap.",
+          "- Fast modes (N 64/256/1024, 4 MHz) have their own INL/noise targets and were not swept here.", ""]
+    return L
 
 
 # ----------------------------------------------------------------------------------------- main

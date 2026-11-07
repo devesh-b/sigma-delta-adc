@@ -1,0 +1,1023 @@
+{
+ "budget": {
+  "noise_uv": 2.5,
+  "inl_ppm": 20.0,
+  "offset_uv": 5.0,
+  "gain_ppm": 5000.0
+ },
+ "spec": {
+  "a0_db": 80.0,
+  "a0_drop": 0.9,
+  "vlin": 2.0,
+  "ota_en": 10.0,
+  "fc": 631000.0,
+  "lf": 9.3,
+  "vres": 5e-06,
+  "vos": 0.009,
+  "vos2": 0.009,
+  "comp_off": 0.02,
+  "comp_noise": 0.005,
+  "tau_in": 1.875e-08,
+  "tau_ref": 1e-08,
+  "r_reset": 0.0001,
+  "i_leak": 1e-10
+ },
+ "sweeps": [
+  {
+   "sweep": "base (ideal OTA, switch kT/C only)",
+   "unit": "",
+   "value": null,
+   "n15": 0.5562488611077518,
+   "n240": 2.3463413398090665,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "A0 x a0_drop (vlin 2 V)",
+   "unit": "dB/-",
+   "value": [
+    70,
+    0.5
+   ],
+   "n15": 0.5879261916367219,
+   "n240": 2.4033163566589866,
+   "inl": 5.09249819030666,
+   "gain": -177.36362093589975,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "A0 x a0_drop (vlin 2 V)",
+   "unit": "dB/-",
+   "value": [
+    75,
+    0.5
+   ],
+   "n15": 0.5457602411658777,
+   "n240": 2.578633845933754,
+   "inl": 2.8646310224478277,
+   "gain": -99.73146066133421,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "A0 x a0_drop (vlin 2 V)",
+   "unit": "dB/-",
+   "value": [
+    80,
+    0.5
+   ],
+   "n15": 0.5549447667106007,
+   "n240": 2.492142596711772,
+   "inl": 1.6095870017385216,
+   "gain": -56.0835839383822,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "A0 x a0_drop (vlin 2 V)",
+   "unit": "dB/-",
+   "value": [
+    85,
+    0.5
+   ],
+   "n15": 0.5546368048245837,
+   "n240": 2.2082523566238974,
+   "inl": 0.9053722501706218,
+   "gain": -31.53751829365614,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "A0 x a0_drop (vlin 2 V)",
+   "unit": "dB/-",
+   "value": [
+    90,
+    0.5
+   ],
+   "n15": 0.5420637221795215,
+   "n240": 2.473397174976871,
+   "inl": 0.508770177320983,
+   "gain": -17.734602758223694,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "A0 x a0_drop (vlin 2 V)",
+   "unit": "dB/-",
+   "value": [
+    70,
+    0.9
+   ],
+   "n15": 0.5733884649316614,
+   "n240": 2.245961805614104,
+   "inl": 10.287129201203005,
+   "gain": -196.04205469603286,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "A0 x a0_drop (vlin 2 V)",
+   "unit": "dB/-",
+   "value": [
+    75,
+    0.9
+   ],
+   "n15": 0.5628103859795247,
+   "n240": 2.4060812154861164,
+   "inl": 5.783029164874165,
+   "gain": -110.23102306206845,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "A0 x a0_drop (vlin 2 V)",
+   "unit": "dB/-",
+   "value": [
+    80,
+    0.9
+   ],
+   "n15": 0.53883891536514,
+   "n240": 2.5497481963060493,
+   "inl": 3.2523324815514343,
+   "gain": -61.99136526297,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "A0 x a0_drop (vlin 2 V)",
+   "unit": "dB/-",
+   "value": [
+    85,
+    0.9
+   ],
+   "n15": 0.570686281104982,
+   "n240": 2.2368026479973673,
+   "inl": 1.828942468140582,
+   "gain": -34.859979094581384,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "A0 x a0_drop (vlin 2 V)",
+   "unit": "dB/-",
+   "value": [
+    90,
+    0.9
+   ],
+   "n15": 0.5433772218818632,
+   "n240": 2.461294853188754,
+   "inl": 1.0279811087365864,
+   "gain": -19.60209333662366,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "vlin_diff (A0 80, drop 0.9)",
+   "unit": "V",
+   "value": 0.8,
+   "n15": 0.5658500430255107,
+   "n240": 2.461294853188754,
+   "inl": 459.24534605640275,
+   "gain": -1522.207385856733,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "vlin_diff (A0 80, drop 0.9)",
+   "unit": "V",
+   "value": 1.0,
+   "n15": 0.5783373266406838,
+   "n240": 2.2263487764709002,
+   "inl": 253.26961265470516,
+   "gain": -792.5447362918669,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "vlin_diff (A0 80, drop 0.9)",
+   "unit": "V",
+   "value": 1.5,
+   "n15": 0.5625271493370219,
+   "n240": 2.4033163566665334,
+   "inl": 7.595716385311313,
+   "gain": -77.28774513804382,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "vlin_diff (A0 80, drop 0.9)",
+   "unit": "V",
+   "value": 2.0,
+   "n15": 0.53883891536514,
+   "n240": 2.5497481963060493,
+   "inl": 3.2523324815514343,
+   "gain": -61.99136526297,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "OTA thermal en",
+   "unit": "nV/rtHz",
+   "value": 5,
+   "n15": 0.6606586447308594,
+   "n240": 2.764160807882046,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "OTA thermal en",
+   "unit": "nV/rtHz",
+   "value": 7,
+   "n15": 0.7759486231086993,
+   "n240": 3.1968050211255825,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "OTA thermal en",
+   "unit": "nV/rtHz",
+   "value": 10,
+   "n15": 0.9270514996162521,
+   "n240": 3.9026333249582676,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "OTA thermal en",
+   "unit": "nV/rtHz",
+   "value": 14,
+   "n15": 1.1598983472751352,
+   "n240": 4.768430087755338,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "OTA thermal en",
+   "unit": "nV/rtHz",
+   "value": 20,
+   "n15": 1.590585054713549,
+   "n240": 6.480642121660636,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "OTA 1/f corner (lf 9.3)",
+   "unit": "Hz",
+   "value": 100000.0,
+   "n15": 0.5741790447893982,
+   "n240": 2.440736113809874,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "OTA 1/f corner (lf 9.3)",
+   "unit": "Hz",
+   "value": 631000.0,
+   "n15": 0.5985308893812629,
+   "n240": 2.644601296800128,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "OTA 1/f corner (lf 9.3)",
+   "unit": "Hz",
+   "value": 2000000.0,
+   "n15": 0.6346251504027319,
+   "n240": 2.897820723234002,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "lf (flicker 631k, Vos1 9 mV, vres 5 uV)",
+   "unit": "-",
+   "value": 1.0,
+   "n15": 0.5898560651914481,
+   "n240": 2.440736113809874,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 7.31074481075153,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "lf (flicker 631k, Vos1 9 mV, vres 5 uV)",
+   "unit": "-",
+   "value": 9.3,
+   "n15": 0.5934465799005734,
+   "n240": 2.5860867562655936,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 66.94520757021827,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "vres (lf 9.3)",
+   "unit": "V",
+   "value": 0.0,
+   "n15": 0.5562488611077518,
+   "n240": 2.3463413398090665,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "vres (lf 9.3)",
+   "unit": "V",
+   "value": 5e-06,
+   "n15": 0.5446567546386988,
+   "n240": 2.4191831962897683,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 46.44383394383978,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "vres (lf 9.3)",
+   "unit": "V",
+   "value": 2e-05,
+   "n15": 0.548745210272325,
+   "n240": 2.328025278988309,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 186.18360805862156,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "Vos2",
+   "unit": "V",
+   "value": 0.001,
+   "n15": 0.5539962704069978,
+   "n240": 2.3479316081933086,
+   "inl": 1.6653345369377348e-10,
+   "gain": -1.1102230246251565e-10,
+   "off_nosys": 3.9081578144077866,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "Vos2",
+   "unit": "V",
+   "value": 0.009,
+   "n15": 0.5536942408527308,
+   "n240": 2.3806899796633703,
+   "inl": 1.6653345369377348e-10,
+   "gain": -1.1102230246251565e-10,
+   "off_nosys": 35.17246642246619,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "Vos2",
+   "unit": "V",
+   "value": 0.02,
+   "n15": 0.5493153867955742,
+   "n240": 2.4122784729222584,
+   "inl": 2.220446049250313e-10,
+   "gain": 2.220446049250313e-10,
+   "off_nosys": 78.16315628815573,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "comp_offset (c2 0.5)",
+   "unit": "V",
+   "value": 0.005,
+   "n15": 0.5638205860311352,
+   "n240": 2.366192171434442,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0009539072038933228,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "comp_offset (c2 0.5)",
+   "unit": "V",
+   "value": 0.02,
+   "n15": 0.5625398660291488,
+   "n240": 2.430775447710126,
+   "inl": 2.7755575615628914e-10,
+   "gain": 2.220446049250313e-10,
+   "off_nosys": 0.006677350427253259,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "comp_offset (c2 0.5)",
+   "unit": "V",
+   "value": 0.05,
+   "n15": 0.5326003876730729,
+   "n240": 2.455981334583688,
+   "inl": 2.220446049250313e-10,
+   "gain": 2.220446049250313e-10,
+   "off_nosys": 0.02003205128181529,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "comp_offset (c2 0.25)",
+   "unit": "V",
+   "value": 0.005,
+   "n15": 0.5673375039305438,
+   "n240": 2.3485773471417333,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0038156288155732914,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "comp_offset (c2 0.25)",
+   "unit": "V",
+   "value": 0.02,
+   "n15": 0.546793097133033,
+   "n240": 2.4799906518555344,
+   "inl": 2.220446049250313e-10,
+   "gain": 2.220446049250313e-10,
+   "off_nosys": 0.020985958485680856,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "comp_offset (c2 0.25)",
+   "unit": "V",
+   "value": 0.05,
+   "n15": 0.5621361496813829,
+   "n240": 2.3143065064448147,
+   "inl": 2.220446049250313e-10,
+   "gain": 2.220446049250313e-10,
+   "off_nosys": 0.20032051281779206,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "comp_noise rms",
+   "unit": "V",
+   "value": 0.0001,
+   "n15": 0.581640183520004,
+   "n240": 2.668661982872782,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "comp_noise rms",
+   "unit": "V",
+   "value": 0.001,
+   "n15": 0.5869828422407161,
+   "n240": 2.668661982872782,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "comp_noise rms",
+   "unit": "V",
+   "value": 0.005,
+   "n15": 0.5919125156886562,
+   "n240": 2.715070191902137,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "tau_in",
+   "unit": "s",
+   "value": 1e-09,
+   "n15": 0.5562488611077518,
+   "n240": 2.3463413398090665,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "tau_in",
+   "unit": "s",
+   "value": 1e-08,
+   "n15": 0.5562488611077518,
+   "n240": 2.3463413398090665,
+   "inl": 2.220446049250313e-10,
+   "gain": -4.1255887595070817e-07,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "tau_in",
+   "unit": "s",
+   "value": 4.5e-08,
+   "n15": 0.5483431431626545,
+   "n240": 2.2662801797424916,
+   "inl": 0.0017554772080430325,
+   "gain": -16.551386359364706,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "tau_ref (cd_ref 5 pF pad)",
+   "unit": "s",
+   "value": 2.5e-09,
+   "n15": 0.5562488611077518,
+   "n240": 2.3463413398090665,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "tau_ref (cd_ref 5 pF pad)",
+   "unit": "s",
+   "value": 1e-08,
+   "n15": 0.5562488611077518,
+   "n240": 2.3463413398090665,
+   "inl": 1.6653345369377348e-10,
+   "gain": -2.9976021664879227e-08,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "tau_ref (cd_ref 5 pF pad)",
+   "unit": "s",
+   "value": 4.5e-08,
+   "n15": 0.5511821185168008,
+   "n240": 2.4113112013524303,
+   "inl": 0.005167618638557414,
+   "gain": -1.1914607079832606,
+   "off_nosys": 0.0,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "reset residue r on x1",
+   "unit": "-",
+   "value": 0.01,
+   "n15": 0.5488617895163981,
+   "n240": 2.238939662975566,
+   "inl": 2.7755575615628914e-10,
+   "gain": 2.220446049250313e-10,
+   "off_nosys": 47.64766483515715,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "reset residue r on x1",
+   "unit": "-",
+   "value": 0.001,
+   "n15": 0.5650947483853581,
+   "n240": 2.318184123886476,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 4.863972832742869,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "reset residue r on x1",
+   "unit": "-",
+   "value": 0.0001,
+   "n15": 0.5526508100353145,
+   "n240": 2.3864155648297944,
+   "inl": 2.7755575615628914e-10,
+   "gain": 2.220446049250313e-10,
+   "off_nosys": 0.4845848595805835,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "leakage at fs 0.25 MHz",
+   "unit": "A",
+   "value": 1e-11,
+   "n15": 1.9173107671136633,
+   "n240": 5.149390886043653,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 80.13392857141774,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "leakage at fs 0.25 MHz",
+   "unit": "A",
+   "value": 1e-10,
+   "n15": 1.8162874117647188,
+   "n240": 4.8121624309635616,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 799.9055631868123,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "leakage at fs 0.25 MHz",
+   "unit": "A",
+   "value": 1e-09,
+   "n15": 1.8995308185271171,
+   "n240": 5.228517325355261,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 7999.9961843711835,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "leakage at fs 2 MHz",
+   "unit": "A",
+   "value": 1e-11,
+   "n15": 0.559818028336924,
+   "n240": 2.3754416791541897,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 10.00839438337843,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "leakage at fs 2 MHz",
+   "unit": "A",
+   "value": 1e-10,
+   "n15": 0.5684224846934536,
+   "n240": 2.3554707210173964,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 100.18505799757176,
+   "off_sys": 0.0
+  },
+  {
+   "sweep": "leakage at fs 2 MHz",
+   "unit": "A",
+   "value": 1e-09,
+   "n15": 0.5499076461432608,
+   "n240": 2.1534840484927145,
+   "inl": 1.1102230246251565e-10,
+   "gain": 0.0,
+   "off_nosys": 999.9980921855922,
+   "off_sys": 0.0
+  }
+ ],
+ "checks": [
+  [
+   "vos1_chop",
+   true,
+   "lf*Vos1/(N-1), ota chop, sys off, lf 9.3, N 4096: model 20.49 vs theory 20.44 uV"
+  ],
+  [
+   "vos1_nochop",
+   true,
+   "lf*Vos1, no chop, sys off: model 83699.9 vs theory 83700.0 uV"
+  ],
+  [
+   "vos2",
+   true,
+   "2*Vos2/(c1(N-1)), sys off: model 35.17 vs theory 35.16 uV"
+  ],
+  [
+   "sys_cancel_vos1",
+   true,
+   "sys pair cancels vos1: residual 0.000 uV (theory 0, tol 0.5)"
+  ],
+  [
+   "sys_cancel_vos2",
+   true,
+   "sys pair cancels vos2: residual 0.000 uV (theory 0, tol 0.5)"
+  ],
+  [
+   "sys_cancel_vres",
+   true,
+   "sys pair cancels vres: residual 0.000 uV (theory 0, tol 0.5)"
+  ],
+  [
+   "ktc_scaling",
+   true,
+   "kT/C noise ratio Cs 0.0625/0.25 pF = 1.988 vs sqrt(4) = 2 (10 %)"
+  ],
+  [
+   "ktc_abs_0.0625pF",
+   true,
+   "kT/C per-conversion rms Cs 0.0625 pF: model 9.19 vs 2kT/C-weighted theory 9.29 uV (15 %)"
+  ],
+  [
+   "ktc_abs_0.125pF",
+   true,
+   "kT/C per-conversion rms Cs 0.125 pF: model 6.49 vs 2kT/C-weighted theory 6.57 uV (15 %)"
+  ],
+  [
+   "ktc_abs_0.25pF",
+   true,
+   "kT/C per-conversion rms Cs 0.25 pF: model 4.62 vs 2kT/C-weighted theory 4.64 uV (15 %)"
+  ],
+  [
+   "reset_0.01",
+   true,
+   "reset residue r 0.01, N 4096: x1-init sim 47.65, model x1_offset 47.65 vs 2*r*x1max/(c1(N-1)) = 47.67 uV"
+  ],
+  [
+   "reset_0.003",
+   true,
+   "reset residue r 0.003, N 4096: x1-init sim 14.18, model x1_offset 14.18 vs 2*r*x1max/(c1(N-1)) = 14.30 uV"
+  ],
+  [
+   "leak_0.25MHz",
+   true,
+   "leakage 100 pA, fs 0.25 MHz: model 799.9 vs I/(fs*Cs) = 800.0 uV; sys-pair residual 0.000 uV (ASSUMES signal-independent)"
+  ],
+  [
+   "leak_2MHz",
+   true,
+   "leakage 100 pA, fs 2 MHz: model 100.2 vs I/(fs*Cs) = 100.0 uV; sys-pair residual 0.000 uV (ASSUMES signal-independent)"
+  ],
+  [
+   "nonvac_compare",
+   true,
+   "comparison rejects theory x1.5, x0.5 and NaN"
+  ]
+ ],
+ "hand": {
+  "beta1": 0.8602150537634409,
+  "beta2": 0.6060606060606061,
+  "cl1_pF": 1.2591397849462367,
+  "step_diff_V": 0.512,
+  "sr_min_V_per_us": 11.377777777777776,
+  "gbw_lin_MHz": 4.1115026965406285,
+  "gbw_full_MHz": 8.223005393081257,
+  "gm_noise": {
+   "7": {
+    "gm_uS": 676.2362448979591,
+    "i_tail_uA": 90.16483265306123,
+    "i_ota1_uA": 198.36263183673472,
+    "gbw_MHz": 85.47608642038674,
+    "sr_diff_V_per_us": 71.6082787082382,
+    "total_uA": 229.89183490705275
+   },
+   "10": {
+    "gm_uS": 331.35576,
+    "i_tail_uA": 44.18076799999999,
+    "i_ota1_uA": 97.19768959999999,
+    "gbw_MHz": 41.8832823459895,
+    "sr_diff_V_per_us": 35.08805656703671,
+    "total_uA": 128.72689267031802
+   },
+   "14": {
+    "gm_uS": 169.05906122448977,
+    "i_tail_uA": 22.541208163265306,
+    "i_ota1_uA": 49.59065795918368,
+    "gbw_MHz": 21.369021605096684,
+    "sr_diff_V_per_us": 17.90206967705955,
+    "total_uA": 81.11986102950172
+   }
+  },
+  "power_other": {
+   "ota2_uA": 5.529203070318037,
+   "comparator_uA": 6.0,
+   "bias_cmfb_refs_uA": 20.0
+  },
+  "ron_ohm": 819.672131147541,
+  "vov_V": 0.5,
+  "tau_in_ns_rsrc0": 7.258196721311475,
+  "rsrc_max_tau10_ohm": 498.50968703427725,
+  "rsrc_max_tau45_ohm": 6862.146050670641,
+  "rsrc_max_tau18_ohm": 2089.418777943368,
+  "fast_4MHz": {
+   "t_half_ns": 112.50000000000001,
+   "gbw_lin_MHz": 8.223005393081257,
+   "gbw_full_MHz": 16.446010786162514,
+   "sr_min_V_per_us": 22.755555555555553
+  },
+  "tau_in_budget_t12_ns": 18.750000000000004,
+  "t_reset_15tau_ns": 59.99999999999999,
+  "r_after_15tau": 3.059023205018258e-07,
+  "tau_needed_for_r1e-4": 9.210340371976184,
+  "stage2": {
+   "Cs2 0.25 / Cint2 0.5 pF, c2 0.5": {
+    "ktc2_in_uV_per_conv": 0.015716229519085474,
+    "mim_um2_diff_x1.5": 1125.0,
+    "x2_step_V": 0.512
+   },
+   "Cs2 0.5 / Cint2 1 pF, c2 0.5": {
+    "ktc2_in_uV_per_conv": 0.011113052467629532,
+    "mim_um2_diff_x1.5": 2250.0,
+    "x2_step_V": 0.512
+   },
+   "Cs2 1 / Cint2 2 pF, c2 0.5": {
+    "ktc2_in_uV_per_conv": 0.007858114759542737,
+    "mim_um2_diff_x1.5": 4500.0,
+    "x2_step_V": 0.512
+   },
+   "Cs2 1 / Cint2 4 pF, c2 0.25": {
+    "ktc2_in_uV_per_conv": 0.007858114759542737,
+    "mim_um2_diff_x1.5": 7499.999999999998,
+    "x2_step_V": 0.256
+   },
+   "Cs2 0.5 / Cint2 2 pF, c2 0.25": {
+    "ktc2_in_uV_per_conv": 0.011113052467629532,
+    "mim_um2_diff_x1.5": 3749.999999999999,
+    "x2_step_V": 0.256
+   }
+  },
+  "mim_um2": {
+   "Cs1": 749.9999999999999,
+   "Cint1": 5999.999999999999,
+   "Cs2": 749.9999999999999,
+   "Cint2": 1499.9999999999998
+  },
+  "mim_total_um2": 8999.999999999998,
+  "tile_um2": 75150,
+  "kick_gain_ppm_per_mV": 3.814697265625,
+  "x2_min_step_V": 0.512
+ },
+ "alloc": [
+  {
+   "block": "sampling switches kT/C (Cs 0.5 pF)",
+   "metric": "noise_uv",
+   "share": 1.2,
+   "spec": "Cs 0.5 pF, 2 events",
+   "value": 0.5562488611077518,
+   "margin": 2.15730778775931,
+   "kind": "model"
+  },
+  {
+   "block": "OTA1 thermal",
+   "metric": "noise_uv",
+   "share": 1.2,
+   "spec": "en <= 10 nV/rtHz",
+   "value": 0.7416277283496558,
+   "margin": 1.6180624781524282,
+   "kind": "model"
+  },
+  {
+   "block": "OTA1 1/f + chopper residue",
+   "metric": "noise_uv",
+   "share": 1.0,
+   "spec": "fc <= 631 kHz, lf <= 9.3, vres <= 5 uV",
+   "value": 0.15454335782702266,
+   "margin": 6.470676022966191,
+   "kind": "model"
+  },
+  {
+   "block": "comparator noise",
+   "metric": "noise_uv",
+   "share": 0.3,
+   "spec": "<= 5 mV rms (input-ref)",
+   "value": 1.0587911840678754e-16,
+   "margin": 2833419889721787.0,
+   "kind": "model"
+  },
+  {
+   "block": "OTA2 + stage-2 kT/C (hand)",
+   "metric": "noise_uv",
+   "share": 0.3,
+   "spec": "Cs2 0.5 pF, OTA2 same excess",
+   "value": 0.004042966689447136,
+   "margin": 74.20293636923932,
+   "kind": "hand"
+  },
+  {
+   "block": "reserve: ref path, substrate, chopper spikes",
+   "metric": "noise_uv",
+   "share": 1.0,
+   "spec": "unmodelled; measure in C10/V",
+   "value": 0.0,
+   "margin": Infinity,
+   "kind": "reserve"
+  },
+  {
+   "block": "OTA1+OTA2 gain and swing linearity",
+   "metric": "inl_ppm",
+   "share": 8.0,
+   "spec": "A >= 80 dB, <= 90 % drop at |Vout,diff| <= 2 V",
+   "value": 3.2523324815514343,
+   "margin": 2.4597731152578297,
+   "kind": "model"
+  },
+  {
+   "block": "input sampling settling",
+   "metric": "inl_ppm",
+   "share": 2.0,
+   "spec": "tau_in <= 18.75 ns",
+   "value": 2.07511785532688e-06,
+   "margin": 963800.6799787055,
+   "kind": "model"
+  },
+  {
+   "block": "reference path settling",
+   "metric": "inl_ppm",
+   "share": 2.0,
+   "spec": "tau_ref <= 10 ns (500 ohm + 5 pF pad)",
+   "value": 1.6653345369377348e-10,
+   "margin": 12009599006.321323,
+   "kind": "model"
+  },
+  {
+   "block": "comparator offset",
+   "metric": "inl_ppm",
+   "share": 1.0,
+   "spec": "<= 20 mV",
+   "value": 2.7755575615628914e-10,
+   "margin": 3602879701.8963966,
+   "kind": "model"
+  },
+  {
+   "block": "quantization floor (N 4096, raw accumulators)",
+   "metric": "inl_ppm",
+   "share": 1.0,
+   "spec": "N = 4096",
+   "value": 0.419421073705184,
+   "margin": 2.3842388060427115,
+   "kind": "model"
+  },
+  {
+   "block": "reserve: MIM VCC, charge-inj. nonlinearity, substrate",
+   "metric": "inl_ppm",
+   "share": 6.0,
+   "spec": "unmodelled",
+   "value": 0.0,
+   "margin": Infinity,
+   "kind": "reserve"
+  },
+  {
+   "block": "Vos1, Vos2, vres, comp offset (model residual in sys pair)",
+   "metric": "offset_uv",
+   "share": 1.0,
+   "spec": "Vos 9 mV, vres 5 uV, comp 20 mV",
+   "value": 0.0,
+   "margin": Infinity,
+   "kind": "model"
+  },
+  {
+   "block": "reset residue r (worst case, does NOT cancel)",
+   "metric": "offset_uv",
+   "share": 1.0,
+   "spec": "r <= 0.0001 (window >= 15 tau)",
+   "value": 0.4845848595805835,
+   "margin": 2.0636220472623044,
+   "kind": "model"
+  },
+  {
+   "block": "virtual-ground leakage (hand, rho 0.1 % ASSUMED)",
+   "metric": "offset_uv",
+   "share": 1.0,
+   "spec": "I_leak <= 100 pA at 125 C, fs 0.25 MHz",
+   "value": 0.8,
+   "margin": 1.25,
+   "kind": "hand"
+  },
+  {
+   "block": "reserve: pair drift, chopper charge injection",
+   "metric": "offset_uv",
+   "share": 2.0,
+   "spec": "unmodelled; +--+ ordering helps",
+   "value": 0.0,
+   "margin": Infinity,
+   "kind": "reserve"
+  },
+  {
+   "block": "finite A0 and swing (model)",
+   "metric": "gain_ppm",
+   "share": 300.0,
+   "spec": "A >= 80 dB",
+   "value": 61.99136526297,
+   "margin": 4.839383658149603,
+   "kind": "model"
+  },
+  {
+   "block": "input + reference settling (model)",
+   "metric": "gain_ppm",
+   "share": 500.0,
+   "spec": "tau_in, tau_ref as above",
+   "value": 0.014990373053969108,
+   "margin": 33354.740285640284,
+   "kind": "model"
+  },
+  {
+   "block": "cap ratio mismatch Cs/Cint (hand)",
+   "metric": "gain_ppm",
+   "share": 3000.0,
+   "spec": "3 sigma ratio mismatch <= 0.3 %; verify by MC in C10",
+   "value": 3000.0,
+   "margin": 1.0,
+   "kind": "requirement"
+  },
+  {
+   "block": "reserve: pad/bond droop, 5 mV kickback",
+   "metric": "gain_ppm",
+   "share": 1200.0,
+   "spec": "calibratable",
+   "value": 19.073486328125,
+   "margin": 62.91456,
+   "kind": "hand"
+  }
+ ],
+ "joint": {
+  "n15": 0.9353166843158615,
+  "n240": 3.943811362058073,
+  "inl": 3.408335365995274,
+  "gain": -62.016522721419776,
+  "off_nosys": 103.47317612942952,
+  "off_sys": -0.020985958485791878
+ },
+ "fails": []
+}
