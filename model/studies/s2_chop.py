@@ -157,6 +157,131 @@ def render(res, out):
         f.write("\n".join(L) + "\n")
 
 
+# ---------------------------------------------------------------- v2 (WO-04)
+V2_NS = (256, 1024, 4096)
+V2_C1 = ((0.25, 1.0), (0.125, 0.5))          # (c1, k)
+RATES4 = (240.0, 60.0, 15.0, 3.75)
+
+
+def e2_offset_est(N, c1, k, kind, sc, e2, M, seed=7):
+    """mean input-referred error [uV] and sem of constant e2 [V] injected via `kind` (vos2|x1_offset),
+    differential vs e2=0 with identical random numbers; sc: pair-average with swapped input polarity."""
+    rng0 = np.random.default_rng(1234)
+    u0 = -0.5 + (np.arange(M) + rng0.uniform(0, 1, M)) / M
+    u = np.tile(u0, 2) if sc else u0
+    sign = np.concatenate([np.ones(M), -np.ones(M)]) if sc else None
+    outs = []
+    for v in (e2, 0.0):
+        p = iadc.Params(order=2, N=N, fs=FS, cs=CS, ktc_on=True, c1=c1, c2=0.5, k=k, sys_chop=sc, **{kind: v})
+        uh = iadc.convert(p, u, rng=np.random.default_rng(seed), sys_sign=sign)
+        outs.append((uh[:M] + uh[M:]) / 2 if sc else uh)
+    d = (outs[0] - outs[1]) * 2.048 * 1e6
+    return float(np.mean(d)), float(np.std(d) / math.sqrt(len(d)))
+
+
+def noise_d17(N, mode, lf, cs, rate, m_out):
+    chop, sc = MODES[mode]
+    k = max(2, 2 * round(FS / (N * rate) / 2))
+    p = iadc.Params(order=2, N=N, fs=FS, vref=2.048, c1=0.125, c2=0.5, k=0.5, cs=cs, a0_db=80, a0_drop=0.9,
+                    vlin_diff=2.0, ktc_on=True, flicker_on=True, vos=9e-3, chop=chop, vres=5e-6, sys_chop=sc,
+                    ref_mode="shared", tau_in=20e-9, tau_ref=10e-9, lf_gain=lf,
+                    white_ng_ref=iadc.Params().noise_gain)
+    r = iadc.measure_noise(p, k, m_out=m_out, u_dc=0.1, seed=3)
+    return r["rms_v"] * 1e6, r["rate"]
+
+
+def main_v2(a):
+    out = a.out or os.path.join(HERE, "..", "out", "s2v2")
+    os.makedirs(out, exist_ok=True)
+    M = a.offset_pairs
+    t0 = time.time()
+    lines, fails = [], []
+
+    def rec(ok, text):
+        lines.append(f"{'PASS' if ok else 'FAIL'} {text}")
+        if not ok:
+            fails.append(text)
+
+    # 1. OTA2 offset / x1 output offset
+    E2 = 9e-3
+    e2rows = []
+    for (c1, k), N, kind in itertools.product(V2_C1, V2_NS, ("vos2", "x1_offset")):
+        mm, ss = e2_offset_est(N, c1, k, kind, False, E2, M)
+        ms, sss = e2_offset_est(N, c1, k, kind, True, E2, M)
+        pred = th.e2_error(N, c1, E2) * 1e6
+        okm = np.isfinite(mm) and abs(mm - pred) <= max(0.10 * abs(pred), 4 * ss)
+        oks = np.isfinite(ms) and abs(ms) <= max(0.5, 4 * sss)
+        wrong = abs(-mm - pred) > max(0.10 * abs(pred), 4 * ss)       # non-vacuity: flipped sign rejects
+        e2rows.append(dict(c1=c1, k=k, N=N, kind=kind, model_uV=mm, sem_uV=ss, theory_uV=pred, sys_uV=ms, sys_sem_uV=sss))
+        rec(okm, f"e2 model-vs-theory {kind} c1 {c1} N {N}: model {mm:.2f} (sem {ss:.2f}) vs theory {pred:.2f} uV (10 %)")
+        rec(oks, f"e2 sys-chop cancels {kind} c1 {c1} N {N}: pair-averaged {ms:.2f} uV (sem {sss:.2f}), single {mm:.1f}")
+        rec(wrong, f"e2 non-vacuity (sign-flipped model rejected) {kind} c1 {c1} N {N}")
+    print(f"e2 done t={time.time()-t0:.0f}s", flush=True)
+
+    # 2. order-1 residue lf*Vos/N (N even), 0 (N odd)
+    o1rows = []
+    VOS = 9e-3
+    for N in (256, 512, 255, 511):
+        mm, ss = offset_est(1, N, "ota", VOS, 0.0, 1.0, a.o1_pairs)
+        pred = th.order1_residue(N, VOS, 1.0) * 1e6
+        old = th.predict(1, N, "ota", VOS, 0.0, 1.0) * 1e6 if N % 2 == 0 else float("nan")
+        ok = np.isfinite(mm) and abs(mm - pred) <= max(0.20 * abs(pred), 4 * ss)
+        o1rows.append(dict(N=N, model_uV=mm, sem_uV=ss, theory_uV=pred, old_kernel_uV=old))
+        rec(ok, f"order-1 OTA-chop residue N {N}: model {mm:.2f} (sem {ss:.2f}) vs theory lf*Vos/N = {pred:.2f} uV")
+    for N in (256, 512):
+        mm, ss = offset_est(1, N, "sys", VOS, 0.0, 1.0, a.o1_pairs // 2)
+        rec(abs(mm) <= max(1.0, 4 * ss), f"order-1 sys-chop cancels residue N {N}: {mm:.2f} uV (sem {ss:.2f})")
+    old512 = [r for r in o1rows if r["N"] == 512][0]
+    rec(abs(old512["model_uV"] - old512["old_kernel_uV"]) > 4 * old512["sem_uV"],
+        f"order-1 non-vacuity: old kernel (0) rejected at N 512 (model {old512['model_uV']:.2f} vs {old512['old_kernel_uV']:.2f})")
+    print(f"order-1 done t={time.time()-t0:.0f}s", flush=True)
+
+    # 6. noise at the D17 point
+    noise = []
+    for N, mode, lf, cs, rate in itertools.product(a.v2_ns, ("ota+sys", "sys"), (1.0, 9.3), (1e-12, 0.5e-12), RATES4):
+        r, act = noise_d17(N, mode, lf, cs, rate, a.m_out)
+        noise.append(dict(N=N, mode=mode, lf=lf, cs_pF=cs * 1e12, rate_nom=rate, rate=act, rms_uV=r))
+        print(f"noise N={N} {mode} lf={lf} cs={cs*1e12} {rate}: {r:.2f} uV t={time.time()-t0:.0f}s", flush=True)
+    rec(all(np.isfinite(r["rms_uV"]) for r in noise), "noise: all measurements finite")
+    for r in noise:
+        if r["rate_nom"] == 15.0 and r["lf"] == 9.3 and r["N"] == max(a.v2_ns):
+            rec(r["rms_uV"] <= 50.0, f"noise <= 50 uV @15 SPS, lf 9.3, N {r['N']}, {r['mode']}, Cs {r['cs_pF']} pF: {r['rms_uV']:.2f} uV")
+
+    L = ["# S2 v2: OTA2 offset, order-1 residue, noise at the D17 point (WO-04)", "",
+         f"Command: `python3 model/studies/s2_chop.py --v2 --out {out} --offset-pairs {M} --o1-pairs {a.o1_pairs} --m-out {a.m_out}`", "",
+         "```"] + lines + ["```", "",
+         "## OTA2 offset / x1 output offset, 9 mV, no sys chop [uV], model (sem) / theory 2*e2/(c1(N-1))", "",
+         "| c1 | injected at | N=256 | N=1024 | N=4096 |", "|---|---|---|---|---|"]
+    for (c1, k) in V2_C1:
+        for kind in ("vos2", "x1_offset"):
+            c = []
+            for N in V2_NS:
+                r = [x for x in e2rows if (x["c1"], x["N"], x["kind"]) == (c1, N, kind)][0]
+                c.append(f"{r['model_uV']:.2f} ({r['sem_uV']:.2f}) / {r['theory_uV']:.2f}")
+            L.append(f"| {c1} | {kind} | " + " | ".join(c) + " |")
+    L += ["", "## Order-1 OTA-chop-only residue, Vos 9 mV, lf 1 [uV]", "",
+          "| N | model (sem) | theory lf*Vos/N (even) / 0 (odd) |", "|---|---|---|"]
+    for r in o1rows:
+        L.append(f"| {r['N']} | {r['model_uV']:.2f} ({r['sem_uV']:.2f}) | {r['theory_uV']:.2f} |")
+    L += ["", "## rms noise at the D17 point [uV]", "",
+          "B (VREF 2.048, c1 .125, c2 .5, k .5), shared Cs, A0 80 dB, a0_drop 0.9 at vlin 2.0 V, flicker + kT/C on, Vos 9 mV, vres 5 uV. "
+          f"m_out {a.m_out} (about 12 % statistical error). Actual rates in brackets.", "",
+          "| N | mode | lf | Cs pF | " + " | ".join(f"{r:g} SPS" for r in RATES4) + " |", "|---|---|---|---|" + "---|" * len(RATES4)]
+    for N, mode, lf, cs in itertools.product(a.v2_ns, ("ota+sys", "sys"), (1.0, 9.3), (1.0, 0.5)):
+        c = []
+        for rt in RATES4:
+            r = [x for x in noise if (x["N"], x["mode"], x["lf"], x["cs_pF"], x["rate_nom"]) == (N, mode, lf, cs, rt)][0]
+            c.append(f"{r['rms_uV']:.2f} ({r['rate']:.1f})")
+        L.append(f"| {N} | {mode} | {lf:g} | {cs:g} | " + " | ".join(c) + " |")
+    L += [""]
+    open(os.path.join(out, "s2_chop_v2.md"), "w").write("\n".join(L) + "\n")
+    json.dump(dict(e2=e2rows, order1=o1rows, noise=noise, lines=lines, offset_pairs=M, o1_pairs=a.o1_pairs,
+                   m_out=a.m_out, runtime_s=time.time() - t0), open(os.path.join(out, "s2_chop_v2.json"), "w"), indent=1)
+    print("\n".join(lines))
+    print("REJECT" if fails else "ACCEPT")
+    return 1 if fails else 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=None)
@@ -164,7 +289,12 @@ def main():
     ap.add_argument("--render-only", action="store_true", help="regenerate md from existing json in --out")
     ap.add_argument("--m-out", type=int, default=32)
     ap.add_argument("--offset-pairs", type=int, default=8192)
+    ap.add_argument("--v2", action="store_true", help="WO-04: OTA2/x1 offset, order-1 residue, D17-point noise")
+    ap.add_argument("--o1-pairs", type=int, default=65536)
+    ap.add_argument("--v2-ns", type=int, nargs="+", default=[1024, 4096])
     a = ap.parse_args()
+    if a.v2:
+        sys.exit(main_v2(a))
     if a.nonvac:
         sys.exit(nonvac(a.offset_pairs))
     out = a.out or os.path.join(HERE, "..", "out", "s2")
