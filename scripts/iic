@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# iic — run one command inside IIC-OSIC-TOOLS on the sandbox (batch, no GUI).
+#
+#   ~/bin/rta-tt 'scripts/iic "ngspice -b sim/foo.spice"'
+#   ~/bin/rta-tt --bg NAME 'scripts/iic "cd /foss/designs/regr/run1 && ngspice -b x.spice"'
+#
+# Mounts (inside the container):
+#   /foss/designs/tt-sd  <- /home/mempool/tt-sd   (synced source tree; treat as read-mostly,
+#                                                    the next sync --delete wipes anything new)
+#   /foss/designs/regr   <- /home/mempool/regr/tt  (write all sim outputs here)
+#
+# PDK: by default the TT-pinned sky130 (open_pdks d56f8a8ea0f9171cbdc5273035907b93f3f3bed7,
+#      ~/.ciel on the box, mounted read-only at /foss/pdks-tt). IIC_PDK=image uses the
+#      image's own /foss/pdks (open_pdks 1689ac3f..., also has gf180 / IHP).
+# Env: IIC_TAG (default 2026.10), PDK (default sky130A), IIC_PDK (tt|image), IIC_CPUS (default 4),
+#      IIC_MEM (default 16g). Caps leave room for AlphaOneSoC jobs on the shared box.
+# Start-up scripts / docs for the image: /home/mempool/iic-osic-tools (git tag 2026.10).
+set -euo pipefail
+
+TAG=${IIC_TAG:-2026.10}
+IMG=hpretl/iic-osic-tools:$TAG
+TT=/home/mempool/tt-sd
+REGR=/home/mempool/regr/tt
+
+if [ "$(hostname)" != mempool ]; then
+  echo "iic: runs on the sandbox only (user rule); use ~/bin/rta-tt" >&2
+  exit 2
+fi
+[ $# -ge 1 ] || { echo "usage: scripts/iic '<command>'" >&2; exit 2; }
+mkdir -p "$REGR"
+case "${IIC_PDK:-tt}" in
+  tt)    PDK_SETUP='export PDK_ROOT=/foss/pdks-tt; export PDKPATH=$PDK_ROOT/$PDK;' ;;
+  image) PDK_SETUP='' ;;
+  *) echo "iic: IIC_PDK must be tt or image" >&2; exit 2 ;;
+esac
+
+exec docker run --rm -i \
+  --name "iic-tt-$$" \
+  --user "$(id -u):$(id -g)" \
+  --cpus "${IIC_CPUS:-4}" --memory "${IIC_MEM:-16g}" \
+  -e PDK="${PDK:-sky130A}" \
+  -v /home/mempool/.ciel:/foss/pdks-tt:ro \
+  -v "$TT":/foss/designs/tt-sd:rw \
+  -v "$REGR":/foss/designs/regr:rw \
+  "$IMG" -s /bin/bash -lc "$PDK_SETUP cd /foss/designs/tt-sd && $*"

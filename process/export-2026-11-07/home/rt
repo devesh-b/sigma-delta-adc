@@ -1,0 +1,438 @@
+#!/usr/bin/env bash
+# rt — run commands in a persistent remote shell over SSH.
+#
+# Nothing is installed on the remote host. State lives in a tmux session
+# there, so cwd, environment variables, and activated virtualenvs persist
+# between invocations.
+#
+# Config via environment:
+#   RT_HOST        ssh alias of the sandbox              (default: sandbox)
+#   RT_SESSION     tmux session name                     (default: rt)
+#   RT_WORKDIR     cwd for a freshly created session     (default: /srv/work)
+#   RT_DIR         remote scratch dir                    (default: /tmp/rt)
+#   RT_TIMEOUT     seconds to wait for a command         (default: 900)
+#   RT_MAX_BYTES   cap on returned output                (default: 200000)
+#   RT_SHELL       shell tmux launches                   (default: /bin/bash -l)
+#   RT_INIT        local file sourced in a NEW session    (default: ~/.config/rt/init.sh)
+#   RT_INIT_CMDS   inline alternative to RT_INIT
+#   RT_NO_HOME=1   run the shell with HOME pointed at RT_DIR/home
+#   RT_FORCE=1     send even if the pane looks busy
+#   RT_LOCAL=1     run against the local machine (for debugging rt itself)
+#
+# Exit status is the remote command's own status, except:
+#    97  rt could not set up or reach the tmux session
+#   124  RT_TIMEOUT elapsed (command may still be running remotely)
+#   125  rt could not read an exit status
+#    75  another rt call is already in flight
+#   255  SSH transport failure (ssh's own code)
+
+set -uo pipefail
+
+HOST=${RT_HOST:-sandbox}
+SESS=${RT_SESSION:-rt}
+WORKDIR=${RT_WORKDIR:-/home/mempool}
+RTDIR=${RT_DIR:-/tmp/rt}
+TIMEOUT=${RT_TIMEOUT:-900}
+MAXBYTES=${RT_MAX_BYTES:-200000}
+FORCE=${RT_FORCE:-0}
+RSHELL=${RT_SHELL:-/bin/bash -l}
+[ "${RT_NO_HOME:-0}" = 1 ] && RSHELL="env HOME=$RTDIR/home /bin/bash --noprofile -i"
+
+CACHE_DIR=${XDG_CACHE_HOME:-$HOME/.cache}/rt
+STATE_FILE="$CACHE_DIR/state-$HOST-$SESS"
+INIT_FILE=${RT_INIT:-${XDG_CONFIG_HOME:-$HOME/.config}/rt/init.sh}
+
+die() { printf 'rt: %s\n' "$*" >&2; exit 97; }
+
+if [ "${RT_LOCAL:-0}" = 1 ]; then
+  # ssh concatenates its command arguments with spaces and hands the result
+  # to a remote shell; emulate that exactly so RT_LOCAL testing is faithful.
+  remote() { bash -c "$*"; }
+  remote_tty() { bash -c "$*"; }
+else
+  remote() { ssh "$HOST" "$@"; }
+  remote_tty() { ssh -t "$HOST" "$@"; }
+fi
+
+usage() {
+  cat <<'EOF'
+usage:
+  rt <command...>              run a command in the persistent remote shell
+  rt --bg NAME <command...>    start a detached command, log to <NAME>.log
+  rt --logs NAME [LINES]       tail a background log (default 50 lines)
+  rt --status                  session state: cwd, running command, uptime
+  rt --attach                  attach interactively (Ctrl-b d to detach)
+  rt --watch                   attach read-only (safe way to observe)
+  rt --interrupt               send Ctrl-C to the remote shell
+  rt --send <keys...>          raw tmux send-keys (feed stdin to a REPL)
+  rt --reset                   kill and recreate the session
+  rt --kill                    kill the session and remove scratch files
+  rt --doctor                  check every link in the chain
+  rt --heal                    rebuild connection, mount, and session
+  rt --help                    this text
+
+state:
+  cwd, exported vars, and activated virtualenvs persist between calls.
+  If the sandbox reboots or the shell dies, rt says so loudly in its
+  output and re-applies the session init script (see RT_INIT).
+EOF
+}
+
+# --- remote driver ---------------------------------------------------------
+RUNNER=$(cat <<'REMOTE'
+set -u
+SESS=$1; WORKDIR=$2; RTDIR=$3; ID=$4; B64=$5; TMO=$6; FORCE=$7
+LASTBOOT=$8; INITB64=$9; MAXB=${10}; RSHELL=${11}
+
+meta() { printf '__RT_META__ %s\n' "$*" >&2; }
+
+command -v tmux >/dev/null 2>&1 || { echo "rt(remote): tmux not found on PATH" >&2; exit 97; }
+
+boot=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || uptime -s 2>/dev/null || echo unknown)
+boot=$(printf %s "$boot" | tr -d ' \n:-')
+meta "boot=$boot"
+
+mkdir -p "$RTDIR" 2>/dev/null || { echo "rt(remote): cannot create $RTDIR" >&2; exit 97; }
+OUT="$RTDIR/$ID.out"; RC="$RTDIR/$ID.rc"
+: > "$OUT" || exit 97
+rm -f "$RC"
+
+created=0
+if ! tmux has-session -t "=$SESS" 2>/dev/null; then
+  created=1
+  # Never fall back to $HOME: it may be unreadable, read-only, or on an
+  # unmounted network filesystem. /tmp always works.
+  [ -d "$WORKDIR" ] || WORKDIR=/tmp
+  mkdir -p "$RTDIR/home" 2>/dev/null
+  tmux new-session -d -s "$SESS" -c "$WORKDIR" $RSHELL 2>/dev/null \
+    || { echo "rt(remote): could not create tmux session '$SESS'" >&2; exit 97; }
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    [ -n "$(tmux display-message -p -t "=$SESS:" '#{pane_pid}' 2>/dev/null)" ] && break
+    sleep 0.2
+  done
+  sleep 0.6
+  # HISTFILE=/dev/null keeps the shell from writing command history into
+  # the remote $HOME. History still works within the session.
+  tmux send-keys -t "=$SESS:" \
+    "export HISTFILE=/dev/null RT_SESSION='$SESS'; PS1='[rt \w]\$ '; clear" Enter
+  sleep 0.4
+
+  if [ -n "$INITB64" ] && [ "$INITB64" != "-" ]; then
+    ILOG="$RTDIR/$ID.initlog"; IRC="$RTDIR/$ID.initrc"
+    rm -f "$IRC"
+    tmux send-keys -t "=$SESS:" \
+      "eval \"\$(printf %s $INITB64 | base64 -d)\" > $ILOG 2>&1; printf %s \$? > $IRC" Enter
+    iend=$(( $(date +%s) + 180 ))
+    while [ ! -s "$IRC" ]; do
+      [ "$(date +%s)" -ge "$iend" ] && break
+      sleep 0.3
+    done
+    if [ -s "$IRC" ]; then
+      irc=$(cat "$IRC")
+      meta "init=$irc"
+      [ "$irc" != 0 ] && { echo "rt(remote): session init exited $irc:" >&2; cat "$ILOG" >&2; }
+    else
+      meta "init=timeout"
+    fi
+    rm -f "$IRC" "$ILOG"
+  fi
+fi
+meta "created=$created"
+
+if [ "$FORCE" != 1 ]; then
+  cur=$(tmux display-message -p -t "=$SESS:" '#{pane_current_command}' 2>/dev/null)
+  case "$cur" in
+    bash|-bash|sh|-sh|zsh|-zsh|dash|ksh|fish|"") : ;;
+    *) echo "rt(remote): pane is busy running '$cur'; refusing to type into it." >&2
+       echo "rt(remote): use 'rt --watch' to look, 'rt --interrupt' to stop it," >&2
+       echo "rt(remote): 'rt --send' to feed it input, or RT_FORCE=1 to override." >&2
+       exit 97 ;;
+  esac
+fi
+
+tmux send-keys -t "=$SESS:" "eval \"\$(printf %s $B64 | base64 -d)\"" Enter 2>/dev/null \
+  || { echo "rt(remote): send-keys failed" >&2; exit 97; }
+
+end=$(( $(date +%s) + TMO ))
+while [ ! -s "$RC" ]; do
+  if [ "$(date +%s)" -ge "$end" ]; then
+    echo "rt(remote): timeout after ${TMO}s; the command is still running." >&2
+    echo "rt(remote): observe with 'rt --watch', stop with 'rt --interrupt'." >&2
+    echo "rt(remote): --- partial output ---" >&2
+    cat "$OUT"
+    exit 124
+  fi
+  sleep 0.2
+done
+sleep 0.25            # let the tee writer flush its tail
+
+sz=$(wc -c < "$OUT" 2>/dev/null || echo 0)
+if [ "$sz" -gt "$MAXB" ] 2>/dev/null; then
+  KEEP="$RTDIR/$ID.full"
+  mv "$OUT" "$KEEP"
+  head -c $(( MAXB * 6 / 10 )) "$KEEP"
+  printf '\n\n===== rt: output truncated (%s bytes total) =====\n' "$sz"
+  printf 'full output kept on the sandbox at %s\n' "$KEEP"
+  printf 'grep it with: rt grep -n PATTERN %s\n\n' "$KEEP"
+  tail -c $(( MAXB * 4 / 10 )) "$KEEP"
+else
+  cat "$OUT"
+  rm -f "$OUT"
+fi
+
+rc=$(cat "$RC" 2>/dev/null)
+rm -f "$RC"
+case "$rc" in ''|*[!0-9]*) exit 125 ;; esac
+exit "$rc"
+REMOTE
+)
+
+new_id() {
+  local id
+  id=$(date +%s%N 2>/dev/null)
+  case "$id" in *N*|'') id="$$-$RANDOM$RANDOM" ;; esac
+  printf 'rt%s' "$id"
+}
+
+# Build the shell payload executed inside the persistent pane.
+#  - the command sits in a brace group redirected via process substitution,
+#    NOT piped into tee: a pipeline would run it in a subshell and `cd`
+#    would not persist, which is the entire point of this tool.
+#  - the exit status goes to a sentinel file so the client gets a real
+#    status instead of screen-scraping the pane.
+build_payload() {
+  local cmd=$1 out=$2 rc=$3 shown
+  printf -v shown '%q' "$cmd"
+  cat <<PAYLOAD
+printf '\n\033[36m> %s\033[0m\n' $shown
+{ $cmd
+} > >(tee -a $out) 2>&1
+printf %s "\$?" > $rc
+PAYLOAD
+}
+
+build_bg_payload() {
+  local name=$1 cmd=$2 log=$3 out=$4 rc=$5
+  cat <<PAYLOAD
+{ $cmd
+} > $log 2>&1 &
+printf 'rt: background job %s started (pid %s)\nrt: log %s  ->  rt --logs %s\n' \\
+  $name "\$!" $log $name | tee -a $out
+disown 2>/dev/null || true
+printf %s 0 > $rc
+PAYLOAD
+}
+
+read_init_b64() {
+  local body=""
+  if [ -n "${RT_INIT_CMDS:-}" ]; then
+    body=$RT_INIT_CMDS
+  elif [ -f "$INIT_FILE" ]; then
+    body=$(cat "$INIT_FILE")
+  fi
+  if [ -z "$body" ]; then printf -- '-'; else printf '%s' "$body" | base64 | tr -d '\n'; fi
+}
+
+# Runs the payload, then translates the metadata channel into notices that
+# land in stdout, where Claude will actually read them.
+exec_payload() {
+  local payload=$1 id=$2 b64 initb64 lastboot newboot created initstat
+  b64=$(printf '%s' "$payload" | base64 | tr -d '\n')
+  initb64=$(read_init_b64)
+
+  mkdir -p "$CACHE_DIR" 2>/dev/null
+  lastboot=$(cat "$STATE_FILE" 2>/dev/null || echo "")
+
+  local lock="${TMPDIR:-/tmp}/rt-${HOST}-${SESS}.lock"
+  exec 9>"$lock" || die "cannot open lock file $lock"
+  flock -w 10 9 || { echo "rt: another rt call is in flight (waited 10s)" >&2; exit 75; }
+
+  local rc
+  RT_OUTF=$(mktemp) ; RT_ERRF=$(mktemp)
+  local outf=$RT_OUTF errf=$RT_ERRF
+  trap 'rm -f "${RT_OUTF:-}" "${RT_ERRF:-}"' EXIT
+
+  remote bash -s -- "$SESS" "$WORKDIR" "$RTDIR" "$id" "$b64" "$TIMEOUT" "$FORCE" \
+    "${lastboot:--}" "$initb64" "$MAXBYTES" "$RSHELL" \
+    9>&- >"$outf" 2>"$errf" <<<"$RUNNER"
+  rc=$?
+
+  newboot=$(sed -n 's/^__RT_META__ boot=//p' "$errf" | tail -1)
+  created=$(sed -n 's/^__RT_META__ created=//p' "$errf" | tail -1)
+  initstat=$(sed -n 's/^__RT_META__ init=//p' "$errf" | tail -1)
+
+  # State-loss notices go to stdout on purpose: stderr is easy to skim past,
+  # and silently losing cwd/venv is how you end up pip-installing into the
+  # system python and not noticing for twenty minutes.
+  if [ -n "$newboot" ] && [ -n "$lastboot" ] && [ "$lastboot" != "-" ] \
+     && [ "$newboot" != "$lastboot" ]; then
+    cat <<'EOF'
+=====================================================================
+rt: NOTICE — the sandbox REBOOTED since the last rt call.
+    Everything in /tmp is gone: background job logs, scratch files,
+    and any state not written under the working directory.
+    Running services may not have come back up. Verify before trusting
+    anything you established earlier in this conversation.
+=====================================================================
+EOF
+  fi
+  if [ "$created" = 1 ]; then
+    cat <<'EOF'
+=====================================================================
+rt: NOTICE — the persistent shell was created fresh.
+    Any cwd, exported variables, or activated virtualenv from earlier
+    calls are GONE. Do not assume you are where you were.
+EOF
+    case "$initstat" in
+      0)       echo "    The session init script re-applied cleanly." ;;
+      timeout) echo "    The session init script TIMED OUT. State is incomplete." ;;
+      "")      echo "    No session init script configured (see RT_INIT)." ;;
+      *)       echo "    The session init script FAILED (exit $initstat)." ;;
+    esac
+    echo "====================================================================="
+  fi
+
+  [ -n "$newboot" ] && printf '%s' "$newboot" > "$STATE_FILE" 2>/dev/null
+
+  cat "$outf"
+  grep -v '^__RT_META__ ' "$errf" >&2
+  return $rc
+}
+
+# --- client-side diagnostics ----------------------------------------------
+doctor() {
+  local ok=0 bad=0
+  chk() { # chk <label> <command...>
+    local label=$1; shift
+    if out=$("$@" 2>&1); then printf '  ok    %-28s %s\n' "$label" "${out:0:60}"; ok=$((ok+1))
+    else printf '  FAIL  %-28s %s\n' "$label" "${out:0:60}"; bad=$((bad+1)); fi
+  }
+  echo "rt --doctor  (host=$HOST session=$SESS workdir=$WORKDIR)"
+  echo
+  echo "control machine:"
+  chk "rt on PATH"        command -v rt
+  [ "${RT_LOCAL:-0}" != 1 ] && chk "ssh config entry" ssh -G "$HOST"
+  if [ "${RT_LOCAL:-0}" != 1 ]; then
+    chk "ssh master"      ssh -O check "$HOST"
+    chk "ssh reachable"   ssh -o BatchMode=yes -o ConnectTimeout=8 "$HOST" true
+  fi
+  local mount=${RT_MOUNT:-$HOME/sandbox}
+  if mountpoint -q "$mount" 2>/dev/null; then
+    chk "sshfs mount readable" timeout 8 ls "$mount"
+  else
+    printf '  warn  %-28s not mounted (run rmount)\n' "sshfs mount"
+  fi
+  echo
+  echo "sandbox:"
+  chk "tmux present"      remote 'command -v tmux'
+  chk "session exists"    remote "tmux has-session -t '=$SESS' 2>/dev/null && echo yes"
+  chk "workdir exists"    remote "test -d '$WORKDIR' && echo yes"
+  chk "scratch writable"  remote "mkdir -p '$RTDIR' && touch '$RTDIR/.probe' && rm -f '$RTDIR/.probe' && echo yes"
+  chk "passwordless sudo" remote 'sudo -n true 2>/dev/null && echo yes'
+  chk "uptime"            remote 'uptime -p 2>/dev/null || uptime'
+  chk "disk on workdir"   remote "df -h '$WORKDIR' 2>/dev/null | tail -1"
+  echo
+  echo "session init: ${RT_INIT_CMDS:+inline}${RT_INIT_CMDS:-$INIT_FILE}"
+  [ -n "${RT_INIT_CMDS:-}" ] || { [ -f "$INIT_FILE" ] && echo "  (present)" || echo "  (absent — state will NOT auto-restore after a reboot)"; }
+  echo
+  echo "$ok ok, $bad failed"
+  [ "$bad" -eq 0 ]
+}
+
+heal() {
+  echo "rt --heal: rebuilding the chain"
+  if [ "${RT_LOCAL:-0}" != 1 ]; then
+    ssh -O exit "$HOST" 2>/dev/null && echo "  closed stale ssh master"
+    ssh -Nf "$HOST" 2>/dev/null && echo "  opened fresh ssh master" \
+      || echo "  WARN could not open ssh master (VPN down?)"
+  fi
+  local mount=${RT_MOUNT:-$HOME/sandbox}
+  if mountpoint -q "$mount" 2>/dev/null; then
+    if ! timeout 8 ls "$mount" >/dev/null 2>&1; then
+      echo "  mount is stale, forcing unmount"
+      fusermount -uz "$mount" 2>/dev/null || true
+      command -v rmount >/dev/null && rmount mount && echo "  remounted"
+    else
+      echo "  mount healthy"
+    fi
+  else
+    command -v rmount >/dev/null && rmount mount && echo "  mounted"
+  fi
+  remote "tmux kill-session -t '=$SESS' 2>/dev/null; true" >/dev/null 2>&1
+  echo "  killed any old session; recreating with init"
+  rm -f "$STATE_FILE"
+  exec_payload "$(build_payload 'pwd' "$RTDIR/heal.out" "$RTDIR/heal.rc")" "heal"
+}
+
+# --- dispatch --------------------------------------------------------------
+[ $# -eq 0 ] && { usage; exit 2; }
+
+case ${1-} in
+  --help|-h)   usage; exit 0 ;;
+  --doctor)    doctor; exit $? ;;
+  --heal)      heal; exit $? ;;
+  --attach|-a) remote_tty "tmux attach -t '=$SESS'" ; exit $? ;;
+  --watch|-w)  remote_tty "tmux attach -r -t '=$SESS'" ; exit $? ;;
+
+  --status|-s)
+    remote "tmux display-message -p -t '=$SESS:' \
+      'session=#{session_name}  cwd=#{pane_current_path}  running=#{pane_current_command}  created=#{t:session_created}' \
+      2>/dev/null || echo 'no session named $SESS'"
+    exit $? ;;
+
+  --interrupt)
+    remote "tmux send-keys -t '=$SESS:' C-c" && echo "rt: sent Ctrl-C"
+    exit $? ;;
+
+  --send)
+    shift
+    [ $# -gt 0 ] || die "--send needs at least one argument"
+    args=""
+    for a in "$@"; do args+=" $(printf '%q' "$a")"; done
+    remote "tmux send-keys -t '=$SESS:'$args"
+    exit $? ;;
+
+  --reset)
+    remote "tmux kill-session -t '=$SESS' 2>/dev/null; rm -f $RTDIR/*.out $RTDIR/*.rc 2>/dev/null; true"
+    echo "rt: session '$SESS' killed; it will be recreated with init on the next command"
+    exit 0 ;;
+
+  --kill)
+    remote "tmux kill-session -t '=$SESS' 2>/dev/null; rm -rf $RTDIR 2>/dev/null; true"
+    rm -f "$STATE_FILE"
+    echo "rt: session '$SESS' killed and $RTDIR removed"
+    exit 0 ;;
+
+  --logs)
+    shift
+    [ $# -ge 1 ] || die "--logs needs a job name"
+    name=$1; lines=${2:-50}
+    remote "tail -n $lines $RTDIR/$name.log 2>/dev/null || echo 'no log for job $name (sandbox may have rebooted: /tmp is cleared)'"
+    exit $? ;;
+
+  --bg)
+    shift
+    [ $# -ge 2 ] || die "--bg needs a job name and a command"
+    name=$1; shift
+    case $name in *[!A-Za-z0-9_-]*) die "job name must be alphanumeric/dash/underscore" ;; esac
+    id=$(new_id)
+    exec_payload "$(build_bg_payload "$name" "$*" "$RTDIR/$name.log" "$RTDIR/$id.out" "$RTDIR/$id.rc")" "$id"
+    exit $? ;;
+
+  --*) die "unknown option: $1 (try rt --help)" ;;
+esac
+
+# A bare `exit` or `logout` runs in the persistent shell itself and would
+# terminate it, losing cwd and environment.
+case "$*" in
+  exit|exit\ *|logout|logout\ *)
+    if [ "$FORCE" != 1 ]; then
+      echo "rt: refusing to run '$*' — it would kill the persistent shell." >&2
+      echo "rt: use 'rt --reset' to restart the session deliberately," >&2
+      echo "rt: wrap it in a subshell like 'rt (exit 3)', or set RT_FORCE=1." >&2
+      exit 2
+    fi ;;
+esac
+
+id=$(new_id)
+exec_payload "$(build_payload "$*" "$RTDIR/$id.out" "$RTDIR/$id.rc")" "$id"

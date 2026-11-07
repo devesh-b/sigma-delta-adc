@@ -1,0 +1,2466 @@
+© 2009 Microchip Technology Inc. DS22003E-page 1
+MCP3421
+Features
+• 18-bit ΔΣ ADC in a SOT-23-6 package
+• Differential Input Operation
+• Self Calibration of Internal Offset and Gain Per 
+Each Conversion
+• On-Board Voltage Reference:
+- Accuracy: 2.048V ± 0.05%
+- Drift: 15 ppm/°C
+• On-Board Programmable Gain Amplifier (PGA):
+- Gains of 1,2, 4 or 8 
+• On-Board Oscillator
+• INL: 10 ppm of FSR (FSR = 4.096V/PGA)
+• Programmable Data Rate Options:
+- 3.75 SPS (18 bits)
+- 15 SPS (16 bits)
+- 60 SPS (14 bits)
+- 240 SPS (12 bits)
+• One-Shot or Continuous Conversion Options
+• Low Current Consumption: 
+- 145 µA typical 
+(VDD= 3V, Continuous Conversion)
+- 39 µA typical
+(VDD= 3V, One-Shot Conversion with 1 SPS)
+• Supports I 2C Serial Interface:
+- Standard, Fast and High Speed Modes
+• Single Supply Operation: 2.7V to 5.5V
+• Extended Temperature Range: -40°C to +125°C
+Typical Applications
+• Portable Instrumentation
+• Weigh Scales and Fuel Gauges
+• Temperature Sensing with RTD, Thermistor, and 
+Thermocouple
+• Bridge Sensing for Pressure, Strain, and Force.
+Package Types
+Description
+The MCP3421 is a single channel low-noise, high
+accuracy  ΔΣ A/D converter with differential inputs and
+up to 18 bits of resolution in a small SOT-23-6 package.
+The on-board precision 2. 048V reference voltage
+enables an input range of ±2.048V differentially
+(Δ voltage = 4.096V). The device uses a two-wire I 2C
+compatible serial interface and operates from a single
+2.7V to 5.5V power supply.
+The MCP3421 device performs conversion at rates of
+3.75, 15, 60, or 240 samples per second (SPS)
+depending on the user cont rollable configuration bit
+settings using the two-wire I 2C serial interface. This
+device has an on-board programmable gain amplifier
+(PGA). The user can select the PGA gain of x1, x2, x4,
+or x8 before the analog-to-digital conversion takes
+place. This allows the MCP3421 device to convert a
+smaller input signal with high resolution. The device
+has two conversion modes: (a) Continuous mode and
+(b) One-Shot mode. In One-Shot mode, the device
+enters a low current standby mode automatically after
+one conversion. This reduces current consumption
+greatly during idle periods.
+The MCP3421 device can be used for various high
+accuracy analog-to-digital data conversion applications
+where design simplicity, low power, and small footprint
+are major considerations.
+Block Diagram
+1
+2
+3 4
+5
+6VIN+
+ VSS
+SCL
+VIN-
+VDD
+SDA
+MCP3421SOT-23-6
+VSS VDD
+VIN+
+VIN-
+SCL SDA
+Voltage Reference
+Clock
+(2.048V)
+I2C Interface
+Gain = 1, 2, 4, or 8 VREF
+ΔΣ ADC
+ConverterPGA Oscillator
+18-Bit Analog-to-Digital Converter 
+with I2C Interface and On-Board Reference
+MCP3421
+DS22003E-page 2 © 2009 Microchip Technology Inc.
+NOTES:
+© 2009 Microchip Technology Inc. DS22003E-page 3
+MCP3421
+1.0 ELECTRICAL 
+CHARACTERISTICS
+1.1 Absolute Maximum Ratings†
+VDD...................................................................................7.0V
+All inputs and outputs w.r.t VSS ............... –0.3V to VDD+0.3V
+Differential Input Voltage ...................................... |VDD - VSS|
+Output Short Circuit Current ................................Continuous
+Current at Input Pins ....................................................±2 mA
+Current at Output and Supply Pins ............................±10 mA
+Storage Temperature ....................................-65°C to +150°C
+Ambient Temp. with power applied ...............-55°C to +125°C
+ESD protection on all pins ................ ≥ 6k VH B M ,  ≥ 400V MM
+Maximum Junction Temperature (TJ). .........................+150°C
+†Notice: Stresses above those listed under “Maximum Rat-
+ings” may cause permanent damage to the device. This is a
+stress rating only and functional operation of the device at
+those or any other conditions  above those indicated in the
+operational listings of this specification is not implied.
+Exposure to maximum rating conditions for extended periods
+may affect device reliability.
+1.2 Electrical Specifications
+ELECTRICAL CHARACTERISTICS
+Electrical Specifications: Unless otherwise specified, all parameters apply for TA = -40°C to +85°C, VDD = +5.0V, VSS = 0V,
+VIN+ = VIN- = VREF/2. All ppm units use 2*VREF as full scale range.
+Parameters Sym  Min  Typ  Max Units              Conditions
+Analog Inputs 
+Differential Input Range — ±2.048/PGA — V V IN = VIN+ - VIN-
+Common-Mode Voltage Range 
+(absolute) (Note 1)
+VSS-0.3 — V DD+0.3 V
+Differential Input Impedance 
+(Note 2)
+ZIND (f) — 2.25/PGA — M Ω During normal mode operation
+Common Mode input 
+Impedance
+ZINC (f) — 25 — M Ω PGA = 1, 2, 4, 8
+System Performance
+Resolution and No Missing 
+Codes (Note 8)
+12 — — Bits DR = 240 SPS
+14 — — Bits DR = 60 SPS
+16 — — Bits DR = 15 SPS
+18 — — Bits DR = 3.75 SPS
+Data Rate (Note 3) DR 176 240 328 SPS S1,S0 = ‘00’, (12 bits mode)
+44 60 82 SPS S1,S0 = ‘01’, (14 bits mode)
+11 15 20.5 SPS S1,S0 = ‘10’, (16 bits mode)
+2.75 3.75 5.1 SPS S1,S0 = ‘11’, (18 bits mode)
+Output Noise — 1.5 — µV RMS TA = +25°C, DR = 3.75 SPS, 
+PGA = 1, VIN = 0 
+Integral Nonlinearity (Note 4) INL — 10 35 ppm of
+FSR
+DR = 3.75 SPS
+(Note 6)
+Internal Reference Voltage V REF — 2.048 — V
+Note 1: Any input voltage below or greater than this voltage causes leakage current through the ESD diodes at the input pins.
+This parameter is ensured by characterization and not 100% tested.
+2: This input impedance is due to 3.2 pF internal input sampling capacitor. 
+3: The total conversion speed includes auto-calibration of offset and gain.
+4: INL is the difference between the endpoints line and the measured code at the center of the quantization band.
+5: Includes all errors from on-board PGA and VREF.
+6: Full Scale Range (FSR) = 2 x 2.048/PGA = 4.096/PGA.
+7: This parameter is ensured by characterization and not 100% tested.
+8: This parameter is ensured by design and not 100% tested.
+MCP3421
+DS22003E-page 4 © 2009 Microchip Technology Inc.
+Gain Error  (Note 5) — 0.05 0.35 % PGA = 1, DR = 3.75 SPS
+PGA Gain Error Match (Note 5) — 0.1 — % Between any 2 PGA gains
+Gain Error Drift  (Note 5) — 15 — ppm/°C PGA=1, DR=3.75 SPS
+Offset Error V OS — 15 40 µV Tested at PGA = 1
+VDD = 5.0V and DR = 3.75 SPS
+Offset Drift vs. Temperature — 50 — nV/°C V DD = 5.0V
+Common-Mode Rejection — 105 — dB at DC and PGA =1,
+— 110 — dB at DC and PGA =8,
+TA = +25°C
+Gain vs. VDD — 5 — ppm/V T A = +25°C, VDD = 2.7V to 5.5V,
+PGA = 1
+Power Supply Rejection at DC — 100 — dB T A = +25°C, VDD = 2.7V to 5.5V,
+PGA = 1
+Power Requirements
+Voltage Range V DD 2.7 — 5.5 V
+Supply Current during 
+Conversion
+IDDA — 155 190 µA V DD = 5.0V
+— 145 — µA V DD = 3.0V
+Supply Current during Standby 
+Mode
+IDDS —0 . 1 0 . 5µ A
+I2C Digital Inputs and Digital Outputs
+High level input voltage V IH 0.7 VDD —V DD V
+Low level input voltage V IL — — 0.3V DD V
+Low level output voltage V OL —— 0 . 4V I OL = 3 mA, VDD = +5.0V
+Hysteresis of Schmitt Trigger 
+for inputs (Note 7)
+VHYST 0.05VDD —— V f SCL = 100 kHz
+Supply Current when I2C bus 
+line is active
+IDDB —— 1 0µ A
+Input Leakage Current I ILH —— 1 µ A V IH = 5.5V
+IILL -1 — — µA V IL = GND
+Pin Capacitance and I2C Bus Capacitance
+Pin capacitance C PIN — — 10 pF
+I2C Bus Capacitance C b — — 400 pF
+ELECTRICAL CHARACTERISTICS (CONTINUED)
+Electrical Specifications: Unless otherwise specified, all parameters apply for TA = -40°C to +85°C, VDD = +5.0V, VSS = 0V,
+VIN+ = VIN- = VREF/2. All ppm units use 2*VREF as full scale range.
+Parameters Sym  Min  Typ  Max Units              Conditions
+Note 1: Any input voltage below or greater than this voltage causes leakage current through the ESD diodes at the input pins.
+This parameter is ensured by characterization and not 100% tested.
+2: This input impedance is due to 3.2 pF internal input sampling capacitor. 
+3: The total conversion speed includes auto-calibration of offset and gain.
+4: INL is the difference between the endpoints line and the measured code at the center of the quantization band.
+5: Includes all errors from on-board PGA and VREF.
+6: Full Scale Range (FSR) = 2 x 2.048/PGA = 4.096/PGA.
+7: This parameter is ensured by characterization and not 100% tested.
+8: This parameter is ensured by design and not 100% tested.
+© 2009 Microchip Technology Inc. DS22003E-page 5
+MCP3421
+TEMPERATURE SPECIFICATIONS
+Electrical Characteristics: Unless otherwise indicated, TA = -40°C to +85°C, VDD = +5.0V, VSS = 0V.
+Parameters Sym Min Typ Max Units Conditions
+Temperature Ranges
+Specified Temperature Range T A -40 — +85 °C
+Operating Temperature Range T A -40 — +125 °C
+Storage Temperature Range T A -65 — +150 °C
+Thermal Package Resistances
+Thermal Resistance, 6L SOT-23 θJA —1 9 0 . 5—° C / W
+MCP3421
+DS22003E-page 6 © 2009 Microchip Technology Inc.
+NOTES:
+© 2009 Microchip Technology Inc. DS22003E-page 7
+MCP3421
+2.0 TYPICAL PERFORMANCE CURVES
+Note: Unless otherwise indicated, TA = -40°C to +85°C, VDD = +5.0V, VSS = 0V, VIN+ = VIN- = VREF/2.
+FIGURE 2-1: INL vs. Supply Voltage 
+(VDD).
+FIGURE 2-2: INL vs. Temperature.
+FIGURE 2-3: Offset Error vs. 
+Temperature.
+FIGURE 2-4: Output Noise vs. Input 
+Voltage.
+FIGURE 2-5: Total Error vs. Input Voltage.
+FIGURE 2-6: Gain Error vs. Temperature.
+Note: The graphs and tables provided following this note are a statistical summary based on a limited number of
+samples and are provided for informational purpose s only. The performance characteristics listed herein
+are not tested or guaranteed. In so me graphs or tables, the data presented may be outside the specified
+operating range (e.g., outside specified power supply range) and therefore outside the warranted range.
+.000
+.001
+.002
+.003
+.004
+.005
+2 . 533 . 544 . 555 . 5
+VDD (V)
+PGA = 1
+PGA = 2
+PGA = 8
+PGA = 4
+Integral Nonlinearity (% of FSR)
+0
+0.001
+0.002
+0.003
+-60 -40 -20 0 20 40 60 80 100 120 140
+Temperature (oC)
+Integral Nonlinearity 
+(% of FSR)          
+VDD = 5 V
+VDD = 2.7V
+PGA = 1
+-20
+-15
+-10
+-5
+0
+5
+10
+15
+20
+-60 -40 -20 0 20 40 60 80 100 120 140
+Temperature (°C)
+Offset Error (µV)
+VDD = 5V
+PGA = 1
+PGA = 2
+PGA = 8PGA = 4
+0.0
+2.5
+5.0
+7.5
+10.0
+-100 -75 -50 -25 0 25 50 75 100
+Input Voltage (% of Full Scale)
+Noise (µV, rms)
+PGA = 1
+PGA = 2
+PGA = 8
+PGA = 4
+TA = +25°C
+VDD = 5V
+-3.0
+-2.0
+-1.0
+0.0
+1.0
+2.0
+3.0
+-100 -75 -50 -25 0 25 50 75 100
+Input Voltage (% of Full Scale)
+Total Error (mV)
+PGA = 1
+PGA = 2
+PGA = 8
+PGA = 4
+-0.4
+-0.3
+-0.2
+-0.1
+0
+0.1
+0.2
+0.3
+0.4
+-60 -40 -20 0 20 40 60 80 100 120 140
+Temperature (°C)
+Gain Error (% of FSR)
+VDD = 5.0V
+PGA = 1
+PGA = 2
+PGA = 8
+PGA = 4
+MCP3421
+DS22003E-page 8 © 2009 Microchip Technology Inc.
+Note: Unless otherwise indicated, TA = -40°C to +85°C, VDD = +5.0V, VSS = 0V, VIN+ = VIN- = VREF/2.
+FIGURE 2-7: IDDA vs. Temperature.
+FIGURE 2-8: IDDS vs. Temperature.
+FIGURE 2-9: IDDB vs. Temperature.
+FIGURE 2-10: OSC Drift vs. Temperature.
+FIGURE 2-11: Frequency Response.
+100
+120
+140
+160
+180
+200
+220
+-60 -40 -20 0 20 40 60 80 100 120 140
+Temperature (
+o
+C)
+IDDA (µA)
+VDD = 5V
+VDD = 2.7V
+0
+100
+200
+300
+400
+500
+600
+-60 -40 -20 0 20 40 60 80 100 120 140
+Temperature (oC)
+IDDS (nA)
+VDD = 2.7V
+VDD = 5V
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+-60 -40 -20 0 20 40 60 80 100 120 140
+Temperature (oC)
+IDDB (μA) 
+VDD = 5V
+VDD = 4.5V
+VDD = 3.3V
+VDD = 2.7V
+-1
+0
+1
+2
+3
+4
+5
+-60 -40 -20 0 20 40 60 80 100 120 140
+Temperature (°C)
+Oscillator Drift (%)VDD = 5.0V
+VDD = 2.7V
+Data Rate = 3.75 SPS
+-120
+-110
+-100
+-90
+-80
+-70
+-60
+-50
+-40
+-30
+-20
+-10
+0
+0.1 1 10 100 1000 10000
+Input Signal Frequency (Hz)
+Magnitude (dB)
+0.1 1 10 100 1k 10k
+© 2009 Microchip Technology Inc. DS22003E-page 9
+MCP3421
+3.0 PIN DESCRIPTIONS
+The descriptions of the pins are listed in Table 3-1.
+TABLE 3-1: PIN FUNCTION TABLE  
+3.1  Analog Inputs (VIN+, VIN-)
+VIN+ and V IN- are differential signal input pins. The
+MCP3421 device accepts a fully differential analog
+input signal which is connected on the V IN+ and V IN-
+input pins. The differential voltage that is converted is
+defined by VIN = (VIN+ - VIN-) where VIN+ is the voltage
+applied at the VIN+ pin and VIN- is the voltage applied
+at the V IN- pin. The user can also connect V IN- pin to
+VSS for a single-ended operation. See Figure 6-4 for
+differential and single-ended connection examples. 
+The input signal level is amplified by the programmable
+gain amplifier (PGA) before the conversion. The
+differential input voltage should not exceed an absolute
+of (VREF/PGA) for accurate measurement, where VREF
+is the internal reference voltage (2.048V) and PGA is
+the PGA gain setting. The converter output code will
+saturate if the input range exceeds (VREF/PGA).
+The absolute voltage range on each of the differential
+input pins is from V SS-0.3V to VDD+0.3V. Any voltage
+above or below this range will cause leakage currents
+through the Electrostatic Discharge (ESD) diodes at
+the input pins. This ESD current can cause unexpected
+performance of the device. The common mode of the
+analog inputs should be chosen such that both the
+differential analog input range and the absolute voltage
+range on each pin are within the specified operating
+range defined in Section 1.0 “Electrical
+Characteristics” and Section 4.0 “Description of
+Device Operation”.
+See Section 4.5 “Input Voltage Range”  for more
+details of the input voltage range. 
+Figure 3-1 shows the input structure of the device. The
+device uses a switched capacitor input stage at the
+front end. C PIN is the package pin capacitance and
+typically about 4 pF. D 1 and D 2 are the ESD diodes.
+CSAMPLE is the differential input sampling capacitor.
+3.2  Supply Voltage (VDD, VSS)
+VDD is the power supply pin for the device. This pin
+requires an appropriate bypass capacitor of about
+0.1 µF (ceramic) to ground. An additional 10 µF
+capacitor (tantalum) in parallel is also recommended
+to further attenuate high frequency noise present in
+some application boards. The supply voltage (V DD)
+must be maintained in the 2.7V to 5.5V range for
+specified operation. 
+VSS is the ground pin and the current return path of the
+device. The user must connect the VSS pin to a ground
+plane through a low impedance connection. If an
+analog ground path is available in the application PCB
+(printed circuit board), it is highly recommended that
+the V SS pin be tied to the analog ground path or
+isolated within an analog ground plane of the circuit
+board. 
+3.3  Serial Clock Pin (SCL)
+SCL is the serial clock pin of the I 2C interface. The
+MCP3421 acts only as a slave and the SCL pin
+accepts only external seri al clocks. The input data
+from the Master device is shifted into the SDA pin on
+the rising edges of the SCL clock and output from the
+MCP3421 occurs at the falling edges of the SCL clock.
+The SCL pin is an open-drain N-channel driver.
+Therefore, it needs a pull-up resistor from the VDD line
+to the SCL pin. Refer to Section 5.3 “I 2C Serial
+Communications” for more details of I 2C Serial
+Interface communication.
+MCP3421 Symbol Description
+1V IN+ Positive Differential Analog Input Pin
+2V SS Ground Pin
+3S C L Serial Clock Input Pin of the I2C Interface
+4S D A Bidirectional Serial Data Pin of the I2C Interface
+5V DD Positive Supply Voltage Pin
+6V IN- Negative Differential Analog Input Pin
+MCP3421
+DS22003E-page 10 © 2009 Microchip Technology Inc.
+3.4  Serial Data Pin (SDA)
+SDA is the serial data pin of the I2C interface. The SDA
+pin is used for input and output data. In read mode, the
+conversion result is read from the SDA pin (output). In
+write mode, the device conf iguration bits are written
+(input) though the SDA pin. The SDA pin is an open-
+drain N-channel driver. Ther efore, it needs a pull-up
+resistor from the V DD line to the SDA pin. Except for
+start and stop conditions, the data on the SDA pin must
+be stable during the high period of the clock. The high
+or low state of the SDA pin can only change when the
+clock signal on the SCL pin is low. Refer to Section 5.3
+“I2C Serial Communications” for more details of I2C
+Serial Interface communication. 
+Typical range of the pull-up resistor value for SCL and
+SDA is from 5 kΩ to 10 kΩ for standard (100 kHz) and
+fast (400 kHz) modes, and less than 1 k Ω for high
+speed mode (3.4 MHz). The High-Speed mode is not
+recommended for VDD less than 2.7V.
+ 
+FIGURE 3-1: Equivalent Analog Input Circuit.
+CPINV
+RSS VIN+,VIN-
+4p F
+VT = 0.6V
+VT = 0.6V ILEAKAGE
+Sampling
+Switch
+SS RS
+CSAMPLE
+(3.2 pF)
+VDD
+(~ ±1 nA)
+Legend:
+V = Signal Source I LEAKAGE = Leakage Current at Analog Pin
+RSS = Source Impedance SS = Sampling Switch
+VIN+, VIN- = Analog Input Pin R S = Sampling Switch Resistor
+CPIN = Input Pin Capacitance C SAMPLE = Sample Capacitance
+VT = Threshold Voltage D 1, D2  = ESD Protection Diode
+D1
+D2
+VSS
+© 2009 Microchip Technology Inc. DS22003E-page 11
+MCP3421
+4.0 DESCRIPTION OF DEVICE 
+OPERATION
+4.1 General Overview
+The MCP3421 is a low-power, 18-Bit Delta-Sigma A/D
+converter with an I 2C serial interface. The device
+contains an on-board voltage reference (2.048V),
+programmable gain amplifier (PGA), and internal
+oscillator. When the device powers up (POR is set), it
+automatically resets the configuration bits to default
+settings. 
+Device default settings are:
+• Conversion bit resolution: 12 bits (240 sps)
+• PGA gain setting: x1
+• Continuous conversion 
+Once the device is powe red-up, the user can
+reprogram the configuration bits using I 2C serial
+interface any time. The configuration bits are stored in
+volatile memory. 
+User selectable options are: 
+• Conversion bit resolution: 12, 14, 16, or 18 bits
+• PGA Gain selection: x1, x2, x4, or x8
+• Continuous or one-shot conversion 
+In the Continuous Conversion mode, the device
+converts the inputs continuously. While in the One-Shot
+Conversion mode, the device converts the input one
+time and stays in the low-power standby mode until it
+receives another command for a new conversion.
+During the standby mode, the device consumes less
+than 1 µA maximum.
+4.2 Power-On-Reset (POR)
+The device contains an internal Power-On-Reset
+(POR) circuit that monitors power supply voltage (VDD)
+during operation. This circuit ensures correct device
+start-up at system power-up and power-down events.
+The POR has built-in hysteresis and a timer to give a
+high degree of immunity to potential ripples and noises
+on the power supply. A 0.1 µF decoupling capacitor
+should be mounted as close as possible to the VDD pin
+for additional transient immunity. 
+The threshold voltage is set at 2.2V with a tolerance of
+approximately ±5%. If the supply voltage falls below
+this threshold, the device will be held in a reset
+condition. The typical hysteresis value is approximately
+200 mV.
+The POR circuit is shut-down during the low-power
+standby mode. Once a power-up event has occurred,
+the device requires additional delay time
+(approximately 300 µs) before a conversion can take
+place. During this time, all internal analog circuitries are
+settled before the first conversion occurs. Figure 4-1
+illustrates the conditions for power-up and power-down
+events under typical start-up conditions. 
+When the device powers up, it automatically resets
+and sets the configuration bi ts to default settings. The
+default configuration bit conditions are a PGA gain of
+1 V/V and a conversion speed of 240 SPS in
+Continuous Conversion mode. When the device
+receives an I 2C General Call Reset command, it
+performs an internal reset similar to a Power-On-Reset
+event.
+ 
+FIGURE 4-1: POR Operation.
+4.3 Internal Voltage Reference 
+The device contains an on-board 2.048V voltage
+reference. This reference vo ltage is for internal use
+only and not directly measurable. The specifications of
+the reference voltage are part of the device’s gain and
+drift specifications. Therefore, there is no separate
+specification for the on-board reference.
+4.4 Analog Input Channel
+The differential analog input channel has a switched
+capacitor structure. The in ternal sampling capacitor
+(3.2 pF for PGA = 1) is charged and discharged to
+process a conversion. The charging and discharging of
+the input sampling capacitor creates dynamic input
+currents at each input pin. The current is a function of
+the differential input voltages, and inversely
+proportional to the internal sampling capacitance,
+sampling frequency, and PGA setting. 
+VDD
+2.2V
+2.0V
+300 µS
+Reset Start-up Normal Operation Reset
+Time
+MCP3421
+DS22003E-page 12 © 2009 Microchip Technology Inc.
+4.5 Input Voltage Range
+The differential (V IN) and common mode voltage
+(VINCOM) at the input pins wit hout considering PGA
+setting are defined by:
+The input signal levels are amplified by the internal
+programmable gain amplifier (PGA) at the front end of
+the ΔΣ modulator. 
+The user needs to consider two conditions for the input
+voltage range: (a) Differential input voltage range and
+(b) Absolute maximum input voltage range.
+4.5.1 DIFFERENTIAL INPUT VOLTAGE 
+RANGE
+The device performs conversions using its internal
+reference voltage (V REF = 2.048V). Therefore, the
+absolute value of the differential input voltage (V IN),
+with PGA setting is included, needs to be less than the
+internal reference voltage. The device will output
+saturated output codes (all 0s or all 1s except sign bit)
+if the absolute value of the input voltage (V IN), with
+PGA setting is included, is greater than the internal
+reference voltage (VREF = 2.048V). The input full-scale
+voltage range is given by:
+EQUATION 4-1:  
+If the input voltage level is greater than the above limit,
+the user can use a voltage divider and bring down the
+input level within the full-scale range. See Figure 6-7
+for more details of the input voltage divider circuit. 
+4.5.2 ABSOLUTE MAXIMUM INPUT 
+VOLTAGE RANGE
+The input voltage at each input pin must be less than
+the following absolute maximum input voltage limits: 
+• Input voltage < V DD+0.3V
+• Input voltage > V SS-0.3V
+Any input voltage outside this range can turn on the
+input ESD protection diodes, and result in input
+leakage current, causing conversion errors, or
+permanently damage the device. 
+Care must be taken in setting the input voltage ranges
+so that the input voltage does not exceed the absolute
+maximum input voltage range. 
+4.6  Input Impedance
+The device uses a switched-capacitor input stage using
+a 3.2 pF sampling capacitor. This capacitor is switched
+(charged and discharged) at a rate of the sampling
+frequency that is generated by on-board clock. The
+differential input impedance varies with the PGA
+settings. The typical differential input impedance during
+a normal mode operation is given by:
+Since the sampling capacitor is only switching to the
+input pins during a conversion process, the above input
+impedance is only valid during conversion periods. In a
+low power standby mode, the above impedance is not
+presented at the input pins. Therefore, only a leakage
+current due to ESD diode is presented at the input pins.
+The conversion accuracy can be affected by the input
+signal source impedance when any external circuit is
+connected to the input pins. The source impedance
+adds to the internal impedance and directly affects the
+time required to charge the internal sampling capacitor.
+Therefore, a large input so urce impedance connected
+to the input pins can degrade the system performance,
+such as offset, gain, and Integral Non-Linearity (INL)
+errors. Ideally, the input source impedance should be
+zero. This can be achievable by using an operational
+amplifier with a closed-loop output impedance of tens
+of ohms.
+4.7 Aliasing and Anti-aliasing Filter
+Aliasing occurs when the input signal contains time-
+varying signal components with frequency greater than
+half the sample rate. In the aliasing conditions, the
+device can output unexpec ted output codes. For
+applications that are operating in electrical noise
+environments, the time-varying signal noise or high
+frequency interference components can be easily
+added to the input signals and cause aliasing. Although
+the device has an internal first order sinc filter, the filter
+response ( Figure 2-11) may not give enough
+attenuation to all aliasing signal components. To avoid
+the aliasing, an external anti-aliasing filter, which can
+be accomplished with a simple RC low-pass filter, is
+typically used at the input pins. The low-pass filter cuts
+off the high frequency noise components and provides
+a band-limited input signal to the input pins. 
+4.8  Self-Calibration
+The device performs a self-calibration of offset and
+gain for each conversion. This provides reliable
+conversion results from conversion-to-conversion over
+variations in temperature as well as power supply
+fluctuations.
+VIN VIN +V IN -–=
+VINCOM
+VIN +V IN -+
+2-------------------------------=
+Where:
+VIN =V IN+ - VIN-
+VREF = 2.048V
+VREF– VIN PGA•() VREF 1LSB–()≤≤
+ZIN(f) = 2.25 MΩ/PGA
+© 2009 Microchip Technology Inc. DS22003E-page 13
+MCP3421
+4.9 Digital Output Codes and 
+Conversion to Real Values
+4.9.1 DIGITAL OUTPUT CODE FROM 
+DEVICE
+The digital output code is proportional to the input
+voltage and PGA settings. The output data format is a
+binary two’s complement. With this code scheme, the
+MSB can be considered a sign indicator. When the
+MSB is a logic ‘0’, the input is positive. When the MSB
+is a logic ‘1’, the input is negativ e. The following is an
+example of the output code:
+a. for a negative full scale input voltage:
+100...000
+Example: (VIN+-V IN-) •PGA = -2.048V
+b. for a zero differential input voltage: 000...000
+Example: (VIN+-V IN-) = 0
+c. for a positive full scale input voltage:
+011...111
+Example: (VIN+-V IN-) • PGA = 2.048V
+The MSB (sign bit) is always transmitted first through
+the I 2C serial data line. The resolution for each
+conversion is 18, 16, 14, or 12 bits depending on the
+conversion rate selection bit settings by the user.
+The output codes will not roll-over even if the input volt-
+age exceeds the maximum input range. In this case,
+the code will be locked at 0111...11 for all voltages
+greater than (VREF - 1 LSB)/PGA and 1000...00 for
+voltages less than -V REF/PGA. Table 4-2 shows an
+example of output codes of various input levels for 18
+bit conversion mode. Table 4-3 shows an example of
+minimum and maximum ou tput codes for each
+conversion rate option.
+The number of output code is given by: 
+EQUATION 4-2:
+The LSB of the data conversion is given by:
+EQUATION 4-3:
+Table 4-1 shows the LSB size of each conversion rate
+setting. The measured unknown input voltage is
+obtained by multiplying the output codes with LSB. See
+the following section for the input voltage calculation
+using the output codes. 
+TABLE 4-1: RESOLUTION SETTINGS VS. 
+LSB
+TABLE 4-2: EXAMPLE OF OUTPUT CODE 
+FOR 18 BITS (NOTE 1,NOTE 2)
+TABLE 4-3: MINIMUM AND MAXIMUM 
+OUTPUT CODES (NOTE) 
+Number of Output Code 
+Maximum Code 1+() PGA
+VIN +V IN -–()
+2.048V-----------------------------------××=
+Where:
+See Table 4-3 for Maximum Code.
+LSB 2V REF×
+2N---------------------- 2 2.048V× 2N--------------------------==
+Where:
+N = User programmable bit resolution: 
+12,14,16, or 18
+Resolution Setting LSB
+12 bits 1 mV
+14 bits 250 µV
+16 bits 62.5 µV
+18 bits 15.625 µV
+Input Voltage: 
+[VIN+-V IN-] • PGA Digital Output Code
+≥ VREF 011111111111111111
+VREF - 1 LSB 011111111111111111
+2L S B 000000000000000010
+1L S B 000000000000000001
+0 000000000000000000
+-1 LSB 111111111111111111
+-2 LSB 111111111111111110
+- VREF 100000000000000000
+< -VREF 100000000000000000
+Note 1: MSB is a sign indicator:
+0: Positive input (VIN+>V IN-)
+1: Negative input (VIN+<V IN-)
+2: Output data format is binary two’s 
+complement.
+Resolution 
+Setting Data Rate MinimumCode MaximumCode
+12 240 SPS -2048 2047
+14 60 SPS -8192 8191
+16 15 SPS -32768 32767
+18 3.75 SPS -131072 131071
+Note: Maximum n-bit code = 2N-1 - 1
+Minimum n-bit code = -1 x 2N-1
+MCP3421
+DS22003E-page 14 © 2009 Microchip Technology Inc.
+4.9.2 CONVERTING THE DEVICE 
+OUTPUT CODE TO INPUT SIGNAL 
+VOLTAGE
+When the user gets the digital output codes from the
+device as described in Section 4.9.1 “Digital output
+code from device” , the next step is converting the
+digital output codes to a measured input voltage.
+Equation 4-4 shows an example of converting the
+output codes to its corresponding input voltage. 
+If the sign indicator bit (MSB) is ‘0’, the input voltage
+is obtained by multiplying the output code with the LSB
+and divided by the PGA setting. 
+If the sign indicator bit (MSB) is ‘1’, the output code
+needs to be converted to two’s complement before
+multiplied by LSB and divided by the PGA setting.
+Table 4-4 shows an example of converting the device
+output codes to input voltage. 
+EQUATION 4-4: CONVERTING OUTPUT 
+CODES TO INPUT 
+VOLTAGE 
+TABLE 4-4: EXAMPLE OF CONVERTING OUTPUT CODE TO VOLTAGE (WITH 18 BIT SETTING) 
+If MSB = 0 (Positive Output Code):
+ If MSB = 1 (Negative Output Code):
+Where:
+LSB = See Table 4-1
+2’s complement = 1’s complement + 1
+Input Voltage (Output Code) LSBPGA------------•=
+Input Voltage (2′s complement of Output Code)
+LSB
+PGA------------•=
+Input Voltage
+[VIN+-V IN-]  • PGA] Digital Output Code MSB(sign bit) Example of Converting Output Codes to Input Voltage 
+≥ VREF 011111111111111111 0 (216+215+214+213+212+211+210+29+28+27+26+25+24+23+22+
+21+20)x LSB(15.625μV)/PGA = 2.048 (V) for PGA = 1
+VREF - 1 LSB 011111111111111111 0 (216+215+214+213+212+211+210+29+28+27+26+25+24+23+22+
+21+20)x LSB(15.625μV)/PGA = 2.048 (V) for PGA = 1
+2L S B 000000000000000010 0 (0+0+0+0+0+0+0+0+0+0+0+0+0+0+0+21+0)x 
+LSB(15.625μV)/PGA = 31.25 (μV) for PGA = 1
+1L S B 000000000000000001 0 (0+0+0+0+0+0+0+0+0+0+0+0+0+0+0+0+20)x 
+LSB(15.625μV)/PGA = 15.625 (μV)for PGA = 1
+0 000000000000000000 0 (0+0+0+0+0+0+0+0+0+0+0+0+0+0+0+0+0)x 
+LSB(15.625μV)/PGA = 0 V (V) for PGA = 1
+-1 LSB 111111111111111111 1 -(0+0+0+0+0+0+0+0+0+0+0+0+0+0+0+0+20)x 
+LSB(15.625μV)/PGA = - 15.625 (μV)for PGA = 1
+-2 LSB 111111111111111110 1 -(0+0+0+0+0+0+0+0+0+0+0+0+0+0+0+21+0)x 
+LSB(15.625μV)/PGA = - 31.25 (μV)for PGA = 1
+- VREF 100000000000000000 1 -(217+0+0+0+0+0+0+0+0+0+0+0+0+0+0+0+0+0) x 
+LSB(15.625μV)/PGA = - 2.048 (V) for PGA = 1
+≤ -VREF 100000000000000000 1 -(217+0+0+0+0+0+0+0+0+0+0+0+0+0+0+0+0+0) x 
+LSB(15.625μV)/PGA = - 2.048 (V) for PGA = 1
+© 2009 Microchip Technology Inc. DS22003E-page 15
+MCP3421
+5.0 USING THE MCP3421 DEVICE
+5.1 Operating Modes
+The user operates the device by setting up the device
+configuration register us ing a write command (see
+Figure 5-2) and reads the conversion data using a read
+command (see Figure 5-3 and Figure 5-4). The device
+operates in two modes: (a) Continuous Conversion
+Mode or (b) One-Shot Conversion Mode (single
+conversion). This mode sele ction is made by setting
+the O /C bit in the Configuration Register. Refer to
+Section 5.2 “Configuration Register”  for more
+information.
+5.1.1 CONTINUOUS CONVERSION 
+MODE (O/C BIT = 1)
+The device performs a Continuous Conversion if the
+O/C bit is set to logic “high”. Once the conversion is
+completed, RDY bit is toggled to ‘0’ and the result is
+placed at the output data register. The device
+immediately begins another conversion and overwrites
+the output data register with the most recent result. The
+device clears the data ready flag (RDY  bit = 0) when
+the conversion is completed. The device sets the ready
+flag bit (RDY bit =1), if the latest conversion result has
+been read by the Master. 
+• When writing configuration register:
+- Setting RDY  bit in continuous mode does not 
+affect anything
+• When reading conversion data:
+- RDY  bit = 0 means the latest conversion 
+result is ready
+- RDY  bit = 1 means the conversion result is 
+not updated since the last reading. A new 
+conversion is under processing and the RDY 
+bit will be cleared when the new conversion 
+result is ready
+5.1.2 ONE-SHOT CONVERSION MODE
+ (O/C BIT = 0)
+Once the One-Shot Conversion (single conversion)
+Mode is selected, the device performs only one
+conversion, updates the output data register, clears the
+data ready flag (RDY = 0), and then enters a low power
+standby mode. A new One-Shot Conversion is started
+again when the device receives a new write command
+with RDY = 1. 
+• When writing configuration register:
+- The RDY  bit needs to be set to begin a new 
+conversion in one-shot mode
+• When reading conversion data:
+- RDY  bit = 0 means the latest conversion 
+result is ready
+- RDY  bit = 1 means the conversion result is 
+not updated since the last reading. A new 
+conversion is under processing and the RDY 
+bit will be cleared when the new conversion is 
+done
+This One-Shot Conversion Mode is highly
+recommended for low power operating applications
+where the conversion result is needed by request on
+demand. During the low current standby mode, the
+device consumes less than 1 µA maximum (or 300 nA
+typical). For example, if the user collects 18 bit
+conversion data once a second in One-Shot
+Conversion mode, the device draws only about one
+fourth of its total operating current. In this example, the
+device consumes approximately 39 µA (145 µA / 3.75
+SPS = 39 µA), if the device performs only one
+conversion per second (1 SPS) in 18-bit conversion
+mode with 3V power supply.
+MCP3421
+DS22003E-page 16 © 2009 Microchip Technology Inc.
+5.2 Configuration Register
+The device has an 8-bit wide configuration register to
+select for: input channel, conversion mode, conversion
+rate, and PGA gain. This register allows the user to
+change the operating condition of the device and check
+the status of the device operation.
+The user can rewrite the configuration byte any time
+during the device operation. Register 5-1 shows the
+configuration register bits.
+REGISTER 5-1: CONFIGURATION REGISTER
+R/W-1 R/W-0 R/W-0 R/W-1 R/W-0 R/W-0 R/W-0 R/W-0
+RDY C1 C0 O /C S1 S0 G1 G0
+1 * 0 * 0 * 1 * 0 * 0 * 0 * 0 *
+bit 7 bit 0
+* Default Configuration after Power-On Reset
+Legend:
+R = Readable bit W = Writable bit U = Unimplemented bit, read as ‘0’
+-n = Value at POR ‘1’ = Bit is set ‘0’  = Bit is cleared x = Bit is unknown
+bit 7 RDY: Ready Bit
+This bit is the data ready flag. In read mode, this bit indicates if the output register has been updated
+with a latest conversion result. In One-Sh ot Conversion mode, writing this bit to “ 1” initiates a new
+conversion.
+Reading RDY bit with the read command:
+1 = Output register has not been updated.
+0 = Output register has been updated with the latest conversion result.
+Writing RDY bit with the write command:
+Continuous Conversion mode: No effect 
+One-Shot Conversion mode:
+1 = Initiate a new conversion.
+0 = No effect.
+bit 6-5 C1-C0: These bits are not effected for the MCP3421. 
+bit 4 O/C: Conversion Mode Bit
+1 = Continuous Conversion Mode (Default). The device performs data conversions continuously.
+0 = One-Shot Conversion Mode. The device performs a single conversion and enters a low power
+standby mode until it receives another write or read command. 
+bit 3-2 S1-S0: Sample Rate Selection Bit
+00 = 240 SPS (12 bits) (Default)
+01 = 60 SPS (14 bits)
+10 = 15 SPS (16 bits)
+11 = 3.75 SPS (18 bits)
+bit 1-0 G1-G0: PGA Gain Selection Bits
+00 = x1 (Default)
+01 = x2 
+10 = x4 
+11 = x8
+© 2009 Microchip Technology Inc. DS22003E-page 17
+MCP3421
+If the configuration byte is read repeatedly by clocking
+continuously after reading the data bytes (i.e., after the
+5th byte in the 18-bit conversion mode), the state of the
+RDY bit indicates whether the device is ready with new
+conversion result. When the Master finds the RDY bit is
+cleared, it can send a not-acknowledge (NAK) bit and
+a stop bit to exit the current read operation and send a
+new read command for the latest conversion data.
+Once the conversion data has been read, the ready bit
+toggles to ‘1’ until the next new conversion data is
+ready. The conversion data in the output register is
+overwritten every time a new conversion is completed.
+Figure 5-3 and Figure 5-4 show the examples of
+reading the conversion data. The user can rewrite the
+configuration byte any time for a new setting.
+Table 5-1 and Table 5-2 show the examples of the
+configuration bit operation.
+ 
+5.3 I 2C Serial Communications
+The device communicates with Master
+(microcontroller) through a serial I 2C (Inter-Integrated
+Circuit) interface and support standard (100 kbits/sec),
+fast (400 kbits/sec) and high-speed (3.4 Mbits/sec)
+modes.
+The serial I 2C is a bidirectional 2-wire data bus
+communication protocol using open-drain SCL and
+SDA lines. 
+The device can only be addressed as a slave. Once
+addressed, it can receive configuration bits with a write
+command or transmit the latest conversion results with
+a read command. The serial clock pin (SCL) is an input
+only and the serial data pin (SDA) is bidirectional. The
+Master starts communication by sending a START bit
+and terminates the communication by sending a STOP
+bit. In read mode, the device releases the SDA line
+after receiving NAK and STOP bits. 
+An example of a hardware connection diagram is
+shown in Figure 6-1. More details of the I 2C bus
+characteristic is described in Section 5.6 “I 2C Bus
+Characteristics”.
+5.3.1 I 2C DEVICE ADDRESSING
+The first byte after the START bit is always the address
+byte of the device, which includes the device code
+(4 bits), address bits (3 bits), and R/W  bit. The device
+code of the MCP3421 is 1101, which is programmed at
+the factory. The device code is followed by three
+address bits (A2, A1, A0) which are also programmed
+at the factory. The three address bits allow up to eight
+MCP3421 devices on the same data bus line. 
+The (R/W) bit determines if the Master device wants to
+read the conversion data or write to the Configuration
+register. If the (R/W) bit is set (read mode), the device
+outputs the conversion data in the following clocks. If
+the (R/W ) bit is cleared (write mode), the device
+expects a configuration byte in the following clocks.
+When the device receives the correct address byte, it
+outputs an acknowledge bit after the R/W bit. 
+Figure 5-1 shows the address byte. Figure 5-2 through
+Figure 5-4 show how to write the configuration register
+bits and read the conversion results.
+TABLE 5-1: WRITE CONFIGURATION BITS
+R/W O/C RDY Operation
+0 0 0 No effect if all other bits remain 
+the same - operation continues 
+with the previous settings 
+0 0 1 Initiate One-Shot Conversion
+0 1 0 Initiate Continuous Conversion
+0 1 1 Initiate Continuous Conversion
+TABLE 5-2: READ CONFIGURATION BITS
+R/W O/C RDY Operation
+1 0 0 New conversion result in One-
+Shot conversion mode has just 
+been read. The RDY bit remains 
+low until set by a new write 
+command. 
+1 0 1 One-Shot Conversion is in 
+progress. The conversion result 
+is not updated yet. The RDY bit 
+stays high until the current 
+conversion is completed.
+1 1 0 New conversion result in 
+Continuous Conversion mode 
+has just been read. The RDY bit 
+changes to high after reading the 
+conversion data. 
+1 1 1 The conversion result in 
+Continuous Conversion mode 
+was already read. The next new 
+conversion data is not ready. The 
+RDY bit stays high until a new 
+conversion is completed. 
+Note: The High-Speed mode is not
+recommended for VDD less than 2.7V.
+MCP3421
+DS22003E-page 18 © 2009 Microchip Technology Inc.
+ 
+FIGURE 5-1: MCP3421 Address Byte.
+5.3.2 WRITING A CONFIGURATION BYTE 
+TO THE DEVICE
+When the Master sends an address byte with the R/W
+bit low (R/W  = 0), the MCP3421 expects one
+configuration byte following the address. Any byte sent
+after this second byte will be ignored. The user can
+change the operating mode of the device by writing the
+configuration register bits. 
+If the device receives a write command with a new
+configuration setting, the device immediately begins a
+new conversion and updates the conversion data. 
+ 
+FIGURE 5-2:  Timing Diagram For Writing To The MCP3421.
+Start bit Read/Write bit
+Address Byte
+R/W ACK
+1 1 0 1 X X X
+Device Code         Address Bits (Note 1)
+Address 
+Acknowledge bit
+Address
+Note 1: Specified by the customer and programmed at 
+the factory. If not specified by the customer, 
+programmed to ‘000’.
+91 91
+Stop Bit by
+11 0 1A 2 A 1 A0
+R/W ACK by
+MCP3421
+RDY
+C1 C0
+O/C
+S1 S0 G1 G0
+1st Byte:
+2nd Byte: 
+Master 
+ACK by
+MCP3421
+ MCP3421 Address Byte 
+Configuration Byte 
+Start Bit by
+Master 
+    with Write command
+Note: – Stop bit can be issued any time during writing. 
+– MCP3421 device code is 1101.
+– Address Bits A2- A0 = 000 are programmed at factory unless customer requests different codes.
+SCL
+SDA
+© 2009 Microchip Technology Inc. DS22003E-page 19
+MCP3421
+5.3.3 READING OUTPUT CODES AND 
+CONFIGURATION BYTE FROM THE 
+DEVICE
+When the Master sends a read command (R/W =1),
+the device outputs both the conversion data and config-
+uration bytes. Each byte consists of 8 bits with one
+acknowledge (ACK) bit. The ACK bit after the address
+byte is issued by the device and the ACK bits after each
+conversion data bytes are issued by the Master.
+When the device is configured for 18-bit conversion
+mode, it outputs three data bytes followed by a
+configuration byte. The first 6 data bits in the first data
+byte are repeated MSB (= sign bit) of the conversion
+data. The user can ignore the first 6 data bits, and take
+the 7th data bit (D17) as the MSB of the conversion
+data. The LSB of the 3rd data byte is the LSB of the
+conversion data (D0).
+If the device is configured for 12, 14, or 16 bit-mode, the
+device outputs two data bytes followed by a
+configuration byte. In 16 bit-conversion mode, the MSB
+(= sign bit) of the first data byte is D15. In 14-bit
+conversion mode, the first two bits in the first data byte
+are repeated MSB bits and can be ignored, and the 3rd
+bit (D13) is the MSB (=sign bit) of the conversion data.
+In 12-bit conversion mode, the first four bits are
+repeated MSB bits and can be ignored. The 5th bit
+(D11) of the byte represents the MSB (= sign bit) of the
+conversion data. Table 5-3 summarizes the conversion
+data output of each conversion mode.
+The configuration byte follows the output data bytes.
+The device repeatedly outputs the configuration byte
+only if the Master sends clocks repeatedly after the
+data bytes. 
+The device terminates the current outputs when it
+receives a Not-Acknowledge (NAK), a repeated start or
+a stop bit at any time during the output bit stream. It is
+not required to read the configuration byte. However,
+the Master may read the c onfiguration byte to check
+the RDY  bit condition.The Master may continuously
+send clock (SCL) to repeat edly read the configuration
+byte (to check the RDY bit status).
+Figures 5-3 and 5-4 show the timing diagrams of the
+reading.
+TABLE 5-3: OUTPUT CODES OF EACH RESOLUTION OPTION
+Conversion 
+Option Digital Output Codes
+18-bits MMMMMMD17D16 (1st data byte) - D15 ~ D8 (2nd da ta byte) - D7 ~ D0 (3rd data byte) - Configuration 
+byte. (Note 1)
+16-bits D15 ~ D8 (1st data byte) - D7 ~ D0 (2nd data byte) - Configuration byte. (Note 2)
+14-bits MMD13D ~ D8 (1st data byte) - D7 ~ D0 (2nd data byte) - Configuration byte. (Note 3)
+12-bits MMMMD11 ~ D8 (1st data byte) - D7 ~ D0 (2nd data byte) - Configuration byte. (Note 4)
+Note 1: D17 is MSB (= sign bit), M is repeated MSB of the data byte.
+2: D15 is MSB (= sign bit).
+3: D13 is MSB (= sign bit), M is repeated MSB of the data byte.
+4: D11 is MSB (= sign bit), M is repeated MSB of the data byte.
+MCP3421
+DS22003E-page 20 © 2009 Microchip Technology Inc.
+    
+FIGURE 5-3: iming Diagram For Reading From The MCP3421 With 18-Bit Mode.
+91 91 91 91 91
+91
+11 0 1 A 2 A1 A0 D
+RDY O/CACK by
+MCP3421R/W
+Start Bit by
+Master
+Repeat of D17 (MSB)
+2nd Byte
+Upper Data Byte
+(Data on Clocks 1-6th
+can be ignored)
+ACK by
+Master
+ACK by
+Master
+ACK by
+Master
+To continue: ACK by Master
+17
+D
+16
+D
+15
+D
+14
+D
+13
+D
+12
+D
+11
+D
+10
+D
+9
+D
+8
+D
+7
+D
+6
+D
+5
+D
+4
+D
+3
+D
+2
+D
+1
+D
+0
+C
+1
+C
+0
+S
+1
+S
+0
+G
+1
+G
+0
+1st Byte
+MCP3421 Address Byte
+3rd Byte
+Middle Data Byte
+4th Byte
+Lower Data Byte
+5th Byte
+Configuration Byte
+(Optional)
+C
+1
+C
+0
+S
+1
+S
+0
+G
+1
+G
+0
+NAK by
+Master
+Stop Bit by
+Master
+(Optional)
+Nth Repeated Byte:
+Configuration Byte
+Note: – MCP3421 device code is 1101.
+– See Figure 5-1 for details in Address Byte.
+– Stop bit or NAK bit can be issued any time during reading. 
+– Data bits on clocks 1 - 6th in 2nd byte are repeated MSB and can be ignored.
+– Configuration byte repeats as long as clock is provided after the 5th byte.
+SCL
+SDA
+RDY O/C
+To end: NAK by Master
+© 2009 Microchip Technology Inc. DS22003E-page 21
+MCP3421
+  
+FIGURE 5-4: Timing Diagram For Reading From The MCP3421 With 12-Bit to 16-Bit Modes.1 1 0 1 A2 A1 A0
+ACK by
+MCP3421
+Start Bit by
+Master
+2nd Byte
+Upper Data Byte
+ACK by
+Master
+ACK by
+Master
+D
+15
+D
+14
+D
+13
+D
+12
+D
+11
+D
+10
+D
+9
+D
+8
+D
+7
+D
+6
+D
+5
+D
+4
+D
+3
+D
+2
+D
+1
+D
+0
+C
+1
+C
+0
+S
+1
+S
+0
+G
+1
+G
+0
+1st Byte
+MCP3421 Address Byte
+3rd Byte
+Lower Data Byte
+4th Byte
+Configuration Byte
+(Optional)
+C
+1
+C
+0
+S
+1
+S
+0
+G
+1
+G
+0
+NAK by
+Master
+Stop Bit by
+Master
+(Optional)
+Nth Repeated Byte:
+Configuration Byte
+Note: – MCP3421 device code is 1101.
+– See Figure 5-1 for details in Address Byte.
+– Stop bit or NAK bit can be issued any time during reading. 
+– In 14 - bit mode: D15 and D14 are repeated MSB and can be ignored.
+– In 12 - bit mode: D15 - D12 are repeated MSB and can be ignored. 
+– Configuration byte repeats as long as clock is provided after the 4th byte.
+91 99 1 91 91
+SCL
+SDA
+91
+RDY O/C
+R/W
+RDY O/C
+To continue: ACK by Master
+To end: NAK by Master
+MCP3421
+DS22003E-page 22 © 2009 Microchip Technology Inc.
+5.4 General Call
+The device acknowledges the general call address
+(0x00 in the first byte). The meaning of the general call
+address is always specified in the second byte. Refer
+to Figure 5-5. The device supports the following two
+general calls.
+For more information on the general call, or other I 2C
+modes, please refer to the Phillips I2C specification.
+5.4.1 GENERAL CALL RESET
+The general call reset occurs if the second byte is
+‘00000110’ (06h). At the acknowledgement of this
+byte, the device will abort current conversion and
+perform an internal reset si milar to a Power-On-Reset
+(POR). All configuration and data register bits are reset
+to default values. 
+5.4.2 GENERAL CALL CONVERSION
+The general call conversion occurs if the second byte
+is ‘00001000’ (08h). All devices on the bus initiate a
+conversion simultaneously. When the device receives
+this command, the configuration will be set to the One-
+Shot Conversion mode and a single conversion will be
+performed. The PGA and data rate settings are
+unchanged with this general call.
+  
+FIGURE 5-5: General Call Address 
+Format.
+5.5 High-Speed (HS) Mode
+The I2C specification requires that a high-speed mode
+device must be ‘activated’  to operate in high-speed
+mode. This is done by sending a special address byte
+of “00001XXX” following the START bit. The “XXX” bits
+are unique to the High-Speed (HS) mode Master. This
+byte is referred to as the High-Speed (HS) Master
+Mode Code (HSMMC). The MCP3421 device does not
+acknowledge this byte. However, upon receiving this
+code, the device switches on  its HS mode filters and
+communicates up to 3.4 MHz on SDA and SCL bus
+lines. The device will switch out of the HS mode on the
+next STOP condition.
+For more information on the HS mode, or other I 2C
+modes, please refer to the Phillips I2C specification. 
+5.6 I 2C Bus Characteristics
+The I 2C specification defines the following bus
+protocol:
+• Data transfer may be in itiated only when the bus 
+is not busy
+• During data transfer, the data line must remain 
+stable whenever the clock line is HIGH. Changes 
+in the data line while the clock line is HIGH will be 
+interpreted as a START or STOP condition
+Accordingly, the following bus conditions have been
+defined using Figure 5-6.
+5.6.1 BUS NOT BUSY (A)
+Both data and clock lines remain HIGH.
+5.6.2 START DATA TRANSFER (B)
+A HIGH to LOW transition of the SDA line while the
+clock (SCL) is HIGH determines a START condition. All
+commands must be preceded by a START condition.
+5.6.3 STOP DATA TRANSFER (C)
+A LOW to HIGH transition of the SDA line while the
+clock (SCL) is HIGH determines a STOP condition. All
+operations can be ended with a STOP condition.
+5.6.4 DATA VALID (D)
+The state of the data line represents valid data when,
+after a START condition, the data line is stable for the
+duration of the HIGH period of the clock signal.
+The data on the line must be changed during the LOW
+period of the clock signal. There is one clock pulse per
+bit of data.
+Each data transfer is init iated with a START condition
+and terminated with a STOP condition.
+LSB
+First Byte ACK
+X0 0 0 0 0 0 0 0 A AXXX XXXX
+(General Call Address)
+Second Byte
+Note: The I 2C specification does not allow
+“00000000” (00h) in the second byte.
+SS
+START
+ACK
+STOP
+© 2009 Microchip Technology Inc. DS22003E-page 23
+MCP3421
+5.6.5 ACKNOWLEDGE AND NON-
+ACKNOWLEDGE
+The Master (microcontroller) and the slave (MCP3421)
+use an acknowledge pulse as a hand shake of commu-
+nication for each byte. The ninth clock pulse of each
+byte is used for the acknowledgement. The clock pulse
+is always provided by the Master (microcontroller) and
+the acknowledgement is issued by the receiving device
+of the byte (Note: The transmitting device must release
+the SDA line during the acknowledge pulse.). The
+acknowledgement is achieved by pulling-down the
+SDA line “LOW” during the 9th clock pulse by the
+receiving device.
+During reads, the Master (microcontroller) can
+terminate the current read ope ration by not providing
+an acknowledge bit (not Acknowledge (NAK)) on the
+last byte. In this case, the MCP3421 device releases
+the SDA line to allow the Master (microcontroller) to
+generate a STOP or repeated START condition.
+The non-acknowledgement (NAK) is issued by
+providing the SDA line to “HIGH” during the 9th clock
+pulse.
+FIGURE 5-6: Data Transfer Sequence on I2C Serial Bus.
+SCL
+SDA
+(A) (B) (D) (D) (A) (C)
+START
+CONDITION
+ADDRESS OR
+ACKNOWLEDGE
+VALID
+DATA
+ALLOWED
+TO CHANGE
+STOP
+CONDITION
+MCP3421
+DS22003E-page 24 © 2009 Microchip Technology Inc.
+TABLE 5-4: I 2C SERIAL TIMING SPECIFICATIONS
+Electrical Specifications: Unless otherwise specified, all limits are specified for TA = -40 to +85°C,
+VIN+ = VIN- = VREF/2,  VSS = 0V, VDD = +2.7V to +5.0V.
+Parameters Sym  Min  Typ  Max Units            Conditions
+Standard Mode (100 kHz)
+Clock frequency f SCL — — 100 kHz
+Clock high time THIGH 4000 — — ns
+Clock low time TLOW 4700 — — ns
+SDA and SCL rise time TR — — 1000 ns From V IL to VIH (Note 1)
+SDA and SCL fall time TF — — 300 ns From V IH to VIL (Note 1)
+START condition hold time THD:STA 4000 — — ns
+START (Repeated) condition 
+setup time
+TSU:STA 4700 — — ns
+Data hold time THD:DAT 0 — 3450 ns ( Note 3)
+Data input setup time TSU:DAT 250 — — ns
+STOP condition setup time TSU:STO 4000 — — ns
+Output valid from clock TAA 0 — 3750 ns ( Note 2, Note 3)
+Bus free time TBUF 4700 — — ns Time between START and 
+STOP conditions. 
+Fast Mode (400 kHz)
+Clock frequency TSCL — — 400 kHz
+Clock high time THIGH 600 — — ns
+Clock low time TLOW 1300 — — ns
+SDA and SCL rise time TR 20 + 0.1Cb — 300 ns From V IL to VIH (Note 1)
+SDA and SCL fall time TF 20 + 0.1Cb — 300 ns From V IH to VIL (Note 1)
+START condition hold time THD:STA 600 — — ns
+START (Repeated) condition 
+setup time
+TSU:STA 600 — — ns
+Data hold time THD:DAT 0 — 900 ns ( Note 4)
+Data input setup time TSU:DAT 100 — — ns
+STOP condition setup time TSU:STO 600 — — ns
+Output valid from clock TAA 0 — 1200 ns ( Note 2, Note 3)
+Bus free time TBUF 1300 — — ns Time between START and 
+STOP conditions. 
+Note 1: This parameter is ensured by characterization and not 100% tested.
+2: This specification is not a part of the I2C specification. This specification is equivalent to the Data Hold 
+Time (THD:DAT) plus SDA Fall (or rise) time: TAA = THD:DAT + TF (OR TR).
+3: If this parameter is too short, it can create an unintended Start or Stop condition to other devices on the 
+bus line. If this parameter is too long, Clock Low time (TLOW) can be affected. 
+4: For Data Input: This parameter must be longer than tSP. If this parameter is too long, the Data Input Setup 
+(TSU:DAT) or Clock Low time (TLOW) can be affected.
+For Data Output: This parameter is characterized, and tested indirectly by testing TAA parameter.
+© 2009 Microchip Technology Inc. DS22003E-page 25
+MCP3421
+ High-Speed Mode (3.4 MHz):  Not recommended for VDD < 2.7V
+Clock frequency f SCL —— 3 . 4 M H z C b = 100 pF
+—— 1 . 7 M H z C b = 400 pF
+Clock high time T HIGH 60 — — ns C b = 100 pF, fSCL = 3.4 MHz
+120 — — ns C b = 400 pF, fSCL = 1.7 MHz
+Clock low time T LOW 160 — — ns C b = 100 pF, fSCL = 3.4 MHz
+320 — — ns C b = 400 pF, fSCL = 1.7 MHz
+SCL rise time
+(Note 1)
+TR — — 40 ns From V IL to VIH,
+Cb = 100 pF, fSCL = 3.4 MHz
+— — 80 ns From V IL to VIH,
+Cb = 400 pF, fSCL = 1.7 MHz
+SCL fall time
+(Note 1)
+TF — — 40 ns From V IH to VIL,
+Cb = 100 pF, fSCL = 3.4 MHz
+— — 80 ns From V IH to VIL,
+Cb = 400 pF, fSCL = 1.7 MHz
+SDA rise time
+(Note 1)
+TR: DAT — — 80 ns From V IL to VIH,
+Cb = 100 pF, fSCL = 3.4 MHz
+— — 160 ns From V IL to VIH,
+Cb = 400 pF, fSCL = 1.7 MHz
+SDA fall time
+(Note 1)
+TF: DATA — — 80 ns From V IH to VIL,
+Cb = 100 pF, fSCL = 3.4 MHz
+— — 160 ns From V IH to VIL,
+Cb = 400 pF, fSCL = 1.7 MHz
+Data hold time
+(Note 4)
+THD:DAT 0 — 70 ns C b = 100 pF, fSCL = 3.4 MHz
+0— 1 5 0 n s C b = 400 pF, fSCL = 1.7 MHz
+Output valid from clock
+(Notes 2 and 3)
+TAA —— 1 5 0 n s C b = 100 pF, fSCL = 3.4 MHz
+—— 3 1 0 n s C b = 400 pF, fSCL = 1.7 MHz
+START condition hold time T HD:STA 160 — — ns
+START (Repeated) condition 
+setup time
+TSU:STA 160 — — ns
+Data input setup time T SU:DAT 10 — — ns
+STOP condition setup time T SU:STO 160 — — ns
+TABLE 5-4: I 2C SERIAL TIMING SPECIFICATIONS (CONTINUED)
+Electrical Specifications: Unless otherwise specified, all limits are specified for TA = -40 to +85°C,
+VIN+ = VIN- = VREF/2,  VSS = 0V, VDD = +2.7V to +5.0V.
+Parameters Sym  Min  Typ  Max Units            Conditions
+Note 1: This parameter is ensured by characterization and not 100% tested.
+2: This specification is not a part of the I2C specification. This specification is equivalent to the Data Hold 
+Time (THD:DAT) plus SDA Fall (or rise) time: TAA = THD:DAT + TF (OR TR).
+3: If this parameter is too short, it can create an unintended Start or Stop condition to other devices on the 
+bus line. If this parameter is too long, Clock Low time (TLOW) can be affected. 
+4: For Data Input: This parameter must be longer than tSP. If this parameter is too long, the Data Input Setup 
+(TSU:DAT) or Clock Low time (TLOW) can be affected.
+For Data Output: This parameter is characterized, and tested indirectly by testing TAA parameter.
+MCP3421
+DS22003E-page 26 © 2009 Microchip Technology Inc.
+ 
+FIGURE 5-7: I2C Bus Timing Data.
+TF
+SCL
+SDA
+TSU:STA
+TSP
+THD:STA
+TLOW
+THIGH
+THD:DAT
+TAA
+TSU:DAT
+TR
+TSU:STO
+TBUF
+0.7VDD
+0.3VDD
+© 2009 Microchip Technology Inc. DS22003E-page 27
+MCP3421
+6.0 BASIC APPLICATION 
+CONFIGURATION
+The MCP3421 can be used for various precision
+analog-to-digital converter applications. The device
+operates with very simp le connections to the
+application circuit. The following sections discuss the
+examples of the device connections and applications.
+6.1 Connecting to the Application 
+Circuits
+6.1.1 BYPASS CAPACITORS ON V DD PIN
+For an accurate measurement, the application circuit
+needs a clean supply voltage and must block any noise
+signal to the MCP3421 device. Figure 6-1 shows an
+example of using two bypass capacitors (a 10 µF
+tantalum capacitor and a 0.1 µF ceramic capacitor) on
+the V DD line of the MCP3421. These capacitors are
+helpful to filter out any hi gh frequency noises on the
+VDD line and also provide the momentary bursts of
+extra currents when the device needs from the supply.
+These capacitors should be placed as close to the VDD
+pin as possible (within one inch). If the application
+circuit has separate digital and analog power supplies,
+the VDD and VSS of the MCP3421 device should reside
+on the analog plane.
+6.1.2 CONNECTING TO I 2C BUS USING 
+PULL-UP RESISTORS
+The SCL and SDA pins of the MCP3421 are open-drain
+configurations. These pins require a pull-up resistor as
+shown in Figure 6-1. The value of these pull-up
+resistors depends on the operating speed and loading
+capacitance of the I2C bus line. Higher value of pull-up
+resistor consumes less power, but increases the signal
+transition time (higher RC time constant) on the bus.
+Therefore, it can limit th e bus operating speed. The
+lower value of resistor, on the other hand, consumes
+higher power, but allows higher operating speed. If the
+bus line has higher capacitance due to long bus line or
+high number of devices connected to the bus, a smaller
+pull-up resistor is needed to compensate the long RC
+time constant. The pull-up resistor is typically chosen
+between 5 kΩ and 10 kΩ ranges for standard and fast
+modes.
+  
+FIGURE 6-1: Typical Connection 
+Example.
+The number of devices connected to the bus is limited
+only by the maximum bus capacitance of 400 pF. The
+bus loading capacitance affects on the bus operating
+speed. Figure 6-2 shows an example of multiple device
+connections.
+FIGURE 6-2: Example of Multiple Device 
+Connection on I2C Bus.
+VIN+ VIN-
+VDDVSS
+1
+2
+3 4
+5
+6
+SCL SDL Rp
+Input Signals VDD VDD
+TO MCU
+(MASTER)
+RP is the pull-up resistor:
+5k Ω - 10 kΩ for fSCL = 100 kHz to 400 kHz
+C1: 0.1 µF, Ceramic capacitor
+C2: 10 µF, Tantalum capacitor
+Rp
+C1 C2
+MCP3421
+SDA SCL
+Microcontroller
+Temperature 
+(PIC16F876)
+MCP4725
+Sensor
+(MCP9804)
+MCP3421
+MCP3421
+DS22003E-page 28 © 2009 Microchip Technology Inc.
+6.1.3 DEVICE COMMUNICATION TEST
+The user can test the communication between the
+Master (MCU) and the MCP3421 by simply checking
+an acknowledge response from the MCP3421 after
+sending a read or write command. Here is an example
+using Figure 6-3:
+a) Set the R/W  bit “LOW” in the address byte.
+b) Check the ACK pulse after sending the
+address byte.
+If the device acknowledges (ACK = 0), then the
+device is connected, otherwise it is not
+connected.
+c) Send a STOP bit.
+  
+FIGURE 6-3: I2C Bus Communications 
+Test.
+6.1.4 DIFFERENTIAL AND SINGLE-
+ENDED CONFIGURATION
+Figure 6-4 shows typical connection examples for
+differential and single-ended inputs. Differential input
+signals are connected to the V IN+ and VIN- input pins.
+For the single-ended input, the input signal is applied to
+one of the input pins (typically connected to the VIN+
+pin) while the other input pin (typically VIN- pin) is
+grounded. All device characteristics hold for the single-
+ended configuration, but this configuration loses one bit
+resolution because the input can only stand in
+positive half scale. Refer to Section 4.9 “Digital
+Output Codes and Conversion to Real Values”.
+ 
+FIGURE 6-4: Differential and Single-
+Ended Input Connections.
+123456789SCL
+SDA 11 0 1A 2 A 1 A 0 0
+Start
+Bit
+Address Byte
+Address bits ADC Section
+R/W 
+Stop
+Bit
+ACK
+Response 
+Device Code 
+MCP3421
+(a) Differential Input Signal Connection: 
+Input Signal
+(b) Single-ended Input Signal Connection: 
+Input Signal
+Sensor
+Sensor
+Excitation
+Excitation
+R1
+R2
+VIN+
+VIN-
+VDD
+VIN+
+VIN-
+VDD
+C1 C2
+C1 C2
+ 
+C1 : 0.1 µF, Ceramic Capacitor
+C2 : 10 µF, Tantalum Capacitor
+MCP3421
+MCP3421
+© 2009 Microchip Technology Inc. DS22003E-page 29
+MCP3421
+6.2  Application Examples
+6.2.1 VOLTAGE MEASUREMENT
+The MCP3421 device can be used in a broad range of
+sensor and data acquisition applications. 
+Figure 6-5 shows a circuit example measuring the
+battery voltage. When the input voltage is greater than
+the internal reference voltage (VREF = 2.048V), it needs
+a voltage divider circuit to prevent the output code from
+being saturated. In the example, R1 and R2 form a volt-
+age divider. The R 1 and R 2 are set to yield V IN to be
+less than the internal reference voltage
+(VREF = 2.048V). 
+If the input voltage range is much less than the internal
+reference voltage, the voltage divider at the input pin is
+not needed, and the user may use the internal PGA
+with a gain of up to 8.
+When the voltage divider or internal PGA is used for the
+input signal, these factor must be taken into account
+when the user converts the output codes to the actual
+input voltage.
+Find the Microchip Application Note AN1156 for the
+input voltage and current measurement using the
+MCP342X device family. The MCU firmware is well
+documented in the reference.
+  
+FIGURE 6-5: Battery Voltage 
+Measurement.
+6.2.2 CURRENT MEASUREMENT
+Figure 6-6 shows a circuit example of current
+measurement. For the current measurement, the
+device measures the voltage across the current sensor,
+and converts it to current by dividing the measured
+voltage by a known resistance value of the current
+sensor. The voltage drops across the sensor is waste.
+Therefore, the current m easurement often prefers to
+use a current sensor with smaller resistance value,
+which, in turn, requires high resolution ADC device.
+The high precision MCP342x devices from Microchip
+Technology Inc. are suitable for the current
+measurement with low resistive current sensors. These
+devices can measure the input voltage as low as 2 µV
+range (or current in ~ µA range) with 18 bit resolution
+and PGA = 8 settings. The MSB (= sign bit) of the
+output code indicates the direction of the current.
+   
+FIGURE 6-6: Battery Current 
+Measurement.
+Output Code LSB
+R1 R2+
+R2
+-------------------×× 1PGA-----------×=
+R1
+Battery
+R1 and R2 = Voltage Divider
+VIN
+R2
+R1 R2+-------------------VBAT×=
+(V)
+To Load
+VIN+
+VIN-
+VDD
+Input Voltage Calculation from Output Code:
+R2
+Measured Analog Input Voltage 
+VBAT
+MCP3421
+Battery
+(V)
+To Load
+VIN-
+VDD
+VIN+
+Current Sensor
+Discharging Current
+Charging 
+Current
+Current Calculation from Output Code:
+Current Output Code LSB×RS e n s o r()----------------------------------------------------1PGA------------ A()×=
+MCP3421
+MCP3421
+DS22003E-page 30 © 2009 Microchip Technology Inc.
+6.2.3 PRESSURE MEASUREMENT
+Figure 6-7 shows an example of measuring the
+pressure using NPP301 (manufactured by
+GE NovaSensor). No external signal conditioning
+circuit is needed by utilizing its internal PGA. The
+pressure sensor output is 20 mV/V. This gives 100 mV
+of full scale output for V DD of 5V (sensor excitation
+voltage). Equation 6-1 shows an example of calculat-
+ing the number of output c ode for the full scale output
+of the NPP301.
+ 
+FIGURE 6-7: Example of Pressure 
+Measurement.
+EQUATION 6-1: EXPEC TED NUMBER OF 
+OUTPUT CODE FOR 
+NPP301 PRESSURE 
+SENSOR
+6.2.4 WHEATSTONE BRIDGE TYPE 
+SENSORS WITH SIGNAL 
+CONDITIONING
+Wheatstone bridge is one of the most common
+configurations in the sensor applications. Strain
+gauges and pressure sensors are the common
+examples. When the sensor output signal is small and
+the common mode noise level is large, it needs a signal
+conditioning circuit between the sensor and the
+MCP3421. Figure 6-8 and Figure 6-9 show examples
+of using the MCP6V01 (high precision auto-zeroed
+Op Amp) for the sensor signal conditioning. Figure 6-8
+shows the interface circuit with a minimum of compo-
+nents between the sensor and the MCP3421, but it is
+not symmetric, and therefore, the ADC input becomes
+a single ended. On the other hand, the Figure 6-9 has
+a symmetric and differential output, but requires more
+components.
+FIGURE 6-8: Simple Signal Conditioning 
+Design with Asymmetric Circuit.
+FIGURE 6-9: High Performance Signal 
+Conditioning Design with Symmetric Circuit.
+NPP301
+MCP3421
+VIN+ VIN-
+VDDVSS
+1
+2
+3 4
+5
+6
+SCL SDL 10 µF0.1 µF
+R R
+VDD VDD
+TO MCU
+(MASTER)
+VDD
+Expected 
+log 2 100 mV15.625μV
+PGA------------------------
+------------------------
+⎝⎠
+⎜⎟
+⎜⎟
+⎛⎞
+Number of Output Code = 
+Where:
+1 LSB = 15.625 µV with 18 Bit configuration.
+= 12.64 bits for PGA =1
+= 13.64 bits for PGA =2
+= 14.64 bits for PGA =4
+= 15.64 bits for PGA =8
+VDD
+RR
+RR
+100R
+C
+MCP6V01
+VDD
+0.2R
+0.2R
+3k Ω
+MCP3421
+20 kΩ
+1µ F
+20 kΩ
+1µ F
+VDD
+1/2 MCP6V02
+1/2 MCP6V02
+200Ω
+200Ω
+3k Ω
+3k Ω
+1µ F
+RR
+RR
+VDD
+10 nF
+10 nF
+200Ω
+200Ω
+MCP3421
+© 2009 Microchip Technology Inc. DS22003E-page 31
+MCP3421
+6.2.5 TEMPERATURE MEASUREMENT 
+Figure 6-10 shows an example of temperature
+measurement using a thermocouple sensor and the
+MCP9800 silicon temperature sensor. The MCP9800 is
+a high accuracy temperature sensor that can detect the
+temperature in the range of  -55°C to 125°C with 1°C
+accuracy.
+The type K thermocouple sensor senses the
+temperature at the hot junction (THJ) with respect to the
+cold junction temperature (reference, T CJ). The
+temperature difference bet ween the hot and cold
+junctions is represented by the voltage V1. This voltage
+is then converted to digital codes by the MCP3421.
+In the circuit, the MCP9800 is used for cold junction
+compensation. The MCU com putes the difference of
+the hot and cold junction temperatures, which is
+proportional to the hot junction temperature (THJ). 
+With Type K  thermocouple, it can measure
+temperature from 0°C to 1250°C degrees. The full
+scale output range of the Type K  thermocouple is
+about 50 mV. This provides 40 µV/°C
+(= 50 mV/1250°C) of measurement resolution.
+Equation 6-2 shows the measurement budget for ther-
+mocouple sensor signal using the MCP3421 device
+with 18 bits and PGA = 8 settings. With this configura-
+tion, it can detect the in put signal level as low as
+approximately 2 µV. The internal PGA boosts the input
+signal level eight times. The 40 µV/°C input from the
+thermocouple is amplified internally to 320 µV/°C
+before the conversion takes place. This results in
+20.48 LSB/°C output codes. This means there are
+about 20 LSB output codes (or about 4.32 bits) per 1°C
+of change in temperature.
+EQUATION 6-2: MEASUREMENT BUDGET 
+FOR THERMOCOUPLE 
+SENSOR   
+ 
+FIGURE 6-10: Example of Temperature 
+Measurement.
+Equation 6-3 shows an example of calculating the
+expected number of output code with various PGA gain
+settings for Type K thermocouple output.
+EQUATION 6-3: EXPECTED NUMBER OF 
+OUTPUT CODE FOR 
+TYPE K THERMOCOUPLE
+Input Signal Level after gain of 8:
+Where:
+1 LSB = 15.625 µV with 18-bit configuration
+Detectable Input Signal Level 15.625 μV/PGA=
+1.953125μV for PGA 8==
+40μV/°C() 83 2 0 μV/°C=•=
+No. of LSB/°C 320μV/°C15.625μV------------------------- 20.48 Codes/°C==
+~ 40 µV°C
+Thermocouple Sensor
+MCP9800
+Isothermal Block
+Heat Cold Junction (TCJ)
+Hot Junction 
+ (THJ)
+SCLSDA
+V1
+VDD
+VDD
+To MCU
+(MASTER)
+MCP3421
+10 kΩ
+10 kΩ
+1µ F
+10 µF
+log 2 50 mV15.625μV
+PGA------------------------
+------------------------
+⎝⎠
+⎜⎟
+⎜⎟
+⎛⎞Expected
+Number of Output Code = 
+Where:
+1 LSB = 15.625 µV with 18-bit configuration.
+= 11.6 bits for PGA = 1
+= 12.6 bits for PGA = 2
+= 13.6 bits for PGA = 4
+= 14.6 bits for PGA = 8
+MCP3421
+DS22003E-page 32 © 2009 Microchip Technology Inc.
+NOTES:
+© 2009 Microchip Technology Inc. DS22003E-page 33
+MCP3421
+7.0 DEVELOPMENT TOOL 
+SUPPORT
+7.1 MCP3421 Evaluation Boards
+The MCP3421 Evaluation Board is available from
+Microchip Technology Inc. This board works with Micro-
+chip’s PICkit™ Serial Analyzer. The user can simply
+connect any sensing voltage to the input test pads of
+the board and read conversion codes using the easy-
+to-use PICkit™ Serial Anal yzer. Refer to www.micro-
+chip.com for further information on this product’s
+capabilities and availability.
+FIGURE 7-1: MCP3421 Evaluation Board.
+FIGURE 7-2:  Setup for the MCP3421 
+Evaluation Board with PICkit™ Serial Analyzer.
+ 
+Sensor Input
+Connection
+MCP3421
+DS22003E-page 34 © 2009 Microchip Technology Inc.
+FIGURE 7-3: Example of PICkit™ Serial User Interface.
+ 
+
+© 2009 Microchip Technology Inc. DS22003E-page 35
+MCP3421
+8.0 PACKAGING INFORMATION
+8.1 Package Marking Information
+Legend: XX...X Customer-specific information
+Y Year code (last digit of calendar year)
+YY Year code (last 2 digits of calendar year)
+WW Week code (week of January 1 is week ‘01’)
+NNN Alphanumeric traceability code
+  Pb-free JEDEC designator for Matte Tin (Sn)
+* This package is Pb-free. The Pb-free JEDEC designator (     )
+can be found on the outer packaging for this package.
+Note: In the event the full Microchip part nu mber cannot be marked on one line, it will
+be carried over to the next line, thus limiting the number of available
+characters for customer-specific information.
+3e
+3e
+1
+6-Lead SOT-23
+XXNN
+Example
+1
+CA25
+Part Number AddressOption Code
+MCP3421A0T-E/CH A0 (000) CANN
+MCP3421A1T-E/CH A1 (001) CBNN
+MCP3421A2T-E/CH A2 (010) CCNN
+MCP3421A3T-E/CH A3 (011) CDNN
+MCP3421A4T-E/CH A4 (100) CENN
+MCP3421A5T-E/CH A5 (101) CFNN
+MCP3421A6T-E/CH A6 (110) CGNN
+MCP3421A7T-E/CH A7 (111) CHNN
+MCP3421
+DS22003E-page 36 © 2009 Microchip Technology Inc.
+/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/g47/g72/g68/g71/;#23#23#23/g51/g79/g68/g86/g87/g76/g70/;#23#23#23/g54/g80/g68/g79/g79/;#23#23#23/g50/g88/g87/g79/g76/g81/g72/;#23#23#23/g55/g85/g68/g81/g86/g76/g86/g87/g82/g85/;#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23/g38/g43/;#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23/g62/g54/g50/g55/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/g64
+/g49/g82/g87/g72/g86/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23
+/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /g39/g76/g80/g72/g81/g86/g76/g82/g81/g86/;#23#23#23/g39/;#23#23#23/g68/g81/g71/;#23#23#23/g40/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23/g71/g82/;#23#23#23/g81/g82/g87/;#23#23#23/g76/g81/g70/g79/g88/g71/g72/;#23#23#23/g80/g82/g79/g71/;#23#23#23/g73/g79/g68/g86/g75/;#23#23#23/g82/g85/;#23#23#23/g83/g85/g82/g87/g85/g88/g86/g76/g82/g81/g86/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23/g48/g82/g79/g71/;#23#23#23/g73/g79/g68/g86/g75/;#23#23#23/g82/g85/;#23#23#23/g83/g85/g82/g87/g85/g88/g86/g76/g82/g81/g86/;#23#23#23/g86/g75/g68/g79/g79/;#23#23#23/g81/g82/g87/;#23#23#23/g72/g91/g70/g72/g72/g71/;#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23/g80/g80/;#23#23#23/g83/g72/g85/;#23#23#23/g86/g76/g71/g72/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23
+/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /g39/g76/g80/g72/g81/g86/g76/g82/g81/g76/g81/g74/;#23#23#23/g68/g81/g71/;#23#23#23/g87/g82/g79/g72/g85/g68/g81/g70/g76/g81/g74/;#23#23#23/g83/g72/g85/;#23#23#23/g36/g54/g48/g40/;#23#23#23/g60/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/g48/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23
+/g37/g54/g38/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/g37/g68/g86/g76/g70/;#23#23#23/g39/g76/g80/g72/g81/g86/g76/g82/g81/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23/g55/g75/g72/g82/g85/g72/g87/g76/g70/g68/g79/g79/g92/;#23#23#23/g72/g91/g68/g70/g87/;#23#23#23/g89/g68/g79/g88/g72/;#23#23#23/g86/g75/g82/g90/g81/;#23#23#23/g90/g76/g87/g75/g82/g88/g87/;#23#23#23/g87/g82/g79/g72/g85/g68/g81/g70/g72/g86/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23
+/g49/g82/g87/g72/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /g41/g82/g85/;#23#23#23/g87/g75/g72/;#23#23#23/g80/g82/g86/g87/;#23#23#23/g70/g88/g85/g85/g72/g81/g87/;#23#23#23/g83/g68/g70/g78/g68/g74/g72/;#23#23#23/g71/g85/g68/g90/g76/g81/g74/g86/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23/g83/g79/g72/g68/g86/g72/;#23#23#23/g86/g72/g72/;#23#23#23/g87/g75/g72/;#23#23#23/g48/g76/g70/g85/g82/g70/g75/g76/g83/;#23#23#23/g51/g68/g70/g78/g68/g74/g76/g81/g74/;#23#23#23/g54/g83/g72/g70/g76/g73/g76/g70/g68/g87/g76/g82/g81/;#23#23#23/g79/g82/g70/g68/g87/g72/g71/;#23#23#23/g68/g87/;#23#23#23
+/g75/g87/g87/g83/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/g90/g90/g90/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/g80/g76/g70/g85/g82/g70/g75/g76/g83/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/g70/g82/g80/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/g83/g68/g70/g78/g68/g74/g76/g81/g74
+/g56/g81/g76/g87/g86 /g48/g44/g47/g47/g44/g48/g40/g55/g40/g53/g54
+/g39/g76/g80/g72/g81/g86/g76/g82/g81/;#23#23#23/g47/g76/g80/g76/g87/g86 /g48/g44/g49 /g49/g50/g48 /g48/g36/g59
+/g49/g88/g80/g69/g72/g85/;#23#23#23/g82/g73/;#23#23#23/g51/g76/g81/g86 /g49 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23
+/g51/g76/g87/g70/g75 /g72 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23/g37/g54/g38
+/g50/g88/g87/g86/g76/g71/g72/;#23#23#23/g47/g72/g68/g71/;#23#23#23/g51/g76/g87/g70/g75 /g72/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23/g37/g54/g38
+/g50/g89/g72/g85/g68/g79/g79/;#23#23#23/g43/g72/g76/g74/g75/g87 /g36 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /g177 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23
+/g48/g82/g79/g71/g72/g71/;#23#23#23/g51/g68/g70/g78/g68/g74/g72/;#23#23#23/g55/g75/g76/g70/g78/g81/g72/g86/g86 /g36/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /g177 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23
+/g54/g87/g68/g81/g71/g82/g73/g73 /g36/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /g177 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23
+/g50/g89/g72/g85/g68/g79/g79/;#23#23#23/g58/g76/g71/g87/g75 /g40 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /g177 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23
+/g48/g82/g79/g71/g72/g71/;#23#23#23/g51/g68/g70/g78/g68/g74/g72/;#23#23#23/g58/g76/g71/g87/g75 /g40/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /g177 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23
+/g50/g89/g72/g85/g68/g79/g79/;#23#23#23/g47/g72/g81/g74/g87/g75 /g39 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /g177 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23
+/g41/g82/g82/g87/;#23#23#23/g47/g72/g81/g74/g87/g75 /g47 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /g177 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23
+/g41/g82/g82/g87/g83/g85/g76/g81/g87 /g47/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /g177 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23
+/g41/g82/g82/g87/;#23#23#23/g36/g81/g74/g79/g72 /g73 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/g131 /g177 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/g131
+/g47/g72/g68/g71/;#23#23#23/g55/g75/g76/g70/g78/g81/g72/g86/g86 /g70 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /g177 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23
+/g47/g72/g68/g71/;#23#23#23/g58/g76/g71/g87/g75 /g69 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23 /g177 /;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23
+b
+E
+4N
+E1
+P I N1I DB Y
+LASER MARK
+D
+1 2 3
+e
+e1
+A
+A1
+A2 c
+L
+L1
+φ
+/g48/g76/g70/g85/g82/g70/g75/g76/g83/g55/g72/g70/g75/g81/g82/g79/g82/g74/g92/g39/g85/g68/g90/g76/g81/g74/g38/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/;#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23#23/g37
+© 2009 Microchip Technology Inc. DS22003E-page 37
+MCP3421
+APPENDIX A: REVISION HISTORY
+Revision E (August 2009)
+The following is the list of modifications:
+1. Updated Section 4.1 “General Overview”.
+2. Added new section: Section 4.5 “Input Voltage
+Range”.
+3. Restructured information in Section 4.9 “Digi-
+tal Output Codes and Conversion to Real
+Values”.
+4. Updated information in Table 5-4 in Section 5.0
+“Using the MCP3421 Device”.
+5. Updated section Section 6.0 “Basic Applica-
+tion Configuration”.
+6. Added new Section 7.0 “Development Tool
+Support”.
+7. Updated drawings in Section 8.0 “Packaging
+Information”.
+Revision D (November 2007)
+The following is the list of modifications:
+1. Section 1.0 Electrical Characteristics: Changed
+Gain Error Drift typical from 5 to 15, and
+Maximum from 40 to —.
+Revision C (October 2007)
+The following is the list of modifications:
+1. Figure 5-4: Changed O/C  designation to O/C.
+2. Updated package outline drawing.
+3. Updated revision history.
+Revision B (December 2006)
+The following is the list of modifications:
+1. Changes to Electrical Characteristics tables
+2. Added characterization data
+3. Changes to I 2C Serial Timing Specification table
+4. Change to Figure 5-7.
+5. Updated package outline drawings
+Revision A (August 2006)
+• Original Release of this Document.
+MCP3421
+DS22003E-page 38 © 2009 Microchip Technology Inc.
+NOTES:
+© 2009 Microchip Technology Inc. DS22003E-page 39
+MCP3421
+PRODUCT IDENTIFICATION SYSTEM
+To order or obtain information, e.g., on pricing or delivery, refer to the factory or the listed sales office.
+  
+Device: MCP3421: Single Channel ΔΣ A/D Converter
+Address Options: XX A2 A1 A0
+A 0  * = 000
+A 1 = 001
+A 2 = 010
+A 3 = 011
+A 4 = 100
+A 5 = 101
+A 6 = 110
+A 7 = 111
+* Default option. Contact Microchip factory for other 
+address options
+Tape and Reel: T = Tape and Reel
+Temperature Range: E = -40°C to +125°C
+Package: CH = Plastic Small Outline Transistor (SOT-23-6),
+6-lead
+Examples:
+a) MCP3421A0T-E/CH: Tape and Reel,
+Single Channel ΔΣ A/D
+Converter,
+SOT-23-6 package,
+Address Option = A0.
+PART NO. XXX
+Address Temperature
+Range
+Device
+/XX
+Package
+Options
+X
+Tape and
+Reel
+MCP3421
+DS22003E-page 40 © 2009 Microchip Technology Inc.
+NOTES:
+© 2009 Microchip Technology Inc. DS22003E-page 41
+Information contained in this  publication regarding device
+applications and the like is provided only for your convenience
+and may be superseded by updates. It is your responsibility to
+ensure that your application me ets with your specifications.
+MICROCHIP MAKES NO REPRESENTATIONS OR
+WARRANTIES OF ANY KIND WHETHER EXPRESS OR
+IMPLIED, WRITTEN OR ORAL, STATUTORY OR
+OTHERWISE, RELATED TO THE INFORMATION,
+INCLUDING BUT NOT LIMITED TO ITS CONDITION,
+QUALITY , PERFORMANCE, MERCHANTABILITY OR
+FITNESS FOR PURPOSE . Microchip disclaims all liability
+arising from this information and its use. Use of Microchip
+devices in life support and/or safety applications is entirely at
+the buyer’s risk, and the buyer agrees to defend, indemnify and
+hold harmless Microchip from any and all damages, claims,
+suits, or expenses resulting fr om such use. No licenses are
+conveyed, implicitly or ot herwise, under any Microchip
+intellectual property rights.
+Trademarks
+The Microchip name and logo, the Microchip logo, dsPIC, 
+KEELOQ, KEELOQ logo, MPLAB, PIC, PICmicro, PICSTART, 
+rfPIC and UNI/O are registered trademarks of Microchip 
+Technology Incorporated in the U.S.A. and other countries.
+FilterLab, Hampshire, HI-TECH C, Linear Active Thermistor, 
+MXDEV, MXLAB, SEEVAL and The Embedded Control 
+Solutions Company are registered trademarks of Microchip 
+Technology Incorporated in the U.S.A.
+Analog-for-the-Digital Age, Application Maestro, CodeGuard, 
+dsPICDEM, dsPICDEM.net, dsPICworks, dsSPEAK, ECAN, 
+ECONOMONITOR, FanSense, HI-TIDE, In-Circuit Serial 
+Programming, ICSP, ICEPIC, Mindi, MiWi, MPASM, MPLAB 
+Certified logo, MPLIB, MPLINK, mTouch, Omniscient Code 
+Generation, PICC, PICC-18, PICkit, PICDEM, PICDEM.net, 
+PICtail, PIC32 logo, REAL ICE, rfLAB, Select Mode, Total 
+Endurance, TSHARC, WiperLock and ZENA are trademarks 
+of Microchip Technology Incorporated in the U.S.A. and other 
+countries.
+SQTP is a service mark of Microchip Technology Incorporated 
+in the U.S.A.
+All other trademarks mentioned herein are property of their 
+respective companies.
+© 2009, Microchip Technology Incorporated, Printed in the 
+U.S.A., All Rights Reserved.
+ Printed on recycled paper.
+Note the following details of the code protection feature on Microchip devices:
+• Microchip products meet the specification cont ained in their particular Microchip Data Sheet.
+• Microchip believes that its family of products is one of the mo st secure families of its kind on the market today, when used in the 
+intended manner and under normal conditions.
+• There are dishonest and possibly illegal meth ods used to breach the code protection feature. All of these methods, to our 
+knowledge, require using the Microchip products in a manner outside the operating specifications contained in Microchip’s Data 
+Sheets. Most likely, the person doing so is engaged in theft of intellectual property.
+• Microchip is willing to work with the customer  who is concerned about the integrity of their code.
+• Neither Microchip nor any other semiconduc tor manufacturer can guarantee the security of their code. Code protection does not 
+mean that we are guaranteeing the product as “unbreakable.”
+Code protection is constantly evolving. We at Microchip are committed to continuously improving the code protection features of our
+products. Attempts to break Microchip’s code protection feature may be a violation of the Digital Millennium Copyright Act. If such acts
+allow unauthorized access to your software or other copyrighted work, you may have a right to sue for relief under that Act.
+Microchip received ISO/TS-16949:2002 certification for its worldwide 
+headquarters, design and wafer fabrication facilities in Chandler and 
+Tempe, Arizona; Gresham, Oregon and design centers in California 
+and India. The Company’s quality system processes and procedures 
+are for its PIC® MCUs and dsPIC® DSCs, KEELOQ® code hopping 
+devices, Serial EEPROMs, microperipherals, nonvolatile memory and 
+analog products. In addition, Microchip’s quality system for the design 
+and manufacture of development systems is ISO 9001:2000 certified.
+
+DS22003E-page 42 © 2009 Microchip Technology Inc.
+AMERICAS
+Corporate Office
+2355 West Chandler Blvd.
+Chandler, AZ  85224-6199
+Tel:  480-792-7200  
+Fax:  480-792-7277
+Technical Support: 
+http://support.microchip.com
+Web Address: 
+www.microchip.com
+Atlanta
+Duluth, GA 
+Tel: 678-957-9614 
+Fax: 678-957-1455
+Boston
+Westborough, MA  
+Tel: 774-760-0087 
+Fax: 774-760-0088
+Chicago
+Itasca, IL  
+Tel: 630-285-0071 
+Fax: 630-285-0075
+Cleveland
+Independence, OH 
+Tel: 216-447-0464 
+Fax: 216-447-0643
+Dallas
+Addison, TX 
+Tel: 972-818-7423  
+Fax: 972-818-2924
+Detroit
+Farmington Hills, MI 
+Tel: 248-538-2250
+Fax: 248-538-2260
+Kokomo
+Kokomo, IN 
+Tel: 765-864-8360
+Fax: 765-864-8387
+Los Angeles
+Mission Viejo, CA 
+Tel: 949-462-9523  
+Fax: 949-462-9608
+Santa Clara
+Santa Clara, CA 
+Tel: 408-961-6444
+Fax: 408-961-6445
+Toronto
+Mississauga, Ontario, 
+Canada
+Tel: 905-673-0699  
+Fax:  905-673-6509
+ASIA/PACIFIC
+Asia Pacific Office
+Suites 3707-14, 37th Floor
+Tower 6, The Gateway
+Harbour City, Kowloon
+Hong Kong
+Tel: 852-2401-1200
+Fax: 852-2401-3431
+Australia - Sydney
+Tel: 61-2-9868-6733
+Fax: 61-2-9868-6755
+China - Beijing
+Tel: 86-10-8528-2100 
+Fax: 86-10-8528-2104
+China - Chengdu
+Tel: 86-28-8665-5511
+Fax: 86-28-8665-7889
+China - Hong Kong SAR
+Tel: 852-2401-1200  
+Fax: 852-2401-3431
+China - Nanjing
+Tel: 86-25-8473-2460
+Fax: 86-25-8473-2470
+China - Qingdao
+Tel: 86-532-8502-7355
+Fax: 86-532-8502-7205
+China - Shanghai
+Tel: 86-21-5407-5533  
+Fax: 86-21-5407-5066
+China - Shenyang
+Tel: 86-24-2334-2829
+Fax: 86-24-2334-2393
+China - Shenzhen
+Tel: 86-755-8203-2660 
+Fax: 86-755-8203-1760
+China - Wuhan
+Tel: 86-27-5980-5300
+Fax: 86-27-5980-5118
+China - Xiamen
+Tel: 86-592-2388138 
+Fax: 86-592-2388130
+China - Xian
+Tel: 86-29-8833-7252
+Fax: 86-29-8833-7256
+China - Zhuhai
+Tel: 86-756-3210040 
+Fax: 86-756-3210049
+ASIA/PACIFIC
+India - Bangalore
+Tel: 91-80-3090-4444 
+Fax: 91-80-3090-4080
+India - New Delhi
+Tel: 91-11-4160-8631
+Fax: 91-11-4160-8632
+India - Pune
+Tel: 91-20-2566-1512
+Fax: 91-20-2566-1513
+Japan - Yokohama
+Tel: 81-45-471- 6166  
+Fax: 81-45-471-6122
+Korea - Daegu
+Tel: 82-53-744-4301
+Fax: 82-53-744-4302
+Korea - Seoul
+Tel: 82-2-554-7200
+Fax: 82-2-558-5932 or 
+82-2-558-5934
+Malaysia - Kuala Lumpur
+Tel: 60-3-6201-9857
+Fax: 60-3-6201-9859
+Malaysia - Penang
+Tel: 60-4-227-8870
+Fax: 60-4-227-4068
+Philippines - Manila
+Tel: 63-2-634-9065
+Fax: 63-2-634-9069
+Singapore
+Tel:  65-6334-8870
+Fax: 65-6334-8850
+Taiwan - Hsin Chu
+Tel: 886-3-6578-300
+Fax: 886-3-6578-370
+Taiwan - Kaohsiung
+Tel: 886-7-536-4818
+Fax: 886-7-536-4803
+Taiwan - Taipei
+Tel: 886-2-2500-6610  
+Fax: 886-2-2508-0102
+Thailand - Bangkok
+Tel: 66-2-694-1351
+Fax: 66-2-694-1350
+EUROPE
+Austria - Wels
+Tel: 43-7242-2244-39
+Fax: 43-7242-2244-393
+Denmark - Copenhagen
+Tel: 45-4450-2828 
+Fax: 45-4485-2829
+France - Paris
+Tel: 33-1-69-53-63-20  
+Fax: 33-1-69-30-90-79
+Germany - Munich
+Tel: 49-89-627-144-0 
+Fax: 49-89-627-144-44
+Italy - Milan 
+Tel: 39-0331-742611  
+Fax: 39-0331-466781
+Netherlands - Drunen
+Tel: 31-416-690399 
+Fax: 31-416-690340
+Spain - Madrid
+Tel: 34-91-708-08-90
+Fax: 34-91-708-08-91
+UK - Wokingham
+Tel: 44-118-921-5869
+Fax: 44-118-921-5820
+WORLDWIDE SALES AND SERVICE
+03/26/09

@@ -1,0 +1,11 @@
+# reference clones (read-only, re-cloneable; see CLAUDE.md)
+repos/
+pcb/
+# local envs and pulled results
+.venv/
+.venv-sbx/
+sandbox-out/
+__pycache__/
+*.pyc
+.DS_Store
+*.raw

@@ -1,0 +1,121 @@
+tt02[sky13]|d|TinyPID|Aidan Medcalf|Tiny PID controller with SPI configuration channel, SPI ADC and DAC driver|https://github.com/AidanMedcalf/tt02-pid
+tt02[sky13]|d|Sigma-Delta ADC/DAC|Adam Greig|Simple ADC and DAC|https://github.com/adamgreig/tt02-adc-dac
+tt02[sky13]|d|Monte Carlo Pi Integrator|regymm|Calculate the value of Pi using the Monte Carlo method|https://github.com/regymm/tt02-verilog-mcpi
+tt02[sky13]|d|Asynchronous Binary to Ternary Converter and Comparator|Steven Bos|This chip offers various kinds of conversions and comparisons between binary encoded terna|https://github.com/aiunderstand/tt02-async-binary-ternary-convert-compare
+tt02[sky13]|d|Stream Integrator|William Moyes|A silicon implementation of a simple optical computation|https://github.com/moyesw/tt02-moyesw-StreamIntegrator
+tt03[sky13]|d|TinyPID|Aidan Medcalf|Tiny PID controller with SPI configuration channel, SPI ADC and DAC driver|https://github.com/AidanMedcalf/tt02-pid
+tt03[sky13]|d|Sigma-Delta ADC/DAC|Adam Greig|Simple ADC and DAC|https://github.com/adamgreig/tt02-adc-dac
+tt03[sky13]|d|Pulse-Density Modulators|Marco Merlin|An implementation of a DDPM, PWM and Sigma-Delta Pulse-Density Modulators with python libr|https://github.com/bat52/tt03-ddpm-pwm
+tt03[sky13]|d|Monte Carlo Pi Integrator|regymm|Calculate the value of Pi using the Monte Carlo method|https://github.com/regymm/tt02-verilog-mcpi
+tt03[sky13]|d|Asynchronous Binary to Ternary Converter and Comparator|Steven Bos|This chip offers various kinds of conversions and comparisons between binary encoded terna|https://github.com/aiunderstand/tt02-async-binary-ternary-convert-compare
+tt03[sky13]|d|Stream Integrator|William Moyes|A silicon implementation of a simple optical computation|https://github.com/moyesw/tt02-moyesw-StreamIntegrator
+tt04[sky13]|d|SAR ADC Backend|Hugo Frisk|A digital backend of a successive approximation digital to analog converter (SAR ADC) feat|https://github.com/PepperoniPingu/tt04-submission-SAR-ADC-Backend
+tt05[sky13]|d|4-Bit ALU|CE JMU Wuerzburg|A simple 4-Bit ALU which contains two types of adders, multipliers, a comparator and a bar|https://github.com/CEJMU/tt05-alu
+tt05of[sky13]|d|4-Bit ALU|CE JMU Wuerzburg|A simple 4-Bit ALU which contains two types of adders, multipliers, a comparator and a bar|https://github.com/CEJMU/tt05-alu
+tt06[sky13]|A|TT06 8-bit SAR ADC|Carsten Wulff|8-bit Successive Approximation Register ADC|https://github.com/wulffern/tt06-sar
+tt06[sky13]|d|Projekt KEIS Hadner Thomas|Thomas Hadner|Demodulator for RC Receiver with different Outputs|https://github.com/ThomasHadner/jku-tt06-pwm-analyzer-hadner
+tt06[sky13]|d|Synthesized Time-to-Digital Converter (TDC)|Harald Pretl|Synthesized TDC based on an interleaved delay line|https://github.com/iic-jku/jku-tt06-tdc-v1
+tt06[sky13]|d|Synthesized Time-to-Digital Converter (TDC) v2|Harald Pretl|Synthesized TDC based on two Vernier delay rings|https://github.com/iic-jku/jku-tt06-tdc-v2
+tt06[sky13]|d|UCSC HW Systems Collective, TDC|Tyler Sheaves, Phillip Marlowe|A tiny TDC constructed entirely of standard cells. Skywater130 FA-2 delay element|https://github.com/tsheaves/tt06_hsc_tdc
+tt06[sky13]|d|UCSC HW Systems Collective, TDC - BUF2x1|Phillip Marlowe, Tyler Sheaves|A tiny TDC constructed entirely of standard cells. Skywater130 AND-2 delay element|https://github.com/phillipmmarlowe/tt06_hsc_tdc_buf_delay
+tt06[sky13]|d|UCSC HW Systems Collective, TDC - MUX2x1|Phillip Marlowe, Tyler Sheaves|A tiny TDC constructed entirely of standard cells. Skywater130 MUX2x1 delay element|https://github.com/phillipmmarlowe/tt06_hsc_tdc_mux_delay
+tt06[sky13]|A|Flash ADC|htfab|4-bit flash ADC with binary encoder|https://github.com/htfab/flash-adc
+tt06[sky13]|d|1st passive Sigma Delta ADC|Joerg Vollrath|External R1 and R2 and C2 realize a ADC|https://github.com/JVollrath/tt06_jv_sigdel_v
+tt06[sky13]|d|Power Management IC|Matt Wong|Creates a half bridge PWM duel output from ADC input|https://github.com/wongmatthew73/tt06-mw-pmic
+tt06[sky13]|A|WoWA|Pat Deegan|Is it really the World Worst ADC?  Maybe it'll be a wow-ADC instead... we'll see!|https://github.com/psychogenic/tt06-analog-wowa
+tt06[sky13]|A|Analog Current Comparator|Renaldas Zioma|An analog current comparator with Excitatory (+) and Inhibitory (-) currents formed by sum|https://github.com/rejunity/tt06-analog-current-comparator
+tt06[sky13]|d|UART interface to ADC TLV2556 (VHDL Test)|Jonas Nilsson|Simple interface that allows values from a TLV2556 ADC to be read out over a UART|https://github.com/sanojn/tt06-vhdl-adc_interface
+tt06[sky13]|d|Convertidor de Tiempo a Digital (TDC)|Juan Vargas Ferrer & Luis Carl|El proyecto consiste en el diseño de un circuito Front end o interfaz para convertir a dig|https://github.com/jferrer08/latinpractice
+tt06[sky13]|d|BIT COMPARATOR|FELIPE SD|Compare two bits |https://github.com/felipe-SD/tt06-wokwi-template-BIT_TEST
+tt07[sky13]|d|Phase Shifted PWM Modulator|Nelson Salvador & Francisca Do|Phase-Shifted Pulse Width Modulation (PS-PWM) that generates the switching signals for 2 P|https://github.com/NelsonSalvadorPinilla/tt07-PS_PWM_Modulator
+tt07[sky13]|A|Analog comparator|Diego Carrera and Leonel Miran|Analog comparator made by the MNEL team from USFQ.|https://github.com/EduHolg/EjemploAnalog2
+tt07[sky13]|d|FastMagnitudeComparator|Daniel Burke|Digital neuron threshold detector|https://github.com/drburke3/FastMagnitudeComparator
+tt07[sky13]|A|Analog TDC|Luis Carlos Alvarez Simon|Analog part of a Time to Digital Convert|https://github.com/luis-asimon/tt07_AnalogTdc
+tt07[sky13]|d|All Digital DAC and Analog Comparators|Maximiliam Luppe|Implementation of a DAC and three versions of a analog comparator using only standard cell|https://github.com/maxluppe/tt07_maxluppe_Digital_DAC_Comp
+tt07[sky13]|A|12 bit SAR ADC|Ricardo Nunes|A 12 bit differential (11 bit single-ended) SAR ADC|https://github.com/rnunes2311/tt07-12bit_SAR_ADC
+tt08[sky13]|d|PDM Pitch Filter|Armaan Gomes|It uses a moving average filter and decimator to filter out a specific frequency|https://github.com/arghunter/Customizable-PDM-Pitch-Filter-ASIC
+tt09[sky13]|A|Time to Digital Converter|Jeremiasz Hauck|Phase difference measuring circuit with digital output|https://github.com/13hihi31/tt09-analog-tdc
+tt09[sky13]|d|Spectrogram extractor, 2 channels|Coline Chehense, Dinko Oletic|Digital part of a time-frequency feature extraction sensor interface, two-channel real-tim|https://github.com/DinkoOletic/tt09-HDL_unizgfer_2ch_AE_tf_spectrogram
+tt09[sky13]|d|Team 17's 8 bit DAC|Vance Wiberg|This 8 bit digital to analogue converter uses a SAR to convert signals from Digial into An|https://github.com/VanceWiberg/8bitSAR
+tt09[sky13]|d|Delta-Sigma ADC Decimation Filter|Alexander Sheldon|Decimation filter for output of a delta-sigma ADC.|https://github.com/asheldon44/tt09-delta-sigma-decimation-filter
+tt09[sky13]|A|2-bit Flash ADC|Brandon S. Ramos|Flash ADC that outputs 2-bit encoded data|https://github.com/J0NTrollston/tt08-analog-adc
+tt09[sky13]|d|Micro tile container|Arna|Example Experimental microtile TDC container|https://github.com/Secure-Embedded-Systems/tt09-microtile-final_TDC
+tt09[sky13]|d|Decimation Filter for Incremental and Regular Delta-Sigma Mo|Andrea Murillo Martinez & Jaed|Decimation filter that efficiently reduces oversampled data from incremental and regular d|https://github.com/bmurmann/tt09-decimation_filter
+tt09[sky13]|d|Stochastic Integrator|Ciecen Lestari, Chih-Kuan Ho, |Use stochastic computing to implement integration|https://github.com/CL-123-abc/tt_um_stochastic_integrator_tt9_CL123abc
+tt09[sky13]|A|tt_um_tim2305_adc_dac|Timonas Juonys|8bit dac and  4bit flash adc|https://github.com/Timonas04/adc_dac2
+tt09[sky13]|A|Noise test for a CDAC capacitor chain|Venkadesh Eswaranandam & Allan|This project was made to answer the question of ow much does bad layout affect performance|https://github.com/TinyTinfoil/tt09-sar-dac-noise
+tt09[sky13]|d|comparator|prtx|comparator|https://github.com/prtx/tiny-tapeout
+tt09[sky13]|d|Sigma-Delta ADC|Martin Schoeberl|Analog to digital converter - and back|https://github.com/schoeberl/tt09-sigma-delta
+ttcad25a[sky13]|A|4-Bit Successive Approximation ADC|Sudarshana K S, Viraj Bhat B, |This project implements a 4-Bit Successive Approximation Analog-to-Digital Converter|https://github.com/RVCE-DrSSN/tt_um_4Bit_SAR_ADC
+ttcad25a[sky13]|d|PDM Pitch Filter|Armaan Gomes|It uses a moving average filter and decimator to filter out a specific frequency|https://github.com/arghunter/Customizable-PDM-Pitch-Filter-ASIC
+ttgf26a[gf180]|d|Very Low Resource Digital Implementation of Bioimpedance Ana|Fabien|Digital bioimpedance demodulator with 8-stage I/Q cascade and UART output|https://github.com/fabien-soulier/tt-gf26A-bioimpedance
+ttgf26a[gf180]|d|RRAM Characterization Platform (DC sweep + endurance + reten|Prof. Santhosh Sivasubramani, |GF180mcuD standalone characterization platform for one external resistive-switching device|https://github.com/SanthoshSivasubramani/tt_um_santhosh_rsd_char_gf_pub
+ttgf26a[gf180]|d|Memristive Crossbar Peripheral Controller (GF180)|Prof. Santhosh Sivasubramani, |GF180mcuD port of the 8x8 memristive crossbar controller: READ/SET/RESET/FORMING/SWEEP mod|https://github.com/SanthoshSivasubramani/tt_um_santhosh_xbar_ctrl_gf_pub
+ttgf26b[gf180]|d|Three Channel RGB PWM Controller|Aiden Koch|Red Green Blue compatable Pulse Width Modulator to control effective voltages at an LED to|https://github.com/aidenkoch4/ece430-tt-GF26A
+ttgf26b[gf180]|d|8-bit Comparator|Nagaraj|Compares two 8-bit inputs and indicates equal, greater than, or less than.|https://github.com/Cambridge-CIT-ASIC-Tapeouts/VLSI-project
+ttgf26b[gf180]|d|Neuromorphic Spike Codec (GF180)|Prof. Santhosh Sivasubramani, |GF180mcuD digital neuromorphic spike codec: three encoders (rate via 8-bit Fibonacci LFSR,|https://github.com/SanthoshSivasubramani/tt_um_santhosh_spike_codec_gf_pub
+ttihp0p3[ihp-s]|d|HBT Comparator|Nicklaus Thompson|A high-speed 555 timer using SiGE NPN devices|https://github.com/FangameEmpire/TTIHP0p3_HBT_555_Timer
+ttihp25a[ihp-s]|d|Spectrogram extractor, 2 channels|Coline Chehense, Dinko Oletic|Digital part of a time-frequency feature extraction sensor interface, two-channel real-tim|https://github.com/DinkoOletic/tt09-HDL_unizgfer_2ch_AE_tf_spectrogram
+ttihp25a[ihp-s]|d|Team 17's 8 bit DAC|Vance Wiberg|This 8 bit digital to analogue converter uses a SAR to convert signals from Digial into An|https://github.com/VanceWiberg/8bitSAR
+ttihp25a[ihp-s]|d|Delta-Sigma ADC Decimation Filter|Alexander Sheldon|Decimation filter for output of a delta-sigma ADC.|https://github.com/asheldon44/tt09-delta-sigma-decimation-filter
+ttihp25a[ihp-s]|d|TDC with SPI|Tautvydas Brukstus|TDC with SPI design|https://github.com/Brukstus/tt10_tdc_with_spi
+ttihp25a[ihp-s]|d|Decimation Filter for Incremental and Regular Delta-Sigma Mo|Andrea Murillo Martinez & Jaed|Decimation filter that efficiently reduces oversampled data from incremental and regular d|https://github.com/bmurmann/tt09-decimation_filter
+ttihp25a[ihp-s]|d|PDM Pitch Filter|Armaan Gomes|It uses a moving average filter and decimator to filter out a specific frequency|https://github.com/arghunter/Customizable-PDM-Pitch-Filter-ASIC
+ttihp25a[ihp-s]|d|Stochastic Integrator|Ciecen Lestari, Chih-Kuan Ho, |Use stochastic computing to implement integration|https://github.com/CL-123-abc/tt_um_stochastic_integrator_tt9_CL123abc
+ttihp25a[ihp-s]|d|comparator|prtx|comparator|https://github.com/prtx/tiny-tapeout
+ttihp25a[ihp-s]|d|Sigma-Delta ADC|Martin Schoeberl|Analog to digital converter - and back|https://github.com/schoeberl/tt09-sigma-delta
+ttihp25b[ihp-s]|d|SAR ADC Controller|Cédric Cyril Hirschi|Simple SAR ADC Controller with SPI interface|https://github.com/CedricHirschi/ttihp-verilog-cedrichirschi
+ttihp25b[ihp-s]|d|Delta Sigma Comparator Based ADC|Pawel Kozlowski|Evaluating the feasibility of implementing a delta-sigma analog-to-digital conversion usin|https://github.com/kozlowp1/Delta-Sigma-Comparator-Based-ADC
+ttihp26a[ihp-s]|d|Discrete-to-ASIC Delta-Sigma Acquisition System|YU ICHI|A 3rd order CIC filter for PDM signal processing.|https://github.com/yuya0421/tt_ihp_cic_filter
+ttihp26a[ihp-s]|A|SoilZ v1 Lock-In Impedance Analyzer|TechHU|1-bit IQ lock-in sigma-delta impedance analyzer for soil moisture, IHP SG13G2 130nm|https://github.com/TechHU-GS/analog-trial
+ttihp26b[ihp-s]|d|Simple comparator + 2 DACs analog layout in a 1x1 tile|algofoogle (Anton Maurovic)|IHP sg13g2 custom layout analog experiments in a regular TT 1x1 digital tile|https://github.com/algofoogle/ttihp26b-analog-junk
+ttihp26b[ihp-s]|d|IEEE Digital EEG Threshold Event Detector|Jacob Kebaso| A digital threshold-crossing event detector with hysteresis and a refractory period, inte|https://github.com/Kebaso-J/tt_EEG-threshold-detector
+ttihp26b[ihp-s]|d|Digital IQ Lock-in (IEEE)|Gabriela Sheilyn Ticona Jimene|Dual-phase digital demodulator with programmable block averaging — Equipo Triada CEG|https://github.com/gabSHtj-pixel/ttihp-lockin-ieee
+ttihp26b[ihp-s]|d|Laser Gyro Lock-in Readout Core|Marco Flückiger|Open-loop lock-in demodulator for the digital readout electronics of a single-axis laser g|https://github.com/marcomursik/Open-Loop-Lock-in-Demodulator
+ttihp26b[ihp-s]|d|4-Bit Charge-Redistribution SAR ADC Controller|Josue Olivos|Three selectable digital controllers for an external 4-bit charge-redistribution SAR ADC: |https://github.com/mariorp206/SAR_ADC_Controller
+ttihp26b[ihp-s]|d|3LFCC PS-PWM Modulator|aaaaaa|Modulador phase-shift PWM con tiempo muerto para un convertidor Flying Capacitor de 3 nive|https://github.com/JorgeMarinN/ttihp-verilog-template_pucv-test1
+ttsky25a[sky13]|A|Time to Digital Converter|Jeremiasz Hauck|Phase difference measuring circuit with digital output|https://github.com/13hihi31/tt09-analog-tdc
+ttsky25a[sky13]|A|adc_dac_BCT_addr_ALU_STI|Stven Bos, Timonas Juonys|adc, dac|https://github.com/aiunderstand/ttsky25a-ternary-alu-ff-dac-adc
+ttsky25a[sky13]|A|2-bit Flash ADC|Brandon S. Ramos|Flash ADC that outputs 2-bit encoded data|https://github.com/J0NTrollston/tt08-analog-adc
+ttsky25a[sky13]|d|Leaky Integrate and Fire Neuron|Chris Htet|Fixed-point accumulator with leak and a comparator to fire a spike when voltage is greater|https://github.com/ChrisHtet/tt_um_chrishtet_LIF
+ttsky25a[sky13]|A|3 Bit TIQ ADC|Emmerson Velazquez|Converts a 0V - 1.8V analog signal from analog pin 0 to a 3 bit digital signal to digital |https://github.com/emmersonv/sky25a-TIQ_ADC
+ttsky25a[sky13]|d|Tiny Tapeout Chirp Modulator|M. R.|This digital circuit will accept a UART input Byte and produce a parallel bus output with |https://github.com/Elettronica-UnivAQ/ttsky-verilog-tt-chirp
+ttsky25a[sky13]|d|Decimation Filter for Incremental and Regular Delta-Sigma Mo|Andrea Murillo Martinez & Jaed|Decimation filter that efficiently reduces oversampled data from incremental and regular d|https://github.com/andreamurillomtz/tt09-decimation_filter
+ttsky25a[sky13]|d|Stochastic Integrator|Ciecen Lestari, Chih-Kuan Ho, |Use stochastic computing to implement integration|https://github.com/CL-123-abc/tt_um_stochastic_integrator_tt9_CL123abc
+ttsky25a[sky13]|d|Micro tile container|Arna|Example Experimental microtile TDC container|https://github.com/Secure-Embedded-Systems/tt09-microtile-final_TDC
+ttsky25b[sky13]|d|PWM_selector|Delia Hurtado, Ruben Velasquez|PWM_module generates a PWM (Pulse-Width Modulation) signal using a counter and a comparato|https://github.com/DeliaMariaHC/PWM_selector
+ttsky25b[sky13]|A|Tiny Whisper|Simon Dorrer, Jonathan Hager, |This chip implements a transmitter for the wireless long-reach protocol called WSPR (weak |https://github.com/iic-jku/tt-sky-jku-jmu-TinyWhisper
+ttsky25b[sky13]|A|8 Bit SAR ADC|Eric Estevez|Convert analog signal to digital|https://github.com/eestevez3/ttsky_SAR_ADC
+ttsky25b[sky13]|d|lime_cic_filter|E Rijnbeek|Cascaded Integrator-Comb (CIC) Filter|https://github.com/erijnbeek/lime_cic_filter
+ttsky25b[sky13]|d|Sleepy Chip|Ron Sardarian|SPI-controlled 3-waveform synthesizer with streaming mode and delta-sigma DAC|https://github.com/teafella/sleepy_tapeout
+ttsky25b[sky13]|A|Time Domain ADC|M. Taufiqul Huda|Time Domain Comparator Based ADC|https://github.com/mthudaa/its_10b_tadc
+ttsky25b[sky13]|A|Tiny Flash ADC|Blake Mott|3bit flash ADC with binary and thermometer output|https://github.com/vincentfusco/ttsky25b_tinyflash
+ttsky25b[sky13]|d|Noise shaping delta-sigma DAC|Toivo Henningsson|16 bit digital noise shaping single pin output delta-sigma DAC|https://github.com/toivoh/ttsky25b-noise-shaping-ds-dac
+ttsky25b[sky13]|d|sigma uncount|Tyler|xor spam|https://github.com/migraine7341/wokwi
+ttsky26a[sky13]|A|12-bit ADC|Ahmed Nematallah|12-bit ADC|https://github.com/Ahmed-Nematallah/12-bit-adc
+ttsky26a[sky13]|d|CFAR Detector without Buzzer|Ilamparuthi G|A simplified CFAR-based signal detection system using 14-bit ADC input and 7-segment displ|https://github.com/illamparuthi/ttsky_cffar_7seg
+ttsky26a[sky13]|d|9-Channel Frequency Counter with I2C + SPI DAC & ADC|Jose Bahamonde|Programmable 9-channel frequency counter with I2C control, SPI DAC output, and SPI ADC sam|https://github.com/JosenBM/tt_asic_jb_sky
+ttsky26a[sky13]|A|Standard Digital Logic Cells Analog Comparator|Maximiliam Luppe|Implementation of an analog comparator using only digital standard cells based on SKY130 d|https://github.com/maxluppe/ttsky26a_analog
+ttsky26a[sky13]|d|Resistor Capacitor TDC|Rowan Tyler|Calculated the resistance of an external RC circuit based on its measured rise time to an |https://github.com/rowantylerr/tt02-RC-TDC
+ttsky26a[sky13]|d|SAR FSM|Sönke Appel|A parameterizable successive approximation (SAR) finite state machine (FSM) for an ADC|https://github.com/FHW-Appel/TTSky26a-SARfms
+ttsky26a[sky13]|d|One-tile ADC|Daniel S|This is the stand-in for my ADC ASIC design. Idea is to use a clamped ±3V sinudoid on an i|https://github.com/shimmydee/TinyTapeout_workshop_SKY130
+ttsky26a[sky13]|A|analog circuit|shimomi|delta-sigma A/D with band-gap reference|https://github.com/0w5/tt_sky26a_analog_prj
+ttsky26a[sky13]|A|Time Domain ADC|Nikitha D|Time Domain Comparator Based ADC|https://github.com/nikithad99/CCCIR_TADC
+ttsky26a[sky13]|d|IEEE Open Silicon 2026: UTB Logic Trivia Challenge: 8-bit Di|George Archbold, Junior Sarmie|8-bit Pattern Comparator that functions as a digital lock|https://github.com/GWATopamp/UTB_2_Electronic_Lock
+ttsky26a[sky13]|d|Lady's First Tapeout|Lady Nicole Payan Cepeda|4-bit comparator.|https://github.com/ladypayancepeda/Tiny-Tapeout
+ttsky26b[sky13]|d|TT ADC SQ Compare|Takaharu YAMADA|For my academic research|https://github.com/nezumi-tech/ttsky-verilog-26b-ADC_Comp
+ttsky26b[sky13]|A|ttsky26b-ramp-adc|Christian Zingl|2-channel ramp ADC|https://github.com/zchris9/ttsky26b-ramp-adc
+ttsky26b[sky13]|d|IEEE Open-Silicon 2026 x NITHUB: Soil Moisture Irrigation Co|Shadia, Elijah, Oluwatomiwa, E| An IEEE Division 1 Open Silicon Tapeout Initiative Project, this is a finite state machin|https://github.com/ultrasage-danz/IEEE_Open-silicon_initiative_2026_Soil_Moisture_Irrigation_Controller
+ttsky26b[sky13]|d|Sigma-Delta Bitstream ADC (8-bit)|William Anthony|Enable-controlled 1-bit sigma-delta decimator ADC with gain and offset trim|https://github.com/wlmoi/TTSKY26A-ADC-8BIT
+ttsky26b[sky13]|d|IEEE IC Bootcamp Khalifa University|Nuzhat, Ayesha and Umamah|This is a 3-bit reversible comparator|https://github.com/nuzhatmahdiyat/wokwi
+ttsky26c[sky13]|A|ADC for CCDmos3D pixel|WJ toren| converts analog pixel signals in digital output signals.|https://github.com/wjtoren/CCDmos3D_ADCv1
+ttsky26c[sky13]|A|CTW LDO and Dynamic Comparator|TuanKiet|Analog LDO and dynamic comparator test chip in SKY130|https://github.com/rakuichijo2001-sketch/tt_um_SAR_ADC
+ttsky26c[sky13]|d|Poly Synth v1.0|Colby Miller|Three-voice polyphonic DDS synthesizer with SPI control and 1-bit sigma-delta audio output|https://github.com/Colbywonn/tt-poly-synth
+ttsky26c[sky13]|d|Darga CiROM digital read + ternary MAC|mpai17|Mask-programmed ternary compute-in-ROM read fully digitally: clocked bitline sampling of a|https://github.com/mpai17/tt_um_darga_cirom
+ttsky26c[sky13]|A|heart_monitor_adc_art|davidbroughsmyth|12-bit ~500 SPS SAR ADC + decorative met4 silicon art (cats/hearts/DBS)|https://github.com/davidbroughsmyth/heart_monitor_adc_art_ttsky26c
+ttsky26c[sky13]|A|sar-adc|Gilang Fajrul Falah|sar-adc|https://github.com/gilangfajrul/ttsky26c-saradc
+ttsky26c[sky13]|A|Continuous-Time Sigma-Delta ADC (1st order)|Paul Thomas|1st-order continuous-time sigma-delta modulator ADC: active-RC integrator, StrongARM compa|https://github.com/pthomas/ttsky-sigma-delta
+ttsky26c[sky13]|A|NS SAR ADC|Silicon Edge|This is a research project designing a noise shaping SAR ADC design|https://github.com/KavishkaJayakody/ttsky26c_ns_sar_adc
+ttsky26c[sky13]|d|BPSK Baseband Modulator|Siraj Muhammad|Transmit-only BPSK baseband modulator: PRBS-7 source, +/-1 symbol mapper and polyphase RRC|https://github.com/sirajmuhammad/tt-bpsk-mod
+ttsky26c[sky13]|A|Dual-Path Noise-Shaping ADC|Tyler McClure|Two ADC architectures share one analog input: a VCO pulse-frequency path and a first-order|https://github.com/TilesOS/tt_um_tilesos_dual_adc
+ttsky26c[sky13]|A|USFQ 8-bit Tracking ADC and Process Variation Monitor|Esteban Astudillo, Raul Villal|SKY130 mixed-signal chip integrating an 8-bit tracking ADC and an on chip process variatio|https://github.com/EduHolg/tt_um_usfq_adc_procmon

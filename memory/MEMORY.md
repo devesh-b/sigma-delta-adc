@@ -1,0 +1,12 @@
+- [Sigma-delta TT project](project-sigma-delta-tt.md) — learning goal: better-spec ΣΔ ADC on sky130 TT; not a competition
+- [TT workspace map](reference-tt-workspace.md) — where NOTES, shuttle index, ref repos, PCB repos live
+- [Workspace in tt folder](feedback-workspace-in-tt.md) — use ~/projects/tt as scratchpad; memory stays in tt/memory
+- [Sandbox only](feedback-sandbox-only.md) — run everything on sandbox, nothing local; box = ssh sandbox, run via rta-tt
+- [Communication rules](feedback-communication.md) — doc=Markdown, report=HTML, no Docs connector, calm framing, user's units
+- [Tiered lean agents](feedback-tiered-lean-agents.md) — Opus plans, Sonnet codes, Haiku tests; budgets, no open-ended digs
+- [Git commits](feedback-git-commits.md) — atomic as-you-go, no attribution trailers, push only on OK
+- [TT submission repo](feedback-tt-submission-repo.md) — never commit there, no Claude traces
+- [Green is not proof](feedback-green-is-not-proof.md) — checks must fail on broken copy; analog false-pass list
+- [Autonomy](feedback-autonomy.md) — keep working, log decisions, nothing outward-facing
+- [Full context snapshot](../CONTEXT.md) — ~/projects/tt/CONTEXT.md: all decisions, learnings, corrections, model results, next steps
+- [Sandbox incident 2026-11-07](project-sandbox-incident-2026-11-07.md) — first sync deleted AlphaOneSoC files in /home/mempool/tt; tt lives in tt-sd

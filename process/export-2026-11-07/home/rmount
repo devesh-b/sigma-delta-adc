@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# rmount — mount/unmount the sandbox working tree locally over sshfs.
+#
+# This is what lets Claude's Read/Edit/Grep/Glob tools operate on remote
+# files natively instead of degrading to cat and sed over the wire.
+# Requires only sftp-server on the remote host, which ships with OpenSSH.
+#
+#   RT_HOST     ssh alias                (default: sandbox)
+#   RT_WORKDIR  remote path to mount     (default: /srv/work)
+#   RT_MOUNT    local mountpoint         (default: ~/sandbox)
+
+set -euo pipefail
+
+HOST=${RT_HOST:-sandbox}
+REMOTE=${RT_WORKDIR:-/home/mempool}
+MOUNT=${RT_MOUNT:-$HOME/sandbox}
+CTL="$HOME/.ssh/cm-%r@%h:%p"
+
+is_mounted() { mountpoint -q "$MOUNT" 2>/dev/null; }
+
+case ${1:-mount} in
+  mount|up)
+    if is_mounted; then echo "rmount: already mounted at $MOUNT"; exit 0; fi
+    command -v sshfs >/dev/null || { echo "rmount: sshfs not installed (sudo apt install sshfs)" >&2; exit 1; }
+    mkdir -p "$MOUNT"
+    # reconnect       survive transient network drops
+    # cache_timeout   short, so remote-side changes show up quickly
+    # ControlPath     reuse the existing multiplexed connection
+    sshfs "$HOST:$REMOTE" "$MOUNT" \
+      -o reconnect \
+      -o ServerAliveInterval=15 \
+      -o ControlPath="$CTL" \
+      -o cache_timeout=5 \
+      -o attr_timeout=5 \
+      -o dir_cache=no \
+      -o follow_symlinks \
+      -o noatime
+    echo "rmount: $HOST:$REMOTE -> $MOUNT"
+    ;;
+  umount|unmount|down)
+    if ! is_mounted; then echo "rmount: not mounted"; exit 0; fi
+    fusermount -u "$MOUNT" || umount "$MOUNT"
+    echo "rmount: unmounted $MOUNT"
+    ;;
+  status)
+    if is_mounted; then
+      echo "mounted: $HOST:$REMOTE -> $MOUNT"
+      ls -la "$MOUNT" | head -15
+    else
+      echo "not mounted ($MOUNT)"
+    fi
+    ;;
+  remount)
+    "$0" umount || true; sleep 1; "$0" mount ;;
+  *)
+    echo "usage: rmount [mount|umount|remount|status]" >&2; exit 2 ;;
+esac

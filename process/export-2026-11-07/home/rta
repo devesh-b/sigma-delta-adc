@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# rta — `rt` bound to the AlphaOneSoC verification session on the sandbox.
+#
+# Same interface as rt (rta --status, rta --bg NAME cmd, rta --logs NAME, ...),
+# but pinned to its own tmux session so it never collides with the MemPool
+# session that smith_waterman drives.
+export RT_HOST=${RT_HOST:-sandbox}
+export RT_SESSION=alpha
+export RT_WORKDIR=/home/mempool/AlphaOneSoC
+export RT_INIT="$HOME/.config/rt/init-alpha.sh"
+export RT_TIMEOUT=${RT_TIMEOUT:-1800}
+exec rt "$@"
