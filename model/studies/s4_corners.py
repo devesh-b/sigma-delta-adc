@@ -2,11 +2,11 @@
 
 Usage: python3 -m model.studies.s4_corners --out DIR [--nonvac] [--procs 4] [--quick]
   (default)  63 analog PVT points x fs {0.25, 2} MHz: noise @15/@240 SPS, INL (N 4096), sys-pair offset, gain error,
-             inter-conversion memory; CMRR (D30; Vin_cm 0.2/1.0/2.0 V, Cs mismatch) in the MC sets; MC (tt/27/3.3 x200, worst-INL and worst-offset point x50); fast mode (4 MHz) table.
+             inter-conversion memory; CMRR on eps_eff (D30/D33; Vin_cm 0.2/1.0/2.0 V, Cs mismatch) in the MC sets; MC (tt/27/3.3 x200, worst-INL and worst-offset point x50); fast mode (4 MHz) table.
              Prints ACCEPT/REJECT naming the failing point; exit 1 on REJECT.
   --nonvac   broken copies that must REJECT at the named point (A(1.4 V) = 60 dB at ss/125/3.0; reset r = 1e-2; sys chop off;
              Cs/100 for noise; tau_in 2 us for gain; CM term flipping with the input
-             (must fail CMRR sys-on); Cs mismatch 3 % (must fail CMRR sys-off)). Exit 1 if they all reject, 0 (loudly) if any one is NOT rejected.
+             (must fail CMRR sys-on); Cs mismatch 3 % and dCp,top 3 sigma 2 fF, both in eps_eff (must fail CMRR sys-off)). Exit 1 if they all reject, 0 (loudly) if any one is NOT rejected.
   --quick    9 corner points and fewer MC draws (smoke test only; never used for the verdict)
 
 NO TRANSISTOR DATA EXISTS YET. Every mapping below is an explicit assumption (MAPPING table, written into the report):
@@ -46,6 +46,11 @@ VREF_CM = 1.0              # V, ASSUMED reference common mode (SPEC 3.0 does not
 VIN_CMS = (0.2, 1.0, 2.0)  # V, input-CM axis (D30)
 EPS_FOR_OFF_GATE = 10 ** (-CMRR_OFF_DB / 20)   # mismatch at which sys-off CMRR = eps^-1 just meets the gate (0.1 %)
 EPS_3SIGMA = 0.0075        # Cs+/Cs- mismatch 0.75 % 3 sigma (SPEC 3.0)
+# D33: D12 residual eps_eff = |dCp_top/Cs| + |(Cp_top/Cs) eps_Cs| + eps_inj (signs combined worst-case until WO-09), C4 allocation:
+CP_TOP = 20e-15            # F per side (fixed allocation)
+DCP_TOP_3S = 0.25e-15      # F, 3 sigma of the Cp_top difference
+EPS_INJ = 2.8e-4           # shorting-TG injection split allocation (fixed, worst sign)
+CMRR_OFF_TARGET_DB = 66.0  # design target (eps_eff <= 5e-4), informational margin only
 CMRR_FLOOR_V = 1e-12       # residual below this is reported as the cap (240 dB at dVcm 1 V)
 N240_MIN_FS = 2 * 240 * 1024     # 240 SPS needs a sys-chop pair of N 1024 conversions: fs >= 0.49 MHz; below that the spec is not reachable (not gated)
 UNITS = {"n15": "uV", "n240": "uV", "inl": "ppm", "off": "uV", "gain": "ppm", "mem": "uV"}
@@ -215,6 +220,7 @@ def mc_task(a):
     d1, d2 = rng.normal(0, 9e-3 / 3, ndraw), rng.normal(0, 9e-3 / 3, ndraw)
     dc = rng.normal(0, 20e-3 / 3, ndraw)
     dcs = rng.normal(0, 0.0075 / 3, ndraw)                       # (Cs+ - Cs-)/Cs, 0.75 % 3 sigma
+    dcp = rng.normal(0, DCP_TOP_3S / 3, ndraw)                   # D33: Cp_top(+) - Cp_top(-), 3 sigma 0.25 fF (drawn after the others: older draws unchanged)
     p, ax = point(proc, T, V, fs)
     inl = np.zeros(ndraw)
     gain = np.zeros(ndraw)
@@ -254,11 +260,15 @@ def mc_task(a):
         resid[sl], raw[sl] = pair * VREF * 1e6, rw * VREF * 1e6
     reset = 2 * ax["r"] * X1MAX_V / (C1 * (p.N - 1)) * 1e6
     leak = s3.leak_offset(ax["i_leak"], fs, ax["cs"]) * 1e6 * s3.RHO_LEAK
-    cmrr = {"3sigma": cmrr_eval(p, EPS_3SIGMA), "worst_draw": cmrr_eval(p, float(np.abs(dcs).max()))}
+    ee = np.array([eps_eff(ax["cs"], e_, d_) for e_, d_ in zip(dcs, dcp)])
+    e3 = eps_eff(ax["cs"], EPS_3SIGMA)
+    cmrr = {"3sigma": cmrr_eval(p, e3), "worst_draw": cmrr_eval(p, float(ee.max()))}
+    superseded = {"3sigma": cmrr_eval(p, EPS_3SIGMA), "worst_draw": cmrr_eval(p, float(np.abs(dcs).max()))}   # old eps_Cs*dVcm term (D33: superseded)
     off = np.abs(resid) + reset + leak
     return {"tag": tag, "point": name(proc, T, V), "fs": fs, "ndraw": ndraw,
             "inl": inl.tolist(), "gain": np.abs(gain).tolist(), "off": off.tolist(), "resid": resid.tolist(),
-            "raw_sysoff_uv": raw.tolist(), "cmrr_uv_per_v": (np.abs(dcs) * 1e6).tolist(), "cmrr": cmrr, "reset": reset, "leak": leak}
+            "raw_sysoff_uv": raw.tolist(), "cmrr_uv_per_v": (np.abs(dcs) * 1e6).tolist(), "eps_eff_uv_per_v": (ee * 1e6).tolist(), "eps_eff_3sigma": e3, "cs": ax["cs"],
+            "cmrr": cmrr, "cmrr_superseded_eps_cs": superseded, "reset": reset, "leak": leak}
 
 
 def mc_verdict(r):
@@ -345,6 +355,11 @@ def cm_err_v(p, e_v, sys, flip=False, B=96):
     return float(np.mean(uh - u)) * q.vref
 
 
+def eps_eff(cs, eps_cs, dcp=DCP_TOP_3S, cp_top=CP_TOP, inj=EPS_INJ):
+    """D33 CM->diff coefficient: |dCp_top/Cs| + |(Cp_top/Cs) eps_Cs| + eps_inj (worst-case signs)."""
+    return abs(dcp / cs) + abs(cp_top / cs * eps_cs) + inj
+
+
 def cmrr_eval(p, eps, vin_cms=VIN_CMS, flip=False):
     """CMRR table for one mismatch eps: per Vin_cm, input-referred error and CMRR = 20 log10(dVcm / error), sys on and off."""
     base = {s_: cm_err_v(p, 0.0, s_, flip) for s_ in (True, False)}
@@ -412,8 +427,10 @@ def run_nonvac(a, pool):
     pcm, _ = point("tt", 27, 3.3, 2e6)
     good_cm = cmrr_eval(pcm, EPS_FOR_OFF_GATE * 0.9)      # a mismatch that meets both gates (0.09 %)
     unbroken_fail += cmrr_fails(good_cm, "unbroken tt/27/3.3")
-    for txt, rows_cm, key, lim in (("CM term applied after the pin-side swap (flips with the input) at tt/27/3.3", cmrr_eval(pcm, EPS_3SIGMA, flip=True), "on", CMRR_ON_DB),
-                                   ("Cs+/Cs- mismatch 3 % (sys off) at tt/27/3.3", cmrr_eval(pcm, 0.03), "off", CMRR_OFF_DB)):
+    cs_ = pcm.cs
+    for txt, rows_cm, key, lim in (("CM term applied after the pin-side swap (flips with the input) at tt/27/3.3", cmrr_eval(pcm, eps_eff(cs_, EPS_3SIGMA), flip=True), "on", CMRR_ON_DB),
+                                   ("Cs+/Cs- mismatch 3 % (sys off) in eps_eff at tt/27/3.3", cmrr_eval(pcm, eps_eff(cs_, 0.03)), "off", CMRR_OFF_DB),
+                                   ("dCp,top 3 sigma 2 fF (sys off) in eps_eff at tt/27/3.3", cmrr_eval(pcm, eps_eff(cs_, EPS_3SIGMA, dcp=2e-15)), "off", CMRR_OFF_DB)):
         w = min((r_ for r_ in rows_cm if math.isfinite(r_[key + "_db"])), key=lambda r_: r_[key + "_db"])
         ok = not (w[key + "_db"] >= lim)
         body.append([txt, "cmrr_" + key, f"{w[key + '_db']:.1f} dB (Vin_cm {w['vin_cm']:g} V)", f">= {lim:g}", "REJECT" if ok else "NOT REJECTED"])
@@ -475,24 +492,26 @@ def main():
     print_cmrr(mcs)
     print(f"{len(rows)} grid evaluations ({len(pts)} PVT x {len(FSS)} fs), {sum(len(r['inl']) for r in mcs)} MC draws, wall {total:.0f} s")
     for k, w, lim, ratio, pn, fs in wt:
-        print(f"worst {k}: {w:.4g} {UNITS[k]} (limit {lim:g}, margin x{ratio:.2f}) at {pn} fs {fs/1e6:g} MHz")
+        print(f"worst {k}: {w:.4g} {UNITS[k]} (limit {lim:g}, margin x{ratio:.2f} = {(ratio - 1) * 100:+.0f} %) at {pn} fs {fs/1e6:g} MHz")
     gates = [("grid specs (n15, n240, INL, gain, offset, memory)", [f for f in fails if not f.startswith(("CMRR", "MC"))]),
              ("MC INL / gain / offset", [f for f in fails if f.startswith("MC")]),
              (f"CMRR sys chop on >= {CMRR_ON_DB:g} dB", [f for f in fails if f.startswith("CMRR") and "sys on" in f]),
-             (f"CMRR sys chop off >= {CMRR_OFF_DB:g} dB (D32)", [f for f in fails if f.startswith("CMRR") and "sys off" in f])]
+             (f"CMRR sys chop off >= {CMRR_OFF_DB:g} dB (D32/D33, eps_eff)", [f for f in fails if f.startswith("CMRR") and "sys off" in f])]
     for g, fl in gates:
         print(f"GATE {g}: {'REJECT (%d)' % len(fl) if fl else 'ACCEPT'}")
-    print(f"CMRR sys-off = 1/eps: eps needed for {CMRR_OFF_DB:g} dB = {EPS_FOR_OFF_GATE*100:.2g} % ({EPS_FOR_OFF_GATE*1e6:.0f} uV/V); spec 3 sigma mismatch {EPS_3SIGMA*100:g} % gives {20*math.log10(1/EPS_3SIGMA):.1f} dB")
+    hand, code, parts, hok, db3 = eps_summary(mcs)
+    print(f"eps_eff (D33) at 3 sigma allocation: code {code:.3e}, hand {hand:.3e} (dCp/Cs {parts[0]:.2e} + Cp/Cs*eps_Cs {parts[1]:.2e} + inj {parts[2]:.2e}); agree within 10 %: {'yes' if hok else 'NO'}; sys-off {db3:.1f} dB, margin vs 60 dB gate {db3 - CMRR_OFF_DB:+.1f} dB, vs {CMRR_OFF_TARGET_DB:g} dB design target {db3 - CMRR_OFF_TARGET_DB:+.1f} dB (informational)")
+    print(f"CMRR sys-off = 1/eps_eff (D33; old eps_Cs term superseded): eps needed for {CMRR_OFF_DB:g} dB = {EPS_FOR_OFF_GATE*100:.2g} % ({EPS_FOR_OFF_GATE*1e6:.0f} uV/V); old eps_Cs-only term at {EPS_3SIGMA*100:g} % gave {20*math.log10(1/EPS_3SIGMA):.1f} dB (superseded)")
     print(verdict)
     for f in fails:
         print("  -", f)
     sys.exit(1 if fails else 0)
 
 
-def cmrr_table(mcs):
+def cmrr_table(mcs, key="cmrr"):
     body = []
     for r in mcs:
-        for tag_, rr in r["cmrr"].items():
+        for tag_, rr in r[key].items():
             for c in rr:
                 f = lambda x: "n/a (dVcm 0)" if math.isinf(x) else (">= 240" if x >= 239.9 else f"{x:.1f}")
                 body.append([r["tag"], f"{r['point']} @ {r['fs']/1e6:g} MHz", tag_, f"{c['eps']*1e6:.0f}", f"{c['vin_cm']:g}", f"{c['dvcm']:+.1f}",
@@ -510,6 +529,26 @@ def gates_of(fails):
     return [("grid specs", [f for f in fails if not f.startswith(("CMRR", "MC"))]), ("MC INL/gain/offset", [f for f in fails if f.startswith("MC")]),
             (f"CMRR sys on >= {CMRR_ON_DB:g} dB", [f for f in fails if f.startswith("CMRR") and "sys on" in f]),
             (f"CMRR sys off >= {CMRR_OFF_DB:g} dB (D32)", [f for f in fails if f.startswith("CMRR") and "sys off" in f])]
+
+
+def _marg(r, k):
+    v = abs(r[k])
+    return "n/a" if v == 0 else f"{(limit(r, k) / v - 1) * 100:+.0f} %"
+
+
+def hand_check(mcs):
+    """Hand calculation of eps_eff at the 3 sigma allocation (plain arithmetic from the C4 numbers, independent of eps_eff())."""
+    cs = mcs[0]["cs"]
+    t1, t2, t3 = 0.25e-15 / cs, 20e-15 / cs * 0.0075, 2.8e-4
+    hand = t1 + t2 + t3
+    code = mcs[0]["eps_eff_3sigma"]
+    return hand, code, (t1, t2, t3), abs(code / hand - 1) <= 0.10
+
+
+def eps_summary(mcs):
+    hand, code, (t1, t2, t3), ok = hand_check(mcs)
+    db = 20 * math.log10(1 / code)
+    return hand, code, (t1, t2, t3), ok, db
 
 
 def write_report(a, rows, wt, mcs, fast, fails, verdict, t_grid, t_mc, total, wi, wo):
@@ -533,13 +572,14 @@ def write_report(a, rows, wt, mcs, fast, fails, verdict, t_grid, t_mc, total, wi
                                                  ["gain error", "5000 ppm", "SPEC 3.0"], ["inter-conversion memory", "0.5 uV", "review S3-5 (+-FS then 0)"]]),
          f"## Corner grid: {len(rows)} evaluations = {len(rows)//2} analog PVT points x fs {{0.25, 2}} MHz", "",
          "Worst point per spec (over all points and both fs):", "",
-         fmt_table(["spec", "worst value", "limit", "margin (limit/value)", "worst point", "fs [MHz]"],
-                   [[k, f"{w:.4g} {UNITS[k]}", f"{lim:g}", f"x{ratio:.2f}", pn, f"{fs/1e6:g}"] for k, w, lim, ratio, pn, fs in wt]), ""]
+         fmt_table(["spec", "worst value", "limit", "margin (limit/value)", "margin % (limit/value - 1)", "worst point", "fs [MHz]"],
+                   [[k, f"{w:.4g} {UNITS[k]}", f"{lim:g}", f"x{ratio:.2f}", f"{(ratio - 1) * 100:+.0f} %", pn, f"{fs/1e6:g}"] for k, w, lim, ratio, pn, fs in wt]), ""]
     for fs in sorted({r["fs"] for r in rows}):
         sub = [r for r in rows if r["fs"] == fs]
         L += [f"Worst per spec at fs {fs/1e6:g} MHz:", "",
-              fmt_table(["spec", "worst", "limit", "point"], [[k + ("" if gated(sub[0], k) else " (NOT GATED: 240 SPS unreachable below 0.49 MHz)"),
+              fmt_table(["spec", "worst", "limit", "margin % (limit/value - 1)", "point"], [[k + ("" if gated(sub[0], k) else " (NOT GATED: 240 SPS unreachable below 0.49 MHz)"),
                                                            f"{abs(max(sub, key=lambda r: abs(r[k]) / limit(r, k))[k]):.4g} {UNITS[k]}", f"{limit(max(sub, key=lambda r: abs(r[k]) / limit(r, k)), k):g}",
+                                                           _marg(max(sub, key=lambda r: abs(r[k]) / limit(r, k)), k),
                                                            max(sub, key=lambda r: abs(r[k]) / limit(r, k))["point"]] for k in LIM]), ""]
     L += ["## Monte Carlo (Vos1, Vos2 3 sigma 9 mV; comparator offset 3 sigma 20 mV; Cs+/Cs- 0.75 % 3 sigma)", "",
           "INL and gain per draw: 161-point sweep, residue-corrected; offset per draw: sys-pair residual (24 inputs) + reset + leakage x rho. Pass: mu + 3 sigma and every sample inside the limit. "
@@ -555,15 +595,33 @@ def write_report(a, rows, wt, mcs, fast, fails, verdict, t_grid, t_mc, total, wi
         body.append(row)
     L.append(fmt_table(["set", "point", "draws", "INL ppm mu/sigma/max", "gain ppm mu/sigma/max", "offset uV mu/sigma/max", "raw sys-off offset uV mean|.|/max (info)"], body))
     cm = np.array(mcs[0]["cmrr_uv_per_v"])
-    L += ["## CMRR (D30)", "",
-          "**This models the hypothesis; WO-08 checks it in SPICE.** The Cs+/Cs- mismatch (|dCs/Cs| " f"{cm.mean():.0f} uV/V mean, max of draws {cm.max():.0f} uV/V, 3 sigma 7500 uV/V) turns an input common-mode "
-          f"change dVcm = Vin_cm - VREF_CM (VREF_CM = {VREF_CM:g} V ASSUMED, SPEC 3.0 does not fix it) into a differential term eps*dVcm. "
-          "Hypothesis: the pin-side sys-chop swap does not change the pin CM, so the mismatch term is fixed in the modulator frame, with the same sign in both halves of a sys pair (like an OTA offset); "
-          "the demodulation flips it between the halves and the pair average cancels it. It is modelled as an additive term e on the sampled input after the swap, u_in = s*u + e, demodulated exactly as the chip does "
-          "(conversion with sys_sign +1 and -1, residue-corrected, averaged). Sys chop off: the term stays, error = eps*dVcm (theory check, tested to 2 %). "
-          "The S4 coder claim that sys chop does not cancel it is the opposite hypothesis (term flips with the input); the --nonvac copy models that and fails the sys-on gate. "
-          "CMRR = 20 log10(dVcm / input-referred error). Errors below 1e-12 V are capped (240 dB). Sets: tt/27 (both fs) and the worst-INL / worst-offset points; eps = 3 sigma 7500 uV/V and the largest MC draw.", "",
-          cmrr_table(mcs), ""]
+    ee = np.array(mcs[0]["eps_eff_uv_per_v"])
+    hand, code, (t1, t2, t3), hok, db3 = eps_summary(mcs)
+    allrows = [c for r in mcs for rr in r["cmrr"].values() for c in rr if math.isfinite(c["off_db"])]
+    wdb = min(c["off_db"] for c in allrows)
+    L += ["## CMRR (D30, D33: on the D12 residual eps_eff)", "",
+          "**This models the hypothesis; WO-08 checks it in SPICE.** D33 (REVIEW-S4S5b C-M3): D12 cancels the Cs+/Cs- mismatch term to first order, so the CM->diff coefficient is the D12 residual "
+          "eps_eff = |dCp,top/Cs| + |(Cp,top/Cs) eps_Cs| + eps_inj, signs combined worst-case until WO-09 settles them. A CM change dVcm = Vin_cm - VREF_CM "
+          f"(VREF_CM = {VREF_CM:g} V ASSUMED, SPEC 3.0 does not fix it) gives a differential term eps_eff*dVcm. "
+          f"Allocation (C4): Cp,top {CP_TOP*1e15:g} fF per side (fixed), dCp,top Gaussian 3 sigma {DCP_TOP_3S*1e15:g} fF, eps_Cs Gaussian 3 sigma 0.75 %, eps_inj {EPS_INJ:g} (fixed, worst sign). "
+          "Corner points use the 3 sigma values; the worst-draw row uses the largest eps_eff of the MC draws. "
+          "Hypothesis for the sys-chop behaviour (unchanged): the pin-side swap does not change the pin CM, so the term is fixed in the modulator frame, with the same sign in both halves of a sys pair (like an OTA offset); "
+          "it is modelled as an additive term e on the sampled input after the swap, u_in = s*u + e, demodulated exactly as the chip does (conversion with sys_sign +1 and -1, residue-corrected, averaged). "
+          "Sys chop off: the term stays, error = eps_eff*dVcm (tested to 2 %). The --nonvac copy with the term flipping with the input fails the sys-on gate. "
+          "CMRR = 20 log10(dVcm / input-referred error). Errors below 1e-12 V are capped (240 dB). Sets: tt/27 (both fs) and the worst-INL / worst-offset points.", "",
+          "### Theory check (hand calculation)", "",
+          f"At tt, Cs = {mcs[0]['cs']*1e12:g} pF: dCp,top/Cs = 0.25 fF / {mcs[0]['cs']*1e12:g} pF = {t1:.2e}; (Cp,top/Cs) eps_Cs = (20 fF / {mcs[0]['cs']*1e12:g} pF) x 0.0075 = {t2:.2e}; eps_inj = {t3:.2e}. "
+          f"Linear worst-case sum = **{hand:.3e}** = {20*math.log10(1/hand):.1f} dB. Printed 3 sigma eps_eff = {code:.3e} = {db3:.1f} dB. Agreement within 10 %: **{'yes' if hok else 'NO'}**. "
+          f"MC eps_eff: mean {ee.mean():.0f} uV/V, max of draws {ee.max():.0f} uV/V (eps_Cs-only mean {cm.mean():.0f}, max {cm.max():.0f}).", "",
+          "**Finding (inconsistent expectation in WO-10 / the review).** The review's 5.6e-4 (65 dB) is the RSS of dCp,top/Cs (5.0e-4) and eps_inj (2.8e-4), which drops the third term. "
+          "With the (Cp,top/Cs) eps_Cs term (3.0e-4) and the worst-case linear sum that D33 prescribes, eps_eff at the allocation is "
+          f"{hand:.2e} = {20*math.log10(1/hand):.1f} dB: **below the 60 dB gate** (needs <= 1.0e-3) and {20*math.log10(1/hand) - CMRR_OFF_TARGET_DB:+.1f} dB against the {CMRR_OFF_TARGET_DB:g} dB design target (informational). "
+          "Reaching the gate needs a tighter allocation (e.g. dCp,top 3 sigma <= 0.15 fF at Cs 0.5 pF, or a larger Cs, or sign knowledge from WO-09 to RSS or cancel terms); the gate is not relaxed here.", "",
+          f"Worst sys-off CMRR over all rows below: {wdb:.1f} dB (gate {CMRR_OFF_DB:g} dB, margin {wdb - CMRR_OFF_DB:+.1f} dB; against the {CMRR_OFF_TARGET_DB:g} dB design target {wdb - CMRR_OFF_TARGET_DB:+.1f} dB, informational).", "",
+          cmrr_table(mcs), "",
+          "### Superseded (D33): old eps_Cs * dVcm term", "",
+          "Kept for the record, not gated. 3 sigma 7500 uV/V gives 42.5 dB sys-off; it modelled a mechanism that D12 cancels to first order.", "",
+          cmrr_table(mcs, "cmrr_superseded_eps_cs"), ""]
     L += ["## Fast mode (fs 4 MHz, informational, not gated)", "",
           "Thermal noise: u = 0, no averaging (k 1, sys-chop pair); at small N it is far below one LSB, so decisions rarely flip and the measured rms can be 0: the quantization column (raw accumulators, rms over a +-0.9 FS sweep) is the real fast-mode resolution limit. INL: ideal-OTA-table model (tables at the corner) with tau_in/tau_ref scaled to the 4 MHz t_half, residue-corrected. "
           "`with settle`: hand slew-then-settle penalty lumped as a finite-gain-equivalent pole error (ESTIMATE, not a simulation): eps = exp(-(t_half - dV/SR)/tau_ota), "

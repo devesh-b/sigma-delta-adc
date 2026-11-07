@@ -119,3 +119,25 @@ def test_cmrr_gate_is_60_db_sys_off_and_eps_for_it_is_0p1_percent():
     assert not s4.cmrr_fails(ok, "t")
     assert s4.cmrr_fails([dict(ok[0], off_db=59.0)], "t") and s4.cmrr_fails([dict(ok[0], on_db=99.0)], "t")
     assert s4.cmrr_fails(s4.cmrr_eval(_pq(), 0.0075), "t")       # spec 3 sigma mismatch: sys-off 42.5 dB < 60 -> REJECT
+
+
+def test_eps_eff_d33_hand_values_and_gate_behaviour():
+    cs = 0.5e-12
+    # hand: 0.25 fF / 0.5 pF = 5.0e-4; (20 fF / 0.5 pF) * 0.0075 = 3.0e-4; injection 2.8e-4; linear worst-case sum 1.08e-3
+    assert math.isclose(s4.eps_eff(cs, 0.0075), 5.0e-4 + 3.0e-4 + 2.8e-4, rel_tol=1e-9)
+    assert math.isclose(20 * math.log10(1 / s4.eps_eff(cs, 0.0075)), 59.33, abs_tol=0.05)
+    # terms are absolute values (worst-case signs)
+    assert math.isclose(s4.eps_eff(cs, -0.0075, dcp=-0.25e-15), s4.eps_eff(cs, 0.0075), rel_tol=1e-12)
+    # dCp,top 2 fF (hand: 4e-3 + 3e-4 + 2.8e-4 = 4.58e-3 = 46.8 dB) must fail sys-off; a small asymmetry (0.05 fF: 1e-4+3e-4+2.8e-4 = 6.8e-4, 63.3 dB) passes
+    bad = s4.cmrr_eval(_pq(), s4.eps_eff(cs, 0.0075, dcp=2e-15))
+    assert any("sys off" in f for f in s4.cmrr_fails(bad, "t"))
+    good = s4.cmrr_eval(_pq(), s4.eps_eff(cs, 0.0075, dcp=0.05e-15))
+    assert not s4.cmrr_fails(good, "t")
+    # the sys-off CMRR follows 1/eps_eff (theory), not the old eps_Cs term
+    by = {r["vin_cm"]: r for r in bad}
+    assert math.isclose(by[2.0]["off_db"], 20 * math.log10(1 / 4.58e-3), abs_tol=0.3)
+
+
+def test_margin_helper():
+    assert s4._marg({"n15": 1.25, "fs": 2e6, "T": 27, "point": "x"}, "n15") == "+100 %"       # limit 2.5 / 1.25 - 1
+    assert s4._marg({"n15": 0.0, "fs": 2e6, "T": 27, "point": "x"}, "n15") == "n/a"
