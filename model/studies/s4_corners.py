@@ -2,10 +2,11 @@
 
 Usage: python3 -m model.studies.s4_corners --out DIR [--nonvac] [--procs 4] [--quick]
   (default)  63 analog PVT points x fs {0.25, 2} MHz: noise @15/@240 SPS, INL (N 4096), sys-pair offset, gain error,
-             inter-conversion memory; MC (tt/27/3.3 x200, worst-INL and worst-offset point x50); fast mode (4 MHz) table.
+             inter-conversion memory; CMRR (D30; Vin_cm 0.2/1.0/2.0 V, Cs mismatch) in the MC sets; MC (tt/27/3.3 x200, worst-INL and worst-offset point x50); fast mode (4 MHz) table.
              Prints ACCEPT/REJECT naming the failing point; exit 1 on REJECT.
   --nonvac   broken copies that must REJECT at the named point (A(1.4 V) = 60 dB at ss/125/3.0; reset r = 1e-2; sys chop off;
-             Cs/100 for noise; tau_in 2 us for gain). Exit 1 if they all reject, 0 (loudly) if any one is NOT rejected.
+             Cs/100 for noise; tau_in 2 us for gain; CM term flipping with the input
+             (must fail CMRR sys-on); Cs mismatch 3 % (must fail CMRR sys-off)). Exit 1 if they all reject, 0 (loudly) if any one is NOT rejected.
   --quick    9 corner points and fewer MC draws (smoke test only; never used for the verdict)
 
 NO TRANSISTOR DATA EXISTS YET. Every mapping below is an explicit assumption (MAPPING table, written into the report):
@@ -33,11 +34,19 @@ X1MAX_V = s3.X1MAX_V
 
 # ----------------------------------------------------------------------------------------- limits (SPEC 3.0 / review)
 LIM = {"n15": 2.5,        # uV rms @15 SPS, u = 0 (budget, SPEC 3.0 header)
-       "n240": 5.0,       # uV rms @240 SPS: ASSUMPTION (SPEC has no 240 SPS limit; joint model at spec is 3.9 uV, SPEC 2.2 stretch 5 uV)
+       "n240": 5.0,       # uV rms @240 SPS, u = 0 (D29, SPEC 3.0 user decisions); gated only where 240 SPS is reachable (fs >= N240_MIN_FS)
        "inl": 20.0,       # ppm FSR, N 4096 (budget)
        "off": 5.0,        # uV, sys-pair offset incl. non-cancelling terms (budget; 2 uV of it is unmodelled reserve)
        "gain": 5000.0,    # ppm (0.5 %)
        "mem": 0.5}        # uV, inter-conversion memory after +-FS then 0 (review S3-5)
+N15_LIM_LOW_FS_HOT = 3.0   # D27: fs < 2 MHz and T > 85 C only (S4 worst 2.98 uV); everywhere else LIM["n15"]
+N15_HOT_C = 85
+CMRR_ON_DB, CMRR_OFF_DB = 100.0, 60.0   # D30 as amended by D32 (sys-off 60 dB, was 40): sys chop on / off, at tt/27 and the worst MC draws
+VREF_CM = 1.0              # V, ASSUMED reference common mode (SPEC 3.0 does not fix it); dVcm = Vin_cm - VREF_CM
+VIN_CMS = (0.2, 1.0, 2.0)  # V, input-CM axis (D30)
+EPS_FOR_OFF_GATE = 10 ** (-CMRR_OFF_DB / 20)   # mismatch at which sys-off CMRR = eps^-1 just meets the gate (0.1 %)
+EPS_3SIGMA = 0.0075        # Cs+/Cs- mismatch 0.75 % 3 sigma (SPEC 3.0)
+CMRR_FLOOR_V = 1e-12       # residual below this is reported as the cap (240 dB at dVcm 1 V)
 N240_MIN_FS = 2 * 240 * 1024     # 240 SPS needs a sys-chop pair of N 1024 conversions: fs >= 0.49 MHz; below that the spec is not reachable (not gated)
 UNITS = {"n15": "uV", "n240": "uV", "inl": "ppm", "off": "uV", "gain": "ppm", "mem": "uV"}
 
@@ -245,14 +254,17 @@ def mc_task(a):
         resid[sl], raw[sl] = pair * VREF * 1e6, rw * VREF * 1e6
     reset = 2 * ax["r"] * X1MAX_V / (C1 * (p.N - 1)) * 1e6
     leak = s3.leak_offset(ax["i_leak"], fs, ax["cs"]) * 1e6 * s3.RHO_LEAK
+    cmrr = {"3sigma": cmrr_eval(p, EPS_3SIGMA), "worst_draw": cmrr_eval(p, float(np.abs(dcs).max()))}
     off = np.abs(resid) + reset + leak
     return {"tag": tag, "point": name(proc, T, V), "fs": fs, "ndraw": ndraw,
             "inl": inl.tolist(), "gain": np.abs(gain).tolist(), "off": off.tolist(), "resid": resid.tolist(),
-            "raw_sysoff_uv": raw.tolist(), "cmrr_uv_per_v": (np.abs(dcs) * 1e6).tolist(), "reset": reset, "leak": leak}
+            "raw_sysoff_uv": raw.tolist(), "cmrr_uv_per_v": (np.abs(dcs) * 1e6).tolist(), "cmrr": cmrr, "reset": reset, "leak": leak}
 
 
 def mc_verdict(r):
     fails = []
+    for tag_, rr in r.get("cmrr", {}).items():
+        fails += cmrr_fails(rr, f"{r['tag']} {r['point']} fs {r['fs']/1e6:g} MHz {tag_}")
     for k in ("inl", "gain", "off"):
         x = np.array(r[k])
         mu, sd, mx = float(x.mean()), float(x.std(ddof=1)), float(x.max())
@@ -294,22 +306,78 @@ def gated(r, k):
     return not (k == "n240" and r["fs"] < N240_MIN_FS)
 
 
+def limit(r, k):
+    """Applied limit for row r and spec k (D27: n15 is 3.0 uV only at fs < 2 MHz and T > 85 C)."""
+    if k == "n15" and r["fs"] < 2e6 and r["T"] > N15_HOT_C:
+        return N15_LIM_LOW_FS_HOT
+    return LIM[k]
+
+
 def spec_fails(rows):
     fails = []
     for r in rows:
-        for k, lim in LIM.items():
+        for k in LIM:
             if not gated(r, k):
                 continue
-            v = r[k]
+            v, lim = r[k], limit(r, k)
             if not (np.isfinite(v) and abs(v) <= lim):
                 fails.append(f"{r['point']} fs {r['fs']/1e6:g} MHz: {k} = {v:.4g} {UNITS[k]} > {lim:g}")
     return fails
 
 
+def cm_err_v(p, e_v, sys, flip=False, B=96):
+    """Input-referred error [V] from a CM->diff term e_v, mean over stratified DC inputs, noise-free, residue-corrected, all
+    other offsets zero. Hypothesis (flip False): the Cs+/Cs- mismatch term is fixed in the modulator frame (same sign in both
+    halves of a sys pair, like an OTA offset), the sys demodulation flips it, the pair cancels it. flip True (broken copy):
+    the term rides on the input and flips with the pin-side swap, so the demodulation cannot remove it."""
+    q = m.with_(p, ktc_on=False, flicker_on=False, **{f: 0.0 for f in s3.OFF_FIELDS})
+    u = -0.5 + (np.arange(B) + 0.5) / B
+    e = e_v / q.vref
+    nz = m.ota_noise_block(q, B, np.random.default_rng(0))
+
+    def run(sg):
+        # the model computes u_in = u' * s (pin-side swap) and demodulates by s. Modulator-frame term (fixed in sign): u_in = s u + e
+        # <=> u' = u + e s. Term that rides on the input (flips with the swap): u_in = s (u + e) <=> u' = u + e.
+        s_ = np.ones(B) if sg is None else sg
+        uh, st = m.convert(q, u + (e if flip else e * s_), ota_noise=nz, sys_sign=sg, return_state=True)
+        return _corr(q, uh, st)
+    uh = 0.5 * (run(np.ones(B)) + run(-np.ones(B))) if sys else run(None)
+    return float(np.mean(uh - u)) * q.vref
+
+
+def cmrr_eval(p, eps, vin_cms=VIN_CMS, flip=False):
+    """CMRR table for one mismatch eps: per Vin_cm, input-referred error and CMRR = 20 log10(dVcm / error), sys on and off."""
+    base = {s_: cm_err_v(p, 0.0, s_, flip) for s_ in (True, False)}
+    rows = []
+    for vc in vin_cms:
+        dv = vc - VREF_CM
+        row = {"eps": eps, "vin_cm": vc, "dvcm": dv}
+        for s_, key in ((True, "on"), (False, "off")):
+            if abs(dv) < 1e-9:
+                row[key + "_err_v"], row[key + "_db"] = 0.0, math.inf
+                continue
+            err = abs(cm_err_v(p, eps * dv, s_, flip) - base[s_])
+            row[key + "_err_v"] = err
+            row[key + "_db"] = 20 * math.log10(abs(dv) / max(err, CMRR_FLOOR_V))
+        rows.append(row)
+    return rows
+
+
+def cmrr_fails(rows, tag):
+    f = []
+    for r in rows:
+        for key, lim in (("on", CMRR_ON_DB), ("off", CMRR_OFF_DB)):
+            v = r[key + "_db"]
+            if not (not math.isnan(v) and v >= lim):
+                f.append(f"CMRR {tag} eps {r['eps']*1e6:.0f} uV/V Vin_cm {r['vin_cm']:g} V: sys {key} = {v:.1f} dB < {lim:g}")
+    return f
+
+
 def worst_table(rows):
     out = []
-    for k, lim in LIM.items():
-        w = max([r for r in rows if gated(r, k)], key=lambda r: abs(r[k]))
+    for k in LIM:
+        w = max([r for r in rows if gated(r, k)], key=lambda r: abs(r[k]) / limit(r, k))
+        lim = limit(w, k)
         out.append((k, abs(w[k]), lim, lim / abs(w[k]) if w[k] else math.inf, w["point"], w["fs"]))
     return out
 
@@ -337,9 +405,19 @@ def run_nonvac(a, pool):
     body, rej, notrej = [], [], []
     for (txt, _, key), r in zip(cases, res):
         v = abs(r[key])
-        ok = (not np.isfinite(v)) or v > LIM[key]
-        body.append([txt, key, f"{v:.4g} {UNITS[key]}", f"{LIM[key]:g}", "REJECT" if ok else "NOT REJECTED"])
-        (rej if ok else notrej).append(f"{r['point']} fs {r['fs']/1e6:g} MHz [{txt}]: {key} = {v:.4g} {UNITS[key]} > {LIM[key]:g}")
+        ok = (not np.isfinite(v)) or v > limit(r, key)
+        body.append([txt, key, f"{v:.4g} {UNITS[key]}", f"{limit(r, key):g}", "REJECT" if ok else "NOT REJECTED"])
+        (rej if ok else notrej).append(f"{r['point']} fs {r['fs']/1e6:g} MHz [{txt}]: {key} = {v:.4g} {UNITS[key]} > {limit(r, key):g}")
+    # CMRR (D30): unbroken must pass; CM term applied so that it flips with the input must fail sys-on; 3 % mismatch must fail sys-off
+    pcm, _ = point("tt", 27, 3.3, 2e6)
+    good_cm = cmrr_eval(pcm, EPS_FOR_OFF_GATE * 0.9)      # a mismatch that meets both gates (0.09 %)
+    unbroken_fail += cmrr_fails(good_cm, "unbroken tt/27/3.3")
+    for txt, rows_cm, key, lim in (("CM term applied after the pin-side swap (flips with the input) at tt/27/3.3", cmrr_eval(pcm, EPS_3SIGMA, flip=True), "on", CMRR_ON_DB),
+                                   ("Cs+/Cs- mismatch 3 % (sys off) at tt/27/3.3", cmrr_eval(pcm, 0.03), "off", CMRR_OFF_DB)):
+        w = min((r_ for r_ in rows_cm if math.isfinite(r_[key + "_db"])), key=lambda r_: r_[key + "_db"])
+        ok = not (w[key + "_db"] >= lim)
+        body.append([txt, "cmrr_" + key, f"{w[key + '_db']:.1f} dB (Vin_cm {w['vin_cm']:g} V)", f">= {lim:g}", "REJECT" if ok else "NOT REJECTED"])
+        (rej if ok else notrej).append(f"tt/27/3.3 fs 2 MHz [{txt}]: sys {key} CMRR = {w[key + '_db']:.1f} dB < {lim:g}")
     L.append(fmt_table(["broken copy", "spec", "value", "limit", "result"], body))
     verdict = "REJECT" if rej and not notrej and not unbroken_fail else "ACCEPT (nonvac FAILED)"
     L += [verdict, ""] + [f"- {x}" for x in rej] + [f"- NOT REJECTED: {x}" for x in notrej] + [f"- unbroken copy fails: {x}" for x in unbroken_fail]
@@ -392,21 +470,54 @@ def main():
     total = time.time() - t0
     verdict = "REJECT" if fails else "ACCEPT"
     write_report(a, rows, wt, mcs, fast, fails, verdict, t_grid, t_mc, total, wi, wo)
+    for r in rows:
+        print(f"row {r['point']} fs {r['fs']/1e6:g} MHz: n15 {r['n15']:.4g} (lim {limit(r, 'n15'):g}) n240 {r['n240']:.4g} " + (f"(lim {LIM['n240']:g})" if gated(r, "n240") else "(NOT GATED, 240 SPS unreachable)"))
+    print_cmrr(mcs)
     print(f"{len(rows)} grid evaluations ({len(pts)} PVT x {len(FSS)} fs), {sum(len(r['inl']) for r in mcs)} MC draws, wall {total:.0f} s")
     for k, w, lim, ratio, pn, fs in wt:
         print(f"worst {k}: {w:.4g} {UNITS[k]} (limit {lim:g}, margin x{ratio:.2f}) at {pn} fs {fs/1e6:g} MHz")
+    gates = [("grid specs (n15, n240, INL, gain, offset, memory)", [f for f in fails if not f.startswith(("CMRR", "MC"))]),
+             ("MC INL / gain / offset", [f for f in fails if f.startswith("MC")]),
+             (f"CMRR sys chop on >= {CMRR_ON_DB:g} dB", [f for f in fails if f.startswith("CMRR") and "sys on" in f]),
+             (f"CMRR sys chop off >= {CMRR_OFF_DB:g} dB (D32)", [f for f in fails if f.startswith("CMRR") and "sys off" in f])]
+    for g, fl in gates:
+        print(f"GATE {g}: {'REJECT (%d)' % len(fl) if fl else 'ACCEPT'}")
+    print(f"CMRR sys-off = 1/eps: eps needed for {CMRR_OFF_DB:g} dB = {EPS_FOR_OFF_GATE*100:.2g} % ({EPS_FOR_OFF_GATE*1e6:.0f} uV/V); spec 3 sigma mismatch {EPS_3SIGMA*100:g} % gives {20*math.log10(1/EPS_3SIGMA):.1f} dB")
     print(verdict)
     for f in fails:
         print("  -", f)
     sys.exit(1 if fails else 0)
 
 
+def cmrr_table(mcs):
+    body = []
+    for r in mcs:
+        for tag_, rr in r["cmrr"].items():
+            for c in rr:
+                f = lambda x: "n/a (dVcm 0)" if math.isinf(x) else (">= 240" if x >= 239.9 else f"{x:.1f}")
+                body.append([r["tag"], f"{r['point']} @ {r['fs']/1e6:g} MHz", tag_, f"{c['eps']*1e6:.0f}", f"{c['vin_cm']:g}", f"{c['dvcm']:+.1f}",
+                             f"{c['off_err_v']*1e6:.4g}", f(c["off_db"]), f"{c['on_err_v']*1e6:.3g}", f(c["on_db"])])
+    return fmt_table(["set", "point", "eps", "eps uV/V", "Vin_cm V", "dVcm V", "sys-off err uV", "sys-off CMRR dB (gate >= 60)", "sys-on err uV", "sys-on CMRR dB (gate >= 100)"], body)
+
+
+def print_cmrr(mcs):
+    print("CMRR table (input-referred error, CMRR dB = 20 log10(dVcm / error); VREF_CM %g V assumed):" % VREF_CM)
+    for line in cmrr_table(mcs).splitlines():
+        print("  " + line)
+
+
+def gates_of(fails):
+    return [("grid specs", [f for f in fails if not f.startswith(("CMRR", "MC"))]), ("MC INL/gain/offset", [f for f in fails if f.startswith("MC")]),
+            (f"CMRR sys on >= {CMRR_ON_DB:g} dB", [f for f in fails if f.startswith("CMRR") and "sys on" in f]),
+            (f"CMRR sys off >= {CMRR_OFF_DB:g} dB (D32)", [f for f in fails if f.startswith("CMRR") and "sys off" in f])]
+
+
 def write_report(a, rows, wt, mcs, fast, fails, verdict, t_grid, t_mc, total, wi, wo):
     out = Path(a.out)
     (out / "s4_corners.json").write_text(json.dumps({"limits": LIM, "mapping": MAPPING, "rows": rows, "worst": wt, "mc": mcs, "fast": fast,
                                                       "fails": fails, "verdict": verdict, "wall_s": total}, indent=1, default=float))
-    L = ["# S4: corner-aware tier-0 model (WO-06)", "",
-         "Command: `python3 -m model.studies.s4_corners --out /home/mempool/regr/tt/WO-06/s4`" + (" --quick" if a.quick else ""), "",
+    L = ["# S4: corner-aware tier-0 model (WO-06, re-gated in WO-06a)", "",
+         "Command: `python3 -m model.studies.s4_corners --out /home/mempool/regr/tt/WO-06a/s4`" + (" --quick" if a.quick else ""), "",
          f"Wall time {total:.0f} s on 4 processes (grid {t_grid:.0f} s, MC {t_mc:.0f} s). No transistor data exists: every mapping is an **assumption** "
          "(nominal at tt/27/3.3, the SPEC 3.0 limit at that mechanism's worst corner, linear in a 0..1 stress between). "
          "A result here says the budget closes if each block just meets SPEC 3.0; it is not a statement about a circuit.", "",
@@ -415,7 +526,8 @@ def write_report(a, rows, wt, mcs, fast, fails, verdict, t_grid, t_mc, total, wi
          "Stress variables: s_gain = (proc{ss 1, sf/fs .5} + max(0,(T-27)/98) + max(0,(3.3-V)/.3))/3; s_speed = (proc{ss 1, sf/fs/ss_hh .5} + max(0,(27-T)/67) + max(0,(3.3-V)/.3))/3. "
          "ff, ff_ll, tt and the RC points (MOS typical) carry no proc stress; nothing is better than nominal.", "",
          "## Limits (pass = every point inside)", "",
-         fmt_table(["spec", "limit", "source"], [["noise @15 SPS (u = 0)", "2.5 uV", "SPEC 3.0 budget"], ["noise @240 SPS", "5 uV", "ASSUMED (SPEC has no 240 SPS limit; joint run at spec 3.9 uV)"],
+         fmt_table(["spec", "limit", "source"], [["noise @15 SPS (u = 0)", "2.5 uV; 3.0 uV at fs < 2 MHz and T > 85 C", "SPEC 3.0 budget; D27 (the applied limit is printed per row in the appendix)"], ["noise @240 SPS (u = 0)", "5 uV (gated only where 240 SPS is reachable, fs >= 0.49 MHz)", "D29"],
+                                                 ["CMRR, sys chop on / off", ">= 100 dB / >= 60 dB at Vin_cm 0.2, 1.0, 2.0 V (VREF_CM 1.0 V assumed), tt/27 and worst MC draws", "D30, sys-off 60 dB per D32"],
                                                  ["INL, N 4096", "20 ppm", "SPEC 3.0 budget (4 ppm of it is unmodelled reserve)"], ["sys-pair offset", "5 uV",
                                                   "SPEC 3.0 budget = model residual + reset 2 r x1max/(c1(N-1)) + leakage x rho 0.1 % (2 uV of it unmodelled reserve)"],
                                                  ["gain error", "5000 ppm", "SPEC 3.0"], ["inter-conversion memory", "0.5 uV", "review S3-5 (+-FS then 0)"]]),
@@ -427,8 +539,8 @@ def write_report(a, rows, wt, mcs, fast, fails, verdict, t_grid, t_mc, total, wi
         sub = [r for r in rows if r["fs"] == fs]
         L += [f"Worst per spec at fs {fs/1e6:g} MHz:", "",
               fmt_table(["spec", "worst", "limit", "point"], [[k + ("" if gated(sub[0], k) else " (NOT GATED: 240 SPS unreachable below 0.49 MHz)"),
-                                                           f"{abs(max(sub, key=lambda r: abs(r[k]))[k]):.4g} {UNITS[k]}", f"{LIM[k]:g}",
-                                                           max(sub, key=lambda r: abs(r[k]))["point"]] for k in LIM]), ""]
+                                                           f"{abs(max(sub, key=lambda r: abs(r[k]) / limit(r, k))[k]):.4g} {UNITS[k]}", f"{limit(max(sub, key=lambda r: abs(r[k]) / limit(r, k)), k):g}",
+                                                           max(sub, key=lambda r: abs(r[k]) / limit(r, k))["point"]] for k in LIM]), ""]
     L += ["## Monte Carlo (Vos1, Vos2 3 sigma 9 mV; comparator offset 3 sigma 20 mV; Cs+/Cs- 0.75 % 3 sigma)", "",
           "INL and gain per draw: 161-point sweep, residue-corrected; offset per draw: sys-pair residual (24 inputs) + reset + leakage x rho. Pass: mu + 3 sigma and every sample inside the limit. "
           "Worst-INL point = grid worst INL " f"({wi['point']}, {wi['fs']/1e6:g} MHz); worst-offset point = grid worst offset ({wo['point']}, {wo['fs']/1e6:g} MHz).", ""]
@@ -443,9 +555,15 @@ def write_report(a, rows, wt, mcs, fast, fails, verdict, t_grid, t_mc, total, wi
         body.append(row)
     L.append(fmt_table(["set", "point", "draws", "INL ppm mu/sigma/max", "gain ppm mu/sigma/max", "offset uV mu/sigma/max", "raw sys-off offset uV mean|.|/max (info)"], body))
     cm = np.array(mcs[0]["cmrr_uv_per_v"])
-    L += [f"CMRR term (Cs+/Cs- mismatch, D12 switching): CM-to-differential gain |dCs/Cs| = {cm.mean():.0f} uV/V mean, 3 sigma point {cm.mean() + 3 * cm.std(ddof=1):.0f} uV/V (7500 uV/V = 0.75 %), "
-          f"max of draws {cm.max():.0f} uV/V. This is a constant offset for a given input common-mode error dVcm that sys chop does NOT cancel: "
-          f"the 5 uV offset budget is used up by dVcm = {5 / 7500 * 1e3:.2f} mV at the 3 sigma mismatch. SPEC 3.0 has no CM-dependent offset limit; this is a spec gap, not gated.", ""]
+    L += ["## CMRR (D30)", "",
+          "**This models the hypothesis; WO-08 checks it in SPICE.** The Cs+/Cs- mismatch (|dCs/Cs| " f"{cm.mean():.0f} uV/V mean, max of draws {cm.max():.0f} uV/V, 3 sigma 7500 uV/V) turns an input common-mode "
+          f"change dVcm = Vin_cm - VREF_CM (VREF_CM = {VREF_CM:g} V ASSUMED, SPEC 3.0 does not fix it) into a differential term eps*dVcm. "
+          "Hypothesis: the pin-side sys-chop swap does not change the pin CM, so the mismatch term is fixed in the modulator frame, with the same sign in both halves of a sys pair (like an OTA offset); "
+          "the demodulation flips it between the halves and the pair average cancels it. It is modelled as an additive term e on the sampled input after the swap, u_in = s*u + e, demodulated exactly as the chip does "
+          "(conversion with sys_sign +1 and -1, residue-corrected, averaged). Sys chop off: the term stays, error = eps*dVcm (theory check, tested to 2 %). "
+          "The S4 coder claim that sys chop does not cancel it is the opposite hypothesis (term flips with the input); the --nonvac copy models that and fails the sys-on gate. "
+          "CMRR = 20 log10(dVcm / input-referred error). Errors below 1e-12 V are capped (240 dB). Sets: tt/27 (both fs) and the worst-INL / worst-offset points; eps = 3 sigma 7500 uV/V and the largest MC draw.", "",
+          cmrr_table(mcs), ""]
     L += ["## Fast mode (fs 4 MHz, informational, not gated)", "",
           "Thermal noise: u = 0, no averaging (k 1, sys-chop pair); at small N it is far below one LSB, so decisions rarely flip and the measured rms can be 0: the quantization column (raw accumulators, rms over a +-0.9 FS sweep) is the real fast-mode resolution limit. INL: ideal-OTA-table model (tables at the corner) with tau_in/tau_ref scaled to the 4 MHz t_half, residue-corrected. "
           "`with settle`: hand slew-then-settle penalty lumped as a finite-gain-equivalent pole error (ESTIMATE, not a simulation): eps = exp(-(t_half - dV/SR)/tau_ota), "
@@ -465,10 +583,11 @@ def write_report(a, rows, wt, mcs, fast, fails, verdict, t_grid, t_mc, total, wi
         return int(2 * x)
     L += ["Proposed fast-mode INL targets (GBW 20 MHz design target, worst of the three points, 1.5x margin rounded up to 1-2-5): "
           + "; ".join(f"N {n}: <= {rnd(v)} ppm" for n, v in sorted(prop.items())) + ". Proposal only; the SPEC fast-mode target is not set.", ""]
-    L += ["## Verdict", "", verdict, ""] + [f"- {f}" for f in fails] + [""]
+    L += ["## Verdict", "", verdict, ""] + [f"GATE {g}: {'REJECT (%d)' % len(fl) if fl else 'ACCEPT'}" for g, fl in gates_of(fails)] + [""] + [f"- {f}" for f in fails] + [""]
     L += ["## Appendix: all grid evaluations", "",
-          fmt_table(["point", "fs MHz", "n15", "n240", "INL", "gain", "offset", "memory"],
-                    [[r["point"], f"{r['fs']/1e6:g}"] + [f"{r[k]:.3g}" for k in ("n15", "n240", "inl", "gain", "off", "mem")] for r in rows])]
+          fmt_table(["point", "fs MHz", "n15", "n15 limit", "n240", "n240 limit", "INL", "gain", "offset", "memory"],
+                    [[r["point"], f"{r['fs']/1e6:g}", f"{r['n15']:.3g}", f"{limit(r, 'n15'):g}", f"{r['n240']:.3g}", (f"{LIM['n240']:g}" if gated(r, "n240") else "not gated")]
+                     + [f"{r[k]:.3g}" for k in ("inl", "gain", "off", "mem")] for r in rows])]
     (out / "s4_corners.md").write_text("\n".join(L) + "\n")
 
 

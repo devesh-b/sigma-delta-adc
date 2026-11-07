@@ -1,8 +1,8 @@
-# S4: corner-aware tier-0 model (WO-06)
+# S4: corner-aware tier-0 model (WO-06, re-gated in WO-06a)
 
-Command: `python3 -m model.studies.s4_corners --out /home/mempool/regr/tt/WO-06/s4`
+Command: `python3 -m model.studies.s4_corners --out /home/mempool/regr/tt/WO-06a/s4`
 
-Wall time 364 s on 4 processes (grid 339 s, MC 24 s). No transistor data exists: every mapping is an **assumption** (nominal at tt/27/3.3, the SPEC 3.0 limit at that mechanism's worst corner, linear in a 0..1 stress between). A result here says the budget closes if each block just meets SPEC 3.0; it is not a statement about a circuit.
+Wall time 246 s on 4 processes (grid 217 s, MC 29 s). No transistor data exists: every mapping is an **assumption** (nominal at tt/27/3.3, the SPEC 3.0 limit at that mechanism's worst corner, linear in a 0..1 stress between). A result here says the budget closes if each block just meets SPEC 3.0; it is not a statement about a circuit.
 
 ## Mapping (explicit)
 
@@ -30,8 +30,9 @@ Stress variables: s_gain = (proc{ss 1, sf/fs .5} + max(0,(T-27)/98) + max(0,(3.3
 
 | spec | limit | source |
 |---|---|---|
-| noise @15 SPS (u = 0) | 2.5 uV | SPEC 3.0 budget |
-| noise @240 SPS | 5 uV | ASSUMED (SPEC has no 240 SPS limit; joint run at spec 3.9 uV) |
+| noise @15 SPS (u = 0) | 2.5 uV; 3.0 uV at fs < 2 MHz and T > 85 C | SPEC 3.0 budget; D27 (the applied limit is printed per row in the appendix) |
+| noise @240 SPS (u = 0) | 5 uV (gated only where 240 SPS is reachable, fs >= 0.49 MHz) | D29 |
+| CMRR, sys chop on / off | >= 100 dB / >= 60 dB at Vin_cm 0.2, 1.0, 2.0 V (VREF_CM 1.0 V assumed), tt/27 and worst MC draws | D30, sys-off 60 dB per D32 |
 | INL, N 4096 | 20 ppm | SPEC 3.0 budget (4 ppm of it is unmodelled reserve) |
 | sys-pair offset | 5 uV | SPEC 3.0 budget = model residual + reset 2 r x1max/(c1(N-1)) + leakage x rho 0.1 % (2 uV of it unmodelled reserve) |
 | gain error | 5000 ppm | SPEC 3.0 |
@@ -43,7 +44,7 @@ Worst point per spec (over all points and both fs):
 
 | spec | worst value | limit | margin (limit/value) | worst point | fs [MHz] |
 |---|---|---|---|---|---|
-| n15 | 2.98 uV | 2.5 | x0.84 | ss/125/3 | 0.25 |
+| n15 | 2.98 uV | 3 | x1.01 | ss/125/3 | 0.25 |
 | n240 | 3.603 uV | 5 | x1.39 | ff_ll/125/3 | 2 |
 | inl | 5.222 ppm | 20 | x3.83 | ss/125/3 | 0.25 |
 | off | 0.9739 uV | 5 | x5.13 | ff/125/3.6 | 0.25 |
@@ -55,7 +56,7 @@ Worst per spec at fs 0.25 MHz:
 
 | spec | worst | limit | point |
 |---|---|---|---|
-| n15 | 2.98 uV | 2.5 | ss/125/3 |
+| n15 | 2.98 uV | 3 | ss/125/3 |
 | n240 (NOT GATED: 240 SPS unreachable below 0.49 MHz) | 9.86 uV | 5 | ss/125/3 |
 | inl | 5.222 ppm | 20 | ss/125/3 |
 | off | 0.9739 uV | 5 | ff/125/3.6 |
@@ -86,7 +87,37 @@ INL and gain per draw: 161-point sweep, residue-corrected; offset per draw: sys-
 | worst-INL | ss/125/3 @ 0.25 MHz | 50 | 5.1 / 0.023 / 5.15 (lim 20) | 71.5 / 0.0031 / 71.5 (lim 5000) | 0.58 / 0.047 / 0.687 (lim 5) | 47.6 / 74.7 |
 | worst-offset | ff/125/3.6 @ 0.25 MHz | 50 | 1.2 / 0.0071 / 1.22 (lim 20) | 28 / 0.00075 / 28 (lim 5000) | 0.902 / 0.039 / 0.983 (lim 5) | 48.2 / 73.6 |
 
-CMRR term (Cs+/Cs- mismatch, D12 switching): CM-to-differential gain |dCs/Cs| = 2175 uV/V mean, 3 sigma point 6696 uV/V (7500 uV/V = 0.75 %), max of draws 6209 uV/V. This is a constant offset for a given input common-mode error dVcm that sys chop does NOT cancel: the 5 uV offset budget is used up by dVcm = 0.67 mV at the 3 sigma mismatch. SPEC 3.0 has no CM-dependent offset limit; this is a spec gap, not gated.
+## CMRR (D30)
+
+**This models the hypothesis; WO-08 checks it in SPICE.** The Cs+/Cs- mismatch (|dCs/Cs| 2175 uV/V mean, max of draws 6209 uV/V, 3 sigma 7500 uV/V) turns an input common-mode change dVcm = Vin_cm - VREF_CM (VREF_CM = 1 V ASSUMED, SPEC 3.0 does not fix it) into a differential term eps*dVcm. Hypothesis: the pin-side sys-chop swap does not change the pin CM, so the mismatch term is fixed in the modulator frame, with the same sign in both halves of a sys pair (like an OTA offset); the demodulation flips it between the halves and the pair average cancels it. It is modelled as an additive term e on the sampled input after the swap, u_in = s*u + e, demodulated exactly as the chip does (conversion with sys_sign +1 and -1, residue-corrected, averaged). Sys chop off: the term stays, error = eps*dVcm (theory check, tested to 2 %). The S4 coder claim that sys chop does not cancel it is the opposite hypothesis (term flips with the input); the --nonvac copy models that and fails the sys-on gate. CMRR = 20 log10(dVcm / input-referred error). Errors below 1e-12 V are capped (240 dB). Sets: tt/27 (both fs) and the worst-INL / worst-offset points; eps = 3 sigma 7500 uV/V and the largest MC draw.
+
+| set | point | eps | eps uV/V | Vin_cm V | dVcm V | sys-off err uV | sys-off CMRR dB (gate >= 60) | sys-on err uV | sys-on CMRR dB (gate >= 100) |
+|---|---|---|---|---|---|---|---|---|---|
+| tt/27 | tt/27/3.3 @ 0.25 MHz | 3sigma | 7500 | 0.2 | -0.8 | 6000 | 42.5 | 0.0395 | 146.1 |
+| tt/27 | tt/27/3.3 @ 0.25 MHz | 3sigma | 7500 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
+| tt/27 | tt/27/3.3 @ 0.25 MHz | 3sigma | 7500 | 2 | +1.0 | 7500 | 42.5 | 0.0388 | 148.2 |
+| tt/27 | tt/27/3.3 @ 0.25 MHz | worst_draw | 6209 | 0.2 | -0.8 | 4967 | 44.1 | 0.0346 | 147.3 |
+| tt/27 | tt/27/3.3 @ 0.25 MHz | worst_draw | 6209 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
+| tt/27 | tt/27/3.3 @ 0.25 MHz | worst_draw | 6209 | 2 | +1.0 | 6209 | 44.1 | 0.0151 | 156.4 |
+| tt/27 | tt/27/3.3 @ 2 MHz | 3sigma | 7500 | 0.2 | -0.8 | 6000 | 42.5 | 0.00413 | 165.7 |
+| tt/27 | tt/27/3.3 @ 2 MHz | 3sigma | 7500 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
+| tt/27 | tt/27/3.3 @ 2 MHz | 3sigma | 7500 | 2 | +1.0 | 7500 | 42.5 | 0.00599 | 164.5 |
+| tt/27 | tt/27/3.3 @ 2 MHz | worst_draw | 6667 | 0.2 | -0.8 | 5334 | 43.5 | 0.00912 | 158.9 |
+| tt/27 | tt/27/3.3 @ 2 MHz | worst_draw | 6667 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
+| tt/27 | tt/27/3.3 @ 2 MHz | worst_draw | 6667 | 2 | +1.0 | 6667 | 43.5 | 0.0369 | 148.7 |
+| worst-INL | ss/125/3 @ 0.25 MHz | 3sigma | 7500 | 0.2 | -0.8 | 6000 | 42.5 | 0.0536 | 143.5 |
+| worst-INL | ss/125/3 @ 0.25 MHz | 3sigma | 7500 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
+| worst-INL | ss/125/3 @ 0.25 MHz | 3sigma | 7500 | 2 | +1.0 | 7500 | 42.5 | 0.018 | 154.9 |
+| worst-INL | ss/125/3 @ 0.25 MHz | worst_draw | 4235 | 0.2 | -0.8 | 3388 | 47.5 | 0.0421 | 145.6 |
+| worst-INL | ss/125/3 @ 0.25 MHz | worst_draw | 4235 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
+| worst-INL | ss/125/3 @ 0.25 MHz | worst_draw | 4235 | 2 | +1.0 | 4235 | 47.5 | 0.0374 | 148.5 |
+| worst-offset | ff/125/3.6 @ 0.25 MHz | 3sigma | 7500 | 0.2 | -0.8 | 6000 | 42.5 | 0.0355 | 147.0 |
+| worst-offset | ff/125/3.6 @ 0.25 MHz | 3sigma | 7500 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
+| worst-offset | ff/125/3.6 @ 0.25 MHz | 3sigma | 7500 | 2 | +1.0 | 7500 | 42.5 | 0.06 | 144.4 |
+| worst-offset | ff/125/3.6 @ 0.25 MHz | worst_draw | 6334 | 0.2 | -0.8 | 5067 | 44.0 | 0.0545 | 143.3 |
+| worst-offset | ff/125/3.6 @ 0.25 MHz | worst_draw | 6334 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
+| worst-offset | ff/125/3.6 @ 0.25 MHz | worst_draw | 6334 | 2 | +1.0 | 6334 | 44.0 | 0.0299 | 150.5 |
+
 
 ## Fast mode (fs 4 MHz, informational, not gated)
 
@@ -119,194 +150,164 @@ Proposed fast-mode INL targets (GBW 20 MHz design target, worst of the three poi
 
 REJECT
 
-- tt/125/3 fs 0.25 MHz: n15 = 2.798 uV > 2.5
-- tt/125/3.3 fs 0.25 MHz: n15 = 2.616 uV > 2.5
-- tt/125/3.6 fs 0.25 MHz: n15 = 2.616 uV > 2.5
-- ss/125/3 fs 0.25 MHz: n15 = 2.98 uV > 2.5
-- ss/125/3.3 fs 0.25 MHz: n15 = 2.798 uV > 2.5
-- ss/125/3.6 fs 0.25 MHz: n15 = 2.798 uV > 2.5
-- ff/125/3 fs 0.25 MHz: n15 = 2.798 uV > 2.5
-- ff/125/3.3 fs 0.25 MHz: n15 = 2.616 uV > 2.5
-- ff/125/3.6 fs 0.25 MHz: n15 = 2.616 uV > 2.5
-- sf/125/3 fs 0.25 MHz: n15 = 2.903 uV > 2.5
-- sf/125/3.3 fs 0.25 MHz: n15 = 2.706 uV > 2.5
-- sf/125/3.6 fs 0.25 MHz: n15 = 2.706 uV > 2.5
-- fs/125/3 fs 0.25 MHz: n15 = 2.903 uV > 2.5
-- fs/125/3.3 fs 0.25 MHz: n15 = 2.706 uV > 2.5
-- fs/125/3.6 fs 0.25 MHz: n15 = 2.706 uV > 2.5
-- ss_hh/125/3 fs 0.25 MHz: n15 = 2.645 uV > 2.5
-- ff_ll/125/3 fs 0.25 MHz: n15 = 2.946 uV > 2.5
-- ff_ll/125/3.3 fs 0.25 MHz: n15 = 2.776 uV > 2.5
-- ff_ll/125/3.6 fs 0.25 MHz: n15 = 2.776 uV > 2.5
+GATE grid specs: ACCEPT
+GATE MC INL/gain/offset: ACCEPT
+GATE CMRR sys on >= 100 dB: ACCEPT
+GATE CMRR sys off >= 60 dB (D32): REJECT (16)
+
+- CMRR tt/27 tt/27/3.3 fs 0.25 MHz 3sigma eps 7500 uV/V Vin_cm 0.2 V: sys off = 42.5 dB < 60
+- CMRR tt/27 tt/27/3.3 fs 0.25 MHz 3sigma eps 7500 uV/V Vin_cm 2 V: sys off = 42.5 dB < 60
+- CMRR tt/27 tt/27/3.3 fs 0.25 MHz worst_draw eps 6209 uV/V Vin_cm 0.2 V: sys off = 44.1 dB < 60
+- CMRR tt/27 tt/27/3.3 fs 0.25 MHz worst_draw eps 6209 uV/V Vin_cm 2 V: sys off = 44.1 dB < 60
+- CMRR tt/27 tt/27/3.3 fs 2 MHz 3sigma eps 7500 uV/V Vin_cm 0.2 V: sys off = 42.5 dB < 60
+- CMRR tt/27 tt/27/3.3 fs 2 MHz 3sigma eps 7500 uV/V Vin_cm 2 V: sys off = 42.5 dB < 60
+- CMRR tt/27 tt/27/3.3 fs 2 MHz worst_draw eps 6667 uV/V Vin_cm 0.2 V: sys off = 43.5 dB < 60
+- CMRR tt/27 tt/27/3.3 fs 2 MHz worst_draw eps 6667 uV/V Vin_cm 2 V: sys off = 43.5 dB < 60
+- CMRR worst-INL ss/125/3 fs 0.25 MHz 3sigma eps 7500 uV/V Vin_cm 0.2 V: sys off = 42.5 dB < 60
+- CMRR worst-INL ss/125/3 fs 0.25 MHz 3sigma eps 7500 uV/V Vin_cm 2 V: sys off = 42.5 dB < 60
+- CMRR worst-INL ss/125/3 fs 0.25 MHz worst_draw eps 4235 uV/V Vin_cm 0.2 V: sys off = 47.5 dB < 60
+- CMRR worst-INL ss/125/3 fs 0.25 MHz worst_draw eps 4235 uV/V Vin_cm 2 V: sys off = 47.5 dB < 60
+- CMRR worst-offset ff/125/3.6 fs 0.25 MHz 3sigma eps 7500 uV/V Vin_cm 0.2 V: sys off = 42.5 dB < 60
+- CMRR worst-offset ff/125/3.6 fs 0.25 MHz 3sigma eps 7500 uV/V Vin_cm 2 V: sys off = 42.5 dB < 60
+- CMRR worst-offset ff/125/3.6 fs 0.25 MHz worst_draw eps 6334 uV/V Vin_cm 0.2 V: sys off = 44.0 dB < 60
+- CMRR worst-offset ff/125/3.6 fs 0.25 MHz worst_draw eps 6334 uV/V Vin_cm 2 V: sys off = 44.0 dB < 60
 
 ## Appendix: all grid evaluations
 
-| point | fs MHz | n15 | n240 | INL | gain | offset | memory |
-|---|---|---|---|---|---|---|---|
-| tt/-40/3 | 0.25 | 2 | 6.51 | 1.23 | 28 | 0.384 | 0.218 |
-| tt/-40/3 | 2 | 0.522 | 2.6 | 0.465 | 21 | 0.435 | 0.219 |
-| tt/-40/3.3 | 0.25 | 1.89 | 6.1 | 0.464 | 17.4 | 0.325 | 0.126 |
-| tt/-40/3.3 | 2 | 0.493 | 2.43 | 0.884 | 10.3 | 0.288 | 0.127 |
-| tt/-40/3.6 | 0.25 | 1.89 | 6.1 | 0.464 | 17.4 | 0.325 | 0.126 |
-| tt/-40/3.6 | 2 | 0.493 | 2.43 | 0.884 | 10.3 | 0.288 | 0.127 |
-| tt/27/3 | 0.25 | 2.29 | 7.54 | 1.23 | 28 | 0.266 | 0.124 |
-| tt/27/3 | 2 | 0.599 | 2.78 | 0.467 | 21 | 0.255 | 0.125 |
-| tt/27/3.3 | 0.25 | 2.13 | 6.96 | 0.464 | 17.4 | 0.129 | 0.0316 |
-| tt/27/3.3 | 2 | 0.561 | 2.67 | 0.884 | 10.3 | 0.13 | 0.0318 |
-| tt/27/3.6 | 0.25 | 2.13 | 6.96 | 0.464 | 17.4 | 0.129 | 0.0316 |
-| tt/27/3.6 | 2 | 0.561 | 2.67 | 0.884 | 10.3 | 0.13 | 0.0318 |
-| tt/125/3 | 0.25 | 2.8 | 8.73 | 2.65 | 44.9 | 0.538 | 0.122 |
-| tt/125/3 | 2 | 0.733 | 3.18 | 1.73 | 37.8 | 0.343 | 0.124 |
-| tt/125/3.3 | 0.25 | 2.62 | 8.55 | 1.23 | 28 | 0.51 | 0.0309 |
-| tt/125/3.3 | 2 | 0.681 | 3.11 | 0.466 | 21 | 0.171 | 0.0317 |
-| tt/125/3.6 | 0.25 | 2.62 | 8.55 | 1.23 | 28 | 0.574 | 0.0309 |
-| tt/125/3.6 | 2 | 0.681 | 3.11 | 0.466 | 21 | 0.179 | 0.0317 |
-| ss/-40/3 | 0.25 | 2.17 | 7.03 | 2.65 | 44.9 | 0.581 | 0.304 |
-| ss/-40/3 | 2 | 0.562 | 2.85 | 1.73 | 37.8 | 0.611 | 0.307 |
-| ss/-40/3.3 | 0.25 | 2 | 6.51 | 1.23 | 28 | 0.384 | 0.218 |
-| ss/-40/3.3 | 2 | 0.522 | 2.6 | 0.465 | 21 | 0.435 | 0.219 |
-| ss/-40/3.6 | 0.25 | 2 | 6.51 | 1.23 | 28 | 0.384 | 0.218 |
-| ss/-40/3.6 | 2 | 0.522 | 2.6 | 0.465 | 21 | 0.435 | 0.219 |
-| ss/27/3 | 0.25 | 2.45 | 7.91 | 2.65 | 44.9 | 0.388 | 0.212 |
-| ss/27/3 | 2 | 0.632 | 2.93 | 1.74 | 37.8 | 0.406 | 0.214 |
-| ss/27/3.3 | 0.25 | 2.29 | 7.54 | 1.23 | 28 | 0.266 | 0.124 |
-| ss/27/3.3 | 2 | 0.599 | 2.78 | 0.467 | 21 | 0.255 | 0.125 |
-| ss/27/3.6 | 0.25 | 2.29 | 7.54 | 1.23 | 28 | 0.266 | 0.124 |
-| ss/27/3.6 | 2 | 0.599 | 2.78 | 0.467 | 21 | 0.255 | 0.125 |
-| ss/125/3 | 0.25 | 2.98 | 9.86 | 5.22 | 71.5 | 0.563 | 0.204 |
-| ss/125/3 | 2 | 0.779 | 3.37 | 4.17 | 64.4 | 0.442 | 0.207 |
-| ss/125/3.3 | 0.25 | 2.8 | 8.73 | 2.65 | 44.9 | 0.462 | 0.122 |
-| ss/125/3.3 | 2 | 0.733 | 3.18 | 1.73 | 37.8 | 0.334 | 0.124 |
-| ss/125/3.6 | 0.25 | 2.8 | 8.73 | 2.65 | 44.9 | 0.501 | 0.122 |
-| ss/125/3.6 | 2 | 0.733 | 3.18 | 1.73 | 37.8 | 0.338 | 0.124 |
-| ff/-40/3 | 0.25 | 2 | 6.51 | 1.23 | 28 | 0.384 | 0.218 |
-| ff/-40/3 | 2 | 0.522 | 2.6 | 0.465 | 21 | 0.435 | 0.219 |
-| ff/-40/3.3 | 0.25 | 1.89 | 6.1 | 0.464 | 17.4 | 0.325 | 0.126 |
-| ff/-40/3.3 | 2 | 0.493 | 2.43 | 0.884 | 10.3 | 0.288 | 0.127 |
-| ff/-40/3.6 | 0.25 | 1.89 | 6.1 | 0.464 | 17.4 | 0.325 | 0.126 |
-| ff/-40/3.6 | 2 | 0.493 | 2.43 | 0.884 | 10.3 | 0.288 | 0.127 |
-| ff/27/3 | 0.25 | 2.29 | 7.54 | 1.23 | 28 | 0.266 | 0.124 |
-| ff/27/3 | 2 | 0.599 | 2.78 | 0.467 | 21 | 0.255 | 0.125 |
-| ff/27/3.3 | 0.25 | 2.13 | 6.96 | 0.464 | 17.4 | 0.129 | 0.0316 |
-| ff/27/3.3 | 2 | 0.561 | 2.67 | 0.884 | 10.3 | 0.13 | 0.0318 |
-| ff/27/3.6 | 0.25 | 2.13 | 6.96 | 0.464 | 17.4 | 0.129 | 0.0316 |
-| ff/27/3.6 | 2 | 0.561 | 2.67 | 0.884 | 10.3 | 0.13 | 0.0318 |
-| ff/125/3 | 0.25 | 2.8 | 8.73 | 2.65 | 44.9 | 0.816 | 0.122 |
-| ff/125/3 | 2 | 0.733 | 3.18 | 1.73 | 37.8 | 0.378 | 0.124 |
-| ff/125/3.3 | 0.25 | 2.62 | 8.55 | 1.23 | 28 | 0.846 | 0.0309 |
-| ff/125/3.3 | 2 | 0.681 | 3.11 | 0.466 | 21 | 0.213 | 0.0317 |
-| ff/125/3.6 | 0.25 | 2.62 | 8.55 | 1.23 | 28 | 0.974 | 0.0309 |
-| ff/125/3.6 | 2 | 0.681 | 3.11 | 0.466 | 21 | 0.229 | 0.0317 |
-| sf/-40/3 | 0.25 | 2.09 | 6.54 | 1.83 | 35.5 | 0.477 | 0.261 |
-| sf/-40/3 | 2 | 0.541 | 2.77 | 0.987 | 28.4 | 0.502 | 0.264 |
-| sf/-40/3.3 | 0.25 | 1.96 | 6.51 | 0.783 | 22.1 | 0.282 | 0.172 |
-| sf/-40/3.3 | 2 | 0.517 | 2.44 | 0.619 | 15 | 0.361 | 0.174 |
-| sf/-40/3.6 | 0.25 | 1.96 | 6.51 | 0.783 | 22.1 | 0.282 | 0.172 |
-| sf/-40/3.6 | 2 | 0.517 | 2.44 | 0.619 | 15 | 0.361 | 0.174 |
-| sf/27/3 | 0.25 | 2.34 | 7.66 | 1.84 | 35.5 | 0.348 | 0.169 |
-| sf/27/3 | 2 | 0.623 | 2.93 | 0.987 | 28.4 | 0.347 | 0.171 |
-| sf/27/3.3 | 0.25 | 2.19 | 7.12 | 0.784 | 22.1 | 0.235 | 0.0778 |
-| sf/27/3.3 | 2 | 0.574 | 2.81 | 0.618 | 15 | 0.209 | 0.079 |
-| sf/27/3.6 | 0.25 | 2.19 | 7.12 | 0.784 | 22.1 | 0.235 | 0.0778 |
-| sf/27/3.6 | 2 | 0.574 | 2.81 | 0.618 | 15 | 0.209 | 0.079 |
-| sf/125/3 | 0.25 | 2.9 | 9.18 | 3.76 | 56.7 | 0.744 | 0.165 |
-| sf/125/3 | 2 | 0.757 | 3.3 | 2.76 | 49.6 | 0.416 | 0.167 |
-| sf/125/3.3 | 0.25 | 2.71 | 8.58 | 1.83 | 35.5 | 0.677 | 0.078 |
-| sf/125/3.3 | 2 | 0.71 | 3.21 | 0.986 | 28.4 | 0.231 | 0.0775 |
-| sf/125/3.6 | 0.25 | 2.71 | 8.58 | 1.83 | 35.5 | 0.766 | 0.078 |
-| sf/125/3.6 | 2 | 0.71 | 3.21 | 0.986 | 28.4 | 0.242 | 0.0775 |
-| fs/-40/3 | 0.25 | 2.09 | 6.54 | 1.83 | 35.5 | 0.477 | 0.261 |
-| fs/-40/3 | 2 | 0.541 | 2.77 | 0.987 | 28.4 | 0.502 | 0.264 |
-| fs/-40/3.3 | 0.25 | 1.96 | 6.51 | 0.783 | 22.1 | 0.282 | 0.172 |
-| fs/-40/3.3 | 2 | 0.517 | 2.44 | 0.619 | 15 | 0.361 | 0.174 |
-| fs/-40/3.6 | 0.25 | 1.96 | 6.51 | 0.783 | 22.1 | 0.282 | 0.172 |
-| fs/-40/3.6 | 2 | 0.517 | 2.44 | 0.619 | 15 | 0.361 | 0.174 |
-| fs/27/3 | 0.25 | 2.34 | 7.66 | 1.84 | 35.5 | 0.348 | 0.169 |
-| fs/27/3 | 2 | 0.623 | 2.93 | 0.987 | 28.4 | 0.347 | 0.171 |
-| fs/27/3.3 | 0.25 | 2.19 | 7.12 | 0.784 | 22.1 | 0.235 | 0.0778 |
-| fs/27/3.3 | 2 | 0.574 | 2.81 | 0.618 | 15 | 0.209 | 0.079 |
-| fs/27/3.6 | 0.25 | 2.19 | 7.12 | 0.784 | 22.1 | 0.235 | 0.0778 |
-| fs/27/3.6 | 2 | 0.574 | 2.81 | 0.618 | 15 | 0.209 | 0.079 |
-| fs/125/3 | 0.25 | 2.9 | 9.18 | 3.76 | 56.7 | 0.744 | 0.165 |
-| fs/125/3 | 2 | 0.757 | 3.3 | 2.76 | 49.6 | 0.416 | 0.167 |
-| fs/125/3.3 | 0.25 | 2.71 | 8.58 | 1.83 | 35.5 | 0.677 | 0.078 |
-| fs/125/3.3 | 2 | 0.71 | 3.21 | 0.986 | 28.4 | 0.231 | 0.0775 |
-| fs/125/3.6 | 0.25 | 2.71 | 8.58 | 1.83 | 35.5 | 0.766 | 0.078 |
-| fs/125/3.6 | 2 | 0.71 | 3.21 | 0.986 | 28.4 | 0.242 | 0.0775 |
-| ss_hh/-40/3 | 0.25 | 1.94 | 6.44 | 1.21 | 27.9 | 0.471 | 0.264 |
-| ss_hh/-40/3 | 2 | 0.5 | 2.43 | 0.41 | 20.2 | 0.525 | 0.266 |
-| ss_hh/-40/3.3 | 0.25 | 1.81 | 6.1 | 0.452 | 17.3 | 0.322 | 0.173 |
-| ss_hh/-40/3.3 | 2 | 0.468 | 2.38 | 1.02 | 9.51 | 0.322 | 0.174 |
-| ss_hh/-40/3.6 | 0.25 | 1.81 | 6.1 | 0.452 | 17.3 | 0.322 | 0.173 |
-| ss_hh/-40/3.6 | 2 | 0.468 | 2.38 | 1.02 | 9.51 | 0.322 | 0.174 |
-| ss_hh/27/3 | 0.25 | 2.17 | 7.19 | 1.21 | 27.9 | 0.394 | 0.171 |
-| ss_hh/27/3 | 2 | 0.562 | 2.82 | 0.41 | 20.2 | 0.344 | 0.173 |
-| ss_hh/27/3.3 | 0.25 | 2.04 | 6.75 | 0.452 | 17.3 | 0.192 | 0.0787 |
-| ss_hh/27/3.3 | 2 | 0.528 | 2.64 | 1.02 | 9.51 | 0.175 | 0.0793 |
-| ss_hh/27/3.6 | 0.25 | 2.04 | 6.75 | 0.452 | 17.3 | 0.192 | 0.0787 |
-| ss_hh/27/3.6 | 2 | 0.528 | 2.64 | 1.02 | 9.51 | 0.175 | 0.0793 |
-| ss_hh/125/3 | 0.25 | 2.65 | 8.62 | 2.64 | 44.8 | 0.586 | 0.167 |
-| ss_hh/125/3 | 2 | 0.69 | 2.99 | 1.65 | 37 | 0.358 | 0.169 |
-| ss_hh/125/3.3 | 0.25 | 2.47 | 8.09 | 1.21 | 27.9 | 0.492 | 0.0785 |
-| ss_hh/125/3.3 | 2 | 0.663 | 3.08 | 0.41 | 20.2 | 0.237 | 0.0788 |
-| ss_hh/125/3.6 | 0.25 | 2.47 | 8.09 | 1.21 | 27.9 | 0.55 | 0.0785 |
-| ss_hh/125/3.6 | 2 | 0.663 | 3.08 | 0.41 | 20.2 | 0.244 | 0.0788 |
-| ff_ll/-40/3 | 0.25 | 2.14 | 6.78 | 1.24 | 28.1 | 0.384 | 0.217 |
-| ff_ll/-40/3 | 2 | 0.55 | 2.72 | 0.535 | 21.8 | 0.446 | 0.219 |
-| ff_ll/-40/3.3 | 0.25 | 1.97 | 6.66 | 0.477 | 17.5 | 0.315 | 0.126 |
-| ff_ll/-40/3.3 | 2 | 0.52 | 2.51 | 0.746 | 11.1 | 0.248 | 0.127 |
-| ff_ll/-40/3.6 | 0.25 | 1.97 | 6.66 | 0.477 | 17.5 | 0.315 | 0.126 |
-| ff_ll/-40/3.6 | 2 | 0.52 | 2.51 | 0.746 | 11.1 | 0.248 | 0.127 |
-| ff_ll/27/3 | 0.25 | 2.4 | 7.6 | 1.24 | 28.1 | 0.266 | 0.125 |
-| ff_ll/27/3 | 2 | 0.629 | 2.97 | 0.535 | 21.8 | 0.27 | 0.126 |
-| ff_ll/27/3.3 | 0.25 | 2.24 | 7.6 | 0.477 | 17.5 | 0.17 | 0.0316 |
-| ff_ll/27/3.3 | 2 | 0.594 | 2.8 | 0.746 | 11.1 | 0.111 | 0.0316 |
-| ff_ll/27/3.6 | 0.25 | 2.24 | 7.6 | 0.477 | 17.5 | 0.17 | 0.0316 |
-| ff_ll/27/3.6 | 2 | 0.594 | 2.8 | 0.746 | 11.1 | 0.111 | 0.0316 |
-| ff_ll/125/3 | 0.25 | 2.95 | 8.91 | 2.67 | 45 | 0.574 | 0.122 |
-| ff_ll/125/3 | 2 | 0.775 | 3.6 | 1.82 | 38.6 | 0.307 | 0.123 |
-| ff_ll/125/3.3 | 0.25 | 2.78 | 8.82 | 1.24 | 28.1 | 0.563 | 0.031 |
-| ff_ll/125/3.3 | 2 | 0.724 | 3.51 | 0.534 | 21.8 | 0.173 | 0.0312 |
-| ff_ll/125/3.6 | 0.25 | 2.78 | 8.82 | 1.24 | 28.1 | 0.634 | 0.031 |
-| ff_ll/125/3.6 | 2 | 0.724 | 3.51 | 0.534 | 21.8 | 0.182 | 0.0312 |
+| point | fs MHz | n15 | n15 limit | n240 | n240 limit | INL | gain | offset | memory |
+|---|---|---|---|---|---|---|---|---|---|
+| tt/-40/3 | 0.25 | 2 | 2.5 | 6.51 | not gated | 1.23 | 28 | 0.384 | 0.218 |
+| tt/-40/3 | 2 | 0.522 | 2.5 | 2.6 | 5 | 0.465 | 21 | 0.435 | 0.219 |
+| tt/-40/3.3 | 0.25 | 1.89 | 2.5 | 6.1 | not gated | 0.464 | 17.4 | 0.325 | 0.126 |
+| tt/-40/3.3 | 2 | 0.493 | 2.5 | 2.43 | 5 | 0.884 | 10.3 | 0.288 | 0.127 |
+| tt/-40/3.6 | 0.25 | 1.89 | 2.5 | 6.1 | not gated | 0.464 | 17.4 | 0.325 | 0.126 |
+| tt/-40/3.6 | 2 | 0.493 | 2.5 | 2.43 | 5 | 0.884 | 10.3 | 0.288 | 0.127 |
+| tt/27/3 | 0.25 | 2.29 | 2.5 | 7.54 | not gated | 1.23 | 28 | 0.266 | 0.124 |
+| tt/27/3 | 2 | 0.599 | 2.5 | 2.78 | 5 | 0.467 | 21 | 0.255 | 0.125 |
+| tt/27/3.3 | 0.25 | 2.13 | 2.5 | 6.96 | not gated | 0.464 | 17.4 | 0.129 | 0.0316 |
+| tt/27/3.3 | 2 | 0.561 | 2.5 | 2.67 | 5 | 0.884 | 10.3 | 0.13 | 0.0318 |
+| tt/27/3.6 | 0.25 | 2.13 | 2.5 | 6.96 | not gated | 0.464 | 17.4 | 0.129 | 0.0316 |
+| tt/27/3.6 | 2 | 0.561 | 2.5 | 2.67 | 5 | 0.884 | 10.3 | 0.13 | 0.0318 |
+| tt/125/3 | 0.25 | 2.8 | 3 | 8.73 | not gated | 2.65 | 44.9 | 0.538 | 0.122 |
+| tt/125/3 | 2 | 0.733 | 2.5 | 3.18 | 5 | 1.73 | 37.8 | 0.343 | 0.124 |
+| tt/125/3.3 | 0.25 | 2.62 | 3 | 8.55 | not gated | 1.23 | 28 | 0.51 | 0.0309 |
+| tt/125/3.3 | 2 | 0.681 | 2.5 | 3.11 | 5 | 0.466 | 21 | 0.171 | 0.0317 |
+| tt/125/3.6 | 0.25 | 2.62 | 3 | 8.55 | not gated | 1.23 | 28 | 0.574 | 0.0309 |
+| tt/125/3.6 | 2 | 0.681 | 2.5 | 3.11 | 5 | 0.466 | 21 | 0.179 | 0.0317 |
+| ss/-40/3 | 0.25 | 2.17 | 2.5 | 7.03 | not gated | 2.65 | 44.9 | 0.581 | 0.304 |
+| ss/-40/3 | 2 | 0.562 | 2.5 | 2.85 | 5 | 1.73 | 37.8 | 0.611 | 0.307 |
+| ss/-40/3.3 | 0.25 | 2 | 2.5 | 6.51 | not gated | 1.23 | 28 | 0.384 | 0.218 |
+| ss/-40/3.3 | 2 | 0.522 | 2.5 | 2.6 | 5 | 0.465 | 21 | 0.435 | 0.219 |
+| ss/-40/3.6 | 0.25 | 2 | 2.5 | 6.51 | not gated | 1.23 | 28 | 0.384 | 0.218 |
+| ss/-40/3.6 | 2 | 0.522 | 2.5 | 2.6 | 5 | 0.465 | 21 | 0.435 | 0.219 |
+| ss/27/3 | 0.25 | 2.45 | 2.5 | 7.91 | not gated | 2.65 | 44.9 | 0.388 | 0.212 |
+| ss/27/3 | 2 | 0.632 | 2.5 | 2.93 | 5 | 1.74 | 37.8 | 0.406 | 0.214 |
+| ss/27/3.3 | 0.25 | 2.29 | 2.5 | 7.54 | not gated | 1.23 | 28 | 0.266 | 0.124 |
+| ss/27/3.3 | 2 | 0.599 | 2.5 | 2.78 | 5 | 0.467 | 21 | 0.255 | 0.125 |
+| ss/27/3.6 | 0.25 | 2.29 | 2.5 | 7.54 | not gated | 1.23 | 28 | 0.266 | 0.124 |
+| ss/27/3.6 | 2 | 0.599 | 2.5 | 2.78 | 5 | 0.467 | 21 | 0.255 | 0.125 |
+| ss/125/3 | 0.25 | 2.98 | 3 | 9.86 | not gated | 5.22 | 71.5 | 0.563 | 0.204 |
+| ss/125/3 | 2 | 0.779 | 2.5 | 3.37 | 5 | 4.17 | 64.4 | 0.442 | 0.207 |
+| ss/125/3.3 | 0.25 | 2.8 | 3 | 8.73 | not gated | 2.65 | 44.9 | 0.462 | 0.122 |
+| ss/125/3.3 | 2 | 0.733 | 2.5 | 3.18 | 5 | 1.73 | 37.8 | 0.334 | 0.124 |
+| ss/125/3.6 | 0.25 | 2.8 | 3 | 8.73 | not gated | 2.65 | 44.9 | 0.501 | 0.122 |
+| ss/125/3.6 | 2 | 0.733 | 2.5 | 3.18 | 5 | 1.73 | 37.8 | 0.338 | 0.124 |
+| ff/-40/3 | 0.25 | 2 | 2.5 | 6.51 | not gated | 1.23 | 28 | 0.384 | 0.218 |
+| ff/-40/3 | 2 | 0.522 | 2.5 | 2.6 | 5 | 0.465 | 21 | 0.435 | 0.219 |
+| ff/-40/3.3 | 0.25 | 1.89 | 2.5 | 6.1 | not gated | 0.464 | 17.4 | 0.325 | 0.126 |
+| ff/-40/3.3 | 2 | 0.493 | 2.5 | 2.43 | 5 | 0.884 | 10.3 | 0.288 | 0.127 |
+| ff/-40/3.6 | 0.25 | 1.89 | 2.5 | 6.1 | not gated | 0.464 | 17.4 | 0.325 | 0.126 |
+| ff/-40/3.6 | 2 | 0.493 | 2.5 | 2.43 | 5 | 0.884 | 10.3 | 0.288 | 0.127 |
+| ff/27/3 | 0.25 | 2.29 | 2.5 | 7.54 | not gated | 1.23 | 28 | 0.266 | 0.124 |
+| ff/27/3 | 2 | 0.599 | 2.5 | 2.78 | 5 | 0.467 | 21 | 0.255 | 0.125 |
+| ff/27/3.3 | 0.25 | 2.13 | 2.5 | 6.96 | not gated | 0.464 | 17.4 | 0.129 | 0.0316 |
+| ff/27/3.3 | 2 | 0.561 | 2.5 | 2.67 | 5 | 0.884 | 10.3 | 0.13 | 0.0318 |
+| ff/27/3.6 | 0.25 | 2.13 | 2.5 | 6.96 | not gated | 0.464 | 17.4 | 0.129 | 0.0316 |
+| ff/27/3.6 | 2 | 0.561 | 2.5 | 2.67 | 5 | 0.884 | 10.3 | 0.13 | 0.0318 |
+| ff/125/3 | 0.25 | 2.8 | 3 | 8.73 | not gated | 2.65 | 44.9 | 0.816 | 0.122 |
+| ff/125/3 | 2 | 0.733 | 2.5 | 3.18 | 5 | 1.73 | 37.8 | 0.378 | 0.124 |
+| ff/125/3.3 | 0.25 | 2.62 | 3 | 8.55 | not gated | 1.23 | 28 | 0.846 | 0.0309 |
+| ff/125/3.3 | 2 | 0.681 | 2.5 | 3.11 | 5 | 0.466 | 21 | 0.213 | 0.0317 |
+| ff/125/3.6 | 0.25 | 2.62 | 3 | 8.55 | not gated | 1.23 | 28 | 0.974 | 0.0309 |
+| ff/125/3.6 | 2 | 0.681 | 2.5 | 3.11 | 5 | 0.466 | 21 | 0.229 | 0.0317 |
+| sf/-40/3 | 0.25 | 2.09 | 2.5 | 6.54 | not gated | 1.83 | 35.5 | 0.477 | 0.261 |
+| sf/-40/3 | 2 | 0.541 | 2.5 | 2.77 | 5 | 0.987 | 28.4 | 0.502 | 0.264 |
+| sf/-40/3.3 | 0.25 | 1.96 | 2.5 | 6.51 | not gated | 0.783 | 22.1 | 0.282 | 0.172 |
+| sf/-40/3.3 | 2 | 0.517 | 2.5 | 2.44 | 5 | 0.619 | 15 | 0.361 | 0.174 |
+| sf/-40/3.6 | 0.25 | 1.96 | 2.5 | 6.51 | not gated | 0.783 | 22.1 | 0.282 | 0.172 |
+| sf/-40/3.6 | 2 | 0.517 | 2.5 | 2.44 | 5 | 0.619 | 15 | 0.361 | 0.174 |
+| sf/27/3 | 0.25 | 2.34 | 2.5 | 7.66 | not gated | 1.84 | 35.5 | 0.348 | 0.169 |
+| sf/27/3 | 2 | 0.623 | 2.5 | 2.93 | 5 | 0.987 | 28.4 | 0.347 | 0.171 |
+| sf/27/3.3 | 0.25 | 2.19 | 2.5 | 7.12 | not gated | 0.784 | 22.1 | 0.235 | 0.0778 |
+| sf/27/3.3 | 2 | 0.574 | 2.5 | 2.81 | 5 | 0.618 | 15 | 0.209 | 0.079 |
+| sf/27/3.6 | 0.25 | 2.19 | 2.5 | 7.12 | not gated | 0.784 | 22.1 | 0.235 | 0.0778 |
+| sf/27/3.6 | 2 | 0.574 | 2.5 | 2.81 | 5 | 0.618 | 15 | 0.209 | 0.079 |
+| sf/125/3 | 0.25 | 2.9 | 3 | 9.18 | not gated | 3.76 | 56.7 | 0.744 | 0.165 |
+| sf/125/3 | 2 | 0.757 | 2.5 | 3.3 | 5 | 2.76 | 49.6 | 0.416 | 0.167 |
+| sf/125/3.3 | 0.25 | 2.71 | 3 | 8.58 | not gated | 1.83 | 35.5 | 0.677 | 0.078 |
+| sf/125/3.3 | 2 | 0.71 | 2.5 | 3.21 | 5 | 0.986 | 28.4 | 0.231 | 0.0775 |
+| sf/125/3.6 | 0.25 | 2.71 | 3 | 8.58 | not gated | 1.83 | 35.5 | 0.766 | 0.078 |
+| sf/125/3.6 | 2 | 0.71 | 2.5 | 3.21 | 5 | 0.986 | 28.4 | 0.242 | 0.0775 |
+| fs/-40/3 | 0.25 | 2.09 | 2.5 | 6.54 | not gated | 1.83 | 35.5 | 0.477 | 0.261 |
+| fs/-40/3 | 2 | 0.541 | 2.5 | 2.77 | 5 | 0.987 | 28.4 | 0.502 | 0.264 |
+| fs/-40/3.3 | 0.25 | 1.96 | 2.5 | 6.51 | not gated | 0.783 | 22.1 | 0.282 | 0.172 |
+| fs/-40/3.3 | 2 | 0.517 | 2.5 | 2.44 | 5 | 0.619 | 15 | 0.361 | 0.174 |
+| fs/-40/3.6 | 0.25 | 1.96 | 2.5 | 6.51 | not gated | 0.783 | 22.1 | 0.282 | 0.172 |
+| fs/-40/3.6 | 2 | 0.517 | 2.5 | 2.44 | 5 | 0.619 | 15 | 0.361 | 0.174 |
+| fs/27/3 | 0.25 | 2.34 | 2.5 | 7.66 | not gated | 1.84 | 35.5 | 0.348 | 0.169 |
+| fs/27/3 | 2 | 0.623 | 2.5 | 2.93 | 5 | 0.987 | 28.4 | 0.347 | 0.171 |
+| fs/27/3.3 | 0.25 | 2.19 | 2.5 | 7.12 | not gated | 0.784 | 22.1 | 0.235 | 0.0778 |
+| fs/27/3.3 | 2 | 0.574 | 2.5 | 2.81 | 5 | 0.618 | 15 | 0.209 | 0.079 |
+| fs/27/3.6 | 0.25 | 2.19 | 2.5 | 7.12 | not gated | 0.784 | 22.1 | 0.235 | 0.0778 |
+| fs/27/3.6 | 2 | 0.574 | 2.5 | 2.81 | 5 | 0.618 | 15 | 0.209 | 0.079 |
+| fs/125/3 | 0.25 | 2.9 | 3 | 9.18 | not gated | 3.76 | 56.7 | 0.744 | 0.165 |
+| fs/125/3 | 2 | 0.757 | 2.5 | 3.3 | 5 | 2.76 | 49.6 | 0.416 | 0.167 |
+| fs/125/3.3 | 0.25 | 2.71 | 3 | 8.58 | not gated | 1.83 | 35.5 | 0.677 | 0.078 |
+| fs/125/3.3 | 2 | 0.71 | 2.5 | 3.21 | 5 | 0.986 | 28.4 | 0.231 | 0.0775 |
+| fs/125/3.6 | 0.25 | 2.71 | 3 | 8.58 | not gated | 1.83 | 35.5 | 0.766 | 0.078 |
+| fs/125/3.6 | 2 | 0.71 | 2.5 | 3.21 | 5 | 0.986 | 28.4 | 0.242 | 0.0775 |
+| ss_hh/-40/3 | 0.25 | 1.94 | 2.5 | 6.44 | not gated | 1.21 | 27.9 | 0.471 | 0.264 |
+| ss_hh/-40/3 | 2 | 0.5 | 2.5 | 2.43 | 5 | 0.41 | 20.2 | 0.525 | 0.266 |
+| ss_hh/-40/3.3 | 0.25 | 1.81 | 2.5 | 6.1 | not gated | 0.452 | 17.3 | 0.322 | 0.173 |
+| ss_hh/-40/3.3 | 2 | 0.468 | 2.5 | 2.38 | 5 | 1.02 | 9.51 | 0.322 | 0.174 |
+| ss_hh/-40/3.6 | 0.25 | 1.81 | 2.5 | 6.1 | not gated | 0.452 | 17.3 | 0.322 | 0.173 |
+| ss_hh/-40/3.6 | 2 | 0.468 | 2.5 | 2.38 | 5 | 1.02 | 9.51 | 0.322 | 0.174 |
+| ss_hh/27/3 | 0.25 | 2.17 | 2.5 | 7.19 | not gated | 1.21 | 27.9 | 0.394 | 0.171 |
+| ss_hh/27/3 | 2 | 0.562 | 2.5 | 2.82 | 5 | 0.41 | 20.2 | 0.344 | 0.173 |
+| ss_hh/27/3.3 | 0.25 | 2.04 | 2.5 | 6.75 | not gated | 0.452 | 17.3 | 0.192 | 0.0787 |
+| ss_hh/27/3.3 | 2 | 0.528 | 2.5 | 2.64 | 5 | 1.02 | 9.51 | 0.175 | 0.0793 |
+| ss_hh/27/3.6 | 0.25 | 2.04 | 2.5 | 6.75 | not gated | 0.452 | 17.3 | 0.192 | 0.0787 |
+| ss_hh/27/3.6 | 2 | 0.528 | 2.5 | 2.64 | 5 | 1.02 | 9.51 | 0.175 | 0.0793 |
+| ss_hh/125/3 | 0.25 | 2.65 | 3 | 8.62 | not gated | 2.64 | 44.8 | 0.586 | 0.167 |
+| ss_hh/125/3 | 2 | 0.69 | 2.5 | 2.99 | 5 | 1.65 | 37 | 0.358 | 0.169 |
+| ss_hh/125/3.3 | 0.25 | 2.47 | 3 | 8.09 | not gated | 1.21 | 27.9 | 0.492 | 0.0785 |
+| ss_hh/125/3.3 | 2 | 0.663 | 2.5 | 3.08 | 5 | 0.41 | 20.2 | 0.237 | 0.0788 |
+| ss_hh/125/3.6 | 0.25 | 2.47 | 3 | 8.09 | not gated | 1.21 | 27.9 | 0.55 | 0.0785 |
+| ss_hh/125/3.6 | 2 | 0.663 | 2.5 | 3.08 | 5 | 0.41 | 20.2 | 0.244 | 0.0788 |
+| ff_ll/-40/3 | 0.25 | 2.14 | 2.5 | 6.78 | not gated | 1.24 | 28.1 | 0.384 | 0.217 |
+| ff_ll/-40/3 | 2 | 0.55 | 2.5 | 2.72 | 5 | 0.535 | 21.8 | 0.446 | 0.219 |
+| ff_ll/-40/3.3 | 0.25 | 1.97 | 2.5 | 6.66 | not gated | 0.477 | 17.5 | 0.315 | 0.126 |
+| ff_ll/-40/3.3 | 2 | 0.52 | 2.5 | 2.51 | 5 | 0.746 | 11.1 | 0.248 | 0.127 |
+| ff_ll/-40/3.6 | 0.25 | 1.97 | 2.5 | 6.66 | not gated | 0.477 | 17.5 | 0.315 | 0.126 |
+| ff_ll/-40/3.6 | 2 | 0.52 | 2.5 | 2.51 | 5 | 0.746 | 11.1 | 0.248 | 0.127 |
+| ff_ll/27/3 | 0.25 | 2.4 | 2.5 | 7.6 | not gated | 1.24 | 28.1 | 0.266 | 0.125 |
+| ff_ll/27/3 | 2 | 0.629 | 2.5 | 2.97 | 5 | 0.535 | 21.8 | 0.27 | 0.126 |
+| ff_ll/27/3.3 | 0.25 | 2.24 | 2.5 | 7.6 | not gated | 0.477 | 17.5 | 0.17 | 0.0316 |
+| ff_ll/27/3.3 | 2 | 0.594 | 2.5 | 2.8 | 5 | 0.746 | 11.1 | 0.111 | 0.0316 |
+| ff_ll/27/3.6 | 0.25 | 2.24 | 2.5 | 7.6 | not gated | 0.477 | 17.5 | 0.17 | 0.0316 |
+| ff_ll/27/3.6 | 2 | 0.594 | 2.5 | 2.8 | 5 | 0.746 | 11.1 | 0.111 | 0.0316 |
+| ff_ll/125/3 | 0.25 | 2.95 | 3 | 8.91 | not gated | 2.67 | 45 | 0.574 | 0.122 |
+| ff_ll/125/3 | 2 | 0.775 | 2.5 | 3.6 | 5 | 1.82 | 38.6 | 0.307 | 0.123 |
+| ff_ll/125/3.3 | 0.25 | 2.78 | 3 | 8.82 | not gated | 1.24 | 28.1 | 0.563 | 0.031 |
+| ff_ll/125/3.3 | 2 | 0.724 | 2.5 | 3.51 | 5 | 0.534 | 21.8 | 0.173 | 0.0312 |
+| ff_ll/125/3.6 | 0.25 | 2.78 | 3 | 8.82 | not gated | 1.24 | 28.1 | 0.634 | 0.031 |
+| ff_ll/125/3.6 | 2 | 0.724 | 2.5 | 3.51 | 5 | 0.534 | 21.8 | 0.182 | 0.0312 |
 
 
-## Findings (read first)
+## Findings (WO-06a, read first)
 
-1. **FAIL, noise @15 SPS at fs 0.25 MHz, at 125 C** (19 of the 21 points at 125 C; none below 125 C; worst 2.98 uV at ss/125/3.0, 2.62 uV at ff/125/3.6 and tt/125/3.3 and 3.6; limit 2.5 uV). Passes at all points at 2 MHz (worst 0.78 uV) and at 0.25 MHz below 125 C. Cause: at a fixed output rate the sample count falls with fs (4 conversions per output at 0.25 MHz vs 33 at 2 MHz) and kT and en rise at 125 C. Not relaxed. Options for the coordinator: (a) state the 2.5 uV noise limit for fs >= 2 MHz and a looser limit (>= 3.0 uV with margin, e.g. 3.5 uV) at 0.25 MHz; (b) raise the lowest precision fs; (c) reduce 0.25 MHz noise with larger Cs (area). The scaling with fs lies between 1/sqrt(fs) and 1/fs (0.78 -> 2.98 uV is x3.8 for fs /8), so the fs at which 2.5 uV is met is not extrapolated here.
-2. noise @240 SPS: SPEC has no limit; 5 uV is an ASSUMPTION (worst 3.60 uV at ff_ll/125/3.0, 2 MHz). At fs 0.25 MHz 240 SPS cannot be reached with a sys-chop pair of N 1024 (needs fs >= 0.49 MHz): not gated there, values reported (6-10 uV).
-3. Everything else passes at all 126 evaluations: INL worst 5.2 ppm (limit 20; 3.8x), offset worst 0.97 uV (limit 5), gain worst 71 ppm (limit 5000), memory worst 0.307 uV (limit 0.5, 1.6x, at the SPEC limit r = 1e-4; r = 1e-2 gives 30.6 uV).
-4. MC: all four sets pass (mu + 3 sigma and every sample). Vos1/Vos2/comparator offset/Cs mismatch move INL and gain by <0.03 ppm and the sys-pair offset by <0.05 uV: INL and offset are set by the A(v) table, R_ext, reset and leakage terms, not by these mismatches. The raw (sys chop off) offset is 48 uV mean, up to 89 uV: characterization-only modes carry it.
-5. SPEC gap: the Cs+/Cs- mismatch makes a CM-to-differential offset of up to 7.5 mV/V (0.75 % 3 sigma) that sys chop does not cancel; 5 uV is used by 0.67 mV of input common-mode error. SPEC 3.0 has no CM-dependent offset limit and the model has no input-CM axis. Not gated.
-6. Fast mode (informational): the model needs OTA GBW 20 MHz at 4 MHz; with GBW 10 MHz the hand slew-then-settle estimate gives about 1.2 % gain error and 75-780 ppm INL. Proposed INL targets with GBW 20 MHz: N 64 <= 200, N 256 <= 20, N 1024 <= 5 ppm (the thermal noise at N 64 is below one LSB; quantization sets resolution).
-7. Method notes: the memory and offset measures use the residue-corrected reconstruction (quantization error removed exactly), so they are deterministic; the memory measurement floor is 0.002 uV (comparator-noise draw differences). The mapping is an assumption table; the transistor-level corner values replace it in Stage C.
+Commands: `python3 -m model.studies.s4_corners --out /home/mempool/regr/tt/WO-06a/s4` (exit 1) and `... --out /home/mempool/regr/tt/WO-06a/nv --nonvac` (REJECT, exit 1; all 7 broken copies rejected, including the CM-term-flips-with-input copy at sys-on 42.5 dB and the 3 % mismatch copy at sys-off 30.5 dB).
 
-## Non-vacuity (separate command, `--nonvac`): broken copies must REJECT at the named point
-
-Command: `python3 -m model.studies.s4_corners --out DIR --nonvac`
-
-Unbroken copies at the same points (all must pass):
-
-| point | n15 | n240 | inl | off | gain | mem |
-|---|---|---|---|---|---|---|
-| ss/125/3 | 0.779 | 3.37 | 4.17 | 0.442 | 64.4 | 0.207 |
-| ss/-40/3 | 0.562 | 2.85 | 1.73 | 0.611 | 37.8 | 0.307 |
-| tt/27/3.3 | 0.561 | 2.67 | 0.884 | 0.13 | 10.3 | 0.0318 |
-
-Broken copies:
-
-| broken copy | spec | value | limit | result |
-|---|---|---|---|---|
-| A(1.4 V) = 60 dB at ss/125/3.0 | inl | 43.76 ppm | 20 | REJECT |
-| reset r = 1e-2 at ss/-40/3.0 | mem | 30.61 uV | 0.5 | REJECT |
-| sys chop off (model offset not cancelled) at tt/27/3.3 | off | 102.5 uV | 5 | REJECT |
-| Cs / 100 (noise) at tt/27/3.3 | n15 | 5.657 uV | 2.5 | REJECT |
-| tau_in 2 us (gain) at ss/-40/3.0 | gain | 2.06e+04 ppm | 5000 | REJECT |
-
-REJECT
-
-- ss/125/3 fs 2 MHz [A(1.4 V) = 60 dB at ss/125/3.0]: inl = 43.76 ppm > 20
-- ss/-40/3 fs 2 MHz [reset r = 1e-2 at ss/-40/3.0]: mem = 30.61 uV > 0.5
-- tt/27/3.3 fs 2 MHz [sys chop off (model offset not cancelled) at tt/27/3.3]: off = 102.5 uV > 5
-- tt/27/3.3 fs 2 MHz [Cs / 100 (noise) at tt/27/3.3]: n15 = 5.657 uV > 2.5
-- ss/-40/3 fs 2 MHz [tau_in 2 us (gain) at ss/-40/3.0]: gain = 2.06e+04 ppm > 5000
+1. Gates: grid specs ACCEPT (n15 worst 2.98 uV vs the applied 3.0 uV limit at ss/125/3, 0.25 MHz; x1.01; at fs 2 MHz worst 0.78 uV vs 2.5; n240 worst 3.60 uV vs 5, gated at fs 2 MHz only); MC INL/gain/offset ACCEPT; CMRR sys-on ACCEPT (143-166 dB); **CMRR sys-off REJECT (D32, 60 dB)**: 42.5 dB at the 3 sigma mismatch 0.75 % (44 dB at the largest MC draws), 16 failing rows. Not relaxed.
+2. Sys-off CMRR = 1/eps in this model (theory check, tested to 2 %). The mismatch needed for 60 dB is eps = 0.1 % (1000 uV/V); the spec mismatch is 7.5x larger.
+3. Sys-on residual is 0.004-0.06 uV (>= 143 dB): the hypothesis (term fixed in the modulator frame, cancels in the pair) is only modelled here; WO-08 checks it in SPICE. VREF_CM = 1.0 V is an assumption; Vin_cm = 1.0 V has dVcm = 0 and shows n/a.

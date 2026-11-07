@@ -33,7 +33,7 @@ def test_stress_bounds_and_63_points():
 
 
 def _row(**kw):
-    r = {"point": "ss/125/3.0", "fs": 2e6, "n15": 1.0, "n240": 3.0, "inl": 5.0, "off": 2.0, "gain": 100.0, "mem": 0.1}
+    r = {"point": "ss/125/3.0", "T": 125, "fs": 2e6, "n15": 1.0, "n240": 3.0, "inl": 5.0, "off": 2.0, "gain": 100.0, "mem": 0.1}
     r.update(kw)
     return r
 
@@ -65,7 +65,57 @@ def test_memory_metric_sees_reset_residue():
 
 
 def test_n240_not_gated_where_unreachable_but_n15_is():
-    low = _row(fs=0.25e6, n240=9.0)
+    low = _row(fs=0.25e6, T=27, n240=9.0)
     assert s4.spec_fails([low]) == []                                  # 240 SPS needs fs >= 2*240*1024 = 0.49 MHz
-    assert s4.spec_fails([_row(fs=0.25e6, n15=3.0)])                   # n15 stays gated at 0.25 MHz
+    assert s4.spec_fails([_row(fs=0.25e6, T=27, n15=3.0)])             # n15 stays gated at 0.25 MHz
     assert s4.spec_fails([_row(fs=0.5e6, n240=9.0)])
+
+
+def test_n15_limits_per_d27():
+    # D27: 2.5 uV at fs >= 2 MHz at every T; at 0.25 MHz 2.5 up to 85 C and 3.0 at 125 C
+    assert s4.spec_fails([_row(fs=2e6, T=125, n15=2.6)])
+    assert not s4.spec_fails([_row(fs=2e6, T=125, n15=2.5)])
+    assert s4.spec_fails([_row(fs=0.25e6, T=27, n15=2.6, n240=1.0)])
+    assert s4.spec_fails([_row(fs=0.25e6, T=85, n15=2.6, n240=1.0)])
+    assert not s4.spec_fails([_row(fs=0.25e6, T=125, n15=2.98, n240=1.0)])
+    assert s4.spec_fails([_row(fs=0.25e6, T=125, n15=3.01, n240=1.0)])
+    assert s4.limit(_row(fs=0.25e6, T=125), "n15") == 3.0 and s4.limit(_row(fs=2e6, T=125), "n15") == 2.5
+
+
+def test_n240_gated_at_5uv_where_reachable():
+    assert s4.spec_fails([_row(fs=2e6, n240=5.1)]) and not s4.spec_fails([_row(fs=2e6, n240=4.9)])
+    assert not s4.spec_fails([_row(fs=0.25e6, T=27, n240=20.0)])        # unreachable below 0.49 MHz: reported, not gated
+
+
+def _pq():
+    return s4.point("tt", 27, 3.3, 2e6, N=256)[0]
+
+
+def test_cmrr_theory_sysoff_equals_eps_dvcm_and_sys_on_cancels():
+    eps = 0.0075
+    rows = s4.cmrr_eval(_pq(), eps)
+    by = {r["vin_cm"]: r for r in rows}
+    assert math.isinf(by[1.0]["on_db"])                                 # dVcm = 0: nothing to reject
+    for vc in (0.2, 2.0):
+        dv = vc - 1.0
+        assert math.isclose(by[vc]["off_err_v"], eps * abs(dv), rel_tol=0.02)     # theory: sys-off error = eps * dVcm
+        assert by[vc]["on_err_v"] < 1e-2 * by[vc]["off_err_v"]                    # sys-on residual ~ 0
+        assert 40 < by[vc]["off_db"] < 60   # D32: 42.5 dB at 0.75 % FAILS the 60 dB gate and by[vc]["on_db"] > 80
+        assert math.isclose(by[vc]["off_db"], 20 * math.log10(1 / eps), abs_tol=0.3)   # 42.5 dB
+
+
+def test_cmrr_flip_copy_fails_sys_on_and_big_mismatch_fails_sys_off():
+    bad = s4.cmrr_eval(_pq(), 0.0075, flip=True)
+    assert all(r["on_db"] < 100 for r in bad if r["dvcm"])             # term flips with the input: sys chop cannot remove it
+    assert s4.cmrr_fails(bad, "t") and "sys on" in s4.cmrr_fails(bad, "t")[0]
+    big = s4.cmrr_eval(_pq(), 0.03)
+    assert s4.cmrr_fails(big, "t") and any("sys off" in f for f in s4.cmrr_fails(big, "t"))
+    assert s4.cmrr_fails([{"eps": 0.0, "vin_cm": 0.2, "on_db": float("nan"), "off_db": 90.0}], "t")        # NaN fails
+
+
+def test_cmrr_gate_is_60_db_sys_off_and_eps_for_it_is_0p1_percent():
+    assert s4.CMRR_OFF_DB == 60.0 and s4.CMRR_ON_DB == 100.0 and math.isclose(s4.EPS_FOR_OFF_GATE, 1e-3)
+    ok = [{"eps": 1e-3, "vin_cm": 2.0, "on_db": 120.0, "off_db": 60.5}]
+    assert not s4.cmrr_fails(ok, "t")
+    assert s4.cmrr_fails([dict(ok[0], off_db=59.0)], "t") and s4.cmrr_fails([dict(ok[0], on_db=99.0)], "t")
+    assert s4.cmrr_fails(s4.cmrr_eval(_pq(), 0.0075), "t")       # spec 3 sigma mismatch: sys-off 42.5 dB < 60 -> REJECT
