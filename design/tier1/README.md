@@ -31,3 +31,9 @@ Cs2 .5p/Cint2 1p, separate k-DAC cap 0.25p on full VREF, shared Cs1 for input an
 `params.SPICE_OPTIONS_TIER1` was qualified on this linear deck only (behavioural parts, ideal `sw` switches). It must NOT be reused as-is at tier 2.
 Tier 2 (transistor switches / OTA) requalifies it with a null test using the transistor switches, over reltol {1e-3, 1e-4, 1e-5} x chgtol {1e-14, 1e-16}:
 the INL change between settings must stay below 0.1 x the INL budget (0.8 ppm of the 8 ppm OTA line, 2 ppm of 20), and the tightest setting becomes the tier-2 default if the loosest differs.
+
+## WO-09 (S5c) extensions
+- Per-OTA dynamics in `ota="v2"`: `sr` / `gbw` are OTA1's; `sr2` / `gbw2` are OTA2's (default `sr2 = max(sr, TIER1_SR2 = 25 V/us)`, `gbw2 = gbw`). **Behaviour change:** OTA2 now runs at its SPEC 25 V/us in every v2 deck (the WO-08 decks ran it at 12). `boost` scales both OTAs; `boost1_only` leaves OTA2 at its base bias.
+- D12 residual: `cptop` / `dcptop` (floating top-plate parasitic to ground, stage 1, Cp+- = cptop +- dcptop/2). `rbl` / `rfl` (island bleeders, 0 = removed), `ileak` (current out of every vg node, same sign both sides), `drsrc` (extra series R on VIN- if > 0, on VIN+ if < 0).
+- Modes: `--knees3 --cm2 --drift --rsrc2 --nonvac3`; outputs in `/home/mempool/regr/tt/WO-09`. `--knees2` / `--knees3` print "run-health ACCEPT" (run health only) plus the spec FLAG count.
+- CMRR is now the slope |dVin_cm / dVoff| over Vin_cm {0.2, 1.0, 2.0} V at fixed mismatch (sys off: plain offset; sys on: pair-demodulated residual).

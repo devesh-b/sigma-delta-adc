@@ -7,6 +7,7 @@ using the residue reconstruction (SPEC 3.7)
 No import of model/iadc.py.
 
 Modes: --null --options --dc --sweep --nonvac (WO-07) and --xcheck --av --knees2 --cm --offsets --rsrc --nonvac2 (WO-08).
+WO-09 (S5c) adds --knees3 --cm2 --drift --rsrc2 --nonvac3.
 Each prints ACCEPT/REJECT and exits nonzero on REJECT (--nonvac/--nonvac2 exit 1 when every broken case was rejected).
 """
 import argparse
@@ -27,7 +28,7 @@ sys.path.insert(0, os.path.join(HERE, ".."))
 import params as P  # noqa: E402
 import gen_tier1 as G  # noqa: E402
 
-OUT = os.environ.get("TIER1_OUT", "/home/mempool/regr/tt/WO-08")
+OUT = os.environ.get("TIER1_OUT", "/home/mempool/regr/tt/WO-09")
 NGSPICE = os.environ.get("NGSPICE", "ngspice")
 BAD_LOG = re.compile(r"(error|singular|timestep too small|no convergence|failed|fatal|unknown (model|param))", re.I)
 FS_FULL = 2.0                       # full-scale range in u (+-1): INL "ppm of FSR" like the model
@@ -384,13 +385,16 @@ def jdump(obj, name):
 IDEAL_OTA = dict(gbw=1e8, sr=1e9, vcl=1e3, ron=1.0)
 # reviewer's probe numbers (REVIEW-S5): deck gain, deck INL ppm, model gain, model INL ppm
 REV = {"A60_base": (-5.59e-4, 3.99, -5.47e-4, 3.09), "A60_k025": (-2.93e-4, 6.98, -2.88e-4, 5.90),
-       "A60_c1_025": (-5.51e-4, 10.05, -5.43e-4, 7.43), "A80_base": (None, 0.29, None, 0.295)}
+       "A60_c1_025": (-5.51e-4, 10.05, -5.43e-4, 7.43), "A80_base": (None, 0.29, None, 0.295),
+       "A80_roff1e14": (None, 0.29, None, 0.295)}
 
 
 def mode_xcheck(args):
     U = u_points(5, 0.9)
     cases = [("A60_base", dict(a0_db=60.0), {}), ("A60_k025", dict(a0_db=60.0, ck=0.125e-12), dict(k=0.25)),
-             ("A60_c1_025", dict(a0_db=60.0, cint1=2e-12), dict(c1=0.25)), ("A80_base", dict(a0_db=80.0), {})]
+             ("A60_c1_025", dict(a0_db=60.0, cint1=2e-12), dict(c1=0.25)), ("A80_base", dict(a0_db=80.0), {}),
+             # m3 (WO-09): at A0 80 dB the compared quantity (~0.3 ppm) is the size of the Roff 1e12 null floor (0.46 ppm): rerun at Roff 1e14
+             ("A80_roff1e14", dict(a0_db=80.0, roff=1e14), {})]
     rows, ok = [], True
     for name, dk, mk in cases:
         cfg = dict(IDEAL_OTA, n=256, u_list=U)
@@ -513,8 +517,9 @@ def mode_knees2(args):
     print("knees:", knees)
     for f_ in flags:
         print(f_)
+    print(f"spec FLAG count: {len(flags)} (the exit code reflects run health only, not the spec flags)")
     jdump(dict(rows=rows, knees=knees, flags=flags), "knees2.json")
-    print("ACCEPT" if ok else "REJECT")
+    print("run-health ACCEPT" if ok else "run-health REJECT")
     return 0 if ok else 1
 
 
@@ -757,10 +762,379 @@ def mode_nonvac2(args):
     print("REJECT-as-required for all broken decks" if not fails else f"VACUOUS: {fails}")
     return 1 if not fails else 0
 
+# =============================================================== WO-09 (S5c)
+# ---- item 1: separated OTA1 / OTA2 knees (C-M1)
+KN3_GRID2 = (8, 9, 10, 11, 12, 13.5, 15)            # V/us, 2 MHz
+KN3_GRID4 = (9, 10, 11, 12, 13.5, 15)               # V/us, 4 MHz boost, base values (before the x2)
+KN3_SETS = [  # label, fs, extra, N list, grid, OTAs swept
+    ("2M", 2e6, {}, (256, 1024), KN3_GRID2, ("ota1", "ota2")),
+    ("4M_boost", 4e6, {"boost": True}, (256, 1024), KN3_GRID4, ("ota1", "ota2")),
+    ("4M_boost_OTA1only", 4e6, {"boost": True, "boost1_only": True}, (1024,), KN3_GRID4, ("ota1",)),
+]
+SR1_SPEC, SR2_SPEC = 12.0, 25.0                      # V/us, SPEC 3.0
+
+
+def knee_of(pairs, thr):
+    """pairs [(sr, inl)]. Returns (grid knee, interpolated knee): the lowest SR such that it and every higher SR meet INL <= thr.
+    Interpolated = log-log crossing between the last failing and the first passing grid point (None when the knee is at/below the lowest SR)."""
+    pairs = sorted(pairs)
+    ok_ = [all(math.isfinite(q[1]) and q[1] <= thr for q in pairs[i:]) for i in range(len(pairs))]
+    idx = next((i for i, g in enumerate(ok_) if g), None)
+    if idx is None:
+        return None, None
+    grid = pairs[idx][0]
+    if idx == 0:
+        return grid, None
+    (s0, i0), (s1, i1) = pairs[idx - 1], pairs[idx]
+    if i0 <= 0 or i1 <= 0 or i0 == i1:
+        return grid, grid
+    f = (math.log(thr) - math.log(i0)) / (math.log(i1) - math.log(i0))
+    return grid, math.exp(math.log(s0) + f * (math.log(s1) - math.log(s0)))
+
+
+def knee_thresholds(fs, n):
+    """(primary, secondary) INL thresholds in ppm FSR. 2 MHz: 20/1.5 (WO-09 rule) and the 8 ppm OTA line. 4 MHz: D28 fast-mode target and target/1.5."""
+    if fs < 3e6:
+        return P.TIER1_KNEE_PPM, P.TIER1_INL_BUDGET_PPM
+    t = P.TIER1_INL_FAST[n]
+    return t, t / 1.5
+
+
+def mode_knees3(args):
+    jobs = []
+    for lab, fs, ex, ns, grid, otas in KN3_SETS:
+        for n in ns:
+            for ota in otas:
+                for v in grid:
+                    e = dict(ex)
+                    e["fs"] = fs
+                    if ota == "ota1":
+                        e["sr"] = v * 1e6                     # OTA2 stays at its own spec (sr2 default 25 V/us)
+                    else:
+                        e["sr"], e["sr2"] = SR1_SPEC * 1e6, v * 1e6   # OTA1 at spec
+                    jobs.append((lab, fs, n, ota, v, e))
+
+    def one(j):
+        lab, fs, n, ota, v, e = j
+        return dc_metrics(v2_cfg(e, n=n, m=21), f"kn3_{lab}_{ota}_{v:g}_N{n}")
+    with ThreadPoolExecutor(3) as ex_:
+        rs = list(ex_.map(one, jobs))
+    rows = []
+    for j, r in zip(jobs, rs):
+        lab, fs, n, ota, v, e = j
+        rows.append(dict(set=lab, fs=fs, n=n, ota=ota, sr_vus=v, ok=bool(r.get("ok")), inl_ep_ppm=r.get("inl_ep_ppm", float("nan")),
+                         gain_err=r.get("gain_err", float("nan")), runtime_s=r["runtime_s"], problems=r["problems"]))
+        print(f"{lab} N{n} {ota} SR={v:g} V/us: INL {rows[-1]['inl_ep_ppm']:.3f} ppm gain {rows[-1]['gain_err']:+.2e} ok={r.get('ok')} {r['problems'][:1]}")
+    knees, flags = {}, []
+    print("\nKNEE TABLES (lowest SR [V/us] with INL <= threshold at it and every higher grid point; interp = log-log crossing)")
+    for lab, fs, ex, ns, grid, otas in KN3_SETS:
+        for n in ns:
+            for ota in otas:
+                pairs = [(r["sr_vus"], r["inl_ep_ppm"]) for r in rows if r["set"] == lab and r["n"] == n and r["ota"] == ota]
+                t1, t2 = knee_thresholds(fs, n)
+                ent = {}
+                for nm, thr in (("primary", t1), ("secondary", t2)):
+                    g, it = knee_of(pairs, thr)
+                    ent[nm] = dict(thr_ppm=thr, grid=g, interp=it)
+                spec = SR1_SPEC if ota == "ota1" else SR2_SPEC
+                p_ = ent["primary"]
+                kn = p_["interp"] if p_["interp"] is not None else p_["grid"]
+                ent["margin_spec_over_knee"] = (spec / kn - 1.0) if kn else None
+                key = f"{lab}/{ota}/N{n}"
+                knees[key] = ent
+                mg = ent["margin_spec_over_knee"]
+                print(f"  {key}: INL [" + ", ".join(f"{a:g}:{b:.2f}" for a, b in sorted(pairs)) + "] ppm; "
+                      f"knee@{t1:.1f}ppm grid {p_['grid']} interp {None if p_['interp'] is None else round(p_['interp'], 2)}; "
+                      f"knee@{t2:.2f}ppm grid {ent['secondary']['grid']} interp {None if ent['secondary']['interp'] is None else round(ent['secondary']['interp'], 2)}; "
+                      f"margin of {spec:g} V/us over primary knee {'n/a' if mg is None else f'{mg*100:.0f} %'}")
+                if p_["grid"] is None or p_["grid"] > spec:
+                    flags.append(f"FLAG {key}: knee {p_['grid']} above SPEC {spec:g} V/us")
+                elif ota == "ota1" and (mg is None or mg < P.TIER1_KNEE_MARGIN_MIN):
+                    flags.append(f"FLAG {key}: margin of {spec:g} V/us over the knee {'n/a' if mg is None else f'{mg*100:.0f} %'} < {P.TIER1_KNEE_MARGIN_MIN*100:.0f} %")
+    ok = all(r["ok"] for r in rows) and all(math.isfinite(r["inl_ep_ppm"]) for r in rows) and len(rows) == len(jobs)
+    for f_ in flags:
+        print(f_)
+    print(f"spec FLAG count: {len(flags)} (the exit code reflects run health only, not the spec flags)")
+    jdump(dict(rows=rows, knees=knees, flags=flags), "knees3.json")
+    print("run-health ACCEPT" if ok else "run-health REJECT")
+    return 0 if ok else 1
+
+
+# ---- items 2, 3: CMRR slope metric and the D12 residual with Cp,top
+CMRR_SLOPE_FLOOR = 1e-9            # V/V: measurement floor of the slope (~180 dB)
+CM2_VINS = (0.2, 1.0, 2.0)
+
+
+def slope_cmrr(vins, vals, floor=CMRR_SLOPE_FLOOR):
+    """CMRR = |dVin_cm / dVoff| as the least-squares slope of the offset over Vin_cm at fixed mismatch. Returns (slope V/V, dB)."""
+    sl = float(np.polyfit(np.asarray(vins, float), np.asarray(vals, float), 1)[0])
+    return sl, 20.0 * math.log10(1.0 / max(abs(sl), floor))
+
+
+def eps_eff_closed(cp, dcp, eps_cs, cs=P.CS1, plus=False):
+    """D12 residual, input-referred slope d(off)/d(Vin_cm), from charge conservation on the shorted top node (Cp+- = cp +- dcp/2, Cs+- = cs(1 +- eps/2)):
+        eps_eff = ((cp/cs)*eps_cs - dcp/cs) / (1 + cp/cs).   plus=True returns the other sign convention (REVIEW section 5), used by the sign test."""
+    p = cp / cs
+    return (p * eps_cs + (dcp / cs if plus else -dcp / cs)) / (1.0 + p)
+
+
+def mode_cm2(args):
+    cs = P.CS1
+    cases = [dict(name="nod12_ref", d12=False, cp=0.0, dcp=0.0, mm=0.0075), dict(name="D12_cp0_mm0", d12=True, cp=0.0, dcp=0.0, mm=0.0),
+             dict(name="D12_cp0_mm0.75", d12=True, cp=0.0, dcp=0.0, mm=0.0075)]
+    for cp in (10e-15, 20e-15):
+        for dcp in (0.0, 0.25e-15, 1e-15):
+            for mm in (0.0, 0.0075):
+                cases.append(dict(name=f"D12_cp{cp*1e15:g}_d{dcp*1e15:g}_mm{mm*100:g}", d12=True, cp=cp, dcp=dcp, mm=mm))
+    jobs = [(i, v) for i in range(len(cases)) for v in CM2_VINS]
+
+    def one(j):
+        i, v = j
+        c = cases[i]
+        return cm_run(v, c["mm"], c["d12"], False, f"cm2_{c['name']}_v{v}", cptop=c["cp"], dcptop=c["dcp"])
+    with ThreadPoolExecutor(3) as ex:
+        rs = list(ex.map(one, jobs))
+    byc = {}
+    for (i, v), r in zip(jobs, rs):
+        byc.setdefault(i, []).append(r)
+    rows = []
+    for i, c in enumerate(cases):
+        rr = byc[i]
+        offs, pairs = [r["off_V"] for r in rr], [r["pair_V"] for r in rr]
+        s_off, db_off = slope_cmrr(CM2_VINS, offs)
+        s_on, db_on = slope_cmrr(CM2_VINS, pairs)
+        cf = eps_eff_closed(c["cp"], c["dcp"], c["mm"], cs)
+        cfp = eps_eff_closed(c["cp"], c["dcp"], c["mm"], cs, plus=True)
+        row = dict(c, ok=all(r["ok"] for r in rr), slope_off=s_off, cmrr_off_db=db_off, slope_on=s_on, cmrr_on_db=db_on, closed=cf, closed_plus_alt=cfp,
+                   off_V=offs, pair_V=pairs, vg1_cm_range=[min(r["vg1_cm_min_all"] for r in rr), max(r["vg1_cm_max_all"] for r in rr)],
+                   problems=sum((r["problems"] for r in rr), []))
+        if c["d12"]:
+            if abs(cf) >= 5e-5:
+                row["rel_err"] = abs(s_off - cf) / abs(cf)
+                row["match"] = bool(row["rel_err"] <= 0.25)
+                row["plus_rel_err"] = abs(s_off - cfp) / abs(cfp) if abs(cfp) > 0 else float("nan")
+            else:
+                row["match"] = bool(abs(s_off) <= 2e-8)           # closed form 0: the deck slope must sit at its floor
+        rows.append(row)
+        print(f"cm2 {c['name']}: slope_off {s_off:+.3e} (closed {cf:+.3e}, alt-sign {cfp:+.3e}"
+              + (f", err {row['rel_err']*100:.1f} %, alt-sign err {row['plus_rel_err']*100:.0f} %" if "rel_err" in row else "")
+              + f") sys-off CMRR {db_off:.1f} dB; sys-on slope {s_on:+.2e} CMRR {db_on:.1f} dB; off_V {[round(x*1e6, 3) for x in offs]} uV "
+              f"vg1 CM [{row['vg1_cm_range'][0]:.3f},{row['vg1_cm_range'][1]:.3f}] ok={row['ok']} match={row.get('match')}")
+    d12r = [r for r in rows if r["d12"]]
+    alloc = [r for r in d12r if r["dcp"] <= 0.25e-15 + 1e-21]
+    sign_cases = [r for r in d12r if "rel_err" in r and r["rel_err"] <= 0.25 and r["plus_rel_err"] > 0.25]
+    chk = dict(runs_ok=all(r["ok"] for r in rows),
+               closed_form_25pct=all(r["match"] for r in d12r),
+               sign_discriminates=len(sign_cases) > 0,
+               sys_off_60_at_alloc_dcp_le_0p25fF=all(r["cmrr_off_db"] >= P.TIER1_CMRR_TARGET_DB["sys_off"] for r in alloc),
+               sys_on_100=all(r["cmrr_on_db"] >= P.TIER1_CMRR_TARGET_DB["sys_on"] for r in d12r))
+    print("checks:", chk, f"; sign-discriminating cases (deck within 25 % of the '-' form, '+' form off by >25 %): {len(sign_cases)}")
+    for r in d12r:
+        if r["cmrr_off_db"] < P.TIER1_CMRR_TARGET_DB["sys_off"]:
+            print(f"FLAG CMRR sys-off {r['cmrr_off_db']:.1f} dB < {P.TIER1_CMRR_TARGET_DB['sys_off']} dB at {r['name']} (dCp,top {r['dcp']*1e15:g} fF)")
+        if r["cmrr_on_db"] < P.TIER1_CMRR_TARGET_DB["sys_on"]:
+            print(f"FLAG CMRR sys-on {r['cmrr_on_db']:.1f} dB < {P.TIER1_CMRR_TARGET_DB['sys_on']} dB at {r['name']}")
+    ok = all(chk.values())
+    jdump(dict(rows=rows, checks=chk), "cm2.json")
+    print("ACCEPT" if ok else "REJECT")
+    return 0 if ok else 1
+
+
+# ---- item 4: island CM drift from leakage
+def drift_run(fs, n, ileak, tag, anchored=False, **kw):
+    """One conversion at u = 0 with ileak drawn from each vg node (both sides, same sign). Returns the drift of the island CM per stage [V]:
+    least-squares slope of the CM sampled once per cycle (0.4 T after the cycle start) times N T."""
+    ex = dict(fs=fs, nrst=4, u_list=(0.0,), extra=CMX, ileak=ileak)
+    if not anchored:
+        ex.update(roff=1e16, rbl=1e16, rfl=1e16)       # WO-09: bleeders and switch Roff raised to 1e16 ohm so nothing anchors the island
+    ex.update(kw)
+    r = run_deck(v2_cfg(ex, n=n, m=1), tag)
+    out = dict(ok=bool(r["ok"]), problems=r["problems"], runtime_s=r["runtime_s"])
+    if "cols" not in r:
+        out["ok"] = False
+        return out
+    T, t0 = r["meta"]["T"], r["meta"]["t0"][0]
+    t = r["cols"]["t"]
+    js = np.arange(2, n)
+    ts = t0 + js * T + 0.4 * T
+    for k in (1, 2):
+        cmv = np.interp(ts, t, 0.5 * (r["cols"][f"vg{k}p"] + r["cols"][f"vg{k}n"]))
+        sl = float(np.polyfit(ts, cmv, 1)[0])
+        out[f"drift{k}_V"] = sl * n * T
+        out[f"cm{k}_start_V"], out[f"cm{k}_end_V"] = float(cmv[0]), float(cmv[-1])
+    return out
+
+
+def drift_closed(fs, n, ileak, stage):
+    """Island CM drift [V; negative for a current drawn out of the nodes] = I_total N / (fs C_island) with I_total = 2 ileak (both sides) and
+    C_island = 2 C_side, C_side = Cs (+ Ck) + Cint + Cp,vg of that stage (Cs/Ck bottoms sit on hard sources while the tops connect to vg)."""
+    cside = (P.CS1 + P.CINT1 + P.TIER1_CP_VG) if stage == 1 else (P.CS2 + P.K * P.CS2 + P.CINT2 + P.TIER1_CP_VG)
+    return -(2 * ileak) * n / (fs * 2 * cside)
+
+
+def drift_limit_ok(d1):
+    return abs(d1) <= P.TIER1_DRIFT_LIMIT_V
+
+
+def mode_drift(args):
+    il = P.TIER1_ILEAK
+    cases = [("2M_N4096", 2e6, 4096, False), ("0p25M_N4096", 0.25e6, 4096, False), ("0p25M_N1024", 0.25e6, 1024, False),
+             ("0p25M_N1024_anchored", 0.25e6, 1024, True)]
+
+    def one(c):
+        nm, fs, n, anch = c
+        return drift_run(fs, n, il, f"dr_{nm}", anchored=anch)
+    with ThreadPoolExecutor(3) as ex:
+        rs = list(ex.map(one, cases))
+    rows, ok = [], True
+    for (nm, fs, n, anch), r in zip(cases, rs):
+        row = dict(case=nm, fs=fs, n=n, anchored=anch, ileak=il, **r)
+        for k in (1, 2):
+            cf = drift_closed(fs, n, il, k)
+            row[f"closed{k}_V"] = cf
+            row[f"rel{k}"] = abs(r.get(f"drift{k}_V", float("nan")) - cf) / abs(cf)
+        gated = not anch
+        good = bool(r["ok"] and all(math.isfinite(row[f"rel{k}"]) for k in (1, 2)) and (not gated or all(row[f"rel{k}"] <= 0.25 for k in (1, 2))))
+        row["gated"], row["good"] = gated, good
+        ok &= good
+        rows.append(row)
+        d1 = r.get("drift1_V", float("nan"))
+        print(f"drift {nm} (fs {fs/1e6:g} MHz, N {n}, {il*1e12:g} pA per side{', bleeders 1e12/1e13 + Roff 1e12 KEPT (contrast, not gated)' if anch else ''}): "
+              f"stage 1 {d1*1e3:+.2f} mV (closed {row['closed1_V']*1e3:+.2f}, err {row['rel1']*100:.1f} %), "
+              f"stage 2 {r.get('drift2_V', float('nan'))*1e3:+.2f} mV (closed {row['closed2_V']*1e3:+.2f}, err {row['rel2']*100:.1f} %) "
+              f"| stage-1 limit {P.TIER1_DRIFT_LIMIT_V} V: {'ok' if drift_limit_ok(d1) else 'FLAG exceeded'}; "
+              f"50 mV row: {'ok' if abs(d1) <= 0.05 else 'FLAG exceeded'}; ok={r['ok']} {r['problems'][:1]}")
+    print("note: I is the leakage of EACH island side (100 pA/side = 200 pA island total); the REVIEW's 21 mV / 170 mV figures count 100 pA for the whole island.")
+    jdump(dict(rows=rows), "drift.json")
+    print("ACCEPT" if ok else "REJECT")
+    return 0 if ok else 1
+
+
+# ---- item 5: pin-path CMRR (m6)
+def pad_g(tau, t_s, T):
+    """Steady-state pad-node deviation at the end of the sampling phase per unit (q/Cpad): exp(-t_s/tau)/(1-exp(-T/tau)); -> tau/T for tau >> T."""
+    return math.exp(-t_s / tau) / (1.0 - math.exp(-T / tau))
+
+
+def pin_eps_closed(rpad, dr, cpad, cp, fs, cs=P.CS1, rsrc=0.0):
+    """Sys-on pin-path slope d(pair err)/d(Vin_cm) with dr on one pin only (D12: CM pin charge per cycle q = Cs Cp/(Cs+Cp) X, X = Vin_cm - Vref_cm).
+    Settling-aware: eps = (q/X)/Cpad * (g(tau_n) - g(tau_p)). The tau >> T limit is dr*fs*Cp' (the review's 1/(dr fs Cp,top) bound)."""
+    T = 1.0 / fs
+    t_s = T / 2 - 2 * 12.5e-9               # length of phi1 = sample instant measured from its start
+    qx = cs * cp / (cs + cp)
+    tp, tn = (rpad + rsrc) * cpad, (rpad + rsrc + dr) * cpad
+    return qx / cpad * (pad_g(tn, t_s, T) - pad_g(tp, t_s, T))
+
+
+def pin_run(vin_cm, dr, pad_c, nrst, tag, u0=0.08, cp=None):
+    """Sys-on pair with the pin-side swap modelled: conversion A has the extra R on VIN- and +u0; conversion B has it on VIN+ and -u0
+    (the swap exchanges which chip node the pin R feeds). Returns the pair-demodulated error [V]."""
+    cp = P.TIER1_CP_TOP if cp is None else cp
+    res = []
+    for sgn, nm in ((+1, "A"), (-1, "B")):
+        cfg = v2_cfg(dict(vin_cm=vin_cm, d12=True, cptop=cp, drsrc=sgn * dr, pad_c=pad_c, nrst=nrst, u_list=(sgn * u0,)), n=256, m=1)
+        res.append(run_deck(cfg, f"{tag}_{nm}"))
+    uh = [u_hat_of(r)[0] for r in res]
+    return dict(ok=all(r["ok"] for r in res), problems=sum((r["problems"] for r in res), []), pair_V=float(((uh[0] - uh[1]) / 2 - u0) * VREF),
+                a_V=float((uh[0] - u0) * VREF), b_V=float((uh[1] + u0) * VREF))
+
+
+RS2_CASES = [("A_pad5p", 5e-12, 4), ("B_pad2n", 2e-9, 16)]       # label, pad cap, reset cycles (B: the pad node must reach its periodic steady state)
+RS2_DR = (0.0, 50.0)
+RS2_VINS = (0.2, 2.0)
+
+
+def mode_rsrc2(args):
+    fs = P.FS_NOM
+    jobs = [(lab, pc, nr, v, dr) for lab, pc, nr in RS2_CASES for dr in RS2_DR for v in RS2_VINS]
+
+    def one(j):
+        lab, pc, nr, v, dr = j
+        return pin_run(v, dr, pc, nr, f"rs2_{lab}_dr{dr:g}_v{v}")
+    with ThreadPoolExecutor(3) as ex:
+        rs = list(ex.map(one, jobs))
+    res = {j: r for j, r in zip(jobs, rs)}
+    rows = []
+    for lab, pc, nr in RS2_CASES:
+        for dr in RS2_DR:
+            vals = [res[(lab, pc, nr, v, dr)]["pair_V"] for v in RS2_VINS]
+            sl = (vals[1] - vals[0]) / (RS2_VINS[1] - RS2_VINS[0])
+            db = 20 * math.log10(1.0 / max(abs(sl), CMRR_SLOPE_FLOOR))
+            cf = pin_eps_closed(P.PAD_R, dr, pc, P.TIER1_CP_TOP, fs)
+            wo = dr * fs * P.TIER1_CP_TOP                                      # review form (tau >> T limit)
+            row = dict(case=lab, pad_c=pc, dr=dr, pair_V=vals, slope=sl, cmrr_on_db=db, closed_settling=cf, wo_form=wo,
+                       wo_cmrr_db=(20 * math.log10(1 / wo) if wo else float("inf")), ok=all(res[(lab, pc, nr, v, dr)]["ok"] for v in RS2_VINS),
+                       problems=sum((res[(lab, pc, nr, v, dr)]["problems"] for v in RS2_VINS), []))
+            if dr:
+                row["rel_settling"] = abs(sl - cf) / abs(cf) if cf else float("inf")
+                row["rel_wo"] = abs(sl - wo) / wo
+            rows.append(row)
+            print(f"rsrc2 {lab} dR {dr:g} ohm (pad {pc*1e12:g} pF, Cp,top {P.TIER1_CP_TOP*1e15:g} fF): pair err at Vin_cm {RS2_VINS} = {[round(x*1e9, 3) for x in vals]} nV, "
+                  f"slope {sl:+.3e} sys-on CMRR {db:.1f} dB; closed (settling-aware) {cf:+.3e}; review form 1/(dR fs Cp) {wo:.3e} = {row['wo_cmrr_db']:.1f} dB"
+                  + (f"; deck vs settling-aware {row['rel_settling']*100:.0f} %, vs review form {row['rel_wo']*100:.0f} %" if dr else "") + f" ok={row['ok']} {row['problems'][:1]}")
+    A = next(r for r in rows if r["case"].startswith("A") and r["dr"])
+    B = next(r for r in rows if r["case"].startswith("B") and r["dr"])
+    chk = dict(runs_ok=all(r["ok"] for r in rows),
+               B_within_30pct_of_settling_aware=bool(B["rel_settling"] <= 0.30),
+               B_sign_ok=bool(B["slope"] * B["closed_settling"] > 0),
+               A_deck_not_worse_than_review_bound=bool(A["cmrr_on_db"] >= A["wo_cmrr_db"] - 1.0),
+               dr0_at_floor=all(abs(r["slope"]) <= 2e-8 for r in rows if not r["dr"]))
+    if A["rel_wo"] > 0.30:
+        print(f"FINDING: with the SPEC pad (5 pF, tau {P.PAD_R*5e-12*1e9:.1f} ns << t_half) the pin node settles inside the phase: deck CMRR {A['cmrr_on_db']:.1f} dB >= the review bound "
+              f"{A['wo_cmrr_db']:.1f} dB, so 1/(dR fs Cp,top) is a bound valid only for tau_pin >~ T (board cap behind dR); case B (pad {RS2_CASES[1][1]*1e9:g} nF) is in that regime")
+    print("checks:", chk)
+    ok = all(chk.values())
+    jdump(dict(rows=rows, checks=chk), "rsrc2.json")
+    print("ACCEPT" if ok else "REJECT")
+    return 0 if ok else 1
+
+
+# ---- item 8: non-vacuity of the S5c checks
+def mode_nonvac3(args):
+    fails = []
+    # (a) dCp,top 2 fF must REJECT the 60 dB sys-off gate; control: 0.25 fF passes it
+    dbs = {}
+    for dcp in (0.25e-15, 2e-15):
+        rr = [cm_run(v, 0.0, True, False, f"nv3_dcp{dcp*1e15:g}_v{v}", cptop=20e-15, dcptop=dcp) for v in CM2_VINS]
+        sl, db = slope_cmrr(CM2_VINS, [r["off_V"] for r in rr])
+        dbs[dcp] = (db, sl, all(r["ok"] for r in rr))
+    gate = P.TIER1_CMRR_TARGET_DB["sys_off"]
+    rej = dbs[2e-15][0] < gate and dbs[2e-15][2]
+    ctl = dbs[0.25e-15][0] >= gate and dbs[0.25e-15][2]
+    print(f"nonvac3 dCp,top 2 fF (Cp 20 fF, eps_Cs 0): sys-off CMRR {dbs[2e-15][0]:.1f} dB vs gate {gate} dB -> {'REJECT (as required)' if rej else 'ACCEPT (BAD)'}; "
+          f"control dCp 0.25 fF {dbs[0.25e-15][0]:.1f} dB -> {'passes (good)' if ctl else 'FAILS (check is broken)'}")
+    if not (rej and ctl):
+        fails.append("dcp_2fF")
+    # (b) OTA1 SR 6 V/us at 2 MHz N 256 must REJECT the knee gate; control: 12 V/us passes
+    inl = {}
+    for sr in (6e6, 12e6):
+        r = dc_metrics(v2_cfg(dict(sr=sr), n=256, m=21), f"nv3_sr{sr/1e6:g}")
+        inl[sr] = (r.get("inl_ep_ppm", float("nan")), bool(r.get("ok")))
+    rej = inl[6e6][1] and inl[6e6][0] > P.TIER1_KNEE_PPM
+    ctl = inl[12e6][1] and inl[12e6][0] <= P.TIER1_KNEE_PPM
+    print(f"nonvac3 OTA1 SR 6 V/us (2 MHz, N 256): INL {inl[6e6][0]:.2f} ppm vs {P.TIER1_KNEE_PPM:.2f} -> {'REJECT (as required)' if rej else 'ACCEPT (BAD)'}; "
+          f"control SR 12 V/us {inl[12e6][0]:.2f} ppm -> {'passes (good)' if ctl else 'FAILS (check is broken)'}")
+    if not (rej and ctl):
+        fails.append("sr6")
+    # (c) 10 nA leakage at 0.25 MHz must REJECT the island-drift limit; control: 100 pA passes
+    dr = {}
+    for il in (10e-9, P.TIER1_ILEAK):
+        dr[il] = drift_run(0.25e6, 256, il, f"nv3_leak{il*1e12:g}p")
+    rej = dr[10e-9]["ok"] and not drift_limit_ok(dr[10e-9]["drift1_V"])
+    ctl = dr[P.TIER1_ILEAK]["ok"] and drift_limit_ok(dr[P.TIER1_ILEAK]["drift1_V"])
+    print(f"nonvac3 leakage 10 nA (0.25 MHz, N 256): stage-1 drift {dr[10e-9]['drift1_V']:+.3f} V vs limit {P.TIER1_DRIFT_LIMIT_V} V -> {'REJECT (as required)' if rej else 'ACCEPT (BAD)'}; "
+          f"control 100 pA {dr[P.TIER1_ILEAK]['drift1_V']*1e3:+.1f} mV -> {'passes (good)' if ctl else 'FAILS (check is broken)'}")
+    if not (rej and ctl):
+        fails.append("leak10n")
+    jdump(dict(dcp={str(k): v for k, v in dbs.items()}, sr={str(k): v for k, v in inl.items()}, leak={str(k): v for k, v in dr.items()}, fails=fails), "nonvac3.json")
+    print("REJECT-as-required for all broken decks" if not fails else f"VACUOUS: {fails}")
+    return 1 if not fails else 0
+
 
 def main():
     ap = argparse.ArgumentParser()
-    for m in ("null", "options", "dc", "sweep", "nonvac", "xcheck", "av", "knees2", "cm", "offsets", "rsrc", "nonvac2"):
+    for m in ("null", "options", "dc", "sweep", "nonvac", "xcheck", "av", "knees2", "cm", "offsets", "rsrc", "nonvac2",
+              "knees3", "cm2", "drift", "rsrc2", "nonvac3"):
         ap.add_argument(f"--{m}", action="store_true")
     ap.add_argument("--n", type=int, default=256)
     ap.add_argument("--m", type=int, default=None, help="number of DC points")
@@ -787,7 +1161,8 @@ def main():
     if a.nonvac:
         return mode_nonvac(a)
     for nm, fn in (("xcheck", mode_xcheck), ("av", mode_av), ("knees2", mode_knees2), ("cm", mode_cm), ("offsets", mode_offsets),
-                   ("rsrc", mode_rsrc), ("nonvac2", mode_nonvac2)):
+                   ("rsrc", mode_rsrc), ("nonvac2", mode_nonvac2), ("knees3", mode_knees3), ("cm2", mode_cm2),
+                   ("drift", mode_drift), ("rsrc2", mode_rsrc2), ("nonvac3", mode_nonvac3)):
         if getattr(a, nm):
             return fn(a)
     ap.print_help()

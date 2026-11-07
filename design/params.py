@@ -115,6 +115,14 @@ TIER1_INL_FAST = {256: 20.0, 1024: 5.0}   # ppm FSR, fast-mode targets at 4 MHz 
 TIER1_CMRR_TARGET_DB = {"sys_off": 60.0, "sys_on": 100.0}   # D32
 TIER1_PAIR_RESID_V = 0.5e-6        # V, sys-chop pair residual budget
 
+# ---- Tier-1 extensions (WO-09 / S5c) ---------------------------------------
+TIER1_SR2 = 25e6                   # V/s diff, OTA2 slew at its SPEC 3.0 value (25 V/us)
+TIER1_KNEE_PPM = 20.0 / 1.5        # ppm FSR: knee criterion = 1/1.5 of the 20 ppm INL budget (REVIEW-S4S5b C-M1, WO-09)
+TIER1_KNEE_MARGIN_MIN = 0.25       # REVIEW-S4S5b: SR_min >= 1.25 x OTA1-only knee
+TIER1_CP_TOP = 15e-15              # F per side, D12 floating top-plate parasitic used for the pin-path case (m6)
+TIER1_DRIFT_LIMIT_V = 0.2          # V, island CM excursion allowed about V_icm (REVIEW-S4S5b C-M4: V_icm +- 0.2 V)
+TIER1_ILEAK = 100e-12              # A per island side, SPEC leakage row (ff/125/3.6)
+
 # ---- Derived ----------------------------------------------------------------
 T_HALF = 1.0 / (2.0 * FS_NOM)            # t_half = 1/(2 fs) = 250 ns at 2 MHz
 TAU_REF_MAX = TAU_REF_FRAC * T_HALF

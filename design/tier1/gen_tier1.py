@@ -49,6 +49,13 @@ DEFAULT = dict(
     noise1=0.0, noise_seed=12345,               # trnoise rms [V] at OTA1 input (per-cycle white)
     rsrc=0.0, cext=0.0,     # source resistance and pin capacitor on VIN+-
     late=False,             # input step one cycle after reset release (broken sys-chop swap)
+    # --- WO-09 (S5c) extensions (all default to the WO-08 deck, except sr2/gbw2 below) ---
+    sr2=None, gbw2=None,    # v2: OTA2's own SR [V/s] and GBW [Hz] (C-M1). None: sr2 = max(sr, TIER1_SR2 = 25 V/us), gbw2 = gbw
+    boost1_only=False,      # v2: with boost, only OTA1 is boosted (OTA2 stays at its base bias)
+    cptop=0.0, dcptop=0.0,  # D12 floating top-plate parasitic to ground, stage 1 [F]: Cp+ = cptop + dcptop/2, Cp- = cptop - dcptop/2
+    rbl=1e12, rfl=1e13,     # island bleeders: vg -> cm (0 = removed) and floating plates -> cm (0 = removed)
+    ileak=0.0,              # leakage current drawn from each vg1+-/vg2+- node to ground [A] (same sign both sides: island CM drifts)
+    drsrc=0.0,              # extra source R in series with VIN- (drsrc > 0) or VIN+ (drsrc < 0) [ohm]
 )
 
 
@@ -123,8 +130,9 @@ def build_deck(cfg=None, rawfile=None):
     w(f"Vrefn_s vrefn_s 0 {vrn:.9g}")
     for nm in ("vinp", "vinn", "vrefp", "vrefn"):
         src = f"{nm}_s"
-        if c["rsrc"] and nm.startswith("vin"):
-            w(f"Rsrc_{nm} {nm}_s {nm}_pin {c['rsrc']:g}")
+        rs_ = c["rsrc"] + (max(c["drsrc"], 0.0) if nm == "vinn" else max(-c["drsrc"], 0.0) if nm == "vinp" else 0.0)
+        if rs_ and nm.startswith("vin"):
+            w(f"Rsrc_{nm} {nm}_s {nm}_pin {rs_:g}")
             src = f"{nm}_pin"
             if c["cext"]:
                 w(f"Cext_{nm} {nm}_pin 0 {c['cext']:g}")
@@ -178,12 +186,14 @@ def build_deck(cfg=None, rawfile=None):
         w(f"Cs1{s} b1{s} tp1{s} {cs1v:g}")
         w(f"Cint1{s} vg1{s} o1{s} {c['cint1']:g}")
         w(f"Srst1{s} vg1{s} o1{s} rst 0 SWM")
-        w(f"Rbl1{s} vg1{s} cm 1e12")
+        if c["rbl"]:
+            w(f"Rbl1{s} vg1{s} cm {c['rbl']:g}")
         if cp:
             w(f"Cpv1{s} vg1{s} 0 {cp:g}")
             w(f"Cpv2{s} vg2{s} 0 {cp:g}")
         for nd in (f"b1{s}", f"tp1{s}", f"b2{s}", f"tp2{s}", f"bk{s}"):
-            w(f"Rfl_{nd} {nd} cm 1e13")   # DC path for floating plates (gmin-level, ~0.04 ppm effect)
+            if c["rfl"]:
+                w(f"Rfl_{nd} {nd} cm {c['rfl']:g}")   # DC path for floating plates (gmin-level, ~0.04 ppm effect)
         # stage 2
         w(f"S2in{s} o1{s} b2{s} phi1 0 SWM")
         w(f"S2cm{s} b2{s} cm phi2 0 SWM")
@@ -197,7 +207,14 @@ def build_deck(cfg=None, rawfile=None):
         w(f"Ck{s} bk{s} tp2{s} {c['ck']:g}")
         w(f"Cint2{s} vg2{s} o2{s} {c['cint2']:g}")
         w(f"Srst2{s} vg2{s} o2{s} rst 0 SWM")
-        w(f"Rbl2{s} vg2{s} cm 1e12")
+        if c["rbl"]:
+            w(f"Rbl2{s} vg2{s} cm {c['rbl']:g}")
+        if c["ileak"]:
+            w(f"Blk1{s} vg1{s} 0 I = {c['ileak']:.6e}")
+            w(f"Blk2{s} vg2{s} 0 I = {c['ileak']:.6e}")
+        if c["cptop"] or c["dcptop"]:
+            cpt = c["cptop"] + (c["dcptop"] / 2 if s == "p" else -c["dcptop"] / 2)
+            w(f"Cptop1{s} tp1{s} 0 {cpt:.6e}")
     if d12:
         w("Stp1d tp1p tp1n phi1e 0 SWM")   # D12: top plates shorted (floating) during sampling
         w("Stp2d tp2p tp2n phi1e 0 SWM")
@@ -225,12 +242,14 @@ def build_deck(cfg=None, rawfile=None):
         cint = c["cint1"] if k == 1 else c["cint2"]
         net = cint * (cin + cp) / (cint + cin + cp)
         cpo = max(cl - net, 0.05e-12)
-        bst = 2.0 if c["boost"] else 1.0
-        gmk = bst * 6.283185307179586 * c["gbw"] * cl
-        ip = bst * c["sr"] * cl                    # diff SR = I_tail / C_side
+        bst = 2.0 if (c["boost"] and not (c["boost1_only"] and k == 2)) else 1.0
+        gbw_k = c["gbw"] if (k == 1 or c["gbw2"] is None) else c["gbw2"]
+        sr_k = c["sr"] if k == 1 else (c["sr2"] if c["sr2"] is not None else max(c["sr"], P.TIER1_SR2))
+        gmk = bst * 6.283185307179586 * gbw_k * cl
+        ip = bst * sr_k * cl                       # diff SR = I_tail / C_side
         im = ip * c["sr_asym"]
         g0 = gmk / a0
-        cf = 1.0 / (6.283185307179586 * c["fp2_mult"] * c["gbw"] * bst * 1e3)
+        cf = 1.0 / (6.283185307179586 * c["fp2_mult"] * gbw_k * bst * 1e3)
         gcm = 6.283185307179586 * c["cmfb_bw"] * cl
         gtot = gcm * (1.0 + 10 ** (-c["cmfb_db"] / 20.0))
         w(f"Bdr{k} dr{k} 0 V = {vd_expr(k)}")

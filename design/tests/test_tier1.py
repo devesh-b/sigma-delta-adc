@@ -155,3 +155,82 @@ def test_nod12_settle_ratio_limits():
     r = TB.nod12_settle_ratio(256)
     assert 0.05 < r < 0.09                                  # about 2*tau/N with tau 9.5 cycles
     assert TB.nod12_settle_ratio(4096) < r / 10             # falls as 1/N
+
+
+# ---------------------------------------------------------------- WO-09 (S5c) additions
+def _gm_ip(deck, k):
+    """(gm, i_tail) of OTAk from the v2 deck text: Bgp = -0.5*(u(gm*V(f))*ip*tanh(...) + ...)."""
+    ln = [l for l in deck.splitlines() if l.startswith(f"Bgp{k} ")][0]
+    gm = float(ln.split("(u(")[1].split("*V(f")[0])
+    ip = float(ln.split(")*")[1].split("*tanh")[0])
+    return gm, ip
+
+
+def test_separate_ota_sr_gbw_and_boost_scope():
+    cl1, cl2 = P.TIER1_CL1, P.TIER1_CL2
+    a, _ = G.build_deck(TB.v2_cfg(dict(), n=8, m=2))
+    g1, i1 = _gm_ip(a, 1)
+    g2, i2 = _gm_ip(a, 2)
+    assert abs(i1 / (12e6 * cl1) - 1) < 1e-6 and abs(i2 / (P.TIER1_SR2 * cl2) - 1) < 1e-6      # OTA1 12 V/us, OTA2 25 V/us
+    assert abs(g1 / (6.283185307179586 * 10e6 * cl1) - 1) < 1e-6 and abs(g2 / (6.283185307179586 * 10e6 * cl2) - 1) < 1e-6
+    b, _ = G.build_deck(TB.v2_cfg(dict(boost=True), n=8, m=2))
+    c, _ = G.build_deck(TB.v2_cfg(dict(boost=True, boost1_only=True), n=8, m=2))
+    assert abs(_gm_ip(b, 1)[1] / i1 - 2) < 1e-6 and abs(_gm_ip(b, 2)[1] / i2 - 2) < 1e-6      # boost scales both
+    assert abs(_gm_ip(c, 1)[1] / i1 - 2) < 1e-6 and abs(_gm_ip(c, 2)[1] / i2 - 1) < 1e-6      # OTA1 only
+    d, _ = G.build_deck(TB.v2_cfg(dict(sr=9e6, sr2=15e6, gbw2=20e6), n=8, m=2))
+    assert abs(_gm_ip(d, 1)[1] / (9e6 * cl1) - 1) < 1e-6 and abs(_gm_ip(d, 2)[1] / (15e6 * cl2) - 1) < 1e-6
+    assert abs(_gm_ip(d, 2)[0] / (6.283185307179586 * 20e6 * cl2) - 1) < 1e-6
+    e, _ = G.build_deck(TB.v2_cfg(dict(sr=1e9), n=8, m=2))                                    # ideal OTA1 must not cap OTA2
+    assert _gm_ip(e, 2)[1] > P.TIER1_SR2 * cl2 * 0.99
+
+
+def test_knee_of_uses_all_higher_points_and_interpolates():
+    pairs = [(8, 100.0), (10, 20.0), (12, 5.0), (15, 1.0)]
+    g, it = TB.knee_of(pairs, 13.3)
+    assert g == 12 and 10 < it < 12
+    assert TB.knee_of([(8, 1.0), (10, 50.0), (12, 2.0)], 13.3)[0] == 12      # a failing higher point moves the knee up
+    assert TB.knee_of(pairs, 0.1) == (None, None)
+    assert TB.knee_of([(8, 1.0), (10, 0.5)], 13.3) == (8, None)
+
+
+def test_eps_eff_sign_and_limits():
+    cs = P.CS1
+    assert TB.eps_eff_closed(0, 0, 0.0075, cs) == 0.0                         # Cp,top = 0: first-order cancellation
+    assert abs(TB.eps_eff_closed(20e-15, 0, 0.0075, cs) - 0.04 * 0.0075 / 1.04) < 1e-12
+    m, p = TB.eps_eff_closed(20e-15, 0.25e-15, 0.0075, cs), TB.eps_eff_closed(20e-15, 0.25e-15, 0.0075, cs, plus=True)
+    assert abs(m - (3e-4 - 5e-4) / 1.04) < 1e-9 and abs(p - (3e-4 + 5e-4) / 1.04) < 1e-9 and abs(p - m) > 0.25 * abs(m)   # the sign test can discriminate
+
+
+def test_slope_cmrr_is_a_slope_not_an_offset():
+    v = (0.2, 1.0, 2.0)
+    sl, db = TB.slope_cmrr(v, [5e-6 + 1e-3 * x for x in v])                    # constant 5 uV is ignored
+    assert abs(sl - 1e-3) < 1e-12 and abs(db - 60.0) < 1e-6
+    assert TB.slope_cmrr(v, [5e-6] * 3)[1] > 179                              # flat: sits at the floor
+    assert TB.slope_cmrr(v, [0.0, 4e-3, 8e-3])[1] < 52                        # 2 fF / 0.5 pF = 4e-3 -> 48 dB class
+
+
+def test_pin_closed_form_limit_and_drift_closed_form():
+    fs, cp, dr = 2e6, 15e-15, 50.0
+    big = TB.pin_eps_closed(500.0, dr, 1e-6, cp, fs)                          # tau >> T: review form dr fs Cp'
+    assert abs(big / (dr * fs * (P.CS1 * cp / (P.CS1 + cp))) - 1) < 0.30
+    assert abs(TB.pin_eps_closed(500.0, dr, 5e-12, cp, fs)) < 1e-12           # settled pad: no pin-path error
+    assert abs(TB.drift_closed(2e6, 4096, 100e-12, 1) + 100e-12 * 4096 / 2e6 / (P.CS1 + P.CINT1 + P.TIER1_CP_VG)) < 1e-9
+    assert TB.drift_limit_ok(-0.086) and not TB.drift_limit_ok(-2.1)
+
+
+def test_s5c_deck_options_audited():
+    deck, _ = G.build_deck(TB.v2_cfg(dict(cptop=20e-15, dcptop=1e-15, ileak=1e-10, rbl=0, rfl=1e16, drsrc=50.0, roff=1e16), n=8, m=2))
+    ok, counts, msgs = TB.audit_netlist(deck)
+    assert ok, msgs
+    low = deck.lower()
+    assert "cptop1p tp1p 0 2.050000e-14" in low and "cptop1n tp1n 0 1.950000e-14" in low
+    assert "blk1p vg1p 0 i = 1.0" in low and "rbl1p" not in low and "rfl_tp1p tp1p cm 1e+16" in low
+    assert "rsrc_vinn vinn_s vinn_pin 50" in low and "rsrc_vinp" not in low
+    d0, _ = G.build_deck(TB.v2_cfg(dict(), n=8, m=2))
+    assert "cptop1" not in d0.lower() and "blk1" not in d0.lower() and "rbl1p vg1p cm 1e+12" in d0.lower().replace("1e12", "1e+12")
+
+
+def test_s5c_defaults_leave_wo08_deck_elements():
+    deck, _ = G.build_deck(TB.v2_cfg(dict(), n=8, m=2))
+    low = deck.lower()
+    assert "rbl1p vg1p cm 1e+12" in low and "rfl_tp1p tp1p cm 1e+13" in low
