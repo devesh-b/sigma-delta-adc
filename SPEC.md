@@ -15,7 +15,7 @@ All targets are v1 (commit) unless marked (stretch). "Confirm in model/PDK" = no
 |---|---|---|
 | Architecture | Fully-differential, 2nd-order CIFB incremental ΣΔ, 1-bit quantiser | reset every conversion |
 | Fallback | 1st-order mode (bypass 2nd integrator) | high-confidence safety net |
-| Loop coefficients | **c1 = 0.125, c2 = 0.5, k = 0.5** (user D3, option B) | bit-identical to c1 0.25/k 1 (k/c1 = 4); both integrators at half swing: S1 peak 0.61 V/side at VREF 2.048 V. c2 stays free for x2 sizing (0.25 halves x2) |
+| Loop coefficients | **c1 = 0.125, c2 = 0.5, k = 0.5** (user D3, option B) | bit-identical to c1 0.25/k 1 (k/c1 = 4); both integrators at half swing: S1 peak 0.61 V/side at VREF 2.048 V. Note (review M1): B's INL edge over A comes from c1 halving, not VREF; at N 4096/A0 80 dB, B ≈ 3.7 ppm. Area option E1: Cs 0.5 pF/Cint1 4 pF keeps ratios (INL unchanged), saves ≈4000 µm², kT/C 0.54→0.76 µV @15 SPS. c2 stays free for x2 sizing (0.25 halves x2) |
 | Clock fs | 0.25–4 MHz, nominal **2 MHz** | SC ⇒ jitter-immune; OTA power ∝ fs·C |
 | N (cycles/conversion) | 64 / 256 / 1024 / 4096 | res ≈ 2·log2(N) − 4 (order 2): N=64→~8 b, N=1024→~16 b, N=4096→~20 b. N is a counter value (digital-only cost), so all four stay in v1 |
 | Output rate | fs/N: e.g. 2 MHz/1024 ≈ 1.95 kSPS; firmware averages K sub-conversions to reach 3.75–240 SPS | slow precision via averaging + system chop |
@@ -147,6 +147,18 @@ Second integrator: same topology, relaxed gain/noise (its noise divides by first
 - **Sequencing rules (S2, binding on C9):** system-chop swap only at conversion boundaries; integrators and
   sampling caps reset between swapped sub-conversions; **N even**; OTA-chop phase restarts at the same value at
   cycle 0 of every sub-conversion; sub-conversions averaged in pairs (alternating polarity, same N and fs).
+  Additional rules from review (REVIEW-S1S2 m2): (7) OTA-chop state during the reset window identical every
+  sub-conversion; (8) sys-chop swap on the pin side, ahead of sampling and CM-rejecting switches (only errors
+  after the swap cancel); (9) one retimed y drives DAC and decimator, y[0] forced at reset release; (10) config
+  changes (N, order, chop enables, fs divider) latched only at a pair boundary, first pair after a change tagged
+  invalid; (11) decimator accumulators cleared on the same edge that releases the analog reset; frame carries
+  chop sign and pair index; (12) reset window ≥ ~15 τ of Cint discharge (1 kΩ × 8 pF ≈ 120 ns) + post-swap input
+  settling + OTA/CMFB recovery; optional +−−+ pair ordering cancels linear offset drift.
+- **OTA chop scope (review E2/M3):** chopper on **OTA1 only** (OTA2 1/f is divided by c1(N−1)/2, its offset
+  cancels with sys chop). OTA chop stays in v1 **only if the C1 OTA meets A0 ≥ 80 dB and settling with the
+  chopper switches in place, chopping and parked**; otherwise drop it (sys-only meets 50 µV even at lf 9.3).
+- **Modes without system chop are characterization-only:** they carry lf·Vos1/(N−1) (order 2; lf·Vos1/N order 1)
+  plus 2·Vos2/(c1(N−1)) from OTA2 offset (35 µV at Vos2 9 mV, c1 0.125, N 4096).
 
 ### 3.7 Decimator (digital, on-chip — must live in the macro)
 - Order-2 **cascade-of-integrators**: 2 accumulators + counter; reset each conversion (incremental).
