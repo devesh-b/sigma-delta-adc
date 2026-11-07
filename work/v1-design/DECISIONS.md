@@ -11,3 +11,5 @@
 | D7 | Corner set (SPEC §6): tt/ss/ff/sf/fs, −40/27/125 °C, VAPWR 3.0/3.3/3.6, VDPWR 1.62/1.8/1.98, MC ≥200 at tt + ≥50 at worst PVT, fs 0.25/2/4 MHz | ROADMAP Phase 2 corner list + ±10 % supplies | 0–85 °C | cheap |
 | D8 | `git init` of ~/projects/tt (repos/, pcb/, .venv excluded via .gitignore); initial commit 48a75e6 | WOs need atomic commits (WORKFLOW §3) | separate design repo | cheap |
 | D9 | WO-01/02/03 run in parallel as file-disjoint WOs; commits path-limited (`git commit -- <paths>`) | S0 (infra) and S1/S2 (model) share no files; WO-02 alone owns iadc.py | serial | cheap |
+| D10 | Review F1 applied live to WO-02: option B = c1 0.125, k 0.5, c2 0.5 (bit-identical to A); option-A c2 = 0.25 variant added | proven by algebra; the old option B was a different NTF | let WO-02 finish, then redo | cheap |
+| D11 | Non-decision review fixes applied to SPEC/PLAN (β, t_half, frame tags, retimed FF, acc width, corners ss_hh/ff_ll, MC rule, VDPWR axis, residue reconstruction, V-gaps); user questions Q1–Q3, Q5, Q6 left open in SPEC §6 | reviewer findings with clear fixes | wait for the user on all | cheap |

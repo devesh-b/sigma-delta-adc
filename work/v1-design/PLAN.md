@@ -13,7 +13,7 @@ Status: plan, 2026-11-07. RESUME HERE.
   - A gate opens only when every check in it prints `ACCEPT` at every corner in SPEC §6.
   - Every check must also print `REJECT` on its broken copy (non-vacuity, WORKFLOW §11).
 - **One failure keeps the gate closed:**
-  - One corner, one MC sample beyond ±3σ, or one vacuous check is enough.
+  - One corner, an MC result whose estimated μ ± 3σ leaves the spec or any single sample outside spec, or one vacuous check is enough.
   - The response is to fix and re-run. Specs are never relaxed silently.
   - Relaxing a spec is a **user decision**, logged in `DECISIONS.md`.
 
@@ -62,9 +62,9 @@ Status: plan, 2026-11-07. RESUME HERE.
 | Tier 0 model | Full 45 PVT + MC, using **per-corner block parameters extracted from tier 2** | cheap; this is where system specs (noise, INL, offset) are proven at every corner |
 | Tier 1 behavioural | Nominal + parameter extremes from tier 2 | checks tier 0 against an independent implementation |
 | Tier 2 blocks (schematic, then PEX) | **Full 45 PVT + MC + fs set** | blocks are small, so this is feasible on the sandbox |
-| Top level, transistor (schematic, then PEX) | **5 extreme points:** tt/27/3.3, ss/125/3.0, ff/−40/3.6, sf/27/3.3, fs/27/3.3. Short windows (≤ 2048 cycles), as Paul did | long full-matrix top transients are infeasible in ngspice: TilesOS's 8192-bit run failed, and Paul gated on 2048-bit windows |
+| Top level, transistor (schematic, then PEX) | **Data-driven points (review F10):** the union of tier-2 worst corners per spec (≈6–8), always including tt/27/3.3, ss/−40/3.0, ss/125/3.0, ff/125/3.6, ff/−40/3.6 and VDPWR 1.62 with VAPWR 3.6. Short windows (≤ 2048 cycles), as Paul did | long full-matrix top transients are infeasible in ngspice: TilesOS's 8192-bit run failed, and Paul gated on 2048-bit windows |
 
-The top-level row is a proposed interpretation of "all corners" (decision **D2**, pending user confirmation). System-level specs are still proven at every corner, but in tier 0 fed with tier-2 per-corner numbers. Transistor top-level runs prove the chip is alive and correct at the extremes.
+The top-level row is the user-approved interpretation of "all corners" (decision **D2**), with point selection refined per review F10. Caveat: tier 0 does not model switch charge injection, kickback, CMFB or input CM, so those mechanisms are checked only at the top-level points. System-level specs are still proven at every corner, but in tier 0 fed with tier-2 per-corner numbers. Transistor top-level runs prove the chip is alive and correct at the extremes.
 
 ---
 
@@ -155,3 +155,27 @@ Total ≈ 18–22 weeks. Check the next sky130 shuttle date at tinytapeout.com/r
 - **Acceptance runs:** Haiku runs them on frozen copies on the sandbox.
 - **Ledger and decisions:** `AGENTS.md`, `DECISIONS.md`.
 - **Work orders:** `wo/`. The first batch is S0–S2.
+
+---
+
+## Review additions (REVIEW-spec-plan-2026-11-07.md), binding on the stages above
+- **S1:** option B = c1 0.125 / k 0.5 (bit-identical to A); option-A c2 = 0.25 variant (E1).
+- **S3:** OTA white-noise spec from a ktc_excess sweep (E2); A0 vs INL margin (F5, user Q6).
+- **S5:** **simulator null test.** An ideal deck must reproduce the theory to < 1/10 of the INL target. Freeze reltol, chgtol and method in params.spice. The B-source OTA gets GBW and slew terms; run spec_sweep on them (F3).
+- **S6:** golden vectors pin the exclusive-S convention (m2). They include frame tags (F4) and PGA ×2 if chosen (F6).
+- **C1/C2:** CMFB start-up with `.ic` outputs at 0 V and at VAPWR, every corner. Virtual-ground leakage measured for tier 0 (offset = I_leak/(fs·Cs)).
+- **C3:** test at Δ = 0, 4 MHz, ss/−40; gate on the probability that the DAC and decimator disagree (F8). Numeric kickback gate: disturbance on x2 ≤ a fraction of the minimum x2 step.
+- **C4:** input-CM sweep (F2); TG sized at ss/−40/3.0 (m4).
+- **C9:** assert the chop swap happens only in the reset window, plus a "swap one cycle late" mutant. Frame tags.
+- **C10:** PGA ratio check (if PGA ×2).
+- **V2/V3/V6:** every top-level testbench includes the TT pad model (500 Ω, 5 pF, ESD) on VIN± and VREF, plus a 10 kΩ source case.
+- **V3/V6:** INL uses residue reconstruction with x2[N] (F9). Plain N = 256 codes have a ≈ 244 ppm floor, which would make the check vacuous. The OTA −20 dB copy must REJECT.
+- **New V-tests:**
+  - reset completeness (back-to-back ±0.9·FS; the second result is independent of the first)
+  - reset charge injection (cancels in the chop pair)
+  - analog/digital reset alignment (off-by-one broken copy)
+  - overload 1.0–1.1·FS with recovery (m3)
+  - input-CM sweep
+  - ground-bounce injection if REF− is chip ground (F7)
+  - PGA ×2 in V4
+- **V9:** lists the un-simulated risks: MIM VCC and bottom-plate parasitic, substrate coupling.
