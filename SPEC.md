@@ -76,6 +76,43 @@ INL; INL comes from gain that **varies with swing** ⇒ OTA output-stage lineari
 
 ## 3. Block specifications
 
+### 3.0 Per-block specs (S3 result, v1) — authoritative for Stage C
+
+Source: `work/v1-design/results/s3_budget.md` (WO-05) as corrected by `work/v1-design/REVIEW-S3-2026-11-07.md`.
+Limits hold at every §6 corner, precision mode 0.25–2 MHz. Where §3.1–3.9 below disagree, **this table wins**.
+Design point: order-2 CIFB c1 0.125 / c2 0.5 / k 0.5, VREF 2.048 V (ua2 VREF+, ua3 VREF−), Cs1 0.5 pF / Cint1 4 pF,
+Cs2 0.5 pF / Cint2 1 pF, fs 2 MHz, N 4096 precision (ota+sys chop), Vos 9 mV.
+Budget (all blocks): noise ≤ 2.5 µV @15 SPS, INL ≤ 20 ppm, offset ≤ 5 µV, gain ≤ 0.5 %. Joint model run at spec:
+0.94 µV @15 SPS, 3.9 µV @240 SPS, 3.4 ppm INL.
+
+| Block | Parameter | Spec | Budget line / verify |
+|---|---|---|---|
+| OTA1, OTA2 (until separated) | DC gain | A(0) ≥ 80 dB; A ≥ 75 dB for \|Vout,diff\| ≤ 1.4 V (x peak 1.21 V + 15 %) | INL 8 ppm; gate: model INL with simulated A(v) table ≤ 8 ppm |
+| OTA1 | Sampled thermal noise | ≤ 250 µV rms diff at the virtual ground, integration-phase network, chopper parked (expect ≈ 75–110 µV); en reported only | noise 1.2 µV; `.noise` integrated |
+| OTA1 | 1/f, chopper | fc ≤ 631 kHz (info); constant chopper residue ≤ 1 mV; signal-dependent residue ≤ 1 µV over ±0.9 FS | noise 1.0 µV, offset reserve |
+| OTA1 | GBW / PM | ≥ 10 MHz (20 MHz design target, also covers 4 MHz fast mode) at β ≥ 0.84, C_L ≥ 1.4 pF (incl. CMFB caps); PM ≥ 60° | AC + step tb |
+| OTA1 | Slew | ≥ 12 V/µs diff (Cs2 samples x1 in OTA1's hold phase, D25); ≥ 25 V/µs if the phase plan changes | transient at real phase plan |
+| OTA2 | GBW / slew | GBW ≥ 10 MHz into ≈ 0.7 pF; SR ≥ 25 V/µs (c2 0.5) | hand |
+| OTA1/OTA2 | Offset | ≤ 9 mV 3σ (constant, cancels in sys pair) | model |
+| OTA1 | Input CM / CMFB | virtual-ground CM within PMOS-pair range for Vin_cm 0…VREF with D12 switching; CMFB absorbs per-cycle CM charge to ≤ 10 mV in 0.2·t_half; starts from either rail | C1/C4 tb |
+| Current | Analog total | ≤ 200 µA; estimate OTA1 ≈ 46, OTA2 ≈ 40, comparator 6, bias/CMFB 20 ⇒ ≈ 112 µA | hand |
+| Comparator | Offset / noise | ≤ 20 mV 3σ; ≤ 5 mV rms | INL 1 ppm, noise 0.3 µV |
+| Comparator | Decision time | < 68 ns at 2 MHz (< 34 ns at 4 MHz) for \|Vin\| ≥ 1 mV, worst corner | tb |
+| Comparator | Single bit (F8) | one retimed FF output drives DAC switches and decimator; y[0] forced at reset release | construction + test |
+| Comparator | Kickback | ≤ 5 mV on x2, recovered before next sample (gain only, 3.8 ppm/mV) | gain reserve |
+| Input switches | Settling | (Ron + 500 Ω + R_src)·(5 pF + Cs) ≤ 18.75 ns; Ron max over 0…VREF+ at ss/−40/3.0 **incl. body effect** ≤ 1.5 kΩ | INL 2 ppm; DC Ron sweep |
+| Input (user-facing) | Source | R_src ≤ 1 kΩ without board cap, or board RC (≥ 10 nF at pin); average pin current fs·Cs·(Vin_cm − Vref_cm) ≤ 1 µA ⇒ offset ΔR·I **not** cancelled by sys chop | datasheet row |
+| Reference | On-chip / board | on-chip τ_ref ≤ 10 ns; board decap ≥ 100 nF at ua2/ua3, DC R_ext ≤ 10 Ω per pin (u³ INL ≈ 1.4 ppm) | INL 2 ppm |
+| Reset | Residue / window | r ≤ 1e-4 on x1 and x2; window ≥ 2 clock cycles (≥ 1 µs at 2 MHz) | offset 1 µV; inter-conversion memory test |
+| Virtual ground | Leakage | ≤ 100 pA at ff/125/3.6; signal-dependent part ≤ 0.1 pA (ρ ≤ 0.1 %, assumption) | offset 1 µV |
+| Capacitors | Matching | Cs+/Cs− ≤ 0.75 % 3σ (CMRR); Cs/Cint not gain-relevant with shared Cs (≈ 11 ppm via k/c1) | gain |
+| Clock | Phases | t_half ≥ 225 ns at 2 MHz after non-overlap; bottom-plate early phases | hand |
+| Noise spec | Condition | at u = 0 (shorted input); reference noise is a board requirement | — |
+
+Allocation after review: INL 8 (OTA) + 2 (input settling) + 2 (ref settling) + 1 (comparator) + 1 (quant floor) + 2 (ref
+current) + 4 (reserve: MIM VCC, charge injection, substrate) = 20 ppm. Gain: A0 300, settling 500, k/c1 50, reserve 4150 ppm.
+Noise and offset allocations unchanged from s3_budget.md. MIM total ≈ 9,000 µm² (12 % of 2×2 tile).
+
 ### 3.1 OTA (first integrator — the critical path, no TT precedent)
 | Parameter | Target | Derivation |
 |---|---|---|
