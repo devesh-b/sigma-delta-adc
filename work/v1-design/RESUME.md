@@ -58,6 +58,20 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - Decide after WO-09's sign result. Options: tighter ΔCp allocation (≤ 0.15 fF), larger Cs, or RSS amendment to D33.
 - **WO-09:** running at dispatch time. It will hit the same outage, so check what it committed.
 
+## Update 2026-11-08 ~02:15
+- Sandbox still down.
+- WO-09 code committed (0903e8d, fd145ac), unrun. WO-10 code d54d8f3, unrun. D35 records the provisional calls (ε_eff sign, rsrc2 gate, per-side leakage, the S4 combination method).
+- **When the sandbox is back:**
+  1. sync;
+  2. `pytest design/tests model/tests`;
+  3. WO-09 modes via nohup (`--knees3` first, ~26 min, then `--cm2 --drift --rsrc2 --xcheck --nonvac3`; out /home/mempool/regr/tt/WO-09);
+  4. the WO-10 full s4 run plus `--nonvac`;
+  5. fix any breakage;
+  6. write s5c_tier1 and s4_corners results;
+  7. Haiku acceptance (direct ssh);
+  8. reviewer pass.
+- It is fine to resume the same coder agents or dispatch fresh ones from the WO files.
+
 ## Resume procedure
 1. `git log --oneline -5`; `git status --short`.
 2. For each of the three outputs above, check whether its file exists.
