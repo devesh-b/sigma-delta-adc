@@ -26,7 +26,7 @@ All targets are v1 (commit) unless marked (stretch). "Confirm in model/PDK" = no
 | PGA | **none in v1 (user Q3: shared Cs)**; ×2 / ×4 / ×8 stretch via a separate Cs:Cref ratio | ×8 needs 8 pF input Cs per side (area, Zin ≈ 125 kΩ) or a 125 fF ref cap (kT/C). Separate input/ref caps add mismatch gain error (calibratable) |
 | Power (analog) | ≤ 200 µA | OTA dominates |
 | Area | 2×2 tile (~334×225 µm, ~75k µm²) | met5 forbidden; power on met4 |
-| Analog pins | ua0 VIN+, ua1 VIN−, ua2 VREF, (ua3 integrator/supply monitor, optional) | pad path <500 Ω, <5 pF, ≤4 mA |
+| Analog pins | **ua0 VIN+, ua1 VIN−, ua2 VREF+, ua3 VREF− (Kelvin to sensor ground, user D24)** | pad path <500 Ω, <5 pF, ≤4 mA; both reference pins settle in ~3 ns ⇒ gain error only. Integrator/supply monitor would need ua4 (not in v1) |
 
 ---
 
@@ -180,7 +180,7 @@ Second integrator: same topology, relaxed gain/noise (its noise divides by first
 - Config register (via ui pins or simple SPI): order (1/2), N, fs divider, PGA gain, OTA-chop en,
   system-chop en, mode.
 - **Internal-short input mode** (mux VIN to CM) — required to measure the ADC's own noise floor.
-- ua3 optional monitor: integrator output or supply-sense (for the leakage-observability experiment).
+- ua3 is VREF− (D24). An integrator/supply monitor would need ua4 (not in v1; leakage observability via the internal-short mode instead).
 
 ### 3.9 Physical
 - Template: `tt_analog_2x2_3v3.def`; uses_3v3: true.
@@ -240,7 +240,7 @@ bottom-plate parasitic** (tc1 = tc2 = 0, c0–c1 only), so Cint VCC INL and Cp a
 digital→analog substrate coupling inside the tile is not simulated.
 
 User decisions 2026-11-07 (review questions): **Q1 → CM-rejecting input switching** (only differential charge
-transferred; input CM anywhere in 0…VREF); REF− pin choice still open (chip ground vs ua3). **Q2 → 4 MHz is a
+transferred; input CM anywhere in 0…VREF); REF− = ua3 (D24). **Q2 → 4 MHz is a
 fast / low-resolution mode** with its own INL target; precision specs gated at 0.25–2 MHz. **Q3 → shared Cs, no
 PGA in v1** (PGA ×2 moves to stretch). **Q6 → OTA A0 ≥ 80 dB.** **D3 → option B (VREF 2.048 V, c1 0.125, k 0.5). D4 → keep OTA chop paired with system chop.** Defaults accepted (D21): Vos 9 mV, order-1 characterization only, overload recovery.
-Cs 0.5 pF (D22), N 4096 precision (D23). REF− on ua3 proposed (D24), awaiting OK.
+Cs 0.5 pF (D22), N 4096 precision (D23). REF− on ua3 (D24, user OK).
