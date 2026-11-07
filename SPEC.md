@@ -117,7 +117,7 @@ Budget (all blocks): noise ≤ 2.5 µV @15 SPS, INL ≤ 20 ppm, offset ≤ 5 µV
   SR ×2, analog ≈ 198 µA. **Analog current ≤ 200 µA in every mode.** OTA input pairs in weak/moderate inversion so that
   GBW(boost)/GBW(nom) ≥ 1.9 at every corner (C1 gate). Boost latched only at a pair boundary (C9); one switched bias leg (C6).
 - Fast mode (4 MHz) INL: N 64 ≤ 200 ppm, N 256 ≤ 20 ppm, N 1024 ≤ 5 ppm (D28).
-- **CMRR ≥ 100 dB DC** (precision, sys chop on; input CM 0…VREF), ≥ 40 dB with sys chop off (D30).
+- **CMRR ≥ 100 dB DC (120 dB goal)** with sys chop on, **≥ 60 dB with sys chop off** (D30, D32; input CM 0…VREF). Risk: 60 dB sys-off needs CM→diff ≤ 0.1 % — Cs+/Cs− matching alone gives ≈ 0.75 % 3σ at 0.5 pF, so the D12 input-switching topology must reject CM to first order independent of cap matching (C4 owns).
 
 Allocation after review: INL 8 (OTA) + 2 (input settling) + 2 (ref settling) + 1 (comparator) + 1 (quant floor) + 2 (ref
 current) + 4 (reserve: MIM VCC, charge injection, substrate) = 20 ppm. Gain: A0 300, settling 500, k/c1 50, reserve 4150 ppm.
