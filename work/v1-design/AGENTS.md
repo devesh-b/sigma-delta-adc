@@ -11,3 +11,5 @@
 | reviewer (Opus) | design review of S3 | DONE → REVIEW-S3-2026-11-07.md; corrected table in SPEC §3.0 |
 
 Next after WO-05: Haiku acceptance + design review, then SPEC §3 update, then S4 (corner-aware tier 0).
+| coder WO-06 (Sonnet) | S4 corner model + hooks | RUNNING, budget 90 |
+| coder WO-07 (Sonnet) | S5 tier-1 ngspice | RUNNING, budget 90 |
