@@ -115,11 +115,197 @@ def finite(o):
     return o is not None
 
 
+# ---------------------------------------------------------------- v2 (WO-04)
+EXPECT_INL_4096 = {"A": 9.3, "A_half": 1.4, "B": 3.7, "C": 541.0}     # review probes, A0 80 dB
+EXPECT_FLOOR = 0.5                                                    # ppm, ideal OTA, N 4096
+V2_TOL = 0.20
+DECAPS_PF = (0, 2, 5, 10, 20)
+PAD_PF, R_REF = 5.0, 500.0
+INL_BUDGET = 100.0
+
+
+def v2_base(vref, c1, c2, k, cs=1e-12, **kw):
+    return m.with_(base(vref, c1, c2, k), a0_db=80, ref_mode="shared", cs=cs, **kw)
+
+
+def v2_opts():
+    return {"A": v2_base(1.2, 0.25, 0.5, 1.0),
+            "A_half": v2_base(1.2, 0.125, 0.5, 0.5),
+            "B": v2_base(2.048, 0.125, 0.5, 0.5),
+            "B_half-Cs": v2_base(2.048, 0.125, 0.5, 0.5, cs=0.5e-12),
+            "C": v2_base(2.048, 0.25, 0.5, 1.0)}
+
+
+def inl_v2(p, N, residue, vlin=2.0, npts=401):
+    """INL/gain of the static sweep (no noise/offset). residue: add x2[N]/(c1 c2)/(N(N-1)/2) to u_hat."""
+    pp = m.with_(p, N=N, ktc_on=False, flicker_on=False, vos=0.0, vres=0.0, vlin_diff=vlin)
+    u = np.linspace(-0.9, 0.9, npts)
+    uh, st = m.convert(pp, u, rng=np.random.default_rng(2), return_state=True)
+    if residue:
+        uh = uh + st["x2_final"] / (pp.c1 * pp.c2) / (N * (N - 1) / 2)
+    return m.linearity(u, uh)
+
+
+def floor_ppm(p, N):
+    u, uh, _ = m.dc_sweep(ideal(p, N), umax=0.9, npts=801)
+    return m.linearity(u, uh)["inl_ppm"]
+
+
+def within(v, exp, tol=V2_TOL):
+    return bool(np.isfinite(v) and abs(v - exp) <= tol * abs(exp))
+
+
+def avg_floor(p0, N, Ks, G=65, R=8, seed=11):
+    """Deterministic error that averaging does not remove (B point, ideal OTA, sys-chop pairs).
+    nf: noise-free max|err| over a fine DC grid (identical in every K by construction).
+    For each K: kT/C-dithered pair averages, per-DC bias = mean over R repeats; max|bias| over G DC values
+    (resolution: std/sqrt(R)), and rms of the repeat scatter (white-noise rms)."""
+    pi = m.with_(ideal(p0, N), sys_chop=True)
+    ug = np.linspace(-0.9, 0.9, 4001)
+    nf = float(np.max(np.abs(m.convert(m.with_(pi, sys_chop=False), ug) - ug))) * p0.vref * 1e6
+    nf_pair = None
+    rows = []
+    for K in Ks:
+        pk = m.with_(pi, ktc_on=True, cs=p0.cs)
+        rng = np.random.default_rng(seed)
+        u0 = np.linspace(-0.9, 0.9, G) + rng.uniform(-0.5, 0.5, G) * (1.8 / G)
+        u = np.repeat(u0, R * K)
+        sign = np.tile(np.array([1.0, -1.0]), len(u) // 2)
+        uh = m.convert(pk, u, rng=rng, sys_sign=sign).reshape(G, R, K).mean(axis=2)
+        err = (uh - u0[:, None]) * p0.vref * 1e6
+        bias = err.mean(axis=1)
+        rows.append({"K": K, "max_abs_bias_uV": float(np.max(np.abs(bias))),
+                     "rms_scatter_uV": float(np.sqrt(np.mean(err.var(axis=1, ddof=1)))),
+                     "bias_resolution_uV": float(np.sqrt(np.mean(err.var(axis=1, ddof=1)) / R)),
+                     "rate_sps": p0.fs / (N * K)})
+    return {"N": N, "noise_free_max_uV": nf, "rows": rows}
+
+
+def main_v2(a):
+    out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
+    lines, fails = [], []
+
+    def rec(ok, text):
+        lines.append(f"{'PASS' if ok else 'FAIL'} {text}")
+        if not ok:
+            fails.append(text)
+
+    opts = v2_opts()
+    inl_tab = {}
+    for n, p in opts.items():
+        l4 = inl_v2(p, 4096, False)
+        l1r = inl_v2(p, 1024, True)
+        l1 = inl_v2(p, 1024, False)
+        inl_tab[n] = {"inl_4096": l4["inl_ppm"], "gain_4096": l4["gain_err_ppm"], "inl_1024_residue": l1r["inl_ppm"],
+                      "inl_1024_plain": l1["inl_ppm"], "floor_4096": floor_ppm(p, 4096), "floor_1024": floor_ppm(p, 1024),
+                      "cint1_pF": p.cs / p.c1 * 1e12}
+    for n, e in EXPECT_INL_4096.items():
+        v = inl_tab[n]["inl_4096"]
+        rec(within(v, e), f"INL N 4096 A0 80 shared {n}: {v:.2f} ppm vs expected {e} (+-20 %)")
+    for n in inl_tab:
+        v = inl_tab[n]["floor_4096"]
+        rec(within(v, EXPECT_FLOOR), f"ideal-OTA quantization floor N 4096 {n}: {v:.2f} ppm vs expected {EXPECT_FLOOR} (+-20 %)")
+    rec(inl_tab["B_half-Cs"]["inl_4096"] <= 1.2 * inl_tab["B"]["inl_4096"],
+        f"B_half-Cs INL ({inl_tab['B_half-Cs']['inl_4096']:.2f}) ~ unchanged vs B ({inl_tab['B']['inl_4096']:.2f}) (review E1)")
+    rec(all(inl_tab[n]["inl_1024_residue"] < inl_tab[n]["inl_1024_plain"] or n == "C" for n in inl_tab),
+        "residue reconstruction lowers N 1024 INL (except C where OTA nonlinearity dominates)")
+    # non-vacuity: the +-20 % comparator rejects a doctored expectation
+    rec(not within(inl_tab["B"]["inl_4096"], 1.5 * EXPECT_INL_4096["B"]) and not within(inl_tab["A"]["inl_4096"], 0.5 * EXPECT_INL_4096["A"]),
+        "non-vacuity: comparator rejects expected values doctored by x1.5 / x0.5")
+    # non-vacuity: with A0 40 dB the A INL must be far outside the expected value
+    bad = inl_v2(m.with_(opts["A"], a0_db=40), 4096, False)["inl_ppm"]
+    rec(not within(bad, EXPECT_INL_4096["A"]), f"non-vacuity: A at A0 40 dB rejects ({bad:.0f} ppm)")
+    print(f"inl done", flush=True)
+
+    # 4. reference recovery at the B point
+    refrows = []
+    for dc in DECAPS_PF:
+        cd = (PAD_PF + dc) * 1e-12
+        pr = m.with_(opts["B"], cd_ref=cd, tau_ref=R_REF * cd)
+        l = inl_v2(pr, 4096, False)
+        refrows.append({"decap_pF": dc, "tau_ref_ns": R_REF * cd * 1e9, "inl_ppm": l["inl_ppm"], "gain_err_ppm": l["gain_err_ppm"],
+                        "decap_area_um2": dc * 1e-12 / MIM_F_PER_UM2})
+    ok_rows = [r for r in refrows if r["inl_ppm"] <= INL_BUDGET / 3]
+    min_decap = ok_rows[0] if ok_rows else None
+    rec(all(np.isfinite(r["inl_ppm"]) and np.isfinite(r["gain_err_ppm"]) for r in refrows), "ref recovery: all measurements finite")
+    rec(min_decap is not None, "ref recovery: some decap in the grid keeps INL <= 100/3 ppm" +
+        (f" (smallest {min_decap['decap_pF']} pF = {min_decap['decap_area_um2']:.0f} um2)" if min_decap else ""))
+    # sensitivity: at R = 500 ohm tau_ref <= 12.5 ns << t_half (225 ns), so the sweep is flat. Show where recovery starts to matter.
+    taurows = []
+    for tau_ns in (12.5, 30, 60, 100, 200):
+        for cd_pf in (2, 10):
+            pr = m.with_(opts["B"], cd_ref=cd_pf * 1e-12, tau_ref=tau_ns * 1e-9)
+            l = inl_v2(pr, 4096, False)
+            taurows.append({"tau_ref_ns": tau_ns, "cd_pF": cd_pf, "inl_ppm": l["inl_ppm"], "gain_err_ppm": l["gain_err_ppm"]})
+    g0 = refrows[0]["gain_err_ppm"]
+    g100 = [r for r in taurows if r["tau_ref_ns"] == 100 and r["cd_pF"] == 2][0]["gain_err_ppm"]
+    rec(abs(g100 - g0) > 10, f"non-vacuity: ref-recovery sweep reacts to a slow reference (tau 100 ns / 2 pF: gain err {g100:.0f} vs settled {g0:.0f} ppm)")
+    print("ref done", flush=True)
+
+    # 5. quantization floor of averaged modes
+    qf = {str(N): avg_floor(opts["B"], N, (2, 4, 8, 16, 32, 64)) for N in (1024, 4096)}
+    th_floor = {"1024": 6.8, "4096": 0.5}
+    for N in qf:
+        rec(np.isfinite(qf[N]["noise_free_max_uV"]) and all(np.isfinite(r["max_abs_bias_uV"]) for r in qf[N]["rows"]),
+            f"quant floor N {N}: finite (noise-free max|err| {qf[N]['noise_free_max_uV']:.1f} uV)")
+    rec(qf["1024"]["noise_free_max_uV"] > 4 * qf["4096"]["noise_free_max_uV"],
+        f"quant floor scales down with N: {qf['1024']['noise_free_max_uV']:.1f} uV (1024) vs {qf['4096']['noise_free_max_uV']:.1f} (4096)")
+    print("avg floor done", flush=True)
+
+    ref_txt = (f"smallest decap with INL <= {INL_BUDGET/3:.1f} ppm: {min_decap['decap_pF']} pF "
+               f"(tau_ref {min_decap['tau_ref_ns']:.1f} ns, {min_decap['decap_area_um2']:.0f} um2 MIM at 2 fF/um2)" if min_decap
+               else f"no decap in {DECAPS_PF} reaches INL <= {INL_BUDGET/3:.1f} ppm")
+    L = ["# S1 v2: INL at the D17 point (WO-04)", "",
+         f"Command: `python3 -m model.studies.s1_vref --v2 --out {a.out}`", "",
+         "Setup: fs 2 MHz, A0 80 dB (D15), a0_drop 0.9 with vlin 2.0 V, ref_mode shared (D14), tau_in 20 ns, tau_ref 10 ns / cd_ref 20 pF "
+         "(items 3, 5), no noise/offset in the INL sweep, 401 points in +-0.9. INL is the endpoint-fit INL in ppm of FSR (2 normalised). "
+         "Residue column: u = (sum S + (k/c1) S + x2[N]/(c1 c2)) / (N(N-1)/2) from the final x2 state. Floor: the same sweep with an ideal OTA, ideal references.", "",
+         "```"] + lines + ["```", "",
+         "## INL (ppm FSR) and quantization floor", "",
+         "| option | VREF | c1 | k | Cs pF | Cint1 pF | INL N4096 | floor N4096 | INL N1024 residue | INL N1024 plain | floor N1024 | gain err N4096 ppm |",
+         "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for n, p in opts.items():
+        t = inl_tab[n]
+        L.append(f"| {n} | {p.vref} | {p.c1} | {p.k} | {p.cs*1e12:g} | {t['cint1_pF']:.1f} | {t['inl_4096']:.2f} | {t['floor_4096']:.2f} | "
+                 f"{t['inl_1024_residue']:.2f} | {t['inl_1024_plain']:.2f} | {t['floor_1024']:.2f} | {t['gain_4096']:.0f} |")
+    L += ["", f"Expected (review probes, N 4096, A0 80): " + ", ".join(f"{k} {v}" for k, v in EXPECT_INL_4096.items()) + f", floor {EXPECT_FLOOR} ppm.", "",
+          "## Reference recovery at the B point (shared Cs, N 4096)", "",
+          f"R = {R_REF:g} ohm, node C = {PAD_PF:g} pF pad + on-chip decap; tau_ref = R C. Model: cd_ref = C, share = Cs/(Cs+C).", "",
+          "| decap pF | tau_ref ns | INL ppm | gain err ppm | decap MIM um2 (2 fF/um2) |", "|---|---|---|---|---|"]
+    for r in refrows:
+        L.append(f"| {r['decap_pF']} | {r['tau_ref_ns']:.1f} | {r['inl_ppm']:.2f} | {r['gain_err_ppm']:.0f} | {r['decap_area_um2']:.0f} |")
+    L += ["", ref_txt + ".", "",
+          "At R = 500 ohm the reference node settles to e^-18 within a half period (t_half 225 ns), so INL and gain error do not depend on the decap in this model; "
+          "decap sizing is then set by other effects (pad/bond droop between cycles, noise), not modelled here. Where recovery starts to matter (B point, shared Cs, N 4096):", "",
+          "| tau_ref ns | cd_ref pF | INL ppm | gain err ppm |", "|---|---|---|---|"] + [
+          f"| {r['tau_ref_ns']:g} | {r['cd_pF']} | {r['inl_ppm']:.2f} | {r['gain_err_ppm']:.0f} |" for r in taurows] + ["",
+          "## Quantization floor of averaged modes (B point, ideal OTA, sys-chop pairs)", "",
+          "Noise-free max|error| over 4001 DC values in +-0.9 is identical for every K (averaging identical conversions removes nothing). "
+          "With kT/C dither (white, Cs 1 pF; flicker not included, which is conservative) the per-DC bias is estimated from 8 repeats at 65 DC values; "
+          "its resolution is std/sqrt(8), shown as 'res'. Rates are fs/(N K).", ""]
+    for N in qf:
+        d = qf[N]
+        L += [f"N = {N}: noise-free max|err| = {d['noise_free_max_uV']:.2f} uV", "",
+              "| K pairs | rate SPS | max abs bias uV | res uV | rms scatter uV |", "|---|---|---|---|---|"]
+        for r in d["rows"]:
+            L.append(f"| {r['K']} | {r['rate_sps']:.2f} | {r['max_abs_bias_uV']:.2f} | {r['bias_resolution_uV']:.2f} | {r['rms_scatter_uV']:.2f} |")
+        L.append("")
+    (out / "s1_vref_v2.md").write_text("\n".join(L) + "\n")
+    (out / "s1_vref_v2.json").write_text(json.dumps({"inl": inl_tab, "ref_recovery": refrows, "ref_tau_sweep": taurows, "min_decap": min_decap,
+                                                    "avg_floor": qf, "lines": lines}, indent=1, default=float))
+    print("\n".join(lines)); print(ref_txt)
+    print("REJECT" if fails else "ACCEPT")
+    return 1 if fails else 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--vlin", type=float, default=2.0)
+    ap.add_argument("--v2", action="store_true", help="WO-04: INL at the D17 point, ref recovery, quant floor")
     a = ap.parse_args(argv)
+    if a.v2:
+        return main_v2(a)
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     fails, lines = [], []
 

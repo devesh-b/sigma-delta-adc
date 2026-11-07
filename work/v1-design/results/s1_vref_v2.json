@@ -1,0 +1,274 @@
+{
+ "inl": {
+  "A": {
+   "inl_4096": 9.285690438010086,
+   "gain_4096": -139.64141568312272,
+   "inl_1024_residue": 9.05773190906789,
+   "inl_1024_plain": 15.264158724326293,
+   "floor_4096": 0.419421073705184,
+   "floor_1024": 7.1786412512153674,
+   "cint1_pF": 4.0
+  },
+  "A_half": {
+   "inl_4096": 1.3801844856997647,
+   "gain_4096": -54.849664224754235,
+   "inl_1024_residue": 1.0268441451022348,
+   "inl_1024_plain": 6.758614369495319,
+   "floor_4096": 0.419421073705184,
+   "floor_1024": 7.1786412512153674,
+   "cint1_pF": 8.0
+  },
+  "B": {
+   "inl_4096": 3.633194062879763,
+   "gain_4096": -63.06386514731699,
+   "inl_1024_residue": 3.3389996348942574,
+   "inl_1024_plain": 9.345598118326581,
+   "floor_4096": 0.419421073705184,
+   "floor_1024": 7.1786412512153674,
+   "cint1_pF": 8.0
+  },
+  "B_half-Cs": {
+   "inl_4096": 3.633194062879763,
+   "gain_4096": -63.06386514731699,
+   "inl_1024_residue": 3.338999635060791,
+   "inl_1024_plain": 9.345598118326581,
+   "floor_4096": 0.419421073705184,
+   "floor_1024": 7.1786412512153674,
+   "cint1_pF": 4.0
+  },
+  "C": {
+   "inl_4096": 541.3184905372904,
+   "gain_4096": -1735.0512142179086,
+   "inl_1024_residue": 539.7933088326922,
+   "inl_1024_plain": 543.1329423264964,
+   "floor_4096": 0.419421073705184,
+   "floor_1024": 7.1786412512153674,
+   "cint1_pF": 4.0
+  }
+ },
+ "ref_recovery": [
+  {
+   "decap_pF": 0,
+   "tau_ref_ns": 2.5,
+   "inl_ppm": 3.633194062879763,
+   "gain_err_ppm": -63.06386514731699,
+   "decap_area_um2": 0.0
+  },
+  {
+   "decap_pF": 2,
+   "tau_ref_ns": 3.5,
+   "inl_ppm": 3.633194062879763,
+   "gain_err_ppm": -63.06386514731699,
+   "decap_area_um2": 999.9999999999999
+  },
+  {
+   "decap_pF": 5,
+   "tau_ref_ns": 5.0,
+   "inl_ppm": 3.633194062879763,
+   "gain_err_ppm": -63.06386514731699,
+   "decap_area_um2": 2499.9999999999995
+  },
+  {
+   "decap_pF": 10,
+   "tau_ref_ns": 7.499999999999999,
+   "inl_ppm": 3.633194062879763,
+   "gain_err_ppm": -63.06386514731699,
+   "decap_area_um2": 4999.999999999999
+  },
+  {
+   "decap_pF": 20,
+   "tau_ref_ns": 12.500000000000002,
+   "inl_ppm": 3.633194062879763,
+   "gain_err_ppm": -63.06386514731699,
+   "decap_area_um2": 9999.999999999998
+  }
+ ],
+ "ref_tau_sweep": [
+  {
+   "tau_ref_ns": 12.5,
+   "cd_pF": 2,
+   "inl_ppm": 3.633194062879763,
+   "gain_err_ppm": -63.06386514731699
+  },
+  {
+   "tau_ref_ns": 12.5,
+   "cd_pF": 10,
+   "inl_ppm": 3.633194062879763,
+   "gain_err_ppm": -63.06386514731699
+  },
+  {
+   "tau_ref_ns": 30,
+   "cd_pF": 2,
+   "inl_ppm": 3.66777319898981,
+   "gain_err_ppm": -63.59381359388738
+  },
+  {
+   "tau_ref_ns": 30,
+   "cd_pF": 10,
+   "inl_ppm": 3.689236111104055,
+   "gain_err_ppm": -63.328839370546675
+  },
+  {
+   "tau_ref_ns": 60,
+   "cd_pF": 2,
+   "inl_ppm": 4.229386065257579,
+   "gain_err_ppm": -78.2998829873538
+  },
+  {
+   "tau_ref_ns": 60,
+   "cd_pF": 10,
+   "inl_ppm": 3.8979033119557194,
+   "gain_err_ppm": -67.30345272010219
+  },
+  {
+   "tau_ref_ns": 100,
+   "cd_pF": 2,
+   "inl_ppm": 58.40952667116039,
+   "gain_err_ppm": -81.87703500206479
+  },
+  {
+   "tau_ref_ns": 100,
+   "cd_pF": 10,
+   "inl_ppm": 23.423191391924725,
+   "gain_err_ppm": -62.66640381236144
+  },
+  {
+   "tau_ref_ns": 200,
+   "cd_pF": 2,
+   "inl_ppm": 1857.1977068071456,
+   "gain_err_ppm": 1520.6870675619211
+  },
+  {
+   "tau_ref_ns": 200,
+   "cd_pF": 10,
+   "inl_ppm": 652.1422371031649,
+   "gain_err_ppm": 520.9393230225512
+  }
+ ],
+ "min_decap": {
+  "decap_pF": 0,
+  "tau_ref_ns": 2.5,
+  "inl_ppm": 3.633194062879763,
+  "gain_err_ppm": -63.06386514731699,
+  "decap_area_um2": 0.0
+ },
+ "avg_floor": {
+  "1024": {
+   "N": 1024,
+   "noise_free_max_uV": 33.257478005907615,
+   "rows": [
+    {
+     "K": 2,
+     "max_abs_bias_uV": 34.51833995632114,
+     "rms_scatter_uV": 5.637616541597883,
+     "bias_resolution_uV": 1.9931984431466576,
+     "rate_sps": 976.5625
+    },
+    {
+     "K": 4,
+     "max_abs_bias_uV": 31.341409360038597,
+     "rms_scatter_uV": 3.8383801300724882,
+     "bias_resolution_uV": 1.3570723093729795,
+     "rate_sps": 488.28125
+    },
+    {
+     "K": 8,
+     "max_abs_bias_uV": 32.56330574322419,
+     "rms_scatter_uV": 2.740517649516417,
+     "bias_resolution_uV": 0.9689193069672383,
+     "rate_sps": 244.140625
+    },
+    {
+     "K": 16,
+     "max_abs_bias_uV": 33.11315911565771,
+     "rms_scatter_uV": 1.9470622055202724,
+     "bias_resolution_uV": 0.6883904444577099,
+     "rate_sps": 122.0703125
+    },
+    {
+     "K": 32,
+     "max_abs_bias_uV": 31.982904961211034,
+     "rms_scatter_uV": 1.3538343859146396,
+     "bias_resolution_uV": 0.47865273744188347,
+     "rate_sps": 61.03515625
+    },
+    {
+     "K": 64,
+     "max_abs_bias_uV": 32.25783164739937,
+     "rms_scatter_uV": 0.9468949768601862,
+     "bias_resolution_uV": 0.33477792960465835,
+     "rate_sps": 30.517578125
+    }
+   ]
+  },
+  "4096": {
+   "N": 4096,
+   "noise_free_max_uV": 2.0825396825330245,
+   "rows": [
+    {
+     "K": 2,
+     "max_abs_bias_uV": 3.1496681008320593,
+     "rms_scatter_uV": 2.23406963663866,
+     "bias_resolution_uV": 0.7898628948550813,
+     "rate_sps": 244.140625
+    },
+    {
+     "K": 4,
+     "max_abs_bias_uV": 2.162704092512513,
+     "rms_scatter_uV": 1.5677710748192593,
+     "bias_resolution_uV": 0.5542907791764102,
+     "rate_sps": 122.0703125
+    },
+    {
+     "K": 8,
+     "max_abs_bias_uV": 1.8140086890241491,
+     "rms_scatter_uV": 1.2077676837873657,
+     "bias_resolution_uV": 0.427010359652008,
+     "rate_sps": 61.03515625
+    },
+    {
+     "K": 16,
+     "max_abs_bias_uV": 1.534552771829567,
+     "rms_scatter_uV": 0.8051940338143709,
+     "bias_resolution_uV": 0.284679080740546,
+     "rate_sps": 30.517578125
+    },
+    {
+     "K": 32,
+     "max_abs_bias_uV": 1.7242371660586286,
+     "rms_scatter_uV": 0.544412450275801,
+     "bias_resolution_uV": 0.1924788676762015,
+     "rate_sps": 15.2587890625
+    },
+    {
+     "K": 64,
+     "max_abs_bias_uV": 1.8702892140822769,
+     "rms_scatter_uV": 0.3910316583154639,
+     "bias_resolution_uV": 0.13825056862674276,
+     "rate_sps": 7.62939453125
+    }
+   ]
+  }
+ },
+ "lines": [
+  "PASS INL N 4096 A0 80 shared A: 9.29 ppm vs expected 9.3 (+-20 %)",
+  "PASS INL N 4096 A0 80 shared A_half: 1.38 ppm vs expected 1.4 (+-20 %)",
+  "PASS INL N 4096 A0 80 shared B: 3.63 ppm vs expected 3.7 (+-20 %)",
+  "PASS INL N 4096 A0 80 shared C: 541.32 ppm vs expected 541.0 (+-20 %)",
+  "PASS ideal-OTA quantization floor N 4096 A: 0.42 ppm vs expected 0.5 (+-20 %)",
+  "PASS ideal-OTA quantization floor N 4096 A_half: 0.42 ppm vs expected 0.5 (+-20 %)",
+  "PASS ideal-OTA quantization floor N 4096 B: 0.42 ppm vs expected 0.5 (+-20 %)",
+  "PASS ideal-OTA quantization floor N 4096 B_half-Cs: 0.42 ppm vs expected 0.5 (+-20 %)",
+  "PASS ideal-OTA quantization floor N 4096 C: 0.42 ppm vs expected 0.5 (+-20 %)",
+  "PASS B_half-Cs INL (3.63) ~ unchanged vs B (3.63) (review E1)",
+  "PASS residue reconstruction lowers N 1024 INL (except C where OTA nonlinearity dominates)",
+  "PASS non-vacuity: comparator rejects expected values doctored by x1.5 / x0.5",
+  "PASS non-vacuity: A at A0 40 dB rejects (869 ppm)",
+  "PASS ref recovery: all measurements finite",
+  "PASS ref recovery: some decap in the grid keeps INL <= 100/3 ppm (smallest 0 pF = 0 um2)",
+  "PASS non-vacuity: ref-recovery sweep reacts to a slow reference (tau 100 ns / 2 pF: gain err -82 vs settled -63 ppm)",
+  "PASS quant floor N 1024: finite (noise-free max|err| 33.3 uV)",
+  "PASS quant floor N 4096: finite (noise-free max|err| 2.1 uV)",
+  "PASS quant floor scales down with N: 33.3 uV (1024) vs 2.1 (4096)"
+ ]
+}
