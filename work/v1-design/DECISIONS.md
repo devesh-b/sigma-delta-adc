@@ -13,3 +13,8 @@
 | D9 | WO-01/02/03 run in parallel as file-disjoint WOs; commits path-limited (`git commit -- <paths>`) | S0 (infra) and S1/S2 (model) share no files; WO-02 alone owns iadc.py | serial | cheap |
 | D10 | Review F1 applied live to WO-02: option B = c1 0.125, k 0.5, c2 0.5 (bit-identical to A); option-A c2 = 0.25 variant added | proven by algebra; the old option B was a different NTF | let WO-02 finish, then redo | cheap |
 | D11 | Non-decision review fixes applied to SPEC/PLAN (β, t_half, frame tags, retimed FF, acc width, corners ss_hh/ff_ll, MC rule, VDPWR axis, residue reconstruction, V-gaps); user questions Q1–Q3, Q5, Q6 left open in SPEC §6 | reviewer findings with clear fixes | wait for the user on all | cheap |
+| D12 | USER Q1: CM-rejecting input switching (only differential charge transferred, input CM 0…VREF); REF− pin (chip ground vs ua3) still open | user choice | ua3 = REF−; chip ground | design effort in C4 |
+| D13 | USER Q2: fs = 4 MHz is a fast / low-resolution mode with its own INL target; precision gated at 0.25–2 MHz | slew-then-settle INL at 4 MHz (review F3) | OTA specced at 4 MHz | cheap |
+| D14 | USER Q3: shared Cs (input = DAC cap), no PGA in v1; PGA ×2 → stretch | separate caps far more settling-sensitive; anchor app (RTD) needs no gain | separate caps + PGA ×2 | cheap now, costly after layout |
+| D15 | USER Q6: OTA A0 ≥ 80 dB | INL margin (review F5) | decide after S1 | cheap now |
+| D16 | Note: S1 (WO-02) ran with the legacy design-point settings (separate caps). Per D14 the design point must be re-run with shared caps in S3 | consistency | — | — |

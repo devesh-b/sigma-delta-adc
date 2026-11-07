@@ -23,7 +23,7 @@ All targets are v1 (commit) unless marked (stretch). "Confirm in model/PDK" = no
 | VREF nominal | **1.2 V provisional** (range 1.0–2.048 V, ratiometric) | 2.048 V keeps the MCP3421 FSR but stresses OTA output swing on 3.3 V. **All model numbers in §2 were run at 2.048 V**: µV noise and ppm INL carry over, effective resolution drops by log2(2.048/1.2) ≈ 0.77 b at 1.2 V. Alternative (option B, corrected per review F1): keep 2.048 V and halve swing with **c1 = 0.125, k = 0.5** (k/c1 stays 4, bitstream identical to c1 = 0.25/k = 1). Decided by study S1 (work/v1-design/PLAN.md) |
 | Supply | VAPWR 3.3 V (analog), VDPWR 1.8 V (digital) | uses_3v3 template |
 | Sampling cap Cs | 1 pF (MIM `cap_mim_m3_1` only) | kT/C averages over N ⇒ 1 pF ample |
-| PGA | **×1 / ×2 (v1)**; ×4 / ×8 (stretch) via Cs:Cref ratio | ×8 needs 8 pF input Cs per side (area, Zin ≈ 125 kΩ) or a 125 fF ref cap (kT/C). Separate input/ref caps add mismatch gain error (calibratable) |
+| PGA | **none in v1 (user Q3: shared Cs)**; ×2 / ×4 / ×8 stretch via a separate Cs:Cref ratio | ×8 needs 8 pF input Cs per side (area, Zin ≈ 125 kΩ) or a 125 fF ref cap (kT/C). Separate input/ref caps add mismatch gain error (calibratable) |
 | Power (analog) | ≤ 200 µA | OTA dominates |
 | Area | 2×2 tile (~334×225 µm, ~75k µm²) | met5 forbidden; power on met4 |
 | Analog pins | ua0 VIN+, ua1 VIN−, ua2 VREF, (ua3 integrator/supply monitor, optional) | pad path <500 Ω, <5 pF, ≤4 mA |
@@ -80,7 +80,7 @@ INL; INL comes from gain that **varies with swing** ⇒ OTA output-stage lineari
 | Parameter | Target | Derivation |
 |---|---|---|
 | Topology | Fully differential, PMOS input pair, with CMFB | PMOS for lower 1/f |
-| DC gain A0 | **≥ 75 dB** (v1, **OPEN — review F5 / user Q6**: 75 dB gives 71 ppm, failing the PLAN's 1.5× INL margin; candidates 78–80 dB, tighter a0_drop, or half swing); 80–90 dB (stretch) | §2.3, for ≤100→≤30 ppm INL |
+| DC gain A0 | **≥ 80 dB** (v1, user Q6; 75 dB gave 71 ppm at VREF 2.048/c1 0.25 and failed the 1.5× INL margin); 90 dB (stretch) | §2.3, for ≤100→≤30 ppm INL |
 | Output-swing linearity | gain drop ≤ ~90% at max excursion; characterise g_m vs Vout | dominant INL mechanism |
 | GBW (OTA) | **≥ 10 MHz required, 20 MHz design target** at fs=2 MHz (scale with fs) | see settling below |
 | Phase margin | ≥ 60° | SC stability |
@@ -126,7 +126,7 @@ Second integrator: same topology, relaxed gain/noise (its noise divides by first
 | Cint1 | 4 pF | c1 = Cs1/Cint1 = 0.25 |
 | Cs2 (sample, int2) | 1 pF | |
 | Cint2 | 2 pF | c2 = Cs2/Cint2 = 0.5 |
-| PGA caps | binary Cs for ×1/2/4/8 | matching-limited gain error |
+| PGA caps | none in v1 (shared Cs); stretch: binary Cs for ×2/4/8 | matching-limited gain error |
 | Density | ~2 fF/µm² (confirm in PDK) | total core caps ×2 (diff) ≈ 16 pF ≈ 8000 µm² (~10% of tile) |
 | Layout | common-centroid, guard-ringed | matching + substrate isolation |
 
@@ -222,5 +222,8 @@ Known un-simulated risks (listed in V9, not gated): the sky130 MIM model has **n
 bottom-plate parasitic** (tc1 = tc2 = 0, c0–c1 only), so Cint VCC INL and Cp appear only in PEX/silicon;
 digital→analog substrate coupling inside the tile is not simulated.
 
-Open user decisions from review: Q1 input CM range + REF− (chip ground vs ua3 as Kelvin REF−, +€100), Q2 4 MHz
-mode, Q3 shared Cs (no PGA) vs separate Cin/Cref (PGA ×2), Q5 order-1 mode coverage, Q6 A0 target vs INL margin.
+User decisions 2026-11-07 (review questions): **Q1 → CM-rejecting input switching** (only differential charge
+transferred; input CM anywhere in 0…VREF); REF− pin choice still open (chip ground vs ua3). **Q2 → 4 MHz is a
+fast / low-resolution mode** with its own INL target; precision specs gated at 0.25–2 MHz. **Q3 → shared Cs, no
+PGA in v1** (PGA ×2 moves to stretch). **Q6 → OTA A0 ≥ 80 dB.** Still open: Q5 order-1 mode coverage; D3 VREF
+option (S1: A and B both pass).
