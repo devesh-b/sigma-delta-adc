@@ -57,3 +57,27 @@ def test_bad_ota_rejects_on_inl_and_spec_ota_passes():
     good = s3.ideal_base(a0_db=80, a0_drop=0.9, vlin_diff=2.0)
     assert s3.inl_gain(bad)[0] > 20.0
     assert s3.inl_gain(good)[0] < 20.0
+
+
+def _row(block, metric, share, value):
+    return {"block": block, "metric": metric, "share": share, "spec": "", "value": value,
+            "margin": share / value if value > 0 else math.inf, "kind": "x"}
+
+
+def test_gate_rejects_value_equal_share_old_cap_row():
+    # the old circular row: value 3000 set equal to its share 3000 (review S3-6)
+    circ = _row("cap ratio mismatch Cs/Cint (hand)", "gain_ppm", 3000.0, 3000.0)
+    joint = {"n15": 0.9, "inl": 3.0, "off_sys": 0.0, "gain": 100.0}
+    fails = s3.verdict([circ], joint)
+    assert any("circular" in f for f in fails)
+    ok_row = _row("k/c1 ratio mismatch", "gain_ppm", 50.0, 10.9)
+    assert not any("circular" in f for f in s3.verdict([ok_row], joint))
+    # a row whose value is within 1e-9 of its share is still circular; a reserve row with value 0 is fine
+    assert any("circular" in f for f in s3.verdict([_row("x", "inl_ppm", 2.0, 2.0 * (1 + 1e-12))], joint))
+    assert not any("circular" in f for f in s3.verdict([_row("reserve", "inl_ppm", 4.0, 0.0)], joint))
+
+
+def test_kc1_row_matches_review_11ppm():
+    # 2 k/(c1 N) * 0.56 % = 2*0.5/(0.125*4096) * 0.0056 = 10.9 ppm (review S3-6: ~11 ppm)
+    assert math.isclose(2 * 0.5 / (0.125 * 4096) * 0.0056 * 1e6, 10.94, rel_tol=0.01)
+    assert "dcs_ratio" in s3.SPEC_BLK and s3.SPEC_BLK["dcs_ratio"] == 0.0056 and s3.SPEC_BLK["r_ext"] == 10.0

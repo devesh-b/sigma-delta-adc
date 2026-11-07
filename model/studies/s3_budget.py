@@ -42,7 +42,8 @@ BUDGET = {"noise_uv": 2.5, "inl_ppm": 20.0, "offset_uv": 5.0, "gain_ppm": 5000.0
 # ----------------------------------------------------------------------------------------- spec candidates
 SPEC_BLK = {"a0_db": 80.0, "a0_drop": 0.9, "vlin": 2.0, "ota_en": 10.0, "fc": 631e3, "lf": LF, "vres": 5e-6,
             "vos": 9e-3, "vos2": 9e-3, "comp_off": 20e-3, "comp_noise": 5e-3, "tau_in": 18.75e-9, "tau_ref": 10e-9,
-            "r_reset": 1e-4, "i_leak": 100e-12}
+            "r_reset": 1e-4, "i_leak": 100e-12, "r_ext": 10.0, "dcs_ratio": 0.0056}
+# r_ext: DC resistance per reference pin (board spec, SPEC 3.0); dcs_ratio: PDK 3-sigma k/c1 ratio mismatch (review S3-6, 0.56 %)
 RHO_LEAK = 1e-3                # ASSUMPTION: fraction of the leakage offset that does not cancel in sys pairs
 
 
@@ -68,7 +69,7 @@ def spec_point(**ov):
     return ideal_base(a0_db=s["a0_db"], a0_drop=s["a0_drop"], vlin_diff=s["vlin"], ktc_excess=excess_from_en(s["ota_en"]),
                       flicker_on=True, ota_fc=s["fc"], lf_gain=s["lf"], vres=s["vres"], vos=s["vos"], vos2=s["vos2"],
                       comp_offset=s["comp_off"] / VREF, comp_noise=s["comp_noise"] / VREF, tau_in=s["tau_in"],
-                      tau_ref=s["tau_ref"], cd_ref=5e-12, x1_offset=s["r_reset"] * X1MAX_V)
+                      tau_ref=s["tau_ref"], cd_ref=5e-12, x1_offset=s["r_reset"] * X1MAX_V, r_ext_ref=s["r_ext"])
 
 
 # ----------------------------------------------------------------------------------------- measurements
@@ -371,7 +372,9 @@ def alloc_rows(spec=None):
     m_co = metrics(ideal_base(comp_offset=s["comp_off"] / VREF, c2=0.5), noise=False)
     add("comparator offset", "inl_ppm", 1.0, f"<= {s['comp_off']*1e3:g} mV", m_co["inl"])
     add("quantization floor (N 4096, raw accumulators)", "inl_ppm", 1.0, "N = 4096", floor)
-    add("reserve: MIM VCC, charge-inj. nonlinearity, substrate", "inl_ppm", 6.0, "unmodelled", 0.0, "reserve")
+    m_rx = metrics(ideal_base(r_ext_ref=s["r_ext"]), noise=False)
+    add("reference current x external R (u^3)", "inl_ppm", 2.0, f"R_ext <= {s['r_ext']:g} ohm per pin, >= 100 nF decap (review S3-7a)", m_rx["inl"])
+    add("reserve: MIM VCC, charge-inj. nonlinearity, substrate", "inl_ppm", 4.0, "unmodelled", 0.0, "reserve")
     # --- offset after sys chop (|residual|, uV)
     m_v1 = metrics(ideal_base(vos=s["vos"], vres=s["vres"], lf_gain=s["lf"]), noise=False)
     m_v2 = metrics(ideal_base(vos2=s["vos2"]), noise=False)
@@ -380,7 +383,7 @@ def alloc_rows(spec=None):
     add("Vos1, Vos2, vres, comp offset (model residual in sys pair)", "offset_uv", 1.0,
         f"Vos {s['vos']*1e3:g} mV, vres {s['vres']*1e6:g} uV, comp {s['comp_off']*1e3:g} mV", mod_res)
     m_rr = metrics(ideal_base(x1_offset=s["r_reset"] * X1MAX_V, sys_chop=False), noise=False)
-    add("reset residue r (worst case, does NOT cancel)", "offset_uv", 1.0, f"r <= {s['r_reset']:g} (window >= 15 tau)",
+    add("reset residue r (worst case, does NOT cancel)", "offset_uv", 1.0, f"r <= {s['r_reset']:g}, reset window >= 2 clock cycles (1 us at 2 MHz)",
         abs(m_rr["off_nosys"]))
     leak = leak_offset(s["i_leak"], 0.25e6, CS) * 1e6 * RHO_LEAK
     add("virtual-ground leakage (hand, rho 0.1 % ASSUMED)", "offset_uv", 1.0,
@@ -390,8 +393,10 @@ def alloc_rows(spec=None):
     add("finite A0 and swing (model)", "gain_ppm", 300.0, f"A >= {s['a0_db']:g} dB", abs(m_o["gain"]))
     ms = metrics(ideal_base(tau_in=s["tau_in"], tau_ref=s["tau_ref"], cd_ref=5e-12), noise=False)
     add("input + reference settling (model)", "gain_ppm", 500.0, "tau_in, tau_ref as above", abs(ms["gain"]))
-    add("cap ratio mismatch Cs/Cint (hand)", "gain_ppm", 3000.0, "3 sigma ratio mismatch <= 0.3 %; verify by MC in C10", 3000.0, "requirement")
-    add("reserve: pad/bond droop, 5 mV kickback", "gain_ppm", 1200.0, "calibratable", hc["kick_gain_ppm_per_mV"] * 5, "hand")
+    # with shared Cs only k/c1 enters the reconstruction: gain error = 2 k /(c1 N) * (k/c1 mismatch)   [theory]
+    kc1 = 2 * KK / (C1 * N_PREC) * s["dcs_ratio"] * 1e6
+    add("k/c1 ratio mismatch (hand, shared Cs)", "gain_ppm", 50.0, f"k/c1 3 sigma mismatch <= {s['dcs_ratio']*100:g} % (PDK, review S3-6)", kc1, "hand")
+    add("reserve: pad/bond droop, 5 mV kickback", "gain_ppm", 4150.0, "calibratable", hc["kick_gain_ppm_per_mV"] * 5, "hand")
     return rows, {"nom_base": base, "floor": floor}
 
 
@@ -410,6 +415,8 @@ def combine(rows):
 def verdict(rows, joint, extra_fail=()):
     fails = list(extra_fail)
     for r in rows:
+        if r["share"] > 0 and np.isfinite(r["value"]) and abs(r["value"] - r["share"]) <= 1e-9 * r["share"]:
+            fails.append(f"row '{r['block']}' [{r['metric']}]: value == share ({r['share']:g}): circular, not a measurement")
         if not (np.isfinite(r["value"]) and r["margin"] >= 1.0):
             fails.append(f"row '{r['block']}' [{r['metric']}]: value {r['value']:.3g} vs share {r['share']:g} (margin {r['margin']:.2f})")
     for mtr, (ssh, _) in combine(rows).items():
@@ -556,9 +563,10 @@ def spec_table(hc, rows):
                                                                                       f"tau <= {g(hc['tau_in_budget_t12_ns'])} ns (t_half/12) is the outer limit", "INL share 2 ppm"],
         ["TG Ron (hand, ASSUMED device numbers)", "ss/-40 C/3.0 V mid-range", f"Ron ~ {hc['ron_ohm']:.0f} ohm at W/L 20/0.5 each; spec Ron <= 1.5 kohm", "hand"],
         ["Reference path", "tau_ref (500 ohm, 5 pF pad)", f"<= {s['tau_ref']*1e9:g} ns, pad path < 500 ohm and < 5 pF", "INL share 2 ppm"],
-        ["Reset", "residue r on x1 at conversion start", f"<= {s['r_reset']:g}; window >= 15 tau = {hc['t_reset_15tau_ns']:.0f} ns (1 kohm x 4 pF), residue at 15 tau {hc['r_after_15tau']:.1e}", "offset share 1 uV"],
+        ["Reset", "residue r on x1 at conversion start", f"<= {s['r_reset']:g}; reset window >= 2 clock cycles (1 us at 2 MHz; OTA slew + settle >= 250 ns, review S3-5); inter-conversion memory test", "offset share 1 uV"],
         ["Virtual ground", "leakage (125 C)", f"<= {s['i_leak']*1e12:g} pA total at the integrator input; non-cancelling fraction <= {RHO_LEAK*100:g} % (ASSUMED)", "offset share 1 uV"],
-        ["Capacitors", "ratio mismatch Cs/Cint", "<= 0.3 % (3 sigma), gain error only; verify by MC (C10)", "gain share 3000 ppm"],
+        ["Capacitors", "k/c1 ratio mismatch (shared Cs)", f"<= {s['dcs_ratio']*100:g} % (3 sigma, PDK) gives {v['k/c1 ratio mismatch (hand, shared Cs)']['value']:.1f} ppm gain error", "gain share 50 ppm"],
+        ["Capacitors", "Cs+/Cs- mismatch (CMRR)", "<= 0.75 % (3 sigma); input-CM to differential conversion 0.75 %", "S4 MC"],
         ["Clock", "t_half / non-overlap", f"t_half {T_HALF*1e9:.0f} ns at 2 MHz, 0.45/fs after non-overlap; jitter-immune (SC)", "hand"],
     ]
     L.append(fmt_table(["block", "parameter", "spec", "budget line"], T))
@@ -568,7 +576,7 @@ def spec_table(hc, rows):
           "- Chopper charge-injection spikes and OTA settling with the chopper in place, chopping and parked.",
           "- OTA1 and OTA2 gain/linearity are applied together in the model (one `a0_db`); OTA2 cannot be relaxed on evidence until iadc.py has a separate a0_db2.",
           "- Leakage cancellation in sys pairs assumes a signal-independent leakage (rho = 0.1 % non-cancelling is an assumption).",
-          "- Reset residue is budgeted as non-cancelling; a +--+ pair order and a >= 15 tau reset window make it negligible.",
+          "- Reset residue is budgeted as non-cancelling; a +--+ pair order and a >= 2-cycle reset window make it negligible.",
           "- Shared-Cs input: the source must settle a 5 pF pad plus Cs every half period; a 10 kohm source is not supported without an external buffer or decap.",
           "- Fast modes (N 64/256/1024, 4 MHz) have their own INL/noise targets and were not swept here.", ""]
     return L
@@ -590,6 +598,11 @@ def main():
         jm = metrics(spec_point(**bad), noise=False)
         fails = verdict(rows, {"n15": 0.0, "inl": jm["inl"], "off_sys": 0.0, "gain": 0.0})
         inl_fail = [f for f in fails if "[inl_ppm]" in f]
+        verdict_txt = "REJECT" if inl_fail else "ACCEPT (nonvac FAILED to reject the broken OTA)"
+        (out / "s3_nonvac.json").write_text(json.dumps({"broken": bad, "joint_inl_ppm": jm["inl"], "fails": fails, "verdict": verdict_txt}, indent=1, default=float))
+        (out / "s3_nonvac.md").write_text("# S3 non-vacuity: broken OTA (A0 70 dB, drop 0.9, vlin 0.8 V)\n\n"
+                                          f"Command: `python3 -m model.studies.s3_budget --out DIR --nonvac`\n\nJoint INL {jm['inl']:.3g} ppm.\n\n"
+                                          + "\n".join(f"- {f}" for f in fails) + f"\n\n{verdict_txt}\n")
         if inl_fail:
             print("REJECT (nonvac: broken OTA 70 dB / drop 0.9 / vlin 0.8 V)")
             for f in inl_fail:
