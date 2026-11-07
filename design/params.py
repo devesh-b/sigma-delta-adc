@@ -86,6 +86,17 @@ MC_RUNS = {"tt_mm": 200, "<worst>_mm": 50}
 MC_PLACEHOLDERS = ("<worst>_mm",)
 FS_SET = (0.25e6, 2e6, 4e6)
 
+# ---- Tier-1 behavioural SC modulator (WO-07 / S5) --------------------------
+TIER1_SR = 12e6                    # V/s diff, SPEC 3.0 OTA1 slew (12 V/us)
+TIER1_VCL = 1.4                    # V diff, OTA output swing clamp (SPEC 3.0)
+TIER1_RON = 1000.0                 # ohm, behavioural sampling-switch Ron (SPEC 3.0 bound 1.5 k)
+TIER1_INL_BUDGET_PPM = 8.0         # OTA INL line, SPEC 3.0
+TIER1_NULL_TOL = 2e-6              # null test, in u (ppm of VREF): 1/10 of the 20 ppm INL budget
+# ngspice options frozen by `tier1_tb.py --options` (WO-07 item 2); see results/s5_tier1.md
+# Frozen = loosest of 18 (method x reltol x chgtol) settings that pass the null test and run the spec deck cleanly.
+SPICE_OPTIONS = {"method": "gear", "reltol": 1e-3, "chgtol": 1e-14,
+                 "vntol": 1e-6, "abstol": 1e-12, "trtol": 7.0, "tmax_ns": 10.0}
+
 # ---- Derived ----------------------------------------------------------------
 T_HALF = 1.0 / (2.0 * FS_NOM)            # t_half = 1/(2 fs) = 250 ns at 2 MHz
 TAU_REF_MAX = TAU_REF_FRAC * T_HALF
