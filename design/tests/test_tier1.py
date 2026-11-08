@@ -314,3 +314,27 @@ def test_stage2_sampled_cap_is_derived_from_k():
         assert abs(st["x2_final"][0] - x2n) < 1e-14, k
         old = (1.0 / (1.0 + (1.0 + c2) / A))                      # the pre-WO-13 stage-2 gain (Ck not loading) differs at the 1e-4 level
         assert abs(g2 / old - 1.0) > 1e-4
+
+
+def test_bstgm_default_is_bit_identical_and_separates_gm_from_current():
+    e = dict(fs=4e6, bst1=2.0, bst2=1.5, sr=12.5e6, sr2=13.5e6, gbw=10e6, gbw2=15e6)
+    d0, _ = G.build_deck(TB.v2_cfg(e, n=8, m=2))
+    d1, _ = G.build_deck(TB.v2_cfg(dict(e, bstgm1=2.0, bstgm2=1.5), n=8, m=2))
+    assert d0 == d1                                                                                  # default bstgm = bst: bit-identical deck
+    d2, _ = G.build_deck(TB.v2_cfg(dict(e, bstgm1=1.8, bstgm2=1.3), n=8, m=2))
+    g1, i1 = _gm_ip(d2, 1)
+    g2, i2 = _gm_ip(d2, 2)
+    cl1, cl2 = P.TIER1_CL1, P.TIER1_CL2
+    assert abs(g1 / (1.8 * 6.283185307179586 * 10e6 * cl1) - 1) < 1e-6 and abs(i1 / (2.0 * 12.5e6 * cl1) - 1) < 1e-6      # gm follows bstgm, tail current still follows bst
+    assert abs(g2 / (1.3 * 6.283185307179586 * 15e6 * cl2) - 1) < 1e-6 and abs(i2 / (1.5 * 13.5e6 * cl2) - 1) < 1e-6
+    assert d2 != d0
+
+
+def test_gmid_ratio_helper_nonvacuous():
+    # synthetic curve: gm/Id = 25/(1+J/1e-7)^0.5, monotone. Ratio at k=2 must lie between 1 and 2 and below sqrt-law-free limit; a flat curve gives 1.
+    J = np.logspace(-9, -4, 400)
+    g = 25.0 / np.sqrt(1.0 + J / 1e-7)
+    r = TB.gm_ratio(J, g, 10.0, 2.0)
+    assert 1.2 < r < 2.0
+    assert abs(TB.gm_ratio(J, 1e-6 / J, 10.0, 2.0) - 1.0) < 0.01          # gm independent of Id (gm/Id = c/J) -> ratio 1
+    assert abs(TB.gm_ratio(J, np.linspace(30, 1, 400) * 0 + np.linspace(30, 1, 400), 10.0, 2.0) - 1.0) > 0.01

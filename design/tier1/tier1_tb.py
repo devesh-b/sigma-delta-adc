@@ -1396,12 +1396,193 @@ def mode_fast2(args):
     return 0 if ok else 1
 
 
+# ---- WO-14: gm/Id table (item 1), gm-boost realism (item 2), V4 margin point (item 3)
+GMID_DEVS = ("01v8", "n01v8", "g5v0d10v5")      # D40: pfet_01v8 primary, nfet_01v8, pfet_g5v0d10v5 comparison
+GMID_PRIMARY = "01v8"
+GMID_CORNERS = ("tt", "ss", "ff")
+GMID_TEMPS = (-40, 27, 100, 125)
+GMID_LS = (1.0, 2.0)
+GMID_W = 10.0
+GMID_J = (1e-9, 1e-8, 1e-7, 3e-7, 1e-6, 3e-6, 1e-5)     # Id/(W/L) [A] columns of the table
+GMID_BASES = {"OTA1": ((10.0,), (2.0,)), "OTA2": ((14.0, 17.0), (1.5, 2.0))}
+GMID_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "work", "v1-design", "results", "gmid_table.json")
+V4_MARGIN_SR2 = 13.5 / 1.25            # V/us: OTA2 SR 25 % below the confirmed 13.5 (D39)
+V4_MARGIN_INL_MAX = SLEW_SHARE_PPM / KNEE_MARGIN_X   # 1.333 ppm
+
+
+def gmid_curve(path, col):
+    """(J = Id/(W/L), gm/Id) from one wrdata csv (cols: Vsg, Id1, Vsg, Id2); gm = dId/dVsg."""
+    d = np.loadtxt(path)
+    v, i = d[:, 0], np.abs(d[:, 1 + 2 * col])
+    gm = np.gradient(i, v)
+    ok = i > 1e-13
+    wl = GMID_W / GMID_LS[col]
+    return i[ok] / wl, gm[ok] / i[ok]
+
+
+def gmid_at(J, g, j):
+    """gm/Id at current density j (log-interp, strong-inversion side of the peak so the curve is monotone). nan outside the range."""
+    pk = int(np.argmax(g))
+    J, g = J[pk:], g[pk:]
+    if j < J[0] or j > J[-1]:
+        return float("nan")
+    return float(np.interp(math.log(j), np.log(J), g))
+
+
+def j_for_gmid(J, g, target):
+    pk = int(np.argmax(g))
+    J, g = J[pk:], g[pk:]
+    if target > g[0] or target < g[-1]:
+        return float("nan")
+    return float(math.exp(np.interp(-target, -g, np.log(J))))
+
+
+def gm_ratio(J, g, base, k):
+    """gm(k Id)/gm(Id) at the same W/L, starting from gm/Id = base: k * gmid(k J0) / base."""
+    j0 = j_for_gmid(J, g, base)
+    if not math.isfinite(j0):
+        return float("nan")
+    g1 = gmid_at(J, g, k * j0)
+    return k * g1 / base if math.isfinite(g1) else float("nan")
+
+
+def mode_gmid(args):
+    src = args.src or os.path.join(OUT, "gmid")
+    rows, peaks, bad = [], [], []
+    for dev in GMID_DEVS:
+        for c in GMID_CORNERS:
+            for t in GMID_TEMPS:
+                f = os.path.join(src, f"gmid_{dev}_{c}_T{t}.csv")
+                for col, L in enumerate(GMID_LS):
+                    if not os.path.exists(f):
+                        bad.append(f"missing {f}")
+                        continue
+                    J, g = gmid_curve(f, col)
+                    ut = 8.617333e-5 * (t + 273.15)
+                    bound = 1.0 / ut                                    # n = 1 (physical limit gm/Id < 1/(n UT), n >= 1)
+                    pkv = float(np.max(g))
+                    if not (np.all(np.isfinite(g)) and pkv < bound):
+                        bad.append(f"{dev} {c} {t} L{L:g}: peak gm/Id {pkv:.2f} not below 1/UT {bound:.2f}")
+                    rows.append(dict(dev=dev, corner=c, T=t, L=L, peak=pkv, bound=bound, n_eff=bound / pkv,
+                                     gmid={f"{j:g}": gmid_at(J, g, j) for j in GMID_J},
+                                     ratios={f"{o}_{b:g}_x{k:g}": gm_ratio(J, g, b, k) for o, (bs, ks) in GMID_BASES.items() for b in bs for k in ks}))
+    worst = {}
+    for dev in GMID_DEVS:
+        rr = [r for r in rows if r["dev"] == dev]
+        worst[dev] = {}
+        for key in rr[0]["ratios"] if rr else []:
+            vals = [(r["ratios"][key], r["corner"], r["T"], r["L"]) for r in rr]
+            fin = [v for v in vals if math.isfinite(v[0])]
+            nan = [v for v in vals if not math.isfinite(v[0])]
+            w = min(fin) if fin else (float("nan"), "", 0, 0)
+            worst[dev][key] = dict(ratio=w[0], corner=w[1], T=w[2], L=w[3], unreachable_corners=len(nan))
+    # OTA2 base gm/Id needed for boosted loaded GBW >= 22.5 MHz: ratio >= 22.5/base_gbw, largest base gm/Id that still satisfies it (g5, worst corner)
+    need = {}
+    rr = [r for r in rows if r["dev"] == GMID_PRIMARY]
+    for gb in (15.0, 20.0):
+        req = 22.5 / gb
+        best = None
+        for b in np.arange(4.0, 24.01, 0.5):
+            ratios = []
+            for r in rr:
+                f = os.path.join(src, f"gmid_{GMID_PRIMARY}_{r['corner']}_T{r['T']}.csv")
+                J, g = gmid_curve(f, GMID_LS.index(r["L"]))
+                ratios.append(gm_ratio(J, g, float(b), 1.5))
+            if all(math.isfinite(x) for x in ratios) and min(ratios) >= req:
+                best = float(b)
+        need[f"gbw_base_{gb:g}"] = dict(required_ratio=req, max_base_gm_over_id=best)
+    out = dict(rows=rows, worst=worst, need_22p5=need, problems=bad)
+    os.makedirs(os.path.dirname(os.path.abspath(GMID_JSON)), exist_ok=True)
+    json.dump(out, open(os.path.abspath(GMID_JSON), "w"), indent=1, default=float)
+    jdump(out, "gmid_table.json")
+    md = ["# gm/Id table (WO-14 item 1)", "", "sky130A pfet_01v8 (primary, D40), nfet_01v8 and pfet_g5v0d10v5 (comparison), W 10 um, L 1 and 2 um, |Vds| 0.5 V, bulk at source, `.option gmin=1e-18`, DC sweep of Vsg. gm = dId/dVsg (numerical).",
+          "Columns: gm/Id [1/V] at Id/(W/L) [A]. `peak` = max gm/Id; `1/UT` = n = 1 limit.", ""]
+    for dev in GMID_DEVS:
+        md += [f"## pfet_{dev}", "", "| corner | T | L | peak | 1/UT | " + " | ".join(f"{j:g}" for j in GMID_J) + " |", "|---|---|---|---|---|" + "---|" * len(GMID_J)]
+        for r in rows:
+            if r["dev"] == dev:
+                md.append(f"| {r['corner']} | {r['T']} | {r['L']:g} | {r['peak']:.1f} | {r['bound']:.1f} | " + " | ".join(f"{v:.1f}" for v in r["gmid"].values()) + " |")
+        md.append("")
+    md += ["## gm(xk)/gm(base) at the worst corner (same W/L, Id x k)", "", "| device | key | ratio | corner | T | L | unreachable corners |", "|---|---|---|---|---|---|---|"]
+    for dev in GMID_DEVS:
+        for key, w in worst[dev].items():
+            md.append(f"| {dev} | {key} | {w['ratio']:.3f} | {w['corner']} | {w['T']} | {w['L']:g} | {w['unreachable_corners']} |")
+    md += ["", "## OTA2 base gm/Id needed for boosted loaded GBW >= 22.5 MHz (x1.5 current, pfet_01v8, worst corner)", ""]
+    for k, v in need.items():
+        md.append(f"- {k} MHz: needs gm ratio >= {v['required_ratio']:.3f}; largest base gm/Id meeting it: {v['max_base_gm_over_id']}")
+    md += ["", f"Problems: {bad if bad else 'none'}"]
+    open(os.path.abspath(GMID_JSON).replace(".json", ".md"), "w").write("\n".join(md) + "\n")
+    print("\n".join(md[-12:]))
+    print("gmid ACCEPT" if not bad and rows else "gmid REJECT")
+    return 0 if (not bad and rows) else 1
+
+
+def _gm_ratios():
+    t = json.load(open(os.path.abspath(GMID_JSON)))["worst"][GMID_PRIMARY]
+    return {k: v["ratio"] for k, v in t.items()}
+
+
+def mode_fast3(args):
+    r = _gm_ratios()
+    r1 = r["OTA1_10_x2"]
+    base = {"fs": 4e6, "bst1": 2.0, "sr": 12.5e6, "sr2": 13.5e6, "gbw": 10e6}
+    jobs = []      # (kind, key, extra, n, m)
+    for n in R2_NS:
+        for g2 in (15e6, 20e6):
+            for b2 in (14, 17):
+                jobs.append(("V5i_gm", (n, g2, b2), dict(base, bst2=1.5, bstgm1=r1, bstgm2=r[f"OTA2_{b2}_x1.5"], gbw2=g2), n, 21))
+        jobs.append(("V5i_x2", (n, 15e6, 14), dict(base, bst2=2.0, bstgm1=r1, bstgm2=r["OTA2_14_x2"], gbw2=15e6, sr2=13.5e6), n, 21))
+    jobs.append(("NV_same", (1024, 15e6), dict(base, bst2=1.5, bstgm1=2.0, bstgm2=1.5, gbw2=15e6), 1024, 21))      # gm boost = current boost: s5e 3.7 ppm
+    jobs.append(("NV_one", (1024, 15e6), dict(base, bst2=1.5, bstgm1=1.0, bstgm2=1.0, gbw2=15e6), 1024, 21))      # gm ratio 1: must fail
+    jobs.append(("V4m", (4096, V4_MARGIN_SR2), {"fs": 2e6, "sr": 12.5e6, "sr2": V4_MARGIN_SR2 * 1e6}, 4096, 11))
+    only = getattr(args, "only", None)
+    if only:
+        jobs = [j for j in jobs if j[0] in only.split(",")]
+    print(f"fast3: {len(jobs)} deck jobs; gm ratios (worst corner): OTA1 {r1:.3f}, " + ", ".join(f"{k} {v:.3f}" for k, v in r.items() if k.startswith("OTA2")))
+
+    def one(j):
+        kind, key, e, n, m = j
+        return dc_metrics(v2_cfg(e, n=n, m=m), f"f3_{kind}_" + "_".join(f"{x:g}" for x in key))
+    with ThreadPoolExecutor(2) as ex_:
+        out = list(ex_.map(one, jobs))
+    rows = []
+    for (kind, key, e, n, m), o in zip(jobs, out):
+        rows.append(dict(kind=kind, key=list(key), n=n, m=m, ok=bool(o.get("ok")), inl_ep_ppm=o.get("inl_ep_ppm", float("nan")), gain_err=o.get("gain_err", float("nan")),
+                         runtime_s=o.get("runtime_s", float("nan")), problems=o.get("problems", []), extra=dict(e)))
+    print("\nV5(i) with realistic gm ratios (4 MHz, OTA1 x2 current, OTA2 x1.5 / x2 current):")
+    for x in rows:
+        if x["kind"].startswith("V5i"):
+            n = int(x["n"])
+            print(f"  {x['kind']} N{n} base GBW2 {x['key'][1]/1e6:g} MHz, OTA2 base gm/Id {x['key'][2]}: gm ratios {x['extra']['bstgm1']:.3f}/{x['extra']['bstgm2']:.3f}: INL {x['inl_ep_ppm']:.3f} ppm vs {V5_TARGET[n]:g}: {'PASS' if x['inl_ep_ppm'] <= V5_TARGET[n] else 'FAIL'}")
+    problems = []
+    nv_same = next((x for x in rows if x["kind"] == "NV_same"), None)
+    nv_one = next((x for x in rows if x["kind"] == "NV_one"), None)
+    if nv_same:
+        okv = abs(nv_same["inl_ep_ppm"] - 3.7) <= 0.02 * 3.7 + 0.05      # 3.7 is quoted to 0.1 ppm: 2 % plus its rounding
+        print(f"  non-vacuity bstgm = bst: {nv_same['inl_ep_ppm']:.3f} ppm vs s5e 3.7 (2 %): {'ok' if okv else 'MISMATCH'}")
+        if not okv:
+            problems.append("bstgm=bst row does not reproduce 3.7 ppm")
+    if nv_one:
+        okv = nv_one["inl_ep_ppm"] > V5_TARGET[1024]
+        print(f"  non-vacuity gm ratio 1.0: {nv_one['inl_ep_ppm']:.3f} ppm vs target 5: {'FAILS target as required' if okv else 'PASSES (check is vacuous)'}")
+        if not okv:
+            problems.append("gm ratio 1.0 row does not fail the N1024 target")
+    for x in rows:
+        if x["kind"] == "V4m":
+            print(f"\nV4 margin: 2 MHz N4096 OTA1 12.5, OTA2 {x['key'][1]:.2f} V/us: INL {x['inl_ep_ppm']:.4f} ppm vs <= {V4_MARGIN_INL_MAX:.3f}: {'PASS' if x['inl_ep_ppm'] <= V4_MARGIN_INL_MAX else 'FAIL'}")
+    ok = all(x["ok"] for x in rows) and all(math.isfinite(x["inl_ep_ppm"]) for x in rows) and len(rows) == len(jobs) and not problems
+    jdump(dict(rows=rows, ratios=r, problems=problems), "fast3.json")
+    print("run-health ACCEPT" if ok else "run-health REJECT: " + "; ".join(problems))
+    return 0 if ok else 1
+
+
 def main():
     ap = argparse.ArgumentParser()
     for m in ("null", "options", "dc", "sweep", "nonvac", "xcheck", "av", "knees2", "cm", "offsets", "rsrc", "nonvac2",
-              "knees3", "cm2", "drift", "rsrc2", "nonvac3", "nonvac4", "knees4", "fast2", "nonvac5"):
+              "knees3", "cm2", "drift", "rsrc2", "nonvac3", "nonvac4", "knees4", "fast2", "nonvac5", "fast3", "gmid"):
         ap.add_argument(f"--{m}", action="store_true")
     ap.add_argument("--only", default=None, help="fast2: comma list of V4,V5i,V5ii")
+    ap.add_argument("--src", default=None, help="gmid: directory with the gmid_*.csv files")
     ap.add_argument("--n", type=int, default=256)
     ap.add_argument("--m", type=int, default=None, help="number of DC points")
     ap.add_argument("--out", default=None)
@@ -1429,7 +1610,7 @@ def main():
         return mode_nonvac(a)
     for nm, fn in (("xcheck", mode_xcheck), ("av", mode_av), ("knees2", mode_knees2), ("cm", mode_cm), ("offsets", mode_offsets),
                    ("rsrc", mode_rsrc), ("nonvac2", mode_nonvac2), ("knees3", mode_knees3), ("cm2", mode_cm2),
-                   ("drift", mode_drift), ("rsrc2", mode_rsrc2), ("nonvac3", mode_nonvac3), ("nonvac4", mode_nonvac4), ("knees4", mode_knees4), ("fast2", mode_fast2), ("nonvac5", mode_nonvac5)):
+                   ("drift", mode_drift), ("rsrc2", mode_rsrc2), ("nonvac3", mode_nonvac3), ("nonvac4", mode_nonvac4), ("knees4", mode_knees4), ("fast2", mode_fast2), ("nonvac5", mode_nonvac5), ("fast3", mode_fast3), ("gmid", mode_gmid)):
         if getattr(a, nm):
             return fn(a)
     ap.print_help()
