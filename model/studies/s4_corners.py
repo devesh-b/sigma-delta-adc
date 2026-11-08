@@ -140,24 +140,14 @@ def memory_uv(p, r):
     state, minus the same conversion from a clean reset. Residue-corrected reconstruction removes the quantization error,
     so the difference is the memory alone (deterministic, no scatter). Returns max |difference| [uV]."""
     q = m.with_(p, ktc_on=False, flicker_on=False, vos=0.0, vres=0.0, reset_r=0.0)
-    W = q.N * (q.N - 1) / 2
-
-    def corr(uh, st):
-        return uh + st["x2_final"] / (q.c1 * q.c2) / W
-
     tg = np.array([-0.5, 0.0, 0.5])
     U = np.array([[pv, t] for pv in (0.95, -0.95) for t in tg])
     out, sts = m.convert_chain(m.with_(q, reset_r=r), U, return_state=True)
-    mem = corr(out[:, 1], sts[1])
+    mem = sts[1]["u_corr"]
     fresh_u, fst = m.convert(q, np.tile(tg, 2), return_state=True)
-    base = corr(fresh_u, fst)
+    base = fst["u_corr"]
     d = (mem - base) * q.vref * 1e6
     return float(np.max(np.abs(d)))
-
-
-def _corr(q, uh, st):
-    """Residue-corrected reconstruction: removes the quantization error exactly, leaving the offset/gain terms."""
-    return uh + st["x2_final"] / (q.c1 * q.c2) / (q.N * (q.N - 1) / 2)
 
 
 def static_err_corr(p, sys, B=96):
@@ -168,7 +158,7 @@ def static_err_corr(p, sys, B=96):
 
     def run(sg):
         uh, st = m.convert(q, u, ota_noise=nz, sys_sign=sg, return_state=True)
-        return _corr(q, uh, st)
+        return st["u_corr"]
     uh = 0.5 * (run(np.ones(B)) + run(-np.ones(B))) if sys else run(None)
     return float(np.mean(uh - u)) * q.vref * 1e6
 
@@ -232,7 +222,7 @@ def mc_task(a):
         q = m.with_(p, ktc_on=False, flicker_on=False, vos=0.0, vres=0.0, vos2=np.repeat(d2[sl], npts),
                     comp_offset=np.repeat(dc[sl], npts) / VREF)
         uh, st = m.convert(q, np.tile(u, D), rng=np.random.default_rng(2), return_state=True)
-        uh = uh + st["x2_final"] / (q.c1 * q.c2) / (q.N * (q.N - 1) / 2)
+        uh = st["u_corr"]
         inl[sl], gain[sl] = _inl_rows(uh.reshape(D, npts), u)
     # offsets: per-draw sys-pair residual and raw (sys-off) offset, 24 stratified inputs per draw
     no = 24
@@ -244,7 +234,7 @@ def mc_task(a):
     one = np.ones(no)
     def cv(q, U, nz, sg):
         uh, st = m.convert(q, U, ota_noise=nz, sys_sign=sg, return_state=True)
-        return _corr(q, uh, st)
+        return st["u_corr"]
     b0 = 0.5 * (cv(base_p, uo, z, one) + cv(base_p, uo, z, -one)) - uo
     r0 = cv(base_p, uo, z, None) - uo
     for i0 in range(0, ndraw, chunk):
@@ -352,7 +342,7 @@ def cm_err_v(p, e_v, sys, flip=False, B=96):
         # <=> u' = u + e s. Term that rides on the input (flips with the swap): u_in = s (u + e) <=> u' = u + e.
         s_ = np.ones(B) if sg is None else sg
         uh, st = m.convert(q, u + (e if flip else e * s_), ota_noise=nz, sys_sign=sg, return_state=True)
-        return _corr(q, uh, st)
+        return st["u_corr"]
     uh = 0.5 * (run(np.ones(B)) + run(-np.ones(B))) if sys else run(None)
     return float(np.mean(uh - u)) * q.vref
 
@@ -490,23 +480,23 @@ def probe_rows(ns=(256, 1024, 4096)):
     return rows
 
 
-def probe_verdict(rows, bound_v=20e-6):
-    """Gates (expected values from SPEC / REVIEW R4, not from the code): table-A(v) sys-on error <= 20 uV at N 256 for every eps (eps-independent bound);
-    at N 4096 the SPEC sys-on gate CMRR >= 100 dB, i.e. err <= 1e-5 x dVcm. NaN / missing fails.
-    NOT gated, reported in run_probe: the 1/N^2 scaling and the ideal-A result (WO-12 finding: the review's expectations of ~1/N^2 at every eps and ~0 with an
-    ideal OTA are NOT borne out, see s4_probe.md)."""
+def probe_verdict(rows, bound_v=1e-9, ideal_bound_v=1e-12, ideal_slope=1e-8):
+    """Gates (D38/V1; expected values from theory, not from the code): after the residue-frame fix (C1) the sys-on error of a CM->diff term is second order
+    (eps x dg_even/du): table-A(v) err <= 1e-3 uV (1e-9 V) at every N and eps; ideal OTA <= 1e-12 V and <= 1e-8 x eps (eps-scaling); the eps = 0 row is 0.
+    NaN / missing / missing N fails. (The earlier 20 uV / 8 uV bounds could not see the C1 bug, 6.3 / 0.04 uV: REVIEW-S5d m4.)"""
     if not rows or not all(np.isfinite(r["err_v"]) for r in rows):
         return ["missing or non-finite probe value"]
     fails = []
     for r in rows:
-        if r["A"] != "table A(v)":
-            continue
-        if r["N"] == 256 and not r["err_v"] <= bound_v:
-            fails.append(f"eps {r['eps']:g}: N256 table err {r['err_v']*1e6:.3g} uV > {bound_v*1e6:g}")
-        if r["N"] == 4096 and not r["err_v"] <= 10 ** (-CMRR_ON_DB / 20) * PROBE_DVCM:
-            fails.append(f"eps {r['eps']:g}: N4096 table err {r['err_v']*1e6:.3g} uV > SPEC sys-on gate {10 ** (-CMRR_ON_DB / 20) * PROBE_DVCM * 1e6:.3g} uV")
-    if not any(r["N"] == 256 for r in rows) or not any(r["N"] == 4096 for r in rows):
-        fails.append("probe lacks N 256 or N 4096 rows")
+        if r["eps"] == 0.0 and r["err_v"] != 0.0:
+            fails.append(f"N{r['N']} {r['A']}: eps = 0 baseline row is not zero")
+        if r["A"] == "table A(v)" and not r["err_v"] <= bound_v:
+            fails.append(f"N{r['N']} eps {r['eps']:g}: table err {r['err_v']*1e6:.3g} uV > {bound_v*1e6:g}")
+        if r["A"] == "ideal A" and not (r["err_v"] <= ideal_bound_v and r["err_v"] <= ideal_slope * r["eps"] + 1e-18):
+            fails.append(f"N{r['N']} eps {r['eps']:g}: ideal-A err {r['err_v']*1e6:.3g} uV > {ideal_bound_v*1e6:g} uV or > {ideal_slope:g} x eps")
+    for n in (256, 1024, 4096):
+        if not any(r["N"] == n for r in rows):
+            fails.append(f"probe lacks N {n} rows")
     return fails
 
 
@@ -520,7 +510,7 @@ def run_probe(a):
     L = ["# S4 sys-on probe (R4, WO-12)", "", "Command: `python3 -m model.studies.s4_corners --out DIR --probe`", "",
          f"tt/27/3.3, 2 MHz, CM->diff term e = eps x {PROBE_DVCM:g} V, sys chop on, noise free, residue corrected. err = |e(eps) - e(0)|.", "",
          fmt_table(["N", "A", "eps", "err uV", "raw uV"], [[str(r["N"]), r["A"], f"{r['eps']:g}", f"{r['err_v']*1e6:.4g}", f"{r['raw_err_v']*1e6:.4g}"] for r in rows]),
-         "Informational (not gated): " + "; ".join(f"eps {e:g}: N256/N1024 table err x{_pr(rows, 256, 'table A(v)', e) / max(_pr(rows, 1024, 'table A(v)', e), 1e-18):.3g}, N1024/N4096 x{_pr(rows, 1024, 'table A(v)', e) / max(_pr(rows, 4096, 'table A(v)', e), 1e-18):.3g}, ideal-A / table at N256 x{_pr(rows, 256, 'ideal A', e) / max(_pr(rows, 256, 'table A(v)', e), 1e-18):.3g}" for e in PROBE_EPS[1:]), "",
+         "Informational (not gated; the gates are in probe_verdict): " + "; ".join(f"eps {e:g}: N256/N1024 table err x{_pr(rows, 256, 'table A(v)', e) / max(_pr(rows, 1024, 'table A(v)', e), 1e-18):.3g}, N1024/N4096 x{_pr(rows, 1024, 'table A(v)', e) / max(_pr(rows, 4096, 'table A(v)', e), 1e-18):.3g}, ideal-A / table at N256 x{_pr(rows, 256, 'ideal A', e) / max(_pr(rows, 256, 'table A(v)', e), 1e-18):.3g}" for e in PROBE_EPS[1:]), "",
          "ACCEPT" if not fails else "REJECT", ""] + [f"- {f}" for f in fails]
     (Path(a.out) / "s4_probe.md").write_text("\n".join(L) + "\n")
     (Path(a.out) / "s4_probe.json").write_text(json.dumps({"rows": rows, "fails": fails}, indent=1, default=float))
@@ -599,7 +589,7 @@ def cmrr_table(mcs, key="cmrr"):
                 f = lambda x: "n/a (dVcm 0)" if math.isinf(x) else (">= 240" if x >= 239.9 else f"{x:.1f}")
                 body.append([r["tag"], f"{r['point']} @ {r['fs']/1e6:g} MHz", tag_, f"{c['eps']*1e6:.0f}", f"{c['vin_cm']:g}", f"{c['dvcm']:+.1f}",
                              f"{c['off_err_v']*1e6:.4g}", f(c["off_db"]), f"{c['on_err_v']*1e6:.3g}", f(c["on_db"])])
-    return fmt_table(["set", "point", "eps", "eps uV/V", "Vin_cm V", "dVcm V", "sys-off err uV", "sys-off CMRR dB (gate >= 60)", "sys-on err uV (metric floor (hypothesis))", "sys-on CMRR dB (gate >= 100; metric floor (hypothesis), specified at N 4096)"], body)
+    return fmt_table(["set", "point", "eps", "eps uV/V", "Vin_cm V", "dVcm V", "sys-off err uV", "sys-off CMRR dB (gate >= 60)", "sys-on err uV", "sys-on CMRR dB (gate >= 100, all N)"], body)
 
 
 def print_cmrr(mcs):
@@ -692,8 +682,7 @@ def write_report(a, rows, wt, mcs, fast, fails, verdict, t_grid, t_mc, total, wi
           "Hypothesis for the sys-chop behaviour (unchanged): the pin-side swap does not change the pin CM, so the term is fixed in the modulator frame, with the same sign in both halves of a sys pair (like an OTA offset); "
           "it is modelled as an additive term e on the sampled input after the swap, u_in = s*u + e, demodulated exactly as the chip does (conversion with sys_sign +1 and -1, residue-corrected, averaged). "
           "Sys chop off: the term stays, error = eps_eff*dVcm (tested to 2 %). The --nonvac copy with the term flipping with the input fails the sys-on gate. "
-          "D37(b)/R4: the sys-on column is a **model metric floor (hypothesis)**: with the ideal-loop residue formula and a finite-A(v) OTA, a bit-pattern-dependent reconstruction error remains when every input shifts by e (about 8.6 uV at N 256, scaling as 1/N^2). "
-          "It is specified and asserted at N 4096 only (the MC and corner rows here are N 4096); the real sys-on evidence is the tier-1 cm2 deck (137-173 dB). "
+          "D38(a): the earlier sys-on 'metric floor' (D37(b)) was a model bug in the S4 reconstruction (residue added in the modulator frame after demodulation, C1); iadc.convert now returns the demodulated residue-corrected u_corr and the sys-on gate is evaluated at every N. The tier-1 cm2 deck (137-173 dB) is independent evidence. "
           "CMRR = 20 log10(dVcm / input-referred error). Errors below 1e-12 V are capped (240 dB). Sets: tt/27 (both fs) and the worst-INL / worst-offset points.", "",
           "### Theory check (hand calculation)", "",
           f"At tt, Cs = {mcs[0]['cs']*1e12:g} pF, 1 + Cp,top/Cs = {1 + CP_TOP/mcs[0]['cs']:.2f}: dCp,top/Cs/(1+Cp/Cs) = {t1:.2e}; (Cp,top/Cs) eps_Cs/(1+Cp/Cs) = {t2:.2e}; eps_inj = {t3:.2e}. "

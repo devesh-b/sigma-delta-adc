@@ -142,12 +142,10 @@ def test_eps_eff_d36_hand_values_and_gate_behaviour():
     assert any("sys off" in f for f in s4.cmrr_fails(bad, "t"))
     good = s4.cmrr_eval(_pq(), s4.eps_eff(cs, 0.0075, dcp=0.05e-15))
     assert not [f for f in s4.cmrr_fails(good, "t") if "sys off" in f]
-    # R4/D37(b): the sys-on column is a metric floor (about 1/N^2). At N 256 only the eps-independent bound (sys-on error <= 20 uV) is asserted;
-    # the full sys-on gate (100 dB) is asserted at N 4096, where the S4 gates run.
-    for r in good:
-        assert r["on_err_v"] <= 20e-6
+    # D38(a): the earlier "metric floor" was the residue-frame bug (C1), fixed in iadc.convert (u_corr). The sys-on gate is asserted at every N below.
+    assert not s4.cmrr_fails(good, "t")
     big256 = s4.cmrr_eval(_pq(), s4.eps_eff(cs, 0.0075))
-    assert all(r["on_err_v"] <= 20e-6 for r in big256)
+    assert not [f for f in s4.cmrr_fails(big256, "t") if "sys on" in f]
     q4k = _pq(4096)
     assert q4k.N == 4096 and s4.N_PREC == 4096
     assert not s4.cmrr_fails(s4.cmrr_eval(q4k, s4.eps_eff(cs, 0.0075, dcp=0.05e-15)), "t")        # restored: all gates at N 4096
@@ -165,30 +163,46 @@ def test_margin_helper():
     assert s4._marg({"n15": 0.0, "fs": 2e6, "T": 27, "point": "x"}, "n15") == "n/a"
 
 
-def test_sys_on_floor_probe_gates_and_nonvacuity():
-    # R4 probe verdict: gates from SPEC / REVIEW (<= 20 uV at N 256; SPEC sys-on 100 dB at N 4096 => err <= 1e-5 x 0.8 V = 8 uV); broken rows reject
-    def mk(t256, t4096):
+def test_sys_on_probe_gates_and_nonvacuity():
+    # R4 probe verdict (D38/V1): table-A(v) err <= 1e-9 V (1e-3 uV) at every N; ideal A <= 1e-12 V and <= 1e-8 x eps; eps = 0 row zero; broken rows reject
+    def mk(t_tab, t_ideal):
         rows = []
         for e in s4.PROBE_EPS:
-            for n, t in ((256, t256), (1024, t256 / 16), (4096, t4096)):
-                for a_ in ("table A(v)", "ideal A"):
-                    rows.append({"N": n, "A": a_, "eps": e, "raw_err_v": t, "err_v": t})
+            for n in (256, 1024, 4096):
+                rows.append({"N": n, "A": "table A(v)", "eps": e, "raw_err_v": t_tab, "err_v": t_tab if e else 0.0})
+                rows.append({"N": n, "A": "ideal A", "eps": e, "raw_err_v": t_ideal, "err_v": t_ideal if e else 0.0})
         return rows
-    assert s4.probe_verdict(mk(8e-6, 1e-8)) == []
-    assert s4.probe_verdict(mk(30e-6, 1e-8))                                # above the 20 uV bound
-    assert s4.probe_verdict(mk(8e-6, 9e-6))                                 # misses the 100 dB gate at N 4096
-    assert s4.probe_verdict(mk(float("nan"), 1e-8))                         # NaN fails
+    assert s4.probe_verdict(mk(3e-10, 2e-13)) == []
+    assert s4.probe_verdict(mk(6.3e-6, 2e-13))                              # the C1 bug size at N 256 (6.3 uV): the old 20 uV bound could not see it
+    assert s4.probe_verdict(mk(3e-10, 6e-12))                               # ideal OTA must be ~0
+    assert s4.probe_verdict(mk(float("nan"), 2e-13))                        # NaN fails
     assert s4.probe_verdict([])                                             # nothing measured fails
 
 
-def test_sys_on_error_vs_n_and_ideal_a_recorded_finding():
-    # WO-12 finding (recorded so it is not lost): the review expected ~1/N^2 scaling at every eps and ~0 with an ideal OTA. Measured at eps 4e-4, dVcm 0.8 V:
-    # the table-A(v) error falls ~x16 from N 256 to N 1024, but an ideal OTA gives a LARGER error at N 256, so finite A(v) is not the cause of the floor.
-    e = 4e-4 * 0.8
-    err = {}
-    for n in (256, 1024):
-        for tag, ov in (("t", None), ("i", s4.IDEAL_A)):
-            p = s4.point("tt", 27, 3.3, 2e6, N=n, ov=ov)[0]
-            err[(n, tag)] = abs(s4.cm_err_v(p, e, True) - s4.cm_err_v(p, 0.0, True))
-    assert 8 < err[(256, "t")] / err[(1024, "t")] < 32
-    assert err[(256, "t")] <= 20e-6 and err[(256, "i")] <= 20e-6
+def _pair_error(N, e, old=False):
+    """Ideal loop (infinite OTA gain, no noise), sys pairs, modulator-frame offset term e: input pin value u_in = s u + e (u' = u + e s).
+    Returns max |pair mean - u|. old=True rebuilds the superseded S4 reconstruction (residue added in the modulator frame, no s)."""
+    from model import iadc as mm
+    p = mm.Params(order=2, N=N, c1=0.125, c2=0.5, k=0.5, vref=2.048, a0_db=np.inf)
+    u = -0.5 + (np.arange(24) + 0.5) / 24
+    out = []
+    for sg in (np.ones(24), -np.ones(24)):
+        uh, st = mm.convert(p, u + e * sg, sys_sign=sg, return_state=True)
+        if old:
+            out.append(uh + st["x2_final"] / (p.c1 * p.c2) / (N * (N - 1) / 2))
+        else:
+            out.append(st["u_corr"])
+    return float(np.max(np.abs(0.5 * (out[0] + out[1]) - u)))
+
+
+def test_residue_frame_ideal_loop_sys_pair_reproduces_input():
+    # V1 (REVIEW-S5d, C1): with an ideal loop the sys-pair mean of the demodulated residue-corrected estimate is the input, exactly.
+    for n in (256, 1024, 4096):
+        for e in (0.0, 0.0005, 0.01):
+            assert _pair_error(n, e) <= 1e-12, (n, e)
+
+
+def test_residue_frame_regression_rejects_old_frame():
+    # the superseded _corr (residue added without the sys sign) must FAIL the V1 bound (nonvacuity): ~2 x2_minus/(c1 c2 W), tens of uV at N 256
+    for n in (256, 1024, 4096):
+        assert _pair_error(n, 0.01, old=True) > 1e-9, n

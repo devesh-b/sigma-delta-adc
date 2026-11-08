@@ -208,7 +208,8 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False, x
         res, sts = convert_chain(p, u[None, :], rng=rng, sys_sign=ss, ota_noise=on, return_state=True)
         uh = res[0]
         if return_state:
-            return uh, {"x1max": max(s_["x1max"] for s_ in sts), "x2max": max(s_["x2max"] for s_ in sts),
+            return uh, {"u_corr": np.concatenate([s_["u_corr"] for s_ in sts]),
+                        "x1max": max(s_["x1max"] for s_ in sts), "x2max": max(s_["x2max"] for s_ in sts),
                         "x1_final": np.concatenate([s_["x1_final"] for s_ in sts]),
                         "x2_final": np.concatenate([s_["x2_final"] for s_ in sts])}
         return uh
@@ -304,10 +305,16 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False, x
         u_hat = S / N
     else:
         u_hat = (sumS + (p.k / p.c1) * S) / (N * (N - 1) / 2)
+    # Residue-corrected estimate in the INPUT frame (C1, WO-13): the final integrator state is in the modulator frame, so it
+    # is added before the demodulation by s. order 2: + x2[N]/(c1 c2 W), W = N(N-1)/2; order 1: + x1[N]/(c1 N).
+    if p.order == 1:
+        u_corr = (u_hat + x1 / (p.c1 * N)) * s
+    else:
+        u_corr = (u_hat + x2 / (p.c1 * p.c2 * (N * (N - 1) / 2))) * s
     u_hat = u_hat * s
     if return_state:
         # units of vref (differential); per-side volts = 0.5 * x * vref
-        return u_hat, {"x1max": xm1, "x2max": xm2,
+        return u_hat, {"u_corr": u_corr, "x1max": xm1, "x2max": xm2,
                        "x1max_v_side": 0.5 * xm1 * p.vref,
                        "x2max_v_side": 0.5 * xm2 * p.vref,
                        "x1_final": x1, "x2_final": x2}
