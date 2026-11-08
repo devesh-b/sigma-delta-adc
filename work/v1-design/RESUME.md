@@ -131,6 +131,18 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - Open finding for the reviewer: the R4 explanation (A(v) floor) is not supported. Ideal-A error is not ≈ 0. Suspect `_corr` uses x2_final only.
 - R9: the xcheck decks have Cp,vg = 0, so the suspect is the Ck loading on the stage-2 node. The model has (1+c2) where the deck has 1+c2(1+k).
 
+## Update 2026-11-08 ~19:00
+- WO-12 results are written (8abe28b, `results/s5d_tier1.md`). All runs completed.
+  - R2: option (a) fails (21–56 ppm at N1024).
+  - R9: solved by adding Ck loading on the stage-2 node; the iadc default needs the change, then rerun S3/S4.
+  - R4: cause still unknown (`_corr`?).
+- Reviewer dispatched for WO-12. The review comes back in its final message; save it as `REVIEW-S5d-2026-11-08.md`.
+- **User decisions asked** (fast-mode options table in chat; recommended: boost both, allow ≈ 210 µA in fast mode only):
+  1. fast mode;
+  2. SR 12.5 / 13.5;
+  3. 0.25 MHz/N 4096 at 125 °C.
+- Next after the review: WO-13, covering the iadc Ck default, the `_corr` fix if needed, and the S3/S4 rerun. Then apply the SPEC §3.0 rows (after the user's decisions), then S6.
+
 ## Resume procedure
 1. `git log --oneline -5`; `git status --short`.
 2. For each of the three outputs above, check whether its file exists.
