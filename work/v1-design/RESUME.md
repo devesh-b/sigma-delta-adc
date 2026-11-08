@@ -117,6 +117,20 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   3. Accept the review's SR rows (OTA1 12.5, OTA2 13.5 V/µs; base ≈ 118 µA).
 - Acceptance acc0911 is still running. Fill `results/ACCEPT-WO09-11-d3ab346.md` when it is done.
 
+## Update 2026-11-08 ~18:45
+- Acceptance WO-09..11: 9/9 (64053c4).
+- WO-12 coder stopped (budget). Commits: 61022f0, c33c0de, 0633796 (tier1 WIP).
+- WO-12 runs in progress: `/home/mempool/regr/tt/WO-12/run.sh`, `ALLDONE` marker.
+  - cm2, drift, nonvac4 and probe are done and OK.
+  - xcheck, knees4, s4 and s4nv are still pending.
+- **To finish:**
+  1. Read the logs.
+  2. Write `results/s5d_tier1.{md,json}`, and refresh `s4_corners.{md,json}` from `WO-12/out_s4`.
+  3. Commit.
+  4. Reviewer pass.
+- Open finding for the reviewer: the R4 explanation (A(v) floor) is not supported. Ideal-A error is not ≈ 0. Suspect `_corr` uses x2_final only.
+- R9: the xcheck decks have Cp,vg = 0, so the suspect is the Ck loading on the stage-2 node. The model has (1+c2) where the deck has 1+c2(1+k).
+
 ## Resume procedure
 1. `git log --oneline -5`; `git status --short`.
 2. For each of the three outputs above, check whether its file exists.
