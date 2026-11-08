@@ -210,3 +210,17 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 
 ## Update 2026-11-08 23:20
 - D40 (user): 1.8 V input devices + SC CMFB. SPEC rows added; WO-14 coder told to use pfet_01v8/nfet_01v8 for the gm/Id table.
+
+## Update 2026-11-08 23:45: WO-14 coded, runs gated on sandbox load
+- WO-14 coder (2966c92, e95b887, 6fb0a6f, 0493917): items 1–7 coded; only item 7 (s5e relabel) is complete; nothing run (load 5.9–6.7 for 30 min, another project). Coordinator fixed the s5e option-(a) wording.
+- **Runner launched (nohup):** frozen copy `/home/mempool/regr/tt/acc14-cb14f34/acc.sh`. It waits for 1-min load < 4 before each step (max 12 h, then `LOAD TIMEOUT` in STATUS). Steps:
+  - pytest;
+  - queue A: 9 gm/Id decks, `--gmid`, `--fast3`, `--xcheck`, `--nonvac5`;
+  - queue B: s4, s4 `--nonvac`, s3, then the S3 A/B (iadc from a3ea4eb^ and a3ea4eb in `ab/pre`, `ab/post`).
+  - Progress in `STATUS`, logs `<step>.log`, and `ALLDONE` when finished.
+- When ALLDONE:
+  1. read the logs;
+  2. write `results/ACCEPT-WO13-14-cb14f34.md`, `gmid_table.{md,json}` (from out_gmid), `s5f_tier1.md` (fast3: V5 with real gm boost, V4m 10.8 V/µs point) and `s3_ab.md`;
+  3. reviewer pass;
+  4. then S6.
+- Known risks (coder): nfet deck sign/column, numerical gm at low current, `gm_ratio` helper. Fix any breakage before trusting the numbers.
