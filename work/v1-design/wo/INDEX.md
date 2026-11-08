@@ -17,3 +17,4 @@
 WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjoint: WO-02 alone owns `iadc.py` and creates `model/studies/__init__.py`.
 | WO-09 | S5c tier-1 follow-ups (C-M1 separated knees, C-M3 Cp,top, C-M4 drift, m1/m3/m6/m7/m9) | review | dispatched 2026-11-08 |
 | WO-10 | S4 close: ε_eff CMRR term (D33), margin columns | routine | dispatched 2026-11-08 |
+| WO-11 | S5c write-up + S4 D36 RSS | routine | dispatched 2026-11-08 |
