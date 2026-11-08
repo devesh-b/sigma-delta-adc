@@ -68,6 +68,10 @@ class Params:
                                  # conversions of a batch (batch = one chain, in order). See convert_chain.
 
     cp_ratio: float = 0.3        # parasitic at OTA input / Cs (noise gain)
+    # R9 (WO-12) hooks, default 0.0 => bit-identical. Extra capacitance on the OTA virtual-ground node of stage 1 / 2, as a ratio to
+    # that stage's integrating cap. It only lowers the feedback factor in the finite-gain term: (1 + c) -> (1 + c + cp_vg).
+    cp_vg1: float = 0.0
+    cp_vg2: float = 0.0
 
     cs: float = 1e-12            # sampling cap per side [F]
     temp_k: float = 300.0
@@ -216,8 +220,8 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False, x
     drop2 = p.a0_drop if p.a0_drop2 is None else p.a0_drop2
     dyn1 = bool(p.a0_drop) or p.av_table1 is not None
     dyn2 = bool(drop2) or p.av_table2 is not None
-    p1, g1 = _leaky(p.a0_db, p.c1, table=p.av_table1, vref=p.vref)
-    p2, g2 = _leaky(a0_2, p.c2, table=p.av_table2, vref=p.vref)
+    p1, g1 = _leaky(p.a0_db, p.c1 + p.cp_vg1, table=p.av_table1, vref=p.vref)
+    p2, g2 = _leaky(a0_2, p.c2 + p.cp_vg2, table=p.av_table2, vref=p.vref)
 
     e_in = np.exp(-p.t_half / p.tau_in) if p.tau_in > 0 else 0.0
     e_ref = np.exp(-p.t_half / p.tau_ref) if p.tau_ref > 0 else 0.0
@@ -283,9 +287,9 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False, x
             e = e + ng * p.vres
 
         if dyn1:
-            p1, g1 = _leaky(p.a0_db, p.c1, x1, p.a0_drop, xsw, p.av_table1, p.vref)
+            p1, g1 = _leaky(p.a0_db, p.c1 + p.cp_vg1, x1, p.a0_drop, xsw, p.av_table1, p.vref)
         if dyn2:
-            p2, g2 = _leaky(a0_2, p.c2, x2, drop2, xsw, p.av_table2, p.vref)
+            p2, g2 = _leaky(a0_2, p.c2 + p.cp_vg2, x2, drop2, xsw, p.av_table2, p.vref)
         x1_old = x1
         x1 = np.clip(p1 * x1 + g1 * p.c1 * (u_s - y * r + e), -p.xmax, p.xmax)
         xm1 = max(xm1, float(np.max(np.abs(x1))))
