@@ -1411,9 +1411,9 @@ V4_MARGIN_INL_MAX = SLEW_SHARE_PPM / KNEE_MARGIN_X   # 1.333 ppm
 
 
 def gmid_curve(path, col):
-    """(J = Id/(W/L), gm/Id) from one wrdata csv (cols: Vsg, Id1, Vsg, Id2); gm = dId/dVsg."""
+    """(J = Id/(W/L), gm/Id) from one wrdata csv written with wr_singlescale (cols: Vsg, Id1, Id2); gm = dId/dVsg."""
     d = np.loadtxt(path)
-    v, i = d[:, 0], np.abs(d[:, 1 + 2 * col])
+    v, i = d[:, 0], np.abs(d[:, 1 + col])
     gm = np.gradient(i, v)
     ok = i > 1e-13
     wl = GMID_W / GMID_LS[col]
@@ -1498,7 +1498,7 @@ def mode_gmid(args):
     md = ["# gm/Id table (WO-14 item 1)", "", "sky130A pfet_01v8 (primary, D40), nfet_01v8 and pfet_g5v0d10v5 (comparison), W 10 um, L 1 and 2 um, |Vds| 0.5 V, bulk at source, `.option gmin=1e-18`, DC sweep of Vsg. gm = dId/dVsg (numerical).",
           "Columns: gm/Id [1/V] at Id/(W/L) [A]. `peak` = max gm/Id; `1/UT` = n = 1 limit.", ""]
     for dev in GMID_DEVS:
-        md += [f"## pfet_{dev}", "", "| corner | T | L | peak | 1/UT | " + " | ".join(f"{j:g}" for j in GMID_J) + " |", "|---|---|---|---|---|" + "---|" * len(GMID_J)]
+        md += [f"## {'nfet_01v8' if dev == 'n01v8' else 'pfet_' + dev}", "", "| corner | T | L | peak | 1/UT | " + " | ".join(f"{j:g}" for j in GMID_J) + " |", "|---|---|---|---|---|" + "---|" * len(GMID_J)]
         for r in rows:
             if r["dev"] == dev:
                 md.append(f"| {r['corner']} | {r['T']} | {r['L']:g} | {r['peak']:.1f} | {r['bound']:.1f} | " + " | ".join(f"{v:.1f}" for v in r["gmid"].values()) + " |")
