@@ -16,6 +16,7 @@ Persistent memory for this project lives in `memory/` (index: `memory/MEMORY.md`
 
 ## Layout
 - `CONTEXT.md` — **single-file snapshot of all context, decisions, learnings, corrections, model results, next steps. Read first in a new session.**
+- `DESIGN_GUIDE.md` — **one-file guide: flow, every design decision with why/pros/cons, budgets, verification strategy, corrections log, token-lean strategy.**
 - `SPEC.md` — design spec, authoritative block targets + corner set (§6)
 - `PUBLICATION_PLAN.md` — characterization paper plan
 - `work/v1-design/RESUME.md` — **after an interruption, read this first: exact pickup steps.**
