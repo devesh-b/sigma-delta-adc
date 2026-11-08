@@ -1,6 +1,6 @@
 # S3: error budget and per-block specs at the decided design point (WO-05)
 
-Command: `python3 -m model.studies.s3_budget --out /home/mempool/regr/tt/WO-05/run4`
+Command: `python3 -m model.studies.s3_budget --out /home/mempool/regr/tt/WO-05/run`
 
 ## Design point
 
@@ -32,20 +32,20 @@ Base (ideal OTA, switch kT/C only): noise 0.556 uV @15, 2.35 uV @240, INL 1.11e-
 
 | sweep | value | noise@15 uV | noise@240 uV | INL ppm | gain err ppm | offset sys-off uV | offset sys-pair uV |
 |---|---|---|---|---|---|---|---|
-| A0 x a0_drop (vlin 2 V) | 70, 0.5 | 0.588 | 2.4 | 5.09 | -177 | 0 | 0 |
-| A0 x a0_drop (vlin 2 V) | 75, 0.5 | 0.546 | 2.58 | 2.86 | -99.7 | 0 | 0 |
-| A0 x a0_drop (vlin 2 V) | 80, 0.5 | 0.555 | 2.49 | 1.61 | -56.1 | 0 | 0 |
-| A0 x a0_drop (vlin 2 V) | 85, 0.5 | 0.555 | 2.21 | 0.905 | -31.5 | 0 | 0 |
-| A0 x a0_drop (vlin 2 V) | 90, 0.5 | 0.542 | 2.47 | 0.509 | -17.7 | 0 | 0 |
-| A0 x a0_drop (vlin 2 V) | 70, 0.9 | 0.573 | 2.25 | 10.3 | -196 | 0 | 0 |
-| A0 x a0_drop (vlin 2 V) | 75, 0.9 | 0.563 | 2.41 | 5.78 | -110 | 0 | 0 |
-| A0 x a0_drop (vlin 2 V) | 80, 0.9 | 0.539 | 2.55 | 3.25 | -62 | 0 | 0 |
-| A0 x a0_drop (vlin 2 V) | 85, 0.9 | 0.571 | 2.24 | 1.83 | -34.9 | 0 | 0 |
+| A0 x a0_drop (vlin 2 V) | 70, 0.5 | 0.581 | 2.38 | 5.13 | -178 | 0 | 0 |
+| A0 x a0_drop (vlin 2 V) | 75, 0.5 | 0.54 | 2.58 | 2.88 | -99.9 | 0 | 0 |
+| A0 x a0_drop (vlin 2 V) | 80, 0.5 | 0.544 | 2.5 | 1.62 | -56.2 | 0 | 0 |
+| A0 x a0_drop (vlin 2 V) | 85, 0.5 | 0.555 | 2.21 | 0.912 | -31.6 | 0 | 0 |
+| A0 x a0_drop (vlin 2 V) | 90, 0.5 | 0.547 | 2.47 | 0.512 | -17.8 | 0 | 0 |
+| A0 x a0_drop (vlin 2 V) | 70, 0.9 | 0.578 | 2.28 | 10.3 | -196 | 0 | 0 |
+| A0 x a0_drop (vlin 2 V) | 75, 0.9 | 0.56 | 2.39 | 5.81 | -110 | 0 | 0 |
+| A0 x a0_drop (vlin 2 V) | 80, 0.9 | 0.543 | 2.55 | 3.27 | -62.1 | 0 | 0 |
+| A0 x a0_drop (vlin 2 V) | 85, 0.9 | 0.569 | 2.24 | 1.84 | -34.9 | 0 | 0 |
 | A0 x a0_drop (vlin 2 V) | 90, 0.9 | 0.543 | 2.46 | 1.03 | -19.6 | 0 | 0 |
-| vlin_diff (A0 80, drop 0.9) | 0.8 | 0.566 | 2.46 | 459 | -1.52e+03 | 0 | 0 |
-| vlin_diff (A0 80, drop 0.9) | 1 | 0.578 | 2.23 | 253 | -793 | 0 | 0 |
-| vlin_diff (A0 80, drop 0.9) | 1.5 | 0.563 | 2.4 | 7.6 | -77.3 | 0 | 0 |
-| vlin_diff (A0 80, drop 0.9) | 2 | 0.539 | 2.55 | 3.25 | -62 | 0 | 0 |
+| vlin_diff (A0 80, drop 0.9) | 0.8 | 0.557 | 2.46 | 462 | -1.53e+03 | 0 | 0 |
+| vlin_diff (A0 80, drop 0.9) | 1 | 0.581 | 2.24 | 254 | -795 | 0 | 0 |
+| vlin_diff (A0 80, drop 0.9) | 1.5 | 0.562 | 2.39 | 7.61 | -77.4 | 0 | 0 |
+| vlin_diff (A0 80, drop 0.9) | 2 | 0.543 | 2.55 | 3.27 | -62.1 | 0 | 0 |
 | OTA thermal en | 5 | 0.661 | 2.76 | 1.11e-10 | 0 | 0 | 0 |
 | OTA thermal en | 7 | 0.776 | 3.2 | 1.11e-10 | 0 | 0 | 0 |
 | OTA thermal en | 10 | 0.927 | 3.9 | 1.11e-10 | 0 | 0 | 0 |
@@ -101,33 +101,34 @@ Noise: RSS of values and of shares. INL, offset, gain: linear sums. Margin = sha
 | comparator noise | noise_uv | 0.3 | <= 5 mV rms (input-ref) | 1.06e-16 | >1000 | model |
 | OTA2 + stage-2 kT/C (hand) | noise_uv | 0.3 | Cs2 0.5 pF, OTA2 same excess | 0.00404 | 74.20 | hand |
 | reserve: ref path, substrate, chopper spikes | noise_uv | 1 | unmodelled; measure in C10/V | 0 | inf | reserve |
-| OTA1+OTA2 gain and swing linearity | inl_ppm | 8 | A >= 80 dB, <= 90 % drop at |Vout,diff| <= 2 V | 3.25 | 2.46 | model |
+| OTA1+OTA2 gain and swing linearity | inl_ppm | 8 | A >= 80 dB, <= 90 % drop at |Vout,diff| <= 2 V | 3.27 | 2.45 | model |
 | input sampling settling | inl_ppm | 2 | tau_in <= 18.75 ns | 2.08e-06 | >1000 | model |
 | reference path settling | inl_ppm | 2 | tau_ref <= 10 ns (500 ohm + 5 pF pad) | 1.67e-10 | >1000 | model |
 | comparator offset | inl_ppm | 1 | <= 20 mV | 2.78e-10 | >1000 | model |
 | quantization floor (N 4096, raw accumulators) | inl_ppm | 1 | N = 4096 | 0.419 | 2.38 | model |
-| reserve: MIM VCC, charge-inj. nonlinearity, substrate | inl_ppm | 6 | unmodelled | 0 | inf | reserve |
+| reference current x external R (u^3) | inl_ppm | 2 | R_ext <= 10 ohm per pin, >= 100 nF decap (review S3-7a) | 1.4 | 1.43 | model |
+| reserve: MIM VCC, charge-inj. nonlinearity, substrate | inl_ppm | 4 | unmodelled | 0 | inf | reserve |
 | Vos1, Vos2, vres, comp offset (model residual in sys pair) | offset_uv | 1 | Vos 9 mV, vres 5 uV, comp 20 mV | 0 | inf | model |
-| reset residue r (worst case, does NOT cancel) | offset_uv | 1 | r <= 0.0001 (window >= 15 tau) | 0.485 | 2.06 | model |
+| reset residue r (worst case, does NOT cancel) | offset_uv | 1 | r <= 0.0001, reset window >= 2 clock cycles (1 us at 2 MHz) | 0.485 | 2.06 | model |
 | virtual-ground leakage (hand, rho 0.1 % ASSUMED) | offset_uv | 1 | I_leak <= 100 pA at 125 C, fs 0.25 MHz | 0.8 | 1.25 | hand |
 | reserve: pair drift, chopper charge injection | offset_uv | 2 | unmodelled; +--+ ordering helps | 0 | inf | reserve |
-| finite A0 and swing (model) | gain_ppm | 300 | A >= 80 dB | 62 | 4.84 | model |
+| finite A0 and swing (model) | gain_ppm | 300 | A >= 80 dB | 62.1 | 4.83 | model |
 | input + reference settling (model) | gain_ppm | 500 | tau_in, tau_ref as above | 0.015 | >1000 | model |
-| cap ratio mismatch Cs/Cint (hand) | gain_ppm | 3e+03 | 3 sigma ratio mismatch <= 0.3 %; verify by MC in C10 | 3e+03 | 1.00 | requirement |
-| reserve: pad/bond droop, 5 mV kickback | gain_ppm | 1.2e+03 | calibratable | 19.1 | 62.91 | hand |
+| k/c1 ratio mismatch (hand, shared Cs) | gain_ppm | 50 | k/c1 3 sigma mismatch <= 0.56 % (PDK, review S3-6) | 10.9 | 4.57 | hand |
+| reserve: pad/bond droop, 5 mV kickback | gain_ppm | 4.15e+03 | calibratable | 19.1 | 217.58 | hand |
 
 | metric | budget | sum of shares | sum of values |
 |---|---|---|---|
 | noise_uv | 2.5 | 2.25 | 0.94 |
-| inl_ppm | 20 | 20 | 3.67 |
+| inl_ppm | 20 | 20 | 5.09 |
 | offset_uv | 5 | 5 | 1.28 |
-| gain_ppm | 5e+03 | 5e+03 | 3.08e+03 |
+| gain_ppm | 5e+03 | 5e+03 | 92.1 |
 
-Joint run (all blocks at spec together): n15 0.935, n240 3.94, inl 3.41, gain -62, off_nosys 103, off_sys -0.021
+Joint run (all blocks at spec together): n15 0.93, n240 3.94, inl 2.03, gain -54, off_nosys 103, off_sys -0.0153
 
 ## Findings from the sweeps
 
-- OTA linearity: INL 3.25 ppm at 80 dB / 90 % drop / 2 V (share 8 ppm, margin 2.5). 75 dB / 0.9 gives 5.78 ppm (still inside the share), 70 dB / 0.9 gives 10.3 ppm (outside). The linear range matters more than A0: vlin 1.5 V gives 7.6 ppm, 1.0 V gives 253 ppm, 0.8 V gives 459 ppm. Spec the swing in volts (m4): the x1 peak is 1.22 V diff, so 2.0 V keeps the gain-drop region away from the signal.
+- OTA linearity: INL 3.27 ppm at 80 dB / 90 % drop / 2 V (share 8 ppm, margin 2.4). 75 dB / 0.9 gives 5.81 ppm (still inside the share), 70 dB / 0.9 gives 10.3 ppm (outside). The linear range matters more than A0: vlin 1.5 V gives 7.61 ppm, 1.0 V gives 254 ppm, 0.8 V gives 462 ppm. Spec the swing in volts (m4): the x1 peak is 1.22 V diff, so 2.0 V keeps the gain-drop region away from the signal.
 - OTA thermal noise: total noise @15 SPS 0.661/0.776/0.927/1.16/1.59 uV for 5/7/10/14/20 nV/rtHz (12 % of statistical scatter). Even 20 nV/rtHz stays inside the 2.5 uV budget alone; the limit is set by current (see power table), not by noise.
 - Sampling kT/C of the switches at Cs 0.5 pF is the floor (0.56 uV @15 SPS) and not reducible without a larger Cs.
 - tau_in and tau_ref (shared Cs): INL stays below 0.01 ppm and gain error below 17 ppm up to 45 ns; the shared-Cs error is a gain error (review F6/m6). The binding limit on the input is the pad/source recharge (hand row), not the model's tau.
@@ -183,9 +184,10 @@ All entries are limits at every corner of SPEC section 6. Margin = allocation sh
 | Input switches | settling tau_in (Ron + 500 ohm + source) x (5 pF + Cs) | <= 18.75 ns, i.e. source <= 2089 ohm (+ the 500 ohm pad); tau <= 18.8 ns (t_half/12) is the outer limit | INL share 2 ppm |
 | TG Ron (hand, ASSUMED device numbers) | ss/-40 C/3.0 V mid-range | Ron ~ 820 ohm at W/L 20/0.5 each; spec Ron <= 1.5 kohm | hand |
 | Reference path | tau_ref (500 ohm, 5 pF pad) | <= 10 ns, pad path < 500 ohm and < 5 pF | INL share 2 ppm |
-| Reset | residue r on x1 at conversion start | <= 0.0001; window >= 15 tau = 60 ns (1 kohm x 4 pF), residue at 15 tau 3.1e-07 | offset share 1 uV |
+| Reset | residue r on x1 at conversion start | <= 0.0001; reset window >= 2 clock cycles (1 us at 2 MHz; OTA slew + settle >= 250 ns, review S3-5); inter-conversion memory test | offset share 1 uV |
 | Virtual ground | leakage (125 C) | <= 100 pA total at the integrator input; non-cancelling fraction <= 0.1 % (ASSUMED) | offset share 1 uV |
-| Capacitors | ratio mismatch Cs/Cint | <= 0.3 % (3 sigma), gain error only; verify by MC (C10) | gain share 3000 ppm |
+| Capacitors | k/c1 ratio mismatch (shared Cs) | <= 0.56 % (3 sigma, PDK) gives 10.9 ppm gain error | gain share 50 ppm |
+| Capacitors | Cs+/Cs- mismatch (CMRR) | <= 0.75 % (3 sigma); input-CM to differential conversion 0.75 % | S4 MC |
 | Clock | t_half / non-overlap | t_half 225 ns at 2 MHz, 0.45/fs after non-overlap; jitter-immune (SC) | hand |
 
 ## Open risks (not modelled)
@@ -195,7 +197,7 @@ All entries are limits at every corner of SPEC section 6. Margin = allocation sh
 - Chopper charge-injection spikes and OTA settling with the chopper in place, chopping and parked.
 - OTA1 and OTA2 gain/linearity are applied together in the model (one `a0_db`); OTA2 cannot be relaxed on evidence until iadc.py has a separate a0_db2.
 - Leakage cancellation in sys pairs assumes a signal-independent leakage (rho = 0.1 % non-cancelling is an assumption).
-- Reset residue is budgeted as non-cancelling; a +--+ pair order and a >= 15 tau reset window make it negligible.
+- Reset residue is budgeted as non-cancelling; a +--+ pair order and a >= 2-cycle reset window make it negligible.
 - Shared-Cs input: the source must settle a 5 pF pad plus Cs every half period; a 10 kohm source is not supported without an external buffer or decap.
 - Fast modes (N 64/256/1024, 4 MHz) have their own INL/noise targets and were not swept here.
 

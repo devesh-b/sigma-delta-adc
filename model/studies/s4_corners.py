@@ -289,7 +289,7 @@ def fast_task(a):
     # hand slew-then-settle penalty (ESTIMATE, not simulated): per-cycle error eps = exp(-(t_half - t_slew)/tau_ota),
     # lumped as a finite-gain-equivalent pole error: A_eq = (1 + c)/(eps_pole + eps_settle)
     res = {}
-    for st, (c, beta, dv, sr) in {"1": (C1, 0.84, C1 * 2 * VREF, 12e6), "2": (C2, 0.61, C2 * (0.6 + KK) * VREF, 25e6)}.items():
+    for st, (c, beta, dv, sr) in {"1": (C1, 0.84, C1 * 2 * VREF, 12e6), "2": (C2, 0.55, C2 * (0.6 + KK) * VREF, 27e6)}.items():
         tau = 1.0 / (2 * math.pi * beta * gbw)
         t_sl = dv / sr
         eps = math.exp(-max(0.0, t_half - t_sl) / tau)
