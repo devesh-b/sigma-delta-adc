@@ -198,3 +198,12 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - Acceptance of WO-13 **deferred**: sandbox saturated by another project's jobs (load 6+ on 6 cores, not ours). Launch when load < 3: frozen copy `/home/mempool/regr/tt/acc13-22dab89`, rows = WO-13 `rerun.sh` set (pytest, s4, s4 --nonvac, s3, xcheck, nonvac5). Write `results/ACCEPT-WO13-22dab89.md`.
 - Reviewer dispatched (background): writes `REVIEW-S5e-2026-11-08.md` (C1 fix, Ck, 3 MHz suspect, GBW2 feasibility, S6/S7 blockers).
 - Decision summary sent to the user (fast mode / SR rows / 0.25 MHz at 125 °C). Waiting on their answer before SPEC §3.0 rows, S6, S7.
+
+## Update 2026-11-08 23:10: user decisions in (D39)
+- User: SR 12.5/13.5 V/µs; fast mode option A; 0.25 MHz N 4096 capped at 100 °C (85 °C if the model doesn't support 100).
+- REVIEW-S5e saved (b02e092): model fixes correct; C-M1 = boost gm grows slower than current, so option A needs absolute boosted-GBW rows (OTA1 ≥ 20, OTA2 ≥ 22.5 MHz); 3 MHz explained (OTA1 slew), dropped.
+- Leakage check (results/leak_temp.md): sky130 junction leakage 125→100 °C ÷9.4, so 100 °C cap holds (drift 37/86 mV).
+- SPEC §3.0 + §6 rows applied, D39 recorded (d3634f0). Leakage rows: ≤ 90 pA ff/125, ≤ 20 pA ff/100.
+- WO-14 dispatched (Sonnet, background; 2b5a53d): gm/Id table, V5 rerun with real gm boost, V4 10.8 V/µs point, S3 A/B, order-1 test, fast_task constants, s5e relabel. Waits for sandbox load < 4.
+- WO-13 acceptance still deferred (sandbox load ~6.5 from another project). Run with WO-14 acceptance on one frozen copy.
+- Next: WO-14 result → acceptance (frozen copy) → reviewer → S6 golden vectors (ideal-A; decimator output = bitstream-only u_hat with sys sign, not u_corr; close F7/F8) → S7 SPEC freeze (user OK).
