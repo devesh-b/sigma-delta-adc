@@ -153,6 +153,22 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - WO-13 dispatched (caac987): model fixes, S3/S4 reruns, xcheck 5 % gate, fast-mode runs (OTA2 boost ×1.5; 3 MHz no boost). Outputs in /home/mempool/regr/tt/WO-13.
 - After WO-13: acceptance (direct ssh, frozen copy), then reviewer. Then the user's fast-mode decision with real numbers, then the SPEC §3.0 rows, then S6.
 
+## Update 2026-11-08 20:05: 1PASSWORD LOCKED
+- WO-13 commit 1 landed (85e9e24, C1 fix).
+- Commit 2 (Ck topology) is STAGED but failed on signing. Its message is in the conversation: "model: stage-2 Ck loading from topology c2(1+k) default, cp_hold g-only term; re-baseline regressions" + the old→new table.
+- Uncommitted working-tree edits: s4_corners.py, gen_tier1.py, tier1_tb.py.
+- Coder stopped. The coordinator launched `/home/mempool/regr/tt/WO-13/rerun.sh`:
+  1. pytest;
+  2. s4 + nonvac;
+  3. s3;
+  4. waits for fast2, then xcheck + nonvac5;
+  5. touches `ALLDONE`.
+- Next:
+  1. Ask the user to unlock 1Password.
+  2. Commit 2, then commit the rest per the WO-13 commit list.
+  3. Write `results/{s3_budget,s4_corners,s5e_tier1}`.
+  4. Acceptance, then reviewer.
+
 ## Resume procedure
 1. `git log --oneline -5`; `git status --short`.
 2. For each of the three outputs above, check whether its file exists.
@@ -176,3 +192,9 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - Explicit-path commits.
 - If 1Password fails, ask the user to unlock.
 - Nothing outward-facing without asking.
+
+## Update 2026-11-08 22:55: WO-13 committed
+- Signing unlocked. Commits: a3ea4eb (Ck default, cp_hold), a8449b4 (S3/S4 reruns + results), 22dab89 (tier-1 xcheck/nonvac5/fast2 + s5e results).
+- Acceptance of WO-13 **deferred**: sandbox saturated by another project's jobs (load 6+ on 6 cores, not ours). Launch when load < 3: frozen copy `/home/mempool/regr/tt/acc13-22dab89`, rows = WO-13 `rerun.sh` set (pytest, s4, s4 --nonvac, s3, xcheck, nonvac5). Write `results/ACCEPT-WO13-22dab89.md`.
+- Reviewer dispatched (background): writes `REVIEW-S5e-2026-11-08.md` (C1 fix, Ck, 3 MHz suspect, GBW2 feasibility, S6/S7 blockers).
+- Decision summary sent to the user (fast mode / SR rows / 0.25 MHz at 125 °C). Waiting on their answer before SPEC §3.0 rows, S6, S7.
