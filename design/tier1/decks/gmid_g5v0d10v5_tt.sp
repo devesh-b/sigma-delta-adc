@@ -12,7 +12,7 @@ set wr_singlescale
 foreach t -40 27 100 125
   set temp=$t
   dc Vsg 0 3.3 0.005
-  wrdata gmid_g5v0d10v5_tt_T$t.csv i(Vd1) i(Vd2)
+  wrdata gmid_g5v0d10v5_tt_T{$t}.csv i(Vd1) i(Vd2)
 end
 quit
 .endc
