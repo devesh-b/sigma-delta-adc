@@ -87,8 +87,8 @@ def test_n240_gated_at_5uv_where_reachable():
     assert not s4.spec_fails([_row(fs=0.25e6, T=27, n240=20.0)])        # unreachable below 0.49 MHz: reported, not gated
 
 
-def _pq():
-    return s4.point("tt", 27, 3.3, 2e6, N=256)[0]
+def _pq(n=256):
+    return s4.point("tt", 27, 3.3, 2e6, N=n)[0]
 
 
 def test_cmrr_theory_sysoff_equals_eps_dvcm_and_sys_on_cancels():
@@ -141,9 +141,18 @@ def test_eps_eff_d36_hand_values_and_gate_behaviour():
     bad = s4.cmrr_eval(_pq(), s4.eps_eff(cs, 0.0075, dcp=2e-15))
     assert any("sys off" in f for f in s4.cmrr_fails(bad, "t"))
     good = s4.cmrr_eval(_pq(), s4.eps_eff(cs, 0.0075, dcp=0.05e-15))
-    assert not [f for f in s4.cmrr_fails(good, "t") if "sys off" in f]   # sys-on residual is not monotonic in eps at this level: only the sys-off gate is asserted here
-    # the D36 3 sigma row passes the 60 dB sys-off gate; a 3 % Cs mismatch fails it
-    assert not [f for f in s4.cmrr_fails(s4.cmrr_eval(_pq(), s4.eps_eff(cs, 0.0075)), "t") if "sys off" in f]
+    assert not [f for f in s4.cmrr_fails(good, "t") if "sys off" in f]
+    # R4/D37(b): the sys-on column is a metric floor (about 1/N^2). At N 256 only the eps-independent bound (sys-on error <= 20 uV) is asserted;
+    # the full sys-on gate (100 dB) is asserted at N 4096, where the S4 gates run.
+    for r in good:
+        assert r["on_err_v"] <= 20e-6
+    big256 = s4.cmrr_eval(_pq(), s4.eps_eff(cs, 0.0075))
+    assert all(r["on_err_v"] <= 20e-6 for r in big256)
+    q4k = _pq(4096)
+    assert q4k.N == 4096 and s4.N_PREC == 4096
+    assert not s4.cmrr_fails(s4.cmrr_eval(q4k, s4.eps_eff(cs, 0.0075, dcp=0.05e-15)), "t")        # restored: all gates at N 4096
+    # the D36 3 sigma row passes the 60 dB sys-off and 100 dB sys-on gates at N 4096; a 3 % Cs mismatch fails sys-off
+    assert not s4.cmrr_fails(s4.cmrr_eval(q4k, s4.eps_eff(cs, 0.0075)), "t")
     assert any("sys off" in f for f in s4.cmrr_fails(s4.cmrr_eval(_pq(), s4.eps_eff(cs, 0.03)), "t"))
     # the sys-off CMRR follows 1/eps_eff (theory), not the old eps_Cs term
     by = {r["vin_cm"]: r for r in bad}
@@ -154,3 +163,32 @@ def test_eps_eff_d36_hand_values_and_gate_behaviour():
 def test_margin_helper():
     assert s4._marg({"n15": 1.25, "fs": 2e6, "T": 27, "point": "x"}, "n15") == "+100 %"       # limit 2.5 / 1.25 - 1
     assert s4._marg({"n15": 0.0, "fs": 2e6, "T": 27, "point": "x"}, "n15") == "n/a"
+
+
+def test_sys_on_floor_probe_gates_and_nonvacuity():
+    # R4 probe verdict: gates from SPEC / REVIEW (<= 20 uV at N 256; SPEC sys-on 100 dB at N 4096 => err <= 1e-5 x 0.8 V = 8 uV); broken rows reject
+    def mk(t256, t4096):
+        rows = []
+        for e in s4.PROBE_EPS:
+            for n, t in ((256, t256), (1024, t256 / 16), (4096, t4096)):
+                for a_ in ("table A(v)", "ideal A"):
+                    rows.append({"N": n, "A": a_, "eps": e, "raw_err_v": t, "err_v": t})
+        return rows
+    assert s4.probe_verdict(mk(8e-6, 1e-8)) == []
+    assert s4.probe_verdict(mk(30e-6, 1e-8))                                # above the 20 uV bound
+    assert s4.probe_verdict(mk(8e-6, 9e-6))                                 # misses the 100 dB gate at N 4096
+    assert s4.probe_verdict(mk(float("nan"), 1e-8))                         # NaN fails
+    assert s4.probe_verdict([])                                             # nothing measured fails
+
+
+def test_sys_on_error_vs_n_and_ideal_a_recorded_finding():
+    # WO-12 finding (recorded so it is not lost): the review expected ~1/N^2 scaling at every eps and ~0 with an ideal OTA. Measured at eps 4e-4, dVcm 0.8 V:
+    # the table-A(v) error falls ~x16 from N 256 to N 1024, but an ideal OTA gives a LARGER error at N 256, so finite A(v) is not the cause of the floor.
+    e = 4e-4 * 0.8
+    err = {}
+    for n in (256, 1024):
+        for tag, ov in (("t", None), ("i", s4.IDEAL_A)):
+            p = s4.point("tt", 27, 3.3, 2e6, N=n, ov=ov)[0]
+            err[(n, tag)] = abs(s4.cm_err_v(p, e, True) - s4.cm_err_v(p, 0.0, True))
+    assert 8 < err[(256, "t")] / err[(1024, "t")] < 32
+    assert err[(256, "t")] <= 20e-6 and err[(256, "i")] <= 20e-6
