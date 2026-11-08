@@ -107,6 +107,16 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   3. Apply the SPEC §3.0 rows that don't wait on user decisions.
   4. Report the user decisions (SR, the 200 µA cap / fast mode, drift).
 
+## Update 2026-11-08 ~18:30
+- Review saved (3e2b326). S4 and S5 closable with conditions. The weakened test is a metric floor, not physics (R4).
+- D37 recorded.
+- WO-12 dispatched (S5d gaps R1 R2 R4 R6 R7 R9). It waits for acc0911 `ALLDONE` before running sims.
+- **User decisions pending (as presented):**
+  1. Fast mode, option (a)–(d). (a) = OTA1-only boost + OTA2 GBW 20 MHz at base bias, ≈ 180 µA; WO-12 R2 tests it.
+  2. Is 0.25 MHz/N 4096 needed at 125 °C?
+  3. Accept the review's SR rows (OTA1 12.5, OTA2 13.5 V/µs; base ≈ 118 µA).
+- Acceptance acc0911 is still running. Fill `results/ACCEPT-WO09-11-d3ab346.md` when it is done.
+
 ## Resume procedure
 1. `git log --oneline -5`; `git status --short`.
 2. For each of the three outputs above, check whether its file exists.
