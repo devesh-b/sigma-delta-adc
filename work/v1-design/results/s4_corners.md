@@ -2,7 +2,7 @@
 
 Command: `python3 -m model.studies.s4_corners --out /home/mempool/regr/tt/WO-06a/s4`
 
-Wall time 461 s on 4 processes (grid 409 s, MC 50 s). No transistor data exists: every mapping is an **assumption** (nominal at tt/27/3.3, the SPEC 3.0 limit at that mechanism's worst corner, linear in a 0..1 stress between). A result here says the budget closes if each block just meets SPEC 3.0; it is not a statement about a circuit.
+Wall time 486 s on 4 processes (grid 431 s, MC 54 s). No transistor data exists: every mapping is an **assumption** (nominal at tt/27/3.3, the SPEC 3.0 limit at that mechanism's worst corner, linear in a 0..1 stress between). A result here says the budget closes if each block just meets SPEC 3.0; it is not a statement about a circuit.
 
 ## Mapping (explicit)
 
@@ -89,7 +89,7 @@ INL and gain per draw: 161-point sweep, residue-corrected; offset per draw: sys-
 
 ## CMRR (D30, D33: on the D12 residual eps_eff)
 
-**This models the hypothesis; WO-08 checks it in SPICE.** D33 (REVIEW-S4S5b C-M3): D12 cancels the Cs+/Cs- mismatch term to first order, so the CM->diff coefficient is the D12 residual eps_eff = ((Cp,top/Cs) eps_Cs - dCp,top/Cs) / (1 + Cp,top/Cs) + eps_inj (D36: sign '-' confirmed by WO-09 --cm2, deck vs closed form 0.0 % in 12 cases). MC: signed per-draw sum of the two independent Gaussians, eps_inj at its worst sign against the draw; 3 sigma corner rows: RSS of the two random terms + |eps_inj| linearly. A CM change dVcm = Vin_cm - VREF_CM (VREF_CM = 1 V ASSUMED, SPEC 3.0 does not fix it) gives a differential term eps_eff*dVcm. Allocation (C4): Cp,top 20 fF per side (fixed), dCp,top Gaussian 3 sigma 0.25 fF, eps_Cs Gaussian 3 sigma 0.75 %, eps_inj 0.00028 (fixed, worst sign). Corner points use the 3 sigma values; the worst-draw row uses the largest per-draw |eps_eff| of the MC draws. Hypothesis for the sys-chop behaviour (unchanged): the pin-side swap does not change the pin CM, so the term is fixed in the modulator frame, with the same sign in both halves of a sys pair (like an OTA offset); it is modelled as an additive term e on the sampled input after the swap, u_in = s*u + e, demodulated exactly as the chip does (conversion with sys_sign +1 and -1, residue-corrected, averaged). Sys chop off: the term stays, error = eps_eff*dVcm (tested to 2 %). The --nonvac copy with the term flipping with the input fails the sys-on gate. CMRR = 20 log10(dVcm / input-referred error). Errors below 1e-12 V are capped (240 dB). Sets: tt/27 (both fs) and the worst-INL / worst-offset points.
+**This models the hypothesis; WO-08 checks it in SPICE.** D33 (REVIEW-S4S5b C-M3): D12 cancels the Cs+/Cs- mismatch term to first order, so the CM->diff coefficient is the D12 residual eps_eff = ((Cp,top/Cs) eps_Cs - dCp,top/Cs) / (1 + Cp,top/Cs) + eps_inj (D36: sign '-' confirmed by WO-09 --cm2, deck vs closed form 0.0 % in 12 cases). MC: signed per-draw sum of the two independent Gaussians, eps_inj at its worst sign against the draw; 3 sigma corner rows: RSS of the two random terms + |eps_inj| linearly. A CM change dVcm = Vin_cm - VREF_CM (VREF_CM = 1 V ASSUMED, SPEC 3.0 does not fix it) gives a differential term eps_eff*dVcm. Allocation (C4): Cp,top 20 fF per side (fixed), dCp,top Gaussian 3 sigma 0.25 fF, eps_Cs Gaussian 3 sigma 0.75 %, eps_inj 0.00028 (fixed, worst sign). Corner points use the 3 sigma values; the worst-draw row uses the largest per-draw |eps_eff| of the MC draws. Hypothesis for the sys-chop behaviour (unchanged): the pin-side swap does not change the pin CM, so the term is fixed in the modulator frame, with the same sign in both halves of a sys pair (like an OTA offset); it is modelled as an additive term e on the sampled input after the swap, u_in = s*u + e, demodulated exactly as the chip does (conversion with sys_sign +1 and -1, residue-corrected, averaged). Sys chop off: the term stays, error = eps_eff*dVcm (tested to 2 %). The --nonvac copy with the term flipping with the input fails the sys-on gate. D37(b)/R4: the sys-on column is a **model metric floor (hypothesis)**: with the ideal-loop residue formula and a finite-A(v) OTA, a bit-pattern-dependent reconstruction error remains when every input shifts by e (about 8.6 uV at N 256, scaling as 1/N^2). It is specified and asserted at N 4096 only (the MC and corner rows here are N 4096); the real sys-on evidence is the tier-1 cm2 deck (137-173 dB). CMRR = 20 log10(dVcm / input-referred error). Errors below 1e-12 V are capped (240 dB). Sets: tt/27 (both fs) and the worst-INL / worst-offset points.
 
 ### Theory check (hand calculation)
 
@@ -99,7 +99,7 @@ At tt, Cs = 0.5 pF, 1 + Cp,top/Cs = 1.04: dCp,top/Cs/(1+Cp/Cs) = 4.81e-04; (Cp,t
 
 Worst sys-off CMRR over all rows below: 61.1 dB (gate 60 dB, margin +1.1 dB; against the 66 dB design target -4.9 dB, informational).
 
-| set | point | eps | eps uV/V | Vin_cm V | dVcm V | sys-off err uV | sys-off CMRR dB (gate >= 60) | sys-on err uV | sys-on CMRR dB (gate >= 100) |
+| set | point | eps | eps uV/V | Vin_cm V | dVcm V | sys-off err uV | sys-off CMRR dB (gate >= 60) | sys-on err uV (metric floor (hypothesis)) | sys-on CMRR dB (gate >= 100; metric floor (hypothesis), specified at N 4096) |
 |---|---|---|---|---|---|---|---|---|---|
 | tt/27 | tt/27/3.3 @ 0.25 MHz | 3sigma | 841 | 0.2 | -0.8 | 672.5 | 61.5 | 0.029 | 148.8 |
 | tt/27 | tt/27/3.3 @ 0.25 MHz | 3sigma | 841 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
@@ -131,7 +131,7 @@ Worst sys-off CMRR over all rows below: 61.1 dB (gate 60 dB, margin +1.1 dB; aga
 
 Kept for the record, not gated. 3 sigma 7500 uV/V gives 42.5 dB sys-off; it modelled a mechanism that D12 cancels to first order.
 
-| set | point | eps | eps uV/V | Vin_cm V | dVcm V | sys-off err uV | sys-off CMRR dB (gate >= 60) | sys-on err uV | sys-on CMRR dB (gate >= 100) |
+| set | point | eps | eps uV/V | Vin_cm V | dVcm V | sys-off err uV | sys-off CMRR dB (gate >= 60) | sys-on err uV (metric floor (hypothesis)) | sys-on CMRR dB (gate >= 100; metric floor (hypothesis), specified at N 4096) |
 |---|---|---|---|---|---|---|---|---|---|
 | tt/27 | tt/27/3.3 @ 0.25 MHz | 3sigma | 7500 | 0.2 | -0.8 | 6000 | 42.5 | 0.0395 | 146.1 |
 | tt/27 | tt/27/3.3 @ 0.25 MHz | 3sigma | 7500 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
