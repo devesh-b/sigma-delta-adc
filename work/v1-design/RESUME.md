@@ -257,3 +257,7 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   2. bias generator constant-gm or constant-current.
 - Coordinator defaults, reversible: fold/cascode current switches with the tail in boost (keeps PM); OTA2 L < 1 µm allowed only if A0 ≥ 80 dB holds.
 - Next: WO-15 result, acceptance, review; the user's answers go into SPEC (D41); add the β2 row (M3); then S6.
+
+## Update 2026-11-09 03:00
+- D42 recorded (bandgap current ref + 3-bit trim), SPEC C6 rows (b8f89e2). DESIGN_GUIDE.md added (global rationale doc; keep it updated at each decision).
+- WO-15 still running in background.
