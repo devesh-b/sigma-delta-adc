@@ -373,8 +373,7 @@ def model_eval(U, n=256, **kw):
     import iadc as M
     p = M.with_(M.Params(order=2, N=n, c1=0.125, c2=0.5, k=0.5, vref=VREF), **kw)
     ub, st = M.convert(p, np.asarray(U, float), rng=np.random.default_rng(0), return_state=True)
-    uh = ub + np.asarray(st["x2_final"]) / (p.c1 * p.c2 * n * (n - 1) / 2.0)
-    return uh, p
+    return np.asarray(st["u_corr"]), p
 
 
 def jdump(obj, name):
@@ -389,47 +388,68 @@ REV = {"A60_base": (-5.59e-4, 3.99, -5.47e-4, 3.09), "A60_k025": (-2.93e-4, 6.98
        "A80_roff1e14": (None, 0.29, None, 0.295)}
 
 
-def mode_xcheck(args):
+XCHECK_REL = 0.05          # WO-13/V3: deck-vs-model INL rel_sym gate (tightened from 0.35 once the model carries Ck in its stage-2 topology)
+XCHECK_GATED_EXTRA = ("A60_base_cpvg",)     # cp_hold gated row: Cp,vg 0.262 pF both stages of the deck
+
+
+def xcheck_rows(no_ck=False, tagpfx="xc_"):
+    """Deck-vs-model cross-check rows. The model side uses the iadc default (Ck loading derived from k). no_ck=True is the broken copy of the model with the
+    Ck term removed from the stage-2 sampled capacitance (test-only monkeypatch of iadc._leaky)."""
+    import iadc as M
     U = u_points(5, 0.9)
     cases = [("A60_base", dict(a0_db=60.0), {}), ("A60_k025", dict(a0_db=60.0, ck=0.125e-12), dict(k=0.25)),
              ("A60_c1_025", dict(a0_db=60.0, cint1=2e-12), dict(c1=0.25)), ("A80_base", dict(a0_db=80.0), {}),
              # m3 (WO-09): at A0 80 dB the compared quantity (~0.3 ppm) is the size of the Roff 1e12 null floor (0.46 ppm): rerun at Roff 1e14
              ("A80_roff1e14", dict(a0_db=80.0, roff=1e14), {})]
-    # R9 (WO-12): diagnostic deck cases with the explicit Cp,vg of the v2 decks (xcheck decks use the legacy OTA path, which has NO Cp,vg: cp = 0). Not gated, no reviewer figures.
+    # R9 (WO-12): decks with the explicit Cp,vg of the v2 decks (xcheck decks use the legacy OTA path, which has NO Cp,vg: cp = 0). WO-13: A60_base_cpvg is gated through cp_hold.
     diag = [("A60_base_cpvg", dict(a0_db=60.0, cp_vg=P.TIER1_CP_VG), {}), ("A60_c1_025_cpvg", dict(a0_db=60.0, cint1=2e-12, cp_vg=P.TIER1_CP_VG), dict(c1=0.25))]
+    orig = M._leaky
+    if no_ck:
+        def _no_ck(a0_db, c, *a, **kw):
+            return orig(a0_db, c / (1.0 + CUR_K[0]) if abs(c - CUR_C2[0] * (1.0 + CUR_K[0])) < 1e-12 else c, *a, **kw)
+        M._leaky = _no_ck
     rows, ok = [], True
-    for name, dk, mk in cases + diag:
-        gated = name in REV
-        cfg = dict(IDEAL_OTA, n=256, u_list=U)
-        cfg.update(dk)
-        r = run_deck(cfg, "xc_" + name)
-        c1, k = mk.get("c1", P.C1), mk.get("k", P.K)
-        uh = np.array([reconstruct(cv["y"], cv["x2n"], 256, c1, P.C2, k) for cv in r["convs"]])
-        g = inl_gain(np.array(U), uh)
-        um, p = model_eval(U, 256, a0_db=dk["a0_db"], **mk)
-        gm_ = inl_gain(np.array(U), um)
-        # model variants with the extra virtual-ground loading the deck actually has (ratios to the stage's Cint): Cp,vg on both stages; Ck on the stage-2 input node
-        cint1, ck, cp = dk.get("cint1", P.CINT1), dk.get("ck", P.K * P.CS2), dk.get("cp_vg", 0.0)
-        var = {}
-        for vn, kw in (("cp_only", dict(cp_vg1=cp / cint1, cp_vg2=cp / P.CINT2)), ("cp_plus_ck", dict(cp_vg1=cp / cint1, cp_vg2=(cp + ck) / P.CINT2))):
-            uv, _ = model_eval(U, 256, a0_db=dk["a0_db"], **mk, **kw)
-            gv = inl_gain(np.array(U), uv)
-            var[vn] = dict(inl=gv["inl_ep_ppm"], gain=gv["gain_err"], rel_inl=rel_sym(g["inl_ep_ppm"], gv["inl_ep_ppm"]), ratio_inl=g["inl_ep_ppm"] / gv["inl_ep_ppm"], rel_gain=rel_sym(g["gain_err"], gv["gain_err"]))
-        rv = REV.get(name, (None, None, None, None))
-        chk = []
-        if gated:
-            chk = [rel_sym(g["inl_ep_ppm"], gm_["inl_ep_ppm"]) <= 0.35, rel_sym(g["inl_ep_ppm"], rv[1]) <= 0.35]
-            if rv[0] is not None:
-                chk += [rel_sym(g["gain_err"], gm_["gain_err"]) <= 0.05, rel_sym(g["gain_err"], rv[0]) <= 0.05]
-        row = dict(case=name, gated=gated, ok=bool(r["ok"] and all(chk)), deck_gain=g["gain_err"], model_gain=gm_["gain_err"], rev_deck_gain=rv[0],
-                   deck_inl=g["inl_ep_ppm"], model_inl=gm_["inl_ep_ppm"], rev_deck_inl=rv[1], rev_model_inl=rv[3], checks=chk, problems=r["problems"],
-                   rel_inl_before=rel_sym(g["inl_ep_ppm"], gm_["inl_ep_ppm"]), ratio_inl_before=g["inl_ep_ppm"] / gm_["inl_ep_ppm"], variants=var)
-        ok &= row["ok"]
-        rows.append(row)
-        print(f"xcheck {name}{'' if gated else ' (diagnostic, not gated)'}: deck gain {g['gain_err']:+.3e} INL {g['inl_ep_ppm']:.3f} | model gain {gm_['gain_err']:+.3e} INL {gm_['inl_ep_ppm']:.3f} "
-              f"| reviewer deck {rv[0]} / {rv[1]} model {rv[2]} / {rv[3]} -> {'ok' if row['ok'] else 'FAIL'} {chk}")
-        print(f"   R9 bias deck/model INL: before {row['ratio_inl_before']:.3f} (rel_sym {row['rel_inl_before']*100:.1f} %); "
-              + "; ".join(f"after {vn} (Cp,vg {cp*1e12:.3g} pF{', +Ck ' + format(ck*1e12, 'g') + ' pF on stage 2' if vn == 'cp_plus_ck' else ''}): model INL {v['inl']:.3f} gain {v['gain']:+.3e} -> ratio {v['ratio_inl']:.3f} (rel_sym {v['rel_inl']*100:.1f} %, gain rel_sym {v['rel_gain']*100:.1f} %)" for vn, v in var.items()))
+    try:
+        for name, dk, mk in cases + diag:
+            gated = name in REV or name in XCHECK_GATED_EXTRA
+            cfg = dict(IDEAL_OTA, n=256, u_list=U)
+            cfg.update(dk)
+            r = run_deck(cfg, tagpfx + name)
+            c1, k = mk.get("c1", P.C1), mk.get("k", P.K)
+            CUR_K[0], CUR_C2[0] = k, P.C2
+            uh = np.array([reconstruct(cv["y"], cv["x2n"], 256, c1, P.C2, k) for cv in r["convs"]])
+            g = inl_gain(np.array(U), uh)
+            cint1, cp = dk.get("cint1", P.CINT1), dk.get("cp_vg", 0.0)
+            hold = dict(cp_hold1=cp / cint1, cp_hold2=cp / P.CINT2) if cp else {}
+            um, p = model_eval(U, 256, a0_db=dk["a0_db"], **mk, **hold)
+            gm_ = inl_gain(np.array(U), um)
+            rv = REV.get(name, (None, None, None, None))
+            rel = rel_sym(g["inl_ep_ppm"], gm_["inl_ep_ppm"])
+            chk = []
+            if gated:
+                chk = [rel <= XCHECK_REL]
+                if rv[1] is not None:
+                    chk.append(rel_sym(g["inl_ep_ppm"], rv[1]) <= 0.35)
+                if rv[0] is not None:
+                    chk += [rel_sym(g["gain_err"], gm_["gain_err"]) <= 0.05, rel_sym(g["gain_err"], rv[0]) <= 0.05]
+            row = dict(case=name, gated=gated, ok=bool(r["ok"] and all(chk)), deck_gain=g["gain_err"], model_gain=gm_["gain_err"], rev_deck_gain=rv[0],
+                       deck_inl=g["inl_ep_ppm"], model_inl=gm_["inl_ep_ppm"], rev_deck_inl=rv[1], rev_model_inl=rv[3], checks=chk, problems=r["problems"],
+                       rel_sym_inl=rel, ratio_inl=g["inl_ep_ppm"] / gm_["inl_ep_ppm"], cp_hold=hold)
+            ok &= row["ok"]
+            rows.append(row)
+            print(f"xcheck{' [NO-Ck BROKEN MODEL]' if no_ck else ''} {name}{'' if gated else ' (diagnostic, not gated)'}: deck gain {g['gain_err']:+.3e} INL {g['inl_ep_ppm']:.3f} | model gain {gm_['gain_err']:+.3e} "
+                  f"INL {gm_['inl_ep_ppm']:.3f} | deck/model INL {row['ratio_inl']:.3f} rel_sym {rel*100:.1f} % (gate {XCHECK_REL*100:g} %) gain rel_sym {rel_sym(g['gain_err'], gm_['gain_err'])*100:.1f} % "
+                  f"| reviewer deck {rv[0]} / {rv[1]} -> {'ok' if row['ok'] else 'FAIL'} {chk}")
+    finally:
+        M._leaky = orig
+    return rows, ok
+
+
+CUR_K, CUR_C2 = [P.K], [P.C2]
+
+
+def mode_xcheck(args):
+    rows, ok = xcheck_rows()
     # noise transfer: trnoise at OTA1 input, per-cycle white, ~30 conversions
     nconv, sig = 32, 2e-3
     cfg = dict(IDEAL_OTA, a0_db=120.0, n=256, u_list=(0.0,) * nconv, noise1=sig)
@@ -439,7 +459,7 @@ def mode_xcheck(args):
     import iadc as M
     _, p = model_eval(np.zeros(nconv), 256, a0_db=float("inf"))
     ub, st = M.convert(p, np.zeros(nconv), ota_noise=E, return_state=True)
-    um = ub + np.asarray(st["x2_final"]) / (p.c1 * p.c2 * 256 * 255 / 2.0)
+    um = np.asarray(st["u_corr"])
     slope = float(np.dot(uh, um) / np.dot(um, um))
     corr = float(np.corrcoef(uh, um)[0, 1])
     rms_d, rms_th = float(np.sqrt(np.mean(uh ** 2))), noise_gain_u(256) * float(np.sqrt(np.mean(E ** 2))) / VREF
@@ -450,6 +470,19 @@ def mode_xcheck(args):
     jdump(dict(rows=rows, noise=dict(sigma_v=float(np.sqrt(np.mean(E ** 2))), deck_rms_u=rms_d, theory_rms_u=rms_th, slope=slope, corr=corr, ok=nz_ok, problems=r["problems"])), "xcheck.json")
     print("ACCEPT" if ok else "REJECT")
     return 0 if ok else 1
+
+
+def mode_nonvac5(args):
+    """WO-13/V3 nonvacuity: the xcheck gate must pass on the unbroken model (control) and fail when the Ck term is removed from the model's stage-2 topology.
+    Prints REJECT and exits 1 when the broken copy is rejected and the control is accepted (the nonvac convention); ACCEPT (exit 0) means the gate is vacuous."""
+    _, ok_ctl = xcheck_rows(False, "nv5c_")
+    rows_b, ok_brk = xcheck_rows(True, "nv5b_")
+    bad = [r["case"] for r in rows_b if r["gated"] and not r["ok"]]
+    print(f"nonvac5: control (Ck in model) gate ok={ok_ctl}; no-Ck broken model gate ok={ok_brk}; rejected rows: {bad}")
+    verdict = (not ok_brk) and ok_ctl
+    jdump(dict(control_ok=ok_ctl, broken_ok=ok_brk, rejected=bad, rows=rows_b), "nonvac5.json")
+    print("REJECT" if verdict else ("ACCEPT (nonvac FAILED)" if ok_ctl else "control failed"))
+    return 1 if verdict else 0
 
 
 # ---- item 4: A(v)
@@ -1296,11 +1329,79 @@ def mode_knees4(args):
     return 0 if ok else 1
 
 
+# ---- WO-13: V4 (2 MHz, N 4096, OTA2 SR) and V5 (fast-mode options)
+V4_SR2 = (11.0, 13.5)                  # V/us
+V5_TARGET = {256: 20.0, 1024: 5.0}     # provisional fast-mode INL targets [ppm FSR] (D28)
+V5_I1, V5_I2, V5_IOTHER = 4.75, 2.4, 26.0   # review M2: uA per V/us (OTA1 CL 1.4 pF, OTA2 CL 0.7 pF) + other [uA]
+V5_GBW1_FULL, V5_GBW2_FULL = (10e6, 16e6, 20e6), (10e6, 15e6, 20e6, 25e6)
+V5_GBW2_BOOST15 = (10e6, 15e6, 20e6)   # base values, loaded = x1.5
+
+
+def fast_current_uA(sr1_eff, sr2_eff):
+    return V5_I1 * sr1_eff + V5_I2 * sr2_eff + V5_IOTHER
+
+
+def mode_fast2(args):
+    jobs = []      # (kind, key, extra, n, m)
+    for sr2 in V4_SR2:
+        jobs.append(("V4", (4096, sr2), {"fs": 2e6, "sr": 12.5e6, "sr2": sr2 * 1e6}, 4096, 11))
+    for n in R2_NS:
+        for g2 in V5_GBW2_BOOST15:
+            jobs.append(("V5i", (n, g2), {"fs": 4e6, "bst1": 2.0, "bst2": 1.5, "sr": 12.5e6, "sr2": 13.5e6, "gbw": 10e6, "gbw2": g2}, n, 21))
+    for n in R2_NS:
+        for g1 in V5_GBW1_FULL:
+            for g2 in V5_GBW2_FULL:
+                jobs.append(("V5ii", (n, g1, g2), {"fs": 3e6, "sr": 12.5e6, "sr2": 13.5e6, "gbw": g1, "gbw2": g2}, n, 21))
+    only = getattr(args, "only", None)
+    if only:
+        jobs = [j for j in jobs if j[0] in only.split(",")]
+    print(f"fast2: {len(jobs)} deck jobs")
+
+    def one(j):
+        kind, key, e, n, m = j
+        tag = f"f2_{kind}_" + "_".join(f"{x:g}" for x in key)
+        return dc_metrics(v2_cfg(e, n=n, m=m), tag)
+    with ThreadPoolExecutor(3) as ex_:
+        out = list(ex_.map(one, jobs))
+    rows = []
+    for (kind, key, e, n, m), r in zip(jobs, out):
+        rows.append(dict(kind=kind, key=list(key), n=n, m=m, ok=bool(r.get("ok")), inl_ep_ppm=r.get("inl_ep_ppm", float("nan")), inl_bf_ppm=r.get("inl_bf_ppm", float("nan")),
+                         gain_err=r.get("gain_err", float("nan")), runtime_s=r.get("runtime_s", float("nan")), problems=r.get("problems", []), extra={k: v for k, v in e.items()}))
+    thr13 = SLEW_SHARE_PPM / KNEE_MARGIN_X
+    print(f"\nV4: 2 MHz, N 4096, OTA1 12.5 V/us, 11 DC points. Knee margin is against the slew INL share {SLEW_SHARE_PPM:g} ppm / {KNEE_MARGIN_X:g} = {thr13:.3f} ppm (= 1.333 ppm)")
+    for r in rows:
+        if r["kind"] == "V4":
+            print(f"  OTA2 SR {r['key'][1]:g} V/us: INL(ep) {r['inl_ep_ppm']:.4f} ppm (best-fit {r['inl_bf_ppm']:.4f}), gain {r['gain_err']:+.3e}; headroom to {thr13:.3f}: {thr13 / r['inl_ep_ppm']:.2f}x; {r['runtime_s']:.0f} s")
+    print("\nV5 (i): 4 MHz, OTA1 boost x2 (12.5 -> 25 V/us, base GBW1 10 -> 20 MHz), OTA2 boost x1.5 (13.5 -> 20.25 V/us), 21 DC points")
+    i_fast = fast_current_uA(25.0, 20.25)
+    i_prec = fast_current_uA(12.5, 13.5)
+    print(f"  current (review M2 per-SR rule: OTA1 {V5_I1}, OTA2 {V5_I2} uA per V/us, + {V5_IOTHER:g} uA): fast {i_fast:.0f} uA, precision {i_prec:.0f} uA")
+    for r in rows:
+        if r["kind"] == "V5i":
+            n, g2 = r["key"]
+            print(f"  N{n:g} base GBW2 {g2/1e6:g} MHz (loaded {g2*1.5/1e6:g}): INL {r['inl_ep_ppm']:.3f} ppm vs target {V5_TARGET[int(n)]:g}: {'PASS' if r['inl_ep_ppm'] <= V5_TARGET[int(n)] else 'FAIL'}")
+    print("\nV5 (ii): 3 MHz, no boost, OTA1 12.5, OTA2 13.5 V/us, 21 DC points")
+    print(f"  current: {fast_current_uA(12.5, 13.5):.0f} uA (same as precision; D31 cap 200 uA)")
+    for n in R2_NS:
+        print(f"  N{n} (target {V5_TARGET[n]:g} ppm) INL ppm, rows GBW1, cols GBW2 {[g/1e6 for g in V5_GBW2_FULL]} MHz")
+        for g1 in V5_GBW1_FULL:
+            vals = []
+            for g2 in V5_GBW2_FULL:
+                rr = next(r for r in rows if r["kind"] == "V5ii" and r["key"] == [n, g1, g2])
+                vals.append(rr["inl_ep_ppm"])
+            print(f"    GBW1 {g1/1e6:g}: " + "  ".join(f"{v:8.3f}" for v in vals))
+    ok = all(r["ok"] for r in rows) and all(math.isfinite(r["inl_ep_ppm"]) for r in rows) and len(rows) == len(jobs)
+    jdump(dict(rows=rows, v4_threshold_ppm=thr13, current_uA=dict(fast_i=i_fast, precision=i_prec)), "fast2.json")
+    print("run-health ACCEPT" if ok else "run-health REJECT")
+    return 0 if ok else 1
+
+
 def main():
     ap = argparse.ArgumentParser()
     for m in ("null", "options", "dc", "sweep", "nonvac", "xcheck", "av", "knees2", "cm", "offsets", "rsrc", "nonvac2",
-              "knees3", "cm2", "drift", "rsrc2", "nonvac3", "nonvac4", "knees4"):
+              "knees3", "cm2", "drift", "rsrc2", "nonvac3", "nonvac4", "knees4", "fast2", "nonvac5"):
         ap.add_argument(f"--{m}", action="store_true")
+    ap.add_argument("--only", default=None, help="fast2: comma list of V4,V5i,V5ii")
     ap.add_argument("--n", type=int, default=256)
     ap.add_argument("--m", type=int, default=None, help="number of DC points")
     ap.add_argument("--out", default=None)
@@ -1328,7 +1429,7 @@ def main():
         return mode_nonvac(a)
     for nm, fn in (("xcheck", mode_xcheck), ("av", mode_av), ("knees2", mode_knees2), ("cm", mode_cm), ("offsets", mode_offsets),
                    ("rsrc", mode_rsrc), ("nonvac2", mode_nonvac2), ("knees3", mode_knees3), ("cm2", mode_cm2),
-                   ("drift", mode_drift), ("rsrc2", mode_rsrc2), ("nonvac3", mode_nonvac3), ("nonvac4", mode_nonvac4), ("knees4", mode_knees4)):
+                   ("drift", mode_drift), ("rsrc2", mode_rsrc2), ("nonvac3", mode_nonvac3), ("nonvac4", mode_nonvac4), ("knees4", mode_knees4), ("fast2", mode_fast2), ("nonvac5", mode_nonvac5)):
         if getattr(a, nm):
             return fn(a)
     ap.print_help()
