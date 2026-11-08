@@ -53,7 +53,7 @@ Current (review M2 rule): **fast 193 µA, precision 118 µA. Inside D31.**
 INL ranges from 110 to 280 ppm across GBW1 {10, 16, 20} x GBW2 {10, 15, 20, 25} MHz.
 - Cause (REVIEW-S5e C-M2, REASONED from scaling against deck data): OTA1 at 12.5 V/us and 3 MHz is equivalent to about 7.9 V/us at 2 MHz, which measured 143 ppm. The earlier "suspect deck / phase plan" label was wrong.
 - Making 3 MHz work unboosted needs OTA1 SR of about 20 V/us always on (about +36 uA in precision mode: about 154 uA instead of 118 uA), so the option is dominated by V5(i).
-- Comparison wording fixed: the 21-56 ppm quoted earlier was the 4 MHz run with the same OTAs *unboosted* (OTA2 at its precision SR, no current boost), not "option (a)" of the fast-mode list (option (a) is the OTA1-only boost).
+- Comparison wording fixed (coordinator): the 21-56 ppm figure is **option (a)** of s5d R2 (OTA1 boosted to 25 V/us, OTA2 unboosted at 13.5 V/us, N 1024, GBW2 25-10 MHz), not "the same OTAs unboosted". 4 MHz with no boost at all gave 6252 ppm (s5b). V5(ii) at 3 MHz is consistent with this trend (OTA1 slew-limited).
 - The 3 MHz point at OTA1 20 V/us was not run (WO-14 item 7).
 
 ## Scope notes (REVIEW-S5e m5, m6)
