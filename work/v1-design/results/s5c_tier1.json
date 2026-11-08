@@ -1,0 +1,38 @@
+{
+ "wo": "WO-11",
+ "source": "/home/mempool/regr/tt/WO-09/{knees3,cm2,drift,rsrc2,xcheck,nonvac3}.log",
+ "command": "nice -n 10 timeout 7200 python3 design/tier1/tier1_tb.py --$m --out /home/mempool/regr/tt/WO-09/$m  (m in knees3 cm2 drift rsrc2 xcheck nonvac3; run_wo0910.sh qa)",
+ "knees": {
+  "sr_spec_v_per_us": 12,
+  "margin_over_ota1_knee_pct": {"2M_N256": 35, "2M_N1024": 36, "4M_boost_N256": 19, "4M_boost_N1024": 10},
+  "margin_over_ota2_knee_pct": {"2M_N256": 212, "2M_N1024": 212, "4M_boost_N256": 178, "4M_boost_N1024": 127},
+  "ota1_only_boost_4M_N1024": {"inl_floor_ppm": 12.9, "knee_above_12": null, "flag": true},
+  "flags": ["4M_boost/ota1/N256 margin 19 % < 25 %", "4M_boost/ota1/N1024 margin 10 % < 25 %", "4M_boost_OTA1only/ota1/N1024 knee None above 12 V/us"]
+ },
+ "cm2": {
+  "sign": "-",
+  "closed_form": "((Cp/Cs) eps_Cs - dCp/Cs)/(1+Cp/Cs)",
+  "deck_vs_closed_err_pct": 0.0,
+  "plus_form_err_pct_range": [125, 200],
+  "sign_discriminating_cases": 8,
+  "sys_off_cmrr_db_at_alloc_dcp_le_0p25fF_min": 66.2,
+  "sys_off_flags_db": {"cp10_d1_mm0": 54.2, "cp10_d1_mm0.75": 54.8, "cp20_d1_mm0": 54.3, "cp20_d1_mm0.75": 55.7},
+  "s5b_cmrr_numbers": "superseded (m1)",
+  "checks_all_true": true
+ },
+ "drift": {
+  "leak_per_side_pA": 100,
+  "stage1_mV": {"2M_N4096": -43.01, "0p25M_N4096": -344.06, "0p25M_N1024": -86.02, "0p25M_N1024_anchored": -85.94},
+  "stage2_mV": {"2M_N4096": -101.79, "0p25M_N4096": -814.35, "0p25M_N1024": -203.59, "0p25M_N1024_anchored": -203.17},
+  "flag": "0.25 MHz N 4096 stage-1 drift 344 mV > 0.2 V"
+ },
+ "rsrc2": {
+  "spec_pad_5pF_dR50_cmrr_db": 179.6,
+  "review_bound_db": 116.5,
+  "pad_2nF_dR50_cmrr_db": 116.8,
+  "pad_2nF_vs_settling_aware_pct": 2,
+  "finding": "review form 1/(dR fs Cp,top) valid only for tau_pin >~ T"
+ },
+ "xcheck": {"A80_base_inl_ppm": 0.413, "A80_roff1e14_inl_ppm": 0.410, "roff_effect": "none", "noise_ratio_deck_over_theory": 1.052, "all_ok": true},
+ "nonvac3": {"dcp_2fF_sysoff_db": 48.3, "ota1_sr6_inl_ppm": 1623.31, "leak_10nA_drift_V": -2.150, "all_rejected": true, "exit": 1}
+}
