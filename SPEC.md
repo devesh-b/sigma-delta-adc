@@ -87,37 +87,39 @@ Budget (all blocks): noise ≤ 2.5 µV @15 SPS, INL ≤ 20 ppm, offset ≤ 5 µV
 
 | Block | Parameter | Spec | Budget line / verify |
 |---|---|---|---|
-| OTA1, OTA2 (until separated) | DC gain | A(0) ≥ 80 dB; A ≥ 75 dB for \|Vout,diff\| ≤ 1.4 V (x peak 1.21 V + 15 %) | INL 8 ppm; gate: model INL with simulated A(v) table ≤ 8 ppm |
+| OTA1, OTA2 (until separated) | DC gain | A(0) ≥ 80 dB; A ≥ 75 dB for \|Vout,diff\| ≤ 1.4 V (x peak 1.21 V + 15 %). A(v) = **static large-signal** gain vo/vg, not incremental; S4 assumed 70/60 dB at 2.0/3.1 V (verify in C1) | INL 8 ppm; gate: model INL with simulated A(v) table ≤ 8 ppm (S4 worst 5.2 ppm) |
 | OTA1 | Sampled thermal noise | ≤ 250 µV rms diff at the virtual ground, integration-phase network, chopper parked (expect ≈ 75–110 µV); en reported only | noise 1.2 µV; `.noise` integrated |
 | OTA1 | 1/f, chopper | fc ≤ 631 kHz (info); constant chopper residue ≤ 1 mV; signal-dependent residue ≤ 1 µV over ±0.9 FS | noise 1.0 µV, offset reserve |
-| OTA1 | GBW / PM | ≥ 10 MHz (20 MHz design target, also covers 4 MHz fast mode) at β ≥ 0.84, C_L ≥ 1.4 pF (incl. CMFB caps); PM ≥ 60° | AC + step tb |
-| OTA1 | Slew | ≥ 12 V/µs diff (Cs2 samples x1 in OTA1's hold phase, D25); ≥ 25 V/µs if the phase plan changes | transient at real phase plan |
-| OTA2 | GBW / slew | GBW ≥ 10 MHz into ≈ 0.7 pF; SR ≥ 25 V/µs (c2 0.5) | hand |
-| OTA1/OTA2 | Offset | ≤ 9 mV 3σ (constant, cancels in sys pair) | model |
-| OTA1 | Input CM / CMFB | virtual-ground CM within PMOS-pair range for Vin_cm 0…VREF with D12 switching; CMFB absorbs per-cycle CM charge to ≤ 10 mV in 0.2·t_half; starts from either rail | C1/C4 tb |
-| Current | Analog total | ≤ 200 µA; estimate OTA1 ≈ 46, OTA2 ≈ 40, comparator 6, bias/CMFB 20 ⇒ ≈ 112 µA | hand |
+| OTA1 | GBW / PM | loaded GBW ≥ 10 MHz base (20 MHz design target) at β ≥ 0.84, C_L ≥ 1.4 pF (incl. CMFB caps); **boost=1: loaded GBW ≥ 20 MHz absolute** (D39); PM ≥ 60° both | AC + step tb, every corner |
+| OTA1 | Slew | ≥ 12.5 V/µs diff, slower edge, every corner, C_L ≥ 1.4 pF, Cs2 samples x1 in OTA1's hold phase (D25); I_fold ≥ 1.2·I_tail; boost=1: ≥ 25 V/µs. Basis: tier-1 knee ≈ 10.0 V/µs at the slew INL share 1.333 ppm (s5d R1), margin 25 % (D39) | transient at real phase plan |
+| OTA2 | GBW / slew | base: loaded GBW ≥ 10 MHz into ≈ 0.7 pF (15 MHz design target), SR ≥ 13.5 V/µs diff (margin 37 % at N 1024, INL 3.4× under share at N 4096); **boost=1: loaded GBW ≥ 22.5 MHz absolute, SR ≥ 20.25 V/µs** (D39; gm does not scale ∝ I in moderate inversion, REVIEW-S5e C-M1) | AC + transient tb, every corner |
+| OTA1/OTA2 | Offset | ≤ 9 mV 3σ (constant, cancels in sys pair). OTA2 u error = 1.5·2·Vos2/(c1(N−1)) = 52.7 µV at N 4096 (1.5 from Ck sharing the OTA2 node) | model |
+| OTA1, OTA2 | Input CM / CMFB | linear (A ≥ 75 dB) for v_g,cm ∈ [V_icm − 0.13 − ΔV_drift, V_icm + 0.13] V (0.13 = D12 CM step + 10 mV CMFB); V_icm chosen in C1 for ≥ 0.2 V tail headroom at ss/−40/3.0; upper limit checked at ss/−40/3.0, lower at ss/125/3.0 (and ss/100/3.0 for 0.25 MHz N 4096). CMFB absorbs per-cycle CM charge to ≤ 10 mV in 0.2·t_half; starts from either rail | C1/C4 tb |
+| Current | Analog total | ≤ 200 µA in every mode. Base ≈ 118 µA (OTA1 ≈ 60, OTA2 ≈ 32, comparator 6, bias/CMFB 20); boost=1 ≈ 193 µA (rule I_tot ≈ 3.4·I_tail, a lower bound if GBW-limited; SC CMFB ≈ 2.7·I_tail) | hand, then C1/C6 sim |
 | Comparator | Offset / noise | ≤ 20 mV 3σ; ≤ 5 mV rms | INL 1 ppm, noise 0.3 µV |
 | Comparator | Decision time | < 68 ns at 2 MHz (< 34 ns at 4 MHz) for \|Vin\| ≥ 1 mV, worst corner | tb |
 | Comparator | Single bit (F8) | one retimed FF output drives DAC switches and decimator; y[0] forced at reset release | construction + test |
 | Comparator | Kickback | ≤ 5 mV on x2, recovered before next sample (gain only, 3.8 ppm/mV) | gain reserve |
 | Input switches | Settling | (Ron + 500 Ω + R_src)·(5 pF + Cs) ≤ 18.75 ns; Ron max over 0…VREF+ at ss/−40/3.0 **incl. body effect** ≤ 1.5 kΩ | INL 2 ppm; DC Ron sweep |
-| Input (user-facing) | Source | R_src ≤ 1 kΩ without board cap, or board RC (≥ 10 nF at pin); average pin current fs·Cs·(Vin_cm − Vref_cm) ≤ 1 µA ⇒ offset ΔR·I **not** cancelled by sys chop | datasheet row |
+| Input (user-facing) | Source | no board cap: R_src ≤ 1 kΩ; with board cap (τ_pin ≥ T): sys-on CMRR = 1/(ΔR·fs·Cp,top) ⇒ ΔR (VIN+ vs VIN−) ≤ 330 Ω at 2 MHz (∝ 1/fs). Pin CM current ≈ fs·Cp,top·\|ΔVcm\|; offset ΔR·I **not** cancelled by sys chop | datasheet row |
 | Reference | On-chip / board | on-chip τ_ref ≤ 10 ns; board decap ≥ 100 nF at ua2/ua3, DC R_ext ≤ 10 Ω per pin (u³ INL ≈ 1.4 ppm) | INL 2 ppm |
 | Reset | Residue / window | r ≤ 1e-4 on x1 and x2; window ≥ 2 clock cycles (≥ 1 µs at 2 MHz) | offset 1 µV; inter-conversion memory test |
-| Virtual ground | Leakage | ≤ 100 pA at ff/125/3.6; signal-dependent part ≤ 0.1 pA (ρ ≤ 0.1 %, assumption) | offset 1 µV |
-| Capacitors | Matching | Cs+/Cs− ≤ 0.75 % 3σ (CMRR); Cs/Cint not gain-relevant with shared Cs (≈ 11 ppm via k/c1) | gain |
+| Virtual ground | Leakage | per vg node (per side), sign stated (NMOS-only island switches ⇒ drift negative): **≤ 90 pA at ff/125/3.6** (0.25 MHz N 1024 stage-2 drift ≤ 0.2 V) and **≤ 20 pA at ff/100/3.6** (0.25 MHz N 4096, D39); signal-dependent ≤ 0.1 pA. Drift = I·N/(fs·C_side), C_side 4.76 / 2.01 pF | offset 1 µV; island CM rows; C4 PEX leakage tb |
+| Capacitors | Matching / CMRR | Cs+/Cs− ≤ 0.75 % 3σ; Cp,top ≤ 20 fF/side; ΔCp,top random ≤ 0.25 fF 3σ, systematic (PEX) ≤ 0.08 fF; ε_inj ≤ 2.8e-4; gate \|sys\| + RSS(random 3σ) + \|ε_inj\| ≤ 1e-3 with ε_eff = ((Cp/Cs)·ε_Cs − ΔCp/Cs)/(1+Cp/Cs) + ε_inj (D36, D37) | S4 MC; C4/C10 PEX + MC |
 | Clock | Phases | t_half ≥ 225 ns at 2 MHz after non-overlap; bottom-plate early phases | hand |
 | Noise spec | Condition | at u = 0 (shorted input); reference noise is a board requirement | — |
 
 **User decisions after S4/S5 (D27–D30):**
-- Noise @15 SPS ≤ 2.5 µV at all corners for fs ≥ 2 MHz; at fs 0.25 MHz ≤ 2.5 µV up to 85 °C and ≤ 3.0 µV at 125 °C (D27).
+- Noise @15 SPS ≤ 2.5 µV at all corners for fs ≥ 2 MHz; at fs 0.25 MHz ≤ 2.5 µV up to 85 °C and ≤ 3.0 µV at 125 °C (D27). **fs 0.25 MHz with N 4096 is rated −40…100 °C only** (island leakage drift, D39); 0.25 MHz N ≤ 1024 keeps 125 °C.
 - **Noise @240 SPS ≤ 5 µV rms** (D29).
-- **Bias-boost config bit (D31, supersedes D28's always-on 20 MHz):** boost=0 (precision, fs ≤ 2 MHz): loaded GBW ≥ 10 MHz
-  (20 MHz design target), analog ≈ 112 µA. boost=1 (fast mode, fs 4 MHz): OTA1/OTA2 tail currents doubled ⇒ loaded GBW ≥ 20 MHz,
-  SR ×2, analog ≈ 198 µA. **Analog current ≤ 200 µA in every mode.** OTA input pairs in weak/moderate inversion so that
-  GBW(boost)/GBW(nom) ≥ 1.9 at every corner (C1 gate). Boost latched only at a pair boundary (C9); one switched bias leg (C6).
-- Fast mode (4 MHz) INL: N 64 ≤ 200 ppm, N 256 ≤ 20 ppm, N 1024 ≤ 5 ppm (D28).
-- **CMRR ≥ 100 dB DC (120 dB goal)** with sys chop on, **≥ 60 dB with sys chop off** (D30, D32; input CM 0…VREF). Risk: 60 dB sys-off needs CM→diff ≤ 0.1 % — Cs+/Cs− matching alone gives ≈ 0.75 % 3σ at 0.5 pF, so the D12 input-switching topology must reject CM to first order independent of cap matching (C4 owns).
+- **Bias-boost config bit (D31, form per D39):** boost=0 (precision, fs ≤ 2 MHz), analog ≈ 118 µA. boost=1 (fast mode,
+  fs 4 MHz): OTA1 tail ×2, OTA2 tail ×1.5 (option A, user 2026-11-08), gated on **absolute boosted loaded GBW**
+  (OTA1 ≥ 20 MHz, OTA2 ≥ 22.5 MHz) and SR (≥ 25 / ≥ 20.25 V/µs) at every corner, analog ≈ 193 µA. **Analog current ≤ 200 µA
+  in every mode.** The former GBW(boost)/GBW(nom) ≥ 1.9 gate is withdrawn (REVIEW-S5e C-M1: needs gm/Id ≈ 24, infeasible
+  at OTA1 size); C1 may meet the absolute rows by input-pair sizing, SC CMFB or a larger OTA2 boost, inside 200 µA.
+  Boost latched only at a pair boundary (C9); one switched bias leg (C6).
+- Fast mode (4 MHz) INL: N 64 ≤ 200 ppm, N 256 ≤ 20 ppm, N 1024 ≤ 5 ppm (D28; confirmed with option A, D39). Option A deck result 3.7 / 7.8 ppm (N 1024 / 256) assumed gm ∝ I; with EKV gm scaling at ×1.5 it is ≈ 5.3 ppm at N 1024 (marginal), hence the absolute boosted-GBW rows.
+- **CMRR ≥ 100 dB DC (120 dB goal)** with sys chop on, **≥ 60 dB with sys chop off** (D30, D32; input CM 0…VREF). Definition: CMRR = \|ΔVin_cm/ΔV_os\|, least-squares slope over Vin_cm {0.2, 1.0, 2.0} V at fixed mismatch, N 4096 (sys off raw offset, sys on pair-demodulated). Evidence: S4 sys off 61.5 dB; sys on cites tier-1 cm2 137–173 dB (the model's ≈ 205 dB is a symmetric-mean metric, not a silicon figure). Risk: 60 dB sys-off needs CM→diff ≤ 0.1 % — Cs+/Cs− matching alone gives ≈ 0.75 % 3σ at 0.5 pF, so the D12 input-switching topology must reject CM to first order independent of cap matching (C4 owns).
 
 Allocation after review: INL 8 (OTA) + 2 (input settling) + 2 (ref settling) + 1 (comparator) + 1 (quant floor) + 2 (ref
 current) + 4 (reserve: MIM VCC, charge injection, substrate) = 20 ppm. Gain: A0 300, settling 500, k/c1 50, reserve 4150 ppm.
@@ -273,7 +275,7 @@ Input impedance to publish: Zin ≈ 1/(fs·Cs) ≈ 1 MΩ/side at 1 MHz, 1 pF —
 | Axis | Set | Note |
 |---|---|---|
 | Process | tt, ss, ff, sf, fs (sky130 MOS corners) **+ 2 combined R+C points: ss_hh (settling), ff_ll (kT/C, noise)** | R+C sections ll/hh/hl/lh and *_mm exist in sky130.lib.spice (review m5) |
-| Temperature | −40, 27, 125 °C | bench test covers 0–60 °C; wider sim range is margin |
+| Temperature | −40, 27, 125 °C; **plus 100 °C for fs 0.25 MHz / N 4096** (that mode is not gated at 125 °C, D39) | bench test covers 0–60 °C; wider sim range is margin |
 | VAPWR | 3.0, 3.3, 3.6 V | ±10 % |
 | VDPWR | 1.62, 1.8, 1.98 V | ±10 %; ×3 axis for level shifters and digital ⇒ 135 points for C7/C9 (review m7) |
 | Mismatch | Monte Carlo ≥ 200 runs at tt/27 °C, ≥ 50 at worst PVT corner (`*_mm` sections) | pass = estimated μ ± 3σ inside spec **and** every sample inside spec (review m6) |
