@@ -235,3 +235,11 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   1. write `results/s5f_tier1.md` (V5 with the real gm ratios, the OTA2 ×2 row, non-vacuity rows, V4m);
   2. reviewer pass on WO-14;
   3. if option A fails N 1024 ≤ 5 ppm: present the fix options to the user (OTA2 ×2 boost using the SC-CMFB headroom, or a larger OTA2 base GBW). Do not decide.
+
+## Update 2026-11-09 02:05
+- fast3 done (`results/s5f_tier1.md`, 8ade439).
+  - Option A built from the minimum bases (OTA1 10, OTA2 15 MHz) fails N 1024: 7.6–12.5 ppm against 5.
+  - The SPEC-meeting point (boosted GBW 20 / 22.5 MHz) gives 3.7 ppm, so the D39 rows hold, but the bases must rise (≈ 14 / 17.5 MHz).
+  - V4m passes (0.579 ppm), so the OTA2 25 % SR margin is shown.
+- Reviewer dispatched (background) on WO-14/S5f. It returns text; save it as `REVIEW-S5f-2026-11-09.md`.
+- Then: tell the user whether fast mode fits 200 µA with the reviewer's sizing. If it doesn't, give them options; do not decide. Then S6.
