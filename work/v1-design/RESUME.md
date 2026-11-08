@@ -224,3 +224,14 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   3. reviewer pass;
   4. then S6.
 - Known risks (coder): nfet deck sign/column, numerical gm at low current, `gm_ratio` helper. Fix any breakage before trusting the numbers.
+
+## Update 2026-11-09 01:55
+- Acceptance done: `results/ACCEPT-WO13-14-cb14f34.md` (1633ab5). All green.
+- Two gm/Id bugs fixed: ngspice `{$t}` (925b983), singlescale columns (05cbab2).
+- gm/Id table committed. Worst-case pfet_01v8 gm ratio: OTA2 ×1.5 at gm/Id 14 = 1.283, ×2 = 1.513; OTA1 ×2 at 10 = 1.423 (ff/−40).
+- S3 A/B: Ck moves S3 ≤ 0.6 %.
+- **Running:** `--fast3` in `/home/mempool/regr/tt/acc14c-05cbab2` (nohup `f3.sh`, `fast3.log`, ALLDONE marker).
+- When it's done:
+  1. write `results/s5f_tier1.md` (V5 with the real gm ratios, the OTA2 ×2 row, non-vacuity rows, V4m);
+  2. reviewer pass on WO-14;
+  3. if option A fails N 1024 ≤ 5 ppm: present the fix options to the user (OTA2 ×2 boost using the SC-CMFB headroom, or a larger OTA2 base GBW). Do not decide.
