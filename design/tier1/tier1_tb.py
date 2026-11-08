@@ -395,8 +395,11 @@ def mode_xcheck(args):
              ("A60_c1_025", dict(a0_db=60.0, cint1=2e-12), dict(c1=0.25)), ("A80_base", dict(a0_db=80.0), {}),
              # m3 (WO-09): at A0 80 dB the compared quantity (~0.3 ppm) is the size of the Roff 1e12 null floor (0.46 ppm): rerun at Roff 1e14
              ("A80_roff1e14", dict(a0_db=80.0, roff=1e14), {})]
+    # R9 (WO-12): diagnostic deck cases with the explicit Cp,vg of the v2 decks (xcheck decks use the legacy OTA path, which has NO Cp,vg: cp = 0). Not gated, no reviewer figures.
+    diag = [("A60_base_cpvg", dict(a0_db=60.0, cp_vg=P.TIER1_CP_VG), {}), ("A60_c1_025_cpvg", dict(a0_db=60.0, cint1=2e-12, cp_vg=P.TIER1_CP_VG), dict(c1=0.25))]
     rows, ok = [], True
-    for name, dk, mk in cases:
+    for name, dk, mk in cases + diag:
+        gated = name in REV
         cfg = dict(IDEAL_OTA, n=256, u_list=U)
         cfg.update(dk)
         r = run_deck(cfg, "xc_" + name)
@@ -405,16 +408,28 @@ def mode_xcheck(args):
         g = inl_gain(np.array(U), uh)
         um, p = model_eval(U, 256, a0_db=dk["a0_db"], **mk)
         gm_ = inl_gain(np.array(U), um)
-        rv = REV[name]
-        chk = [rel_sym(g["inl_ep_ppm"], gm_["inl_ep_ppm"]) <= 0.35, rel_sym(g["inl_ep_ppm"], rv[1]) <= 0.35]
-        if rv[0] is not None:
-            chk += [rel_sym(g["gain_err"], gm_["gain_err"]) <= 0.05, rel_sym(g["gain_err"], rv[0]) <= 0.05]
-        row = dict(case=name, ok=bool(r["ok"] and all(chk)), deck_gain=g["gain_err"], model_gain=gm_["gain_err"], rev_deck_gain=rv[0],
-                   deck_inl=g["inl_ep_ppm"], model_inl=gm_["inl_ep_ppm"], rev_deck_inl=rv[1], rev_model_inl=rv[3], checks=chk, problems=r["problems"])
+        # model variants with the extra virtual-ground loading the deck actually has (ratios to the stage's Cint): Cp,vg on both stages; Ck on the stage-2 input node
+        cint1, ck, cp = dk.get("cint1", P.CINT1), dk.get("ck", P.K * P.CS2), dk.get("cp_vg", 0.0)
+        var = {}
+        for vn, kw in (("cp_only", dict(cp_vg1=cp / cint1, cp_vg2=cp / P.CINT2)), ("cp_plus_ck", dict(cp_vg1=cp / cint1, cp_vg2=(cp + ck) / P.CINT2))):
+            uv, _ = model_eval(U, 256, a0_db=dk["a0_db"], **mk, **kw)
+            gv = inl_gain(np.array(U), uv)
+            var[vn] = dict(inl=gv["inl_ep_ppm"], gain=gv["gain_err"], rel_inl=rel_sym(g["inl_ep_ppm"], gv["inl_ep_ppm"]), ratio_inl=g["inl_ep_ppm"] / gv["inl_ep_ppm"], rel_gain=rel_sym(g["gain_err"], gv["gain_err"]))
+        rv = REV.get(name, (None, None, None, None))
+        chk = []
+        if gated:
+            chk = [rel_sym(g["inl_ep_ppm"], gm_["inl_ep_ppm"]) <= 0.35, rel_sym(g["inl_ep_ppm"], rv[1]) <= 0.35]
+            if rv[0] is not None:
+                chk += [rel_sym(g["gain_err"], gm_["gain_err"]) <= 0.05, rel_sym(g["gain_err"], rv[0]) <= 0.05]
+        row = dict(case=name, gated=gated, ok=bool(r["ok"] and all(chk)), deck_gain=g["gain_err"], model_gain=gm_["gain_err"], rev_deck_gain=rv[0],
+                   deck_inl=g["inl_ep_ppm"], model_inl=gm_["inl_ep_ppm"], rev_deck_inl=rv[1], rev_model_inl=rv[3], checks=chk, problems=r["problems"],
+                   rel_inl_before=rel_sym(g["inl_ep_ppm"], gm_["inl_ep_ppm"]), ratio_inl_before=g["inl_ep_ppm"] / gm_["inl_ep_ppm"], variants=var)
         ok &= row["ok"]
         rows.append(row)
-        print(f"xcheck {name}: deck gain {g['gain_err']:+.3e} INL {g['inl_ep_ppm']:.3f} | model gain {gm_['gain_err']:+.3e} INL {gm_['inl_ep_ppm']:.3f} "
+        print(f"xcheck {name}{'' if gated else ' (diagnostic, not gated)'}: deck gain {g['gain_err']:+.3e} INL {g['inl_ep_ppm']:.3f} | model gain {gm_['gain_err']:+.3e} INL {gm_['inl_ep_ppm']:.3f} "
               f"| reviewer deck {rv[0]} / {rv[1]} model {rv[2]} / {rv[3]} -> {'ok' if row['ok'] else 'FAIL'} {chk}")
+        print(f"   R9 bias deck/model INL: before {row['ratio_inl_before']:.3f} (rel_sym {row['rel_inl_before']*100:.1f} %); "
+              + "; ".join(f"after {vn} (Cp,vg {cp*1e12:.3g} pF{', +Ck ' + format(ck*1e12, 'g') + ' pF on stage 2' if vn == 'cp_plus_ck' else ''}): model INL {v['inl']:.3f} gain {v['gain']:+.3e} -> ratio {v['ratio_inl']:.3f} (rel_sym {v['rel_inl']*100:.1f} %, gain rel_sym {v['rel_gain']*100:.1f} %)" for vn, v in var.items()))
     # noise transfer: trnoise at OTA1 input, per-cycle white, ~30 conversions
     nconv, sig = 32, 2e-3
     cfg = dict(IDEAL_OTA, a0_db=120.0, n=256, u_list=(0.0,) * nconv, noise1=sig)
@@ -878,6 +893,15 @@ def eps_eff_closed(cp, dcp, eps_cs, cs=P.CS1, plus=False):
     return (p * eps_cs + (dcp / cs if plus else -dcp / cs)) / (1.0 + p)
 
 
+V_ICM = P.CM                        # V, island CM the OTA input pair is designed around (ASSUMED = mid-supply; V_icm is chosen in C1)
+VG_CM_TOL = 0.15                    # V, REVIEW R7: vg1,cm must stay within V_icm +- 0.15 V over Vin_cm 0.2-2.0 V
+
+
+def vg_cm_ok(lo, hi, vicm=V_ICM, tol=VG_CM_TOL):
+    """True when the observed virtual-ground CM range [lo, hi] lies inside vicm +- tol. NaN fails."""
+    return bool(math.isfinite(lo) and math.isfinite(hi) and lo >= vicm - tol and hi <= vicm + tol)
+
+
 def mode_cm2(args):
     cs = P.CS1
     cases = [dict(name="nod12_ref", d12=False, cp=0.0, dcp=0.0, mm=0.0075), dict(name="D12_cp0_mm0", d12=True, cp=0.0, dcp=0.0, mm=0.0),
@@ -927,7 +951,11 @@ def mode_cm2(args):
                closed_form_25pct=all(r["match"] for r in d12r),
                sign_discriminates=len(sign_cases) > 0,
                sys_off_60_at_alloc_dcp_le_0p25fF=all(r["cmrr_off_db"] >= P.TIER1_CMRR_TARGET_DB["sys_off"] for r in alloc),
-               sys_on_100=all(r["cmrr_on_db"] >= P.TIER1_CMRR_TARGET_DB["sys_on"] for r in d12r))
+               sys_on_100=all(r["cmrr_on_db"] >= P.TIER1_CMRR_TARGET_DB["sys_on"] for r in d12r),
+               vg1_cm_within_vicm_pm_0p15=all(vg_cm_ok(*r["vg1_cm_range"]) for r in d12r))
+    print(f"vg1 CM over Vin_cm {CM2_VINS[0]}-{CM2_VINS[-1]} V, D12 rows: [{min(r['vg1_cm_range'][0] for r in d12r):.3f}, {max(r['vg1_cm_range'][1] for r in d12r):.3f}] V "
+          f"vs gate V_icm {V_ICM:g} +- {VG_CM_TOL} = [{V_ICM - VG_CM_TOL:.3f}, {V_ICM + VG_CM_TOL:.3f}] V; no-D12 reference row (not gated, shows what D12 buys): "
+          f"[{rows[0]['vg1_cm_range'][0]:.3f}, {rows[0]['vg1_cm_range'][1]:.3f}] V -> {'in' if vg_cm_ok(*rows[0]['vg1_cm_range']) else 'OUT of'} range")
     print("checks:", chk, f"; sign-discriminating cases (deck within 25 % of the '-' form, '+' form off by >25 %): {len(sign_cases)}")
     for r in d12r:
         if r["cmrr_off_db"] < P.TIER1_CMRR_TARGET_DB["sys_off"]:
@@ -972,8 +1000,18 @@ def drift_closed(fs, n, ileak, stage):
     return -(2 * ileak) * n / (fs * 2 * cside)
 
 
-def drift_limit_ok(d1):
-    return abs(d1) <= P.TIER1_DRIFT_LIMIT_V
+def drift_limit_ok(d):
+    """Island CM excursion limit (informational, V_icm +- 0.2 V from REVIEW-S4S5b C-M4). Applies to either stage; NaN fails."""
+    return bool(math.isfinite(d) and abs(d) <= P.TIER1_DRIFT_LIMIT_V)
+
+
+CM_STEP_V = 0.13                    # V, D12 CM step (cm2 -0.10/+0.08 V) + 10 mV CMFB, REVIEW section 10 input-CM row
+
+
+def drift_budget(d):
+    """REVIEW R6: lower input-pair CM limit relative to V_icm for a drift d (negative = downward): V_icm - 0.13 - |d|. Informational; the
+    limit itself is set in C1. Returns (lower offset from V_icm, upper offset) in V."""
+    return -(CM_STEP_V + max(0.0, -d)), CM_STEP_V + max(0.0, d)
 
 
 def mode_drift(args):
@@ -999,11 +1037,19 @@ def mode_drift(args):
         ok &= good
         rows.append(row)
         d1 = r.get("drift1_V", float("nan"))
+        d2 = r.get("drift2_V", float("nan"))
         print(f"drift {nm} (fs {fs/1e6:g} MHz, N {n}, {il*1e12:g} pA per side{', bleeders 1e12/1e13 + Roff 1e12 KEPT (contrast, not gated)' if anch else ''}): "
               f"stage 1 {d1*1e3:+.2f} mV (closed {row['closed1_V']*1e3:+.2f}, err {row['rel1']*100:.1f} %), "
               f"stage 2 {r.get('drift2_V', float('nan'))*1e3:+.2f} mV (closed {row['closed2_V']*1e3:+.2f}, err {row['rel2']*100:.1f} %) "
-              f"| stage-1 limit {P.TIER1_DRIFT_LIMIT_V} V: {'ok' if drift_limit_ok(d1) else 'FLAG exceeded'}; "
-              f"50 mV row: {'ok' if abs(d1) <= 0.05 else 'FLAG exceeded'}; ok={r['ok']} {r['problems'][:1]}")
+              f"| |drift| vs V_icm +- {P.TIER1_DRIFT_LIMIT_V} V: stage 1 {'ok' if drift_limit_ok(d1) else 'FLAG exceeded'}, stage 2 {'ok' if drift_limit_ok(d2) else 'FLAG exceeded'}; "
+              f"input-pair CM window needed (V_icm +): stage 1 [{drift_budget(d1)[0]:+.3f}, {drift_budget(d1)[1]:+.3f}] V, stage 2 [{drift_budget(d2)[0]:+.3f}, {drift_budget(d2)[1]:+.3f}] V "
+              f"(+-{CM_STEP_V} V CM step + drift; informational, limit set in C1); ok={r['ok']} {r['problems'][:1]}")
+        row["limit_ok"] = [drift_limit_ok(d1), drift_limit_ok(d2)]
+        row["cm_window_1"], row["cm_window_2"] = list(drift_budget(d1)), list(drift_budget(d2))
+        if gated:
+            for k_, d_ in ((1, d1), (2, d2)):
+                if not drift_limit_ok(d_):
+                    print(f"FLAG drift stage {k_} {d_*1e3:+.1f} mV exceeds {P.TIER1_DRIFT_LIMIT_V} V ({nm}); informational (exit code reflects run health and closed-form agreement)")
     print("note: I is the leakage of EACH island side (100 pA/side = 200 pA island total); the REVIEW's 21 mV / 170 mV figures count 100 pA for the whole island.")
     jdump(dict(rows=rows), "drift.json")
     print("ACCEPT" if ok else "REJECT")
@@ -1131,14 +1177,134 @@ def mode_nonvac3(args):
     return 1 if not fails else 0
 
 
+# =============================================================== WO-12 (S5d)
+def mode_nonvac4(args):
+    """Non-vacuity of the WO-12 gates: (a) no-D12 must REJECT the vg1 CM gate (control: D12 passes); (b) OTA1 SR 8 V/us must REJECT the slew-share
+    knee threshold (control 12.5 V/us passes); (c) 10 nA leakage must REJECT the stage-2 drift limit (control 100 pA passes)."""
+    fails = []
+    rng_ = {}
+    for d12 in (False, True):
+        rr = [cm_run(v, 0.0075, d12, False, f"nv4_d12{int(d12)}_v{v}") for v in (0.2, 1.0, 2.0)]
+        rng_[d12] = (min(r["vg1_cm_min_all"] for r in rr), max(r["vg1_cm_max_all"] for r in rr), all(r["ok"] for r in rr))
+    rej = rng_[False][2] and not vg_cm_ok(rng_[False][0], rng_[False][1])
+    ctl = rng_[True][2] and vg_cm_ok(rng_[True][0], rng_[True][1])
+    print(f"nonvac4 no-D12 vg1 CM [{rng_[False][0]:.3f}, {rng_[False][1]:.3f}] V vs V_icm {V_ICM:g} +- {VG_CM_TOL} -> {'REJECT (as required)' if rej else 'ACCEPT (BAD)'}; "
+          f"control D12 [{rng_[True][0]:.3f}, {rng_[True][1]:.3f}] V -> {'passes (good)' if ctl else 'FAILS (check is broken)'}")
+    if not (rej and ctl):
+        fails.append("nod12_vg_cm")
+    thr = SLEW_SHARE_PPM / KNEE_MARGIN_X
+    inl = {}
+    for sr in (8e6, 12.5e6):
+        r = dc_metrics(v2_cfg(dict(sr=sr), n=256, m=21), f"nv4_sr{sr/1e6:g}")
+        inl[sr] = (r.get("inl_ep_ppm", float("nan")), bool(r.get("ok")))
+    rej = inl[8e6][1] and inl[8e6][0] > thr
+    ctl = inl[12.5e6][1] and inl[12.5e6][0] <= thr
+    print(f"nonvac4 OTA1 SR 8 V/us (2 MHz, N 256): INL {inl[8e6][0]:.2f} ppm vs slew-share threshold {thr:.3f} -> {'REJECT (as required)' if rej else 'ACCEPT (BAD)'}; "
+          f"control 12.5 V/us {inl[12.5e6][0]:.3f} ppm -> {'passes (good)' if ctl else 'FAILS (check is broken)'}")
+    if not (rej and ctl):
+        fails.append("sr8")
+    dr = {il: drift_run(0.25e6, 256, il, f"nv4_leak{il*1e12:g}p") for il in (10e-9, P.TIER1_ILEAK)}
+    rej = dr[10e-9]["ok"] and not drift_limit_ok(dr[10e-9]["drift2_V"])
+    ctl = dr[P.TIER1_ILEAK]["ok"] and drift_limit_ok(dr[P.TIER1_ILEAK]["drift2_V"])
+    print(f"nonvac4 leakage 10 nA (0.25 MHz, N 256): stage-2 drift {dr[10e-9]['drift2_V']:+.3f} V vs limit {P.TIER1_DRIFT_LIMIT_V} V -> {'REJECT (as required)' if rej else 'ACCEPT (BAD)'}; "
+          f"control 100 pA {dr[P.TIER1_ILEAK]['drift2_V']*1e3:+.1f} mV -> {'passes (good)' if ctl else 'FAILS (check is broken)'}")
+    if not (rej and ctl):
+        fails.append("leak10n_stage2")
+    jdump(dict(vg_cm={str(k): v for k, v in rng_.items()}, sr={str(k): v for k, v in inl.items()}, leak={str(k): v for k, v in dr.items()}, fails=fails), "nonvac4.json")
+    print("REJECT-as-required for all broken decks" if not fails else f"VACUOUS: {fails}")
+    return 1 if not fails else 0
+
+
+# ---- R1, R2: knees at the slew INL share, OTA2 GBW fast-mode sweep
+SLEW_SHARE_PPM = 2.0               # ppm FSR, REVIEW R1: slew gets its own INL line (from the 4 ppm reserve); the OTA line is used by A(v)
+KNEE_MARGIN_X = 1.5                # the 1.5x margin of the knee rule
+KN4_EXTRA = {"ota1": (9.5, 10.5), "ota2": (12.5,)}          # V/us, added to KN3_GRID2 at 2 MHz
+R2_GBW2 = (10e6, 15e6, 20e6, 25e6)
+R2_NS = (256, 1024)
+R2_TARGET_PPM = 5.0                 # D28 provisional N 1024 fast-mode target (R10: user decision; used here only to answer the OTA2 GBW question)
+
+
+def mode_knees4(args):
+    prev = {}
+    if getattr(args, "prev", None) and os.path.exists(args.prev):
+        for r in json.load(open(args.prev))["rows"]:
+            if r["set"] == "2M" and r["ok"] and math.isfinite(r["inl_ep_ppm"]):
+                prev[(r["n"], r["ota"], float(r["sr_vus"]))] = r
+    jobs = []        # (kind, key, cfg-extra, n)
+    for n in (256, 1024):
+        for ota in ("ota1", "ota2"):
+            for v in sorted(set(KN3_GRID2) | set(KN4_EXTRA[ota])):
+                e = {"fs": 2e6}
+                if ota == "ota1":
+                    e["sr"] = v * 1e6
+                else:
+                    e["sr"], e["sr2"] = SR1_SPEC * 1e6, v * 1e6
+                jobs.append(("R1", (n, ota, float(v)), e, n))
+    for n in R2_NS:
+        for g in R2_GBW2:
+            jobs.append(("R2", (n, g), {"fs": 4e6, "boost": True, "boost1_only": True, "sr": 12.5e6, "sr2": 13.5e6, "gbw2": g}, n))
+    todo = [j for j in jobs if not (j[0] == "R1" and j[1] in prev)]
+    print(f"knees4: {len(jobs)} points, {len(jobs) - len(todo)} reused from --prev, {len(todo)} to run")
+
+    def one(j):
+        kind, key, e, n = j
+        tag = f"kn4_{kind}_" + "_".join(f"{x:g}" if not isinstance(x, str) else x for x in key)
+        return dc_metrics(v2_cfg(e, n=n, m=21), tag)
+    with ThreadPoolExecutor(3) as ex_:
+        out = list(ex_.map(one, todo))
+    res = {(j[0], j[1]): r for j, r in zip(todo, out)}
+    rows = []
+    for kind, key, e, n in jobs:
+        if kind == "R1" and key in prev:
+            r = prev[key]
+            rows.append(dict(kind=kind, n=n, ota=key[1], sr_vus=key[2], ok=True, inl_ep_ppm=r["inl_ep_ppm"], source="prev"))
+        else:
+            r = res[(kind, key)]
+            row = dict(kind=kind, n=n, ok=bool(r.get("ok")), inl_ep_ppm=r.get("inl_ep_ppm", float("nan")), gain_err=r.get("gain_err", float("nan")),
+                       runtime_s=r["runtime_s"], problems=r["problems"], source="run")
+            if kind == "R1":
+                row.update(ota=key[1], sr_vus=key[2])
+            else:
+                row.update(gbw2_MHz=key[1] / 1e6)
+            rows.append(row)
+    thr = SLEW_SHARE_PPM / KNEE_MARGIN_X
+    knees = {}
+    print(f"\nR1: knee at the slew INL share {SLEW_SHARE_PPM:g} ppm / {KNEE_MARGIN_X:g} = {thr:.3f} ppm (2 MHz; lowest SR with INL <= threshold at it and every higher grid point; interp = log-log)")
+    for n in (256, 1024):
+        for ota in ("ota1", "ota2"):
+            pairs = [(r["sr_vus"], r["inl_ep_ppm"]) for r in rows if r["kind"] == "R1" and r["n"] == n and r["ota"] == ota]
+            g, it = knee_of(pairs, thr)
+            kn = it if it is not None else g
+            ent = dict(thr_ppm=thr, grid=g, interp=it, pairs=sorted(pairs))
+            if ota == "ota1":
+                ent["margin"] = {str(sv): (sv / kn - 1.0 if kn else None) for sv in (12.0, 12.5)}
+            else:
+                ent["margin"] = {str(sv): (sv / kn - 1.0 if kn else None) for sv in (13.5, 25.0)}
+            knees[f"{ota}/N{n}"] = ent
+            print(f"  {ota} N{n}: INL [" + ", ".join(f"{a:g}:{b:.3f}" for a, b in sorted(pairs)) + f"] ppm; knee grid {g} interp {None if it is None else round(it, 2)} V/us; margin "
+                  + ", ".join(f"{k} V/us: {'n/a' if v is None else f'{v*100:.0f} %'}" for k, v in ent["margin"].items()))
+    print("\nR2: 4 MHz, OTA1 boosted (base SR 12.5 -> 25 V/us), OTA2 unboosted SR 13.5 V/us, loaded GBW2 sweep, 21 DC points")
+    for n in R2_NS:
+        pr = sorted((r["gbw2_MHz"], r["inl_ep_ppm"]) for r in rows if r["kind"] == "R2" and r["n"] == n)
+        print(f"  N{n}: " + ", ".join(f"GBW2 {a:g} MHz: {b:.2f} ppm" for a, b in pr))
+    p1024 = sorted((r["gbw2_MHz"], r["inl_ep_ppm"]) for r in rows if r["kind"] == "R2" and r["n"] == 1024)
+    first = next((a for a, b in p1024 if b <= R2_TARGET_PPM), None)
+    print(f"R2 answer: lowest swept OTA2 GBW with N1024 INL <= {R2_TARGET_PPM:g} ppm (provisional D28 target): {first} MHz (fast-mode option (a): OTA1-only boost + OTA2 loaded GBW at base bias)")
+    ok = all(r["ok"] for r in rows) and all(math.isfinite(r["inl_ep_ppm"]) for r in rows) and len(rows) == len(jobs)
+    jdump(dict(rows=rows, knees=knees, thr_ppm=thr, r2_first_gbw_MHz=first, r2_target_ppm=R2_TARGET_PPM), "knees4.json")
+    print("run-health ACCEPT" if ok else "run-health REJECT")
+    return 0 if ok else 1
+
+
 def main():
     ap = argparse.ArgumentParser()
     for m in ("null", "options", "dc", "sweep", "nonvac", "xcheck", "av", "knees2", "cm", "offsets", "rsrc", "nonvac2",
-              "knees3", "cm2", "drift", "rsrc2", "nonvac3"):
+              "knees3", "cm2", "drift", "rsrc2", "nonvac3", "nonvac4", "knees4"):
         ap.add_argument(f"--{m}", action="store_true")
     ap.add_argument("--n", type=int, default=256)
     ap.add_argument("--m", type=int, default=None, help="number of DC points")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--prev", default=None, help="knees4: knees3.json whose 2 MHz rows are reused")
     ap.add_argument("--opt", action="append", default=[], help="override a SPICE option, e.g. --opt method=gear")
     a = ap.parse_args()
     for kv in a.opt:
@@ -1162,7 +1328,7 @@ def main():
         return mode_nonvac(a)
     for nm, fn in (("xcheck", mode_xcheck), ("av", mode_av), ("knees2", mode_knees2), ("cm", mode_cm), ("offsets", mode_offsets),
                    ("rsrc", mode_rsrc), ("nonvac2", mode_nonvac2), ("knees3", mode_knees3), ("cm2", mode_cm2),
-                   ("drift", mode_drift), ("rsrc2", mode_rsrc2), ("nonvac3", mode_nonvac3)):
+                   ("drift", mode_drift), ("rsrc2", mode_rsrc2), ("nonvac3", mode_nonvac3), ("nonvac4", mode_nonvac4), ("knees4", mode_knees4)):
         if getattr(a, nm):
             return fn(a)
     ap.print_help()

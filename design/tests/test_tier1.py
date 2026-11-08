@@ -234,3 +234,57 @@ def test_s5c_defaults_leave_wo08_deck_elements():
     deck, _ = G.build_deck(TB.v2_cfg(dict(), n=8, m=2))
     low = deck.lower()
     assert "rbl1p vg1p cm 1e+12" in low and "rfl_tp1p tp1p cm 1e+13" in low
+
+
+# ---------------------------------------------------------------- WO-12 (S5d) additions
+def test_vg_cm_gate_window_and_nonvacuity():
+    # REVIEW R7: window = V_icm +- 0.15 V. The measured cm2 D12 range [1.554, 1.728] V at V_icm 1.65 passes; the no-D12 range [0.673, 2.538] V is rejected.
+    assert abs(TB.V_ICM - 1.65) < 1e-12 and abs(TB.VG_CM_TOL - 0.15) < 1e-12
+    assert TB.vg_cm_ok(1.554, 1.728)
+    assert not TB.vg_cm_ok(0.673, 2.538)
+    assert not TB.vg_cm_ok(1.40, 1.70) and not TB.vg_cm_ok(1.60, 1.81)      # either edge alone rejects
+    assert not TB.vg_cm_ok(float("nan"), 1.7) and not TB.vg_cm_ok(1.6, float("nan"))
+
+
+def test_drift_limit_both_stages_and_budget_no_50mv_row():
+    assert not TB.drift_limit_ok(-0.204) and TB.drift_limit_ok(-0.102) and not TB.drift_limit_ok(float("nan"))     # stage-2 values from the REVIEW table
+    lo, hi = TB.drift_budget(-0.204)
+    assert abs(lo - (-0.334)) < 1e-9 and abs(hi - 0.13) < 1e-9             # V_icm - 0.13 - 0.204 ; V_icm + 0.13
+    lo, hi = TB.drift_budget(+0.05)
+    assert abs(lo + 0.13) < 1e-9 and abs(hi - 0.18) < 1e-9
+    src = open(TB.__file__).read()
+    assert "50 mV row" not in src                                           # D37(c): the invented row is gone
+    # stage-2 closed form, SPEC C_side2 = 0.5 + 0.25 + 1 + 0.26 = 2.01 pF: 2 MHz N4096 -> 102 mV
+    assert abs(TB.drift_closed(2e6, 4096, 100e-12, 2) + 0.102) < 0.002
+
+
+def test_slew_share_threshold_and_knee_grid():
+    assert abs(TB.SLEW_SHARE_PPM / TB.KNEE_MARGIN_X - 4.0 / 3.0) < 1e-12
+    # knees3 data, 2 MHz N256 OTA1: 10 V/us gives 1.334 ppm, just above the 1.3333 ppm line, so the grid knee is 11 and the log-log crossing is at 10.0 V/us
+    g, it = TB.knee_of([(8, 143.1), (9, 10.412), (10, 1.334), (11, 0.557), (12, 0.289)], TB.SLEW_SHARE_PPM / TB.KNEE_MARGIN_X)
+    assert g == 11 and 10.0 <= it < 10.05
+    assert TB.knee_of([(9, 10.4), (10, 1.4), (11, 0.5)], 4.0 / 3.0)[0] == 11   # 1.4 ppm at 10 fails the 1.33 ppm line
+    assert set(TB.KN4_EXTRA["ota1"]) == {9.5, 10.5} and TB.R2_GBW2 == (10e6, 15e6, 20e6, 25e6)
+
+
+def test_knees4_r2_deck_scopes_boost_to_ota1():
+    cl1, cl2 = P.TIER1_CL1, P.TIER1_CL2
+    d, _ = G.build_deck(TB.v2_cfg(dict(fs=4e6, boost=True, boost1_only=True, sr=12.5e6, sr2=13.5e6, gbw2=20e6), n=8, m=2))
+    g1, i1 = _gm_ip(d, 1)
+    g2, i2 = _gm_ip(d, 2)
+    assert abs(i1 / (2 * 12.5e6 * cl1) - 1) < 1e-6 and abs(i2 / (13.5e6 * cl2) - 1) < 1e-6          # OTA1 boosted to 25 V/us, OTA2 base 13.5
+    assert abs(g2 / (6.283185307179586 * 20e6 * cl2) - 1) < 1e-6                                   # OTA2 loaded GBW 20 MHz
+    assert abs(g1 / (2 * 6.283185307179586 * P.OTA_GBW_MIN * cl1) - 1) < 1e-6
+
+
+def test_model_cp_vg_default_off_is_bit_identical_and_lowers_gain():
+    import iadc as M
+    U = np.linspace(-0.9, 0.9, 7)
+    a, _ = TB.model_eval(U, 256, a0_db=60.0)
+    b, _ = TB.model_eval(U, 256, a0_db=60.0, cp_vg1=0.0, cp_vg2=0.0)
+    assert np.array_equal(a, b)                                                                      # default off => bit-identical
+    c, _ = TB.model_eval(U, 256, a0_db=60.0, cp_vg1=0.0625, cp_vg2=0.25)
+    ge = lambda x: abs(TB.inl_gain(U, x)["gain_err"])
+    ratio = ge(c) / ge(a)
+    assert 1.02 < ratio < 1.5                                                                        # beta falls: (1+c1+cp1) 1.19 vs 1.125, stage 2 (1+c2+cp2) 1.75 vs 1.5
+    assert M.Params().cp_vg1 == 0.0 and M.Params().cp_vg2 == 0.0
