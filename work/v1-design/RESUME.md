@@ -243,3 +243,17 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - V4m passes (0.579 ppm), so the OTA2 25 % SR margin is shown.
 - Reviewer dispatched (background) on WO-14/S5f. It returns text; save it as `REVIEW-S5f-2026-11-09.md`.
 - Then: tell the user whether fast mode fits 200 µA with the reviewer's sizing. If it doesn't, give them options; do not decide. Then S6.
+
+## Update 2026-11-09 02:30
+- REVIEW-S5f saved (85ddf24).
+  - Gate the *boosted operating point* at every corner, not base × ratio.
+  - Fast mode fits 200 µA: A ≈ 159 µA, A′ (OTA2 ×2) ≈ 172 µA.
+  - INL rises with OTA2 GBW at fixed SR (M2), so the cold corner (≈ 30/34 MHz) is untested.
+  - The SPEC has no β2/Cp_vg2 row (M3).
+- SPEC fast-mode text refreshed (db2333d).
+- WO-15 dispatched (Sonnet, background; f4e7945): cold-corner boosted points, trend discrimination, fp2 sensitivity, gm/Id tooling.
+- **Asked the user:**
+  1. fast-mode option A / A′ / relaxed N 1024 target;
+  2. bias generator constant-gm or constant-current.
+- Coordinator defaults, reversible: fold/cascode current switches with the tail in boost (keeps PM); OTA2 L < 1 µm allowed only if A0 ≥ 80 dB holds.
+- Next: WO-15 result, acceptance, review; the user's answers go into SPEC (D41); add the β2 row (M3); then S6.
