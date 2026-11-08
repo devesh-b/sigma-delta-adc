@@ -163,7 +163,7 @@ def test_memory_default_off_identical_and_chain_matches_loop():
 
 
 # ---------------------------------------------------------------- legacy configs unchanged
-GOLDEN_SHA256 = "a20759418171ca17354d28f548701f6a44b18b8d3909ae07f415c22667606361"   # computed with iadc.py at commit bd93ecf (before the hooks)
+GOLDEN_SHA256 = "b7811b7ecc4ca6535879814b8fed41b1aecc35db45f19eccbe2f5a1a4996eafa"   # re-baselined WO-13 (stage-2 sampled cap c2(1+k), D38(b)); was a20759418171ca17354d28f548701f6a44b18b8d3909ae07f415c22667606361 at bd93ecf (before the hooks)
 
 
 def _legacy_digest():

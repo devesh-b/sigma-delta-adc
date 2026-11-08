@@ -68,10 +68,13 @@ class Params:
                                  # conversions of a batch (batch = one chain, in order). See convert_chain.
 
     cp_ratio: float = 0.3        # parasitic at OTA input / Cs (noise gain)
-    # R9 (WO-12) hooks, default 0.0 => bit-identical. Extra capacitance on the OTA virtual-ground node of stage 1 / 2, as a ratio to
-    # that stage's integrating cap. It only lowers the feedback factor in the finite-gain term: (1 + c) -> (1 + c + cp_vg).
-    cp_vg1: float = 0.0
-    cp_vg2: float = 0.0
+    # M1 (WO-13/D38(b)): permanent capacitance on the OTA virtual-ground node of stage 1 / 2, as a ratio to that stage's integrating cap.
+    # It is never reset, so it lowers the gain g only: g = 1/(1 + (1 + c_samp + cp)/A), p = (1 + (1 + cp)/A) g. The leak 1 - p ~ c_samp/A is unchanged.
+    # Default 0.0. (Replaces the WO-12 cp_vg hook, which modelled it as a sampled cap and so overstated the leak.)
+    cp_hold1: float = 0.0
+    cp_hold2: float = 0.0
+    # Stage-2 sampled capacitance (cleared every cycle): Cs2 (c2) plus the separate k-DAC cap Ck = c2*k (D25), so c_samp2 = c2 (1 + k),
+    # derived from k (not a stored ratio) and always on. Stage 1 samples c1 only.
 
     cs: float = 1e-12            # sampling cap per side [F]
     temp_k: float = 300.0
@@ -128,8 +131,12 @@ def with_(p, **kw):
     return replace(p, **kw)
 
 
-def _leaky(a0_db, c, x=None, drop=0.0, xswing=1.0, table=None, vref=1.0):
+def _leaky(a0_db, c, x=None, drop=0.0, xswing=1.0, table=None, vref=1.0, cp=0.0):
     """Pole p and gain g of an SC integrator with finite OTA gain.
+
+    c = total sampled (reset every cycle) capacitance on the OTA input node / Cint; cp = permanent virtual-ground
+    capacitance / Cint. Charge conservation at vg = -vo/A gives
+    vo' (1 + (1 + c + cp)/A) = vo (1 + (1 + cp)/A) + c vin, so g = 1/(1 + (1 + c + cp)/A), p = (1 + (1 + cp)/A) g.
 
     With drop > 0 the gain falls quadratically with the output state x,
     A(x) = A0 * max(0.02, 1 - drop * (x / xswing)^2): the usual source of
@@ -140,16 +147,16 @@ def _leaky(a0_db, c, x=None, drop=0.0, xswing=1.0, table=None, vref=1.0):
         td = np.array([t[1] for t in table], dtype=float)
         xv = 0.0 if x is None else np.abs(x) * vref
         a = 10 ** (np.interp(xv, tv, td) / 20)
-        g = 1.0 / (1.0 + (1.0 + c) / a)
-        p = (1.0 + 1.0 / a) * g
+        g = 1.0 / (1.0 + (1.0 + c + cp) / a)
+        p = (1.0 + (1.0 + cp) / a) * g
         return p, g
     if not np.isfinite(a0_db):
         return 1.0, 1.0
     a = 10 ** (a0_db / 20)
     if drop and x is not None:
         a = a * np.maximum(0.02, 1.0 - drop * (x / xswing) ** 2)
-    g = 1.0 / (1.0 + (1.0 + c) / a)
-    p = (1.0 + 1.0 / a) * g
+    g = 1.0 / (1.0 + (1.0 + c + cp) / a)
+    p = (1.0 + (1.0 + cp) / a) * g
     return p, g
 
 
@@ -221,8 +228,9 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False, x
     drop2 = p.a0_drop if p.a0_drop2 is None else p.a0_drop2
     dyn1 = bool(p.a0_drop) or p.av_table1 is not None
     dyn2 = bool(drop2) or p.av_table2 is not None
-    p1, g1 = _leaky(p.a0_db, p.c1 + p.cp_vg1, table=p.av_table1, vref=p.vref)
-    p2, g2 = _leaky(a0_2, p.c2 + p.cp_vg2, table=p.av_table2, vref=p.vref)
+    cs2 = p.c2 * (1.0 + p.k)          # stage-2 sampled cap (Cs2 + Ck), D25
+    p1, g1 = _leaky(p.a0_db, p.c1, table=p.av_table1, vref=p.vref, cp=p.cp_hold1)
+    p2, g2 = _leaky(a0_2, cs2, table=p.av_table2, vref=p.vref, cp=p.cp_hold2)
 
     e_in = np.exp(-p.t_half / p.tau_in) if p.tau_in > 0 else 0.0
     e_ref = np.exp(-p.t_half / p.tau_ref) if p.tau_ref > 0 else 0.0
@@ -288,9 +296,9 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False, x
             e = e + ng * p.vres
 
         if dyn1:
-            p1, g1 = _leaky(p.a0_db, p.c1 + p.cp_vg1, x1, p.a0_drop, xsw, p.av_table1, p.vref)
+            p1, g1 = _leaky(p.a0_db, p.c1, x1, p.a0_drop, xsw, p.av_table1, p.vref, p.cp_hold1)
         if dyn2:
-            p2, g2 = _leaky(a0_2, p.c2 + p.cp_vg2, x2, drop2, xsw, p.av_table2, p.vref)
+            p2, g2 = _leaky(a0_2, cs2, x2, drop2, xsw, p.av_table2, p.vref, p.cp_hold2)
         x1_old = x1
         x1 = np.clip(p1 * x1 + g1 * p.c1 * (u_s - y * r + e), -p.xmax, p.xmax)
         xm1 = max(xm1, float(np.max(np.abs(x1))))

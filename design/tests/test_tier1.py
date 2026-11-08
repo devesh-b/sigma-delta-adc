@@ -277,14 +277,40 @@ def test_knees4_r2_deck_scopes_boost_to_ota1():
     assert abs(g1 / (2 * 6.283185307179586 * P.OTA_GBW_MIN * cl1) - 1) < 1e-6
 
 
-def test_model_cp_vg_default_off_is_bit_identical_and_lowers_gain():
+def test_model_cp_hold_default_off_is_bit_identical_and_enters_g_only():
     import iadc as M
     U = np.linspace(-0.9, 0.9, 7)
     a, _ = TB.model_eval(U, 256, a0_db=60.0)
-    b, _ = TB.model_eval(U, 256, a0_db=60.0, cp_vg1=0.0, cp_vg2=0.0)
+    b, _ = TB.model_eval(U, 256, a0_db=60.0, cp_hold1=0.0, cp_hold2=0.0)
     assert np.array_equal(a, b)                                                                      # default off => bit-identical
-    c, _ = TB.model_eval(U, 256, a0_db=60.0, cp_vg1=0.0625, cp_vg2=0.25)
+    assert M.Params().cp_hold1 == 0.0 and M.Params().cp_hold2 == 0.0 and not hasattr(M.Params(), "cp_vg1")
+    # theory (charge conservation at vg): g = 1/(1+(1+c+cp)/A), p = (1+(1+cp)/A) g, so 1 - p = (c/A) g independent of cp apart from g itself
+    A, c, cp = 1000.0, 0.75, 0.5
+    p0, g0 = M._leaky(20 * np.log10(A), c)
+    p1, g1 = M._leaky(20 * np.log10(A), c, cp=cp)
+    assert abs(g1 - 1.0 / (1 + (1 + c + cp) / A)) < 1e-15 and abs(p1 - (1 + (1 + cp) / A) * g1) < 1e-15
+    assert abs((1 - p1) / g1 - c / A) < 1e-12 and abs((1 - p0) / g0 - c / A) < 1e-12              # the leak per unit gain is c/A with or without cp
+    c_, _ = TB.model_eval(U, 256, a0_db=60.0, cp_hold1=0.0625, cp_hold2=0.25)
     ge = lambda x: abs(TB.inl_gain(U, x)["gain_err"])
-    ratio = ge(c) / ge(a)
-    assert 1.02 < ratio < 1.5                                                                        # beta falls: (1+c1+cp1) 1.19 vs 1.125, stage 2 (1+c2+cp2) 1.75 vs 1.5
-    assert M.Params().cp_vg1 == 0.0 and M.Params().cp_vg2 == 0.0
+    assert 1.001 < ge(c_) / ge(a) < 1.02                                                             # cp lowers g only: a ~0.3 % gain-error change (a sampled-cap hook would give > 1.02)
+
+
+def test_stage2_sampled_cap_is_derived_from_k():
+    import iadc as M
+    # Hand recursion for N = 2 (theory: charge conservation, c_samp2 = c2 (1 + k)): cycle 0: x1 = 0, x2 = 0 -> y0 = +1;
+    # x1' = g1 c1 (u - 1), x2' = g2 c2 (0 - k); cycle 1: y1 = sign(x2'), x2'' = p2 x2' + g2 c2 (x1' - k y1).
+    A = 10 ** (60.0 / 20)
+    for k in (0.25, 0.5):
+        c1, c2, u = 0.125, 0.5, np.array([0.4])
+        p = M.Params(order=2, N=2, c1=c1, c2=c2, k=k, a0_db=60.0)
+        _, st = M.convert(p, u, return_state=True)
+        g1 = 1.0 / (1.0 + (1.0 + c1) / A)
+        g2 = 1.0 / (1.0 + (1.0 + c2 * (1.0 + k)) / A)
+        p2 = (1.0 + 1.0 / A) * g2
+        x1 = g1 * c1 * (0.4 - 1.0)
+        x2 = g2 * c2 * (0.0 - k)
+        y1 = 1.0 if x2 >= 0 else -1.0
+        x2n = p2 * x2 + g2 * c2 * (x1 - k * y1)
+        assert abs(st["x2_final"][0] - x2n) < 1e-14, k
+        old = (1.0 / (1.0 + (1.0 + c2) / A))                      # the pre-WO-13 stage-2 gain (Ck not loading) differs at the 1e-4 level
+        assert abs(g2 / old - 1.0) > 1e-4
