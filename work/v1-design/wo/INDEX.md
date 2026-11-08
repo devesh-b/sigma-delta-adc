@@ -21,3 +21,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 | WO-12 | S5d verification gaps (R1 R2 R4 R6 R7 R9) | review | dispatched 2026-11-08 |
 | WO-13 | model residue-frame + Ck topology fixes, S3/S4 reruns, fast-mode option runs | review | dispatched 2026-11-08 |
 - WO-14 S5e follow-ups (gm-boost realism, V4 margin point, S3 A\/B, small fixes): dispatched 2026-11-08
+- WO-15 S5g boosted-point runs, INL-vs-GBW2 trend, gm/Id tooling: dispatched 2026-11-09
