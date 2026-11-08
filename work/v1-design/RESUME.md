@@ -96,6 +96,17 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   2. The 200 µA cap; OTA1-only boost is not enough.
   3. The 0.25 MHz/N 4096 leakage drift.
 
+## Update 2026-11-08 18:10
+- WO-11 done: 6076f49 (s5c results), d3ab346 (S4 D36: ACCEPT, sys-off 61.5 dB; nonvac 8/8 REJECT).
+- Watch item: WO-11 weakened one test assertion. At the ΔCp 0.05 fF case sys-on came out at 99.4 dB, which should not depend on ε. The reviewer is asked to explain it.
+- Acceptance launched on the frozen copy `/home/mempool/regr/tt/acc0911-d3ab346`: `acc.sh`, writes `ALLDONE`. Logs: pytest, the 6 tier1 modes, s4, s4nv.
+- Reviewer dispatched, writing `REVIEW-S5c-S4close-2026-11-08.md`.
+- Next:
+  1. Fill `results/ACCEPT-WO09-11-d3ab346.md` from the logs.
+  2. Commit the review.
+  3. Apply the SPEC §3.0 rows that don't wait on user decisions.
+  4. Report the user decisions (SR, the 200 µA cap / fast mode, drift).
+
 ## Resume procedure
 1. `git log --oneline -5`; `git status --short`.
 2. For each of the three outputs above, check whether its file exists.
