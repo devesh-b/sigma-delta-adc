@@ -2,7 +2,7 @@
 
 Command: `python3 -m model.studies.s4_corners --out /home/mempool/regr/tt/WO-06a/s4`
 
-Wall time 483 s on 4 processes (grid 429 s, MC 53 s). No transistor data exists: every mapping is an **assumption** (nominal at tt/27/3.3, the SPEC 3.0 limit at that mechanism's worst corner, linear in a 0..1 stress between). A result here says the budget closes if each block just meets SPEC 3.0; it is not a statement about a circuit.
+Wall time 461 s on 4 processes (grid 409 s, MC 50 s). No transistor data exists: every mapping is an **assumption** (nominal at tt/27/3.3, the SPEC 3.0 limit at that mechanism's worst corner, linear in a 0..1 stress between). A result here says the budget closes if each block just meets SPEC 3.0; it is not a statement about a circuit.
 
 ## Mapping (explicit)
 
@@ -89,42 +89,42 @@ INL and gain per draw: 161-point sweep, residue-corrected; offset per draw: sys-
 
 ## CMRR (D30, D33: on the D12 residual eps_eff)
 
-**This models the hypothesis; WO-08 checks it in SPICE.** D33 (REVIEW-S4S5b C-M3): D12 cancels the Cs+/Cs- mismatch term to first order, so the CM->diff coefficient is the D12 residual eps_eff = |dCp,top/Cs| + |(Cp,top/Cs) eps_Cs| + eps_inj, signs combined worst-case until WO-09 settles them. A CM change dVcm = Vin_cm - VREF_CM (VREF_CM = 1 V ASSUMED, SPEC 3.0 does not fix it) gives a differential term eps_eff*dVcm. Allocation (C4): Cp,top 20 fF per side (fixed), dCp,top Gaussian 3 sigma 0.25 fF, eps_Cs Gaussian 3 sigma 0.75 %, eps_inj 0.00028 (fixed, worst sign). Corner points use the 3 sigma values; the worst-draw row uses the largest eps_eff of the MC draws. Hypothesis for the sys-chop behaviour (unchanged): the pin-side swap does not change the pin CM, so the term is fixed in the modulator frame, with the same sign in both halves of a sys pair (like an OTA offset); it is modelled as an additive term e on the sampled input after the swap, u_in = s*u + e, demodulated exactly as the chip does (conversion with sys_sign +1 and -1, residue-corrected, averaged). Sys chop off: the term stays, error = eps_eff*dVcm (tested to 2 %). The --nonvac copy with the term flipping with the input fails the sys-on gate. CMRR = 20 log10(dVcm / input-referred error). Errors below 1e-12 V are capped (240 dB). Sets: tt/27 (both fs) and the worst-INL / worst-offset points.
+**This models the hypothesis; WO-08 checks it in SPICE.** D33 (REVIEW-S4S5b C-M3): D12 cancels the Cs+/Cs- mismatch term to first order, so the CM->diff coefficient is the D12 residual eps_eff = ((Cp,top/Cs) eps_Cs - dCp,top/Cs) / (1 + Cp,top/Cs) + eps_inj (D36: sign '-' confirmed by WO-09 --cm2, deck vs closed form 0.0 % in 12 cases). MC: signed per-draw sum of the two independent Gaussians, eps_inj at its worst sign against the draw; 3 sigma corner rows: RSS of the two random terms + |eps_inj| linearly. A CM change dVcm = Vin_cm - VREF_CM (VREF_CM = 1 V ASSUMED, SPEC 3.0 does not fix it) gives a differential term eps_eff*dVcm. Allocation (C4): Cp,top 20 fF per side (fixed), dCp,top Gaussian 3 sigma 0.25 fF, eps_Cs Gaussian 3 sigma 0.75 %, eps_inj 0.00028 (fixed, worst sign). Corner points use the 3 sigma values; the worst-draw row uses the largest per-draw |eps_eff| of the MC draws. Hypothesis for the sys-chop behaviour (unchanged): the pin-side swap does not change the pin CM, so the term is fixed in the modulator frame, with the same sign in both halves of a sys pair (like an OTA offset); it is modelled as an additive term e on the sampled input after the swap, u_in = s*u + e, demodulated exactly as the chip does (conversion with sys_sign +1 and -1, residue-corrected, averaged). Sys chop off: the term stays, error = eps_eff*dVcm (tested to 2 %). The --nonvac copy with the term flipping with the input fails the sys-on gate. CMRR = 20 log10(dVcm / input-referred error). Errors below 1e-12 V are capped (240 dB). Sets: tt/27 (both fs) and the worst-INL / worst-offset points.
 
 ### Theory check (hand calculation)
 
-At tt, Cs = 0.5 pF: dCp,top/Cs = 0.25 fF / 0.5 pF = 5.00e-04; (Cp,top/Cs) eps_Cs = (20 fF / 0.5 pF) x 0.0075 = 3.00e-04; eps_inj = 2.80e-04. Linear worst-case sum = **1.080e-03** = 59.3 dB. Printed 3 sigma eps_eff = 1.080e-03 = 59.3 dB. Agreement within 10 %: **yes**. MC eps_eff: mean 504 uV/V, max of draws 892 uV/V (eps_Cs-only mean 2175, max 6209).
+At tt, Cs = 0.5 pF, 1 + Cp,top/Cs = 1.04: dCp,top/Cs/(1+Cp/Cs) = 4.81e-04; (Cp,top/Cs) eps_Cs/(1+Cp/Cs) = 2.88e-04; eps_inj = 2.80e-04. RSS of the two random terms + |inj| = **8.407e-04** = 61.5 dB. Printed 3 sigma eps_eff = 8.407e-04 = 61.5 dB. Agreement within 10 %: **yes**. MC |eps_eff| (signed sum, inj worst sign): mean 429 uV/V, max of draws 831 uV/V (eps_Cs-only mean 2175, max 6209).
 
-**Finding (inconsistent expectation in WO-10 / the review).** The review's 5.6e-4 (65 dB) is the RSS of dCp,top/Cs (5.0e-4) and eps_inj (2.8e-4), which drops the third term. With the (Cp,top/Cs) eps_Cs term (3.0e-4) and the worst-case linear sum that D33 prescribes, eps_eff at the allocation is 1.08e-03 = 59.3 dB: **below the 60 dB gate** (needs <= 1.0e-3) and -6.7 dB against the 66 dB design target (informational). Reaching the gate needs a tighter allocation (e.g. dCp,top 3 sigma <= 0.15 fF at Cs 0.5 pF, or a larger Cs, or sign knowledge from WO-09 to RSS or cancel terms); the gate is not relaxed here.
+**Superseded (D36): D33 linear worst-case sum** = 1.080e-03 = 59.3 dB (REJECT). A linear sum of independent 3 sigma terms is about 4.2 sigma, beyond the MC pass rule; D36 uses RSS of the independent random terms plus |eps_inj|. The result 61.5 dB passes the 60 dB gate (+1.5 dB) and misses the 66 dB design target (-4.5 dB, informational). The target stays a C4/C10 layout goal (dCp,top 3 sigma <= 0.15 fF). The gate is not relaxed.
 
-Worst sys-off CMRR over all rows below: 59.3 dB (gate 60 dB, margin -0.7 dB; against the 66 dB design target -6.7 dB, informational).
+Worst sys-off CMRR over all rows below: 61.1 dB (gate 60 dB, margin +1.1 dB; against the 66 dB design target -4.9 dB, informational).
 
 | set | point | eps | eps uV/V | Vin_cm V | dVcm V | sys-off err uV | sys-off CMRR dB (gate >= 60) | sys-on err uV | sys-on CMRR dB (gate >= 100) |
 |---|---|---|---|---|---|---|---|---|---|
-| tt/27 | tt/27/3.3 @ 0.25 MHz | 3sigma | 1080 | 0.2 | -0.8 | 864 | 59.3 | 0.045 | 145.0 |
-| tt/27 | tt/27/3.3 @ 0.25 MHz | 3sigma | 1080 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
-| tt/27 | tt/27/3.3 @ 0.25 MHz | 3sigma | 1080 | 2 | +1.0 | 1080 | 59.3 | 0.0129 | 157.8 |
-| tt/27 | tt/27/3.3 @ 0.25 MHz | worst_draw | 892 | 0.2 | -0.8 | 713.3 | 61.0 | 0.034 | 147.4 |
-| tt/27 | tt/27/3.3 @ 0.25 MHz | worst_draw | 892 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
-| tt/27 | tt/27/3.3 @ 0.25 MHz | worst_draw | 892 | 2 | +1.0 | 891.6 | 61.0 | 0.0733 | 142.7 |
-| tt/27 | tt/27/3.3 @ 2 MHz | 3sigma | 1080 | 0.2 | -0.8 | 864 | 59.3 | 0.0484 | 144.4 |
-| tt/27 | tt/27/3.3 @ 2 MHz | 3sigma | 1080 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
-| tt/27 | tt/27/3.3 @ 2 MHz | 3sigma | 1080 | 2 | +1.0 | 1080 | 59.3 | 0.00466 | 166.6 |
-| tt/27 | tt/27/3.3 @ 2 MHz | worst_draw | 907 | 0.2 | -0.8 | 725.9 | 60.8 | 0.0392 | 146.2 |
-| tt/27 | tt/27/3.3 @ 2 MHz | worst_draw | 907 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
-| tt/27 | tt/27/3.3 @ 2 MHz | worst_draw | 907 | 2 | +1.0 | 907.4 | 60.8 | 0.029 | 150.8 |
-| worst-INL | ss/125/3 @ 0.25 MHz | 3sigma | 1080 | 0.2 | -0.8 | 864 | 59.3 | 0.00906 | 158.9 |
-| worst-INL | ss/125/3 @ 0.25 MHz | 3sigma | 1080 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
-| worst-INL | ss/125/3 @ 0.25 MHz | 3sigma | 1080 | 2 | +1.0 | 1080 | 59.3 | 0.0292 | 150.7 |
-| worst-INL | ss/125/3 @ 0.25 MHz | worst_draw | 817 | 0.2 | -0.8 | 653.5 | 61.8 | 0.00967 | 158.4 |
-| worst-INL | ss/125/3 @ 0.25 MHz | worst_draw | 817 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
-| worst-INL | ss/125/3 @ 0.25 MHz | worst_draw | 817 | 2 | +1.0 | 816.9 | 61.8 | 0.0378 | 148.5 |
-| worst-offset | ff/125/3.6 @ 0.25 MHz | 3sigma | 1080 | 0.2 | -0.8 | 864 | 59.3 | 0.0752 | 140.5 |
-| worst-offset | ff/125/3.6 @ 0.25 MHz | 3sigma | 1080 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
-| worst-offset | ff/125/3.6 @ 0.25 MHz | 3sigma | 1080 | 2 | +1.0 | 1080 | 59.3 | 0.0652 | 143.7 |
-| worst-offset | ff/125/3.6 @ 0.25 MHz | worst_draw | 851 | 0.2 | -0.8 | 681.2 | 61.4 | 0.0161 | 153.9 |
-| worst-offset | ff/125/3.6 @ 0.25 MHz | worst_draw | 851 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
-| worst-offset | ff/125/3.6 @ 0.25 MHz | worst_draw | 851 | 2 | +1.0 | 851.4 | 61.4 | 0.0309 | 150.2 |
+| tt/27 | tt/27/3.3 @ 0.25 MHz | 3sigma | 841 | 0.2 | -0.8 | 672.5 | 61.5 | 0.029 | 148.8 |
+| tt/27 | tt/27/3.3 @ 0.25 MHz | 3sigma | 841 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
+| tt/27 | tt/27/3.3 @ 0.25 MHz | 3sigma | 841 | 2 | +1.0 | 840.7 | 61.5 | 0.0314 | 150.1 |
+| tt/27 | tt/27/3.3 @ 0.25 MHz | worst_draw | 831 | 0.2 | -0.8 | 664.9 | 61.6 | 0.0396 | 146.1 |
+| tt/27 | tt/27/3.3 @ 0.25 MHz | worst_draw | 831 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
+| tt/27 | tt/27/3.3 @ 0.25 MHz | worst_draw | 831 | 2 | +1.0 | 831.1 | 61.6 | 0.0159 | 156.0 |
+| tt/27 | tt/27/3.3 @ 2 MHz | 3sigma | 841 | 0.2 | -0.8 | 672.5 | 61.5 | 0.0376 | 146.6 |
+| tt/27 | tt/27/3.3 @ 2 MHz | 3sigma | 841 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
+| tt/27 | tt/27/3.3 @ 2 MHz | 3sigma | 841 | 2 | +1.0 | 840.7 | 61.5 | 0.00258 | 171.8 |
+| tt/27 | tt/27/3.3 @ 2 MHz | worst_draw | 883 | 0.2 | -0.8 | 706.6 | 61.1 | 0.00839 | 159.6 |
+| tt/27 | tt/27/3.3 @ 2 MHz | worst_draw | 883 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
+| tt/27 | tt/27/3.3 @ 2 MHz | worst_draw | 883 | 2 | +1.0 | 883.3 | 61.1 | 0.00205 | 173.8 |
+| worst-INL | ss/125/3 @ 0.25 MHz | 3sigma | 841 | 0.2 | -0.8 | 672.5 | 61.5 | 0.0328 | 147.8 |
+| worst-INL | ss/125/3 @ 0.25 MHz | 3sigma | 841 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
+| worst-INL | ss/125/3 @ 0.25 MHz | 3sigma | 841 | 2 | +1.0 | 840.6 | 61.5 | 0.0354 | 149.0 |
+| worst-INL | ss/125/3 @ 0.25 MHz | worst_draw | 796 | 0.2 | -0.8 | 637 | 62.0 | 0.0532 | 143.5 |
+| worst-INL | ss/125/3 @ 0.25 MHz | worst_draw | 796 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
+| worst-INL | ss/125/3 @ 0.25 MHz | worst_draw | 796 | 2 | +1.0 | 796.3 | 62.0 | 0.0631 | 144.0 |
+| worst-offset | ff/125/3.6 @ 0.25 MHz | 3sigma | 841 | 0.2 | -0.8 | 672.5 | 61.5 | 0.0521 | 143.7 |
+| worst-offset | ff/125/3.6 @ 0.25 MHz | 3sigma | 841 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
+| worst-offset | ff/125/3.6 @ 0.25 MHz | 3sigma | 841 | 2 | +1.0 | 840.6 | 61.5 | 0.0699 | 143.1 |
+| worst-offset | ff/125/3.6 @ 0.25 MHz | worst_draw | 789 | 0.2 | -0.8 | 631.3 | 62.1 | 0.00723 | 160.9 |
+| worst-offset | ff/125/3.6 @ 0.25 MHz | worst_draw | 789 | 1 | +0.0 | 0 | n/a (dVcm 0) | 0 | n/a (dVcm 0) |
+| worst-offset | ff/125/3.6 @ 0.25 MHz | worst_draw | 789 | 2 | +1.0 | 789.1 | 62.1 | 0.0338 | 149.4 |
 
 
 ### Superseded (D33): old eps_Cs * dVcm term
@@ -188,21 +188,13 @@ Proposed fast-mode INL targets (GBW 20 MHz design target, worst of the three poi
 
 ## Verdict
 
-REJECT
+ACCEPT
 
 GATE grid specs: ACCEPT
 GATE MC INL/gain/offset: ACCEPT
 GATE CMRR sys on >= 100 dB: ACCEPT
-GATE CMRR sys off >= 60 dB (D32): REJECT (8)
+GATE CMRR sys off >= 60 dB (D32): ACCEPT
 
-- CMRR tt/27 tt/27/3.3 fs 0.25 MHz 3sigma eps 1080 uV/V Vin_cm 0.2 V: sys off = 59.3 dB < 60
-- CMRR tt/27 tt/27/3.3 fs 0.25 MHz 3sigma eps 1080 uV/V Vin_cm 2 V: sys off = 59.3 dB < 60
-- CMRR tt/27 tt/27/3.3 fs 2 MHz 3sigma eps 1080 uV/V Vin_cm 0.2 V: sys off = 59.3 dB < 60
-- CMRR tt/27 tt/27/3.3 fs 2 MHz 3sigma eps 1080 uV/V Vin_cm 2 V: sys off = 59.3 dB < 60
-- CMRR worst-INL ss/125/3 fs 0.25 MHz 3sigma eps 1080 uV/V Vin_cm 0.2 V: sys off = 59.3 dB < 60
-- CMRR worst-INL ss/125/3 fs 0.25 MHz 3sigma eps 1080 uV/V Vin_cm 2 V: sys off = 59.3 dB < 60
-- CMRR worst-offset ff/125/3.6 fs 0.25 MHz 3sigma eps 1080 uV/V Vin_cm 0.2 V: sys off = 59.3 dB < 60
-- CMRR worst-offset ff/125/3.6 fs 0.25 MHz 3sigma eps 1080 uV/V Vin_cm 2 V: sys off = 59.3 dB < 60
 
 ## Appendix: all grid evaluations
 

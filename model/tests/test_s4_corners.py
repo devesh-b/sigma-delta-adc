@@ -121,21 +121,34 @@ def test_cmrr_gate_is_60_db_sys_off_and_eps_for_it_is_0p1_percent():
     assert s4.cmrr_fails(s4.cmrr_eval(_pq(), 0.0075), "t")       # spec 3 sigma mismatch: sys-off 42.5 dB < 60 -> REJECT
 
 
-def test_eps_eff_d33_hand_values_and_gate_behaviour():
+def test_eps_eff_d36_hand_values_and_gate_behaviour():
     cs = 0.5e-12
-    # hand: 0.25 fF / 0.5 pF = 5.0e-4; (20 fF / 0.5 pF) * 0.0075 = 3.0e-4; injection 2.8e-4; linear worst-case sum 1.08e-3
-    assert math.isclose(s4.eps_eff(cs, 0.0075), 5.0e-4 + 3.0e-4 + 2.8e-4, rel_tol=1e-9)
-    assert math.isclose(20 * math.log10(1 / s4.eps_eff(cs, 0.0075)), 59.33, abs_tol=0.05)
-    # terms are absolute values (worst-case signs)
-    assert math.isclose(s4.eps_eff(cs, -0.0075, dcp=-0.25e-15), s4.eps_eff(cs, 0.0075), rel_tol=1e-12)
-    # dCp,top 2 fF (hand: 4e-3 + 3e-4 + 2.8e-4 = 4.58e-3 = 46.8 dB) must fail sys-off; a small asymmetry (0.05 fF: 1e-4+3e-4+2.8e-4 = 6.8e-4, 63.3 dB) passes
+    k = 1.04   # 1 + Cp/Cs = 1 + 20 fF / 0.5 pF
+    # hand: 0.25 fF / 0.5 pF / 1.04 = 4.808e-4; (20 fF / 0.5 pF) * 0.0075 / 1.04 = 2.885e-4; RSS 5.607e-4; + injection 2.8e-4 = 8.407e-4 (61.5 dB)
+    hand = math.hypot(5.0e-4 / k, 3.0e-4 / k) + 2.8e-4
+    assert math.isclose(s4.eps_eff(cs, 0.0075), hand, rel_tol=1e-9)
+    assert math.isclose(20 * math.log10(1 / s4.eps_eff(cs, 0.0075)), 61.5, abs_tol=0.1)
+    # the superseded D33 linear sum stays available and gives 1.08e-3 (59.3 dB)
+    assert math.isclose(s4.eps_eff_linear(cs, 0.0075), 1.08e-3, rel_tol=1e-9)
+    # signed per-draw sum, '-' sign (WO-09 cm2): same-sign eps_Cs and dCp partly cancel, opposite signs add
+    assert math.isclose(s4.eps_signed(cs, 0.0075, 0.25e-15), (3.0e-4 - 5.0e-4) / k, rel_tol=1e-9)
+    assert math.isclose(s4.eps_signed(cs, 0.0075, -0.25e-15), (3.0e-4 + 5.0e-4) / k, rel_tol=1e-9)
+    assert math.isclose(s4.eps_draw(cs, 0.0075, 0.25e-15), 2.0e-4 / k + 2.8e-4, rel_tol=1e-9)   # inj at worst sign against the draw
+    assert math.isclose(s4.eps_draw(cs, -0.0075, -0.25e-15), 2.0e-4 / k + 2.8e-4, rel_tol=1e-9)
+    # the corner row (RSS) is below the linear sum
+    assert s4.eps_eff(cs, 0.0075) < s4.eps_eff_linear(cs, 0.0075)
+    # dCp,top 2 fF (hand: RSS(4e-3, 3e-4)/1.04 + 2.8e-4 = 4.15e-3 = 47.6 dB) must fail sys-off; a small asymmetry (0.05 fF) passes
     bad = s4.cmrr_eval(_pq(), s4.eps_eff(cs, 0.0075, dcp=2e-15))
     assert any("sys off" in f for f in s4.cmrr_fails(bad, "t"))
     good = s4.cmrr_eval(_pq(), s4.eps_eff(cs, 0.0075, dcp=0.05e-15))
-    assert not s4.cmrr_fails(good, "t")
+    assert not [f for f in s4.cmrr_fails(good, "t") if "sys off" in f]   # sys-on residual is not monotonic in eps at this level: only the sys-off gate is asserted here
+    # the D36 3 sigma row passes the 60 dB sys-off gate; a 3 % Cs mismatch fails it
+    assert not [f for f in s4.cmrr_fails(s4.cmrr_eval(_pq(), s4.eps_eff(cs, 0.0075)), "t") if "sys off" in f]
+    assert any("sys off" in f for f in s4.cmrr_fails(s4.cmrr_eval(_pq(), s4.eps_eff(cs, 0.03)), "t"))
     # the sys-off CMRR follows 1/eps_eff (theory), not the old eps_Cs term
     by = {r["vin_cm"]: r for r in bad}
-    assert math.isclose(by[2.0]["off_db"], 20 * math.log10(1 / 4.58e-3), abs_tol=0.3)
+    e_bad = math.hypot(4e-3 / k, 3e-4 / k) + 2.8e-4
+    assert math.isclose(by[2.0]["off_db"], 20 * math.log10(1 / e_bad), abs_tol=0.3)
 
 
 def test_margin_helper():

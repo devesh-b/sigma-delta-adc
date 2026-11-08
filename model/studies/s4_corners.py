@@ -46,7 +46,7 @@ VREF_CM = 1.0              # V, ASSUMED reference common mode (SPEC 3.0 does not
 VIN_CMS = (0.2, 1.0, 2.0)  # V, input-CM axis (D30)
 EPS_FOR_OFF_GATE = 10 ** (-CMRR_OFF_DB / 20)   # mismatch at which sys-off CMRR = eps^-1 just meets the gate (0.1 %)
 EPS_3SIGMA = 0.0075        # Cs+/Cs- mismatch 0.75 % 3 sigma (SPEC 3.0)
-# D33: D12 residual eps_eff = |dCp_top/Cs| + |(Cp_top/Cs) eps_Cs| + eps_inj (signs combined worst-case until WO-09), C4 allocation:
+# D33/D36: D12 residual eps_eff = ((Cp/Cs) eps_Cs - dCp/Cs)/(1+Cp/Cs) + eps_inj (sign '-' confirmed by WO-09 --cm2); MC signed per draw, corner rows RSS + |inj|. C4 allocation:
 CP_TOP = 20e-15            # F per side (fixed allocation)
 DCP_TOP_3S = 0.25e-15      # F, 3 sigma of the Cp_top difference
 EPS_INJ = 2.8e-4           # shorting-TG injection split allocation (fixed, worst sign)
@@ -260,14 +260,16 @@ def mc_task(a):
         resid[sl], raw[sl] = pair * VREF * 1e6, rw * VREF * 1e6
     reset = 2 * ax["r"] * X1MAX_V / (C1 * (p.N - 1)) * 1e6
     leak = s3.leak_offset(ax["i_leak"], fs, ax["cs"]) * 1e6 * s3.RHO_LEAK
-    ee = np.array([eps_eff(ax["cs"], e_, d_) for e_, d_ in zip(dcs, dcp)])
+    ee = np.array([eps_draw(ax["cs"], e_, d_) for e_, d_ in zip(dcs, dcp)])      # D36: signed per-draw sum, inj worst sign
+    ee_lin = np.array([eps_eff_linear(ax["cs"], e_, d_) for e_, d_ in zip(dcs, dcp)])
     e3 = eps_eff(ax["cs"], EPS_3SIGMA)
     cmrr = {"3sigma": cmrr_eval(p, e3), "worst_draw": cmrr_eval(p, float(ee.max()))}
     superseded = {"3sigma": cmrr_eval(p, EPS_3SIGMA), "worst_draw": cmrr_eval(p, float(np.abs(dcs).max()))}   # old eps_Cs*dVcm term (D33: superseded)
     off = np.abs(resid) + reset + leak
     return {"tag": tag, "point": name(proc, T, V), "fs": fs, "ndraw": ndraw,
             "inl": inl.tolist(), "gain": np.abs(gain).tolist(), "off": off.tolist(), "resid": resid.tolist(),
-            "raw_sysoff_uv": raw.tolist(), "cmrr_uv_per_v": (np.abs(dcs) * 1e6).tolist(), "eps_eff_uv_per_v": (ee * 1e6).tolist(), "eps_eff_3sigma": e3, "cs": ax["cs"],
+            "raw_sysoff_uv": raw.tolist(), "cmrr_uv_per_v": (np.abs(dcs) * 1e6).tolist(), "eps_eff_uv_per_v": (ee * 1e6).tolist(), "eps_eff_linear_uv_per_v": (ee_lin * 1e6).tolist(), "eps_eff_3sigma": e3,
+            "eps_eff_3sigma_linear": eps_eff_linear(ax["cs"], EPS_3SIGMA), "cs": ax["cs"],
             "cmrr": cmrr, "cmrr_superseded_eps_cs": superseded, "reset": reset, "leak": leak}
 
 
@@ -355,9 +357,27 @@ def cm_err_v(p, e_v, sys, flip=False, B=96):
     return float(np.mean(uh - u)) * q.vref
 
 
+def eps_signed(cs, eps_cs, dcp, cp_top=CP_TOP):
+    """D36 random part of the D12 residual, signed (WO-09 --cm2 confirmed the '-' sign): ((Cp/Cs) eps_Cs - dCp/Cs) / (1 + Cp/Cs)."""
+    r = cp_top / cs
+    return (r * eps_cs - dcp / cs) / (1 + r)
+
+
 def eps_eff(cs, eps_cs, dcp=DCP_TOP_3S, cp_top=CP_TOP, inj=EPS_INJ):
-    """D33 CM->diff coefficient: |dCp_top/Cs| + |(Cp_top/Cs) eps_Cs| + eps_inj (worst-case signs)."""
+    """D36 corner-row eps_eff (3 sigma inputs): RSS of the two independent random terms + |eps_inj| added linearly."""
+    r = cp_top / cs
+    return math.hypot(r * eps_cs / (1 + r), dcp / cs / (1 + r)) + inj
+
+
+def eps_eff_linear(cs, eps_cs, dcp=DCP_TOP_3S, cp_top=CP_TOP, inj=EPS_INJ):
+    """SUPERSEDED (D36) D33 linear worst-case sum: |dCp/Cs| + |(Cp/Cs) eps_Cs| + eps_inj. Reported for the record only."""
     return abs(dcp / cs) + abs(cp_top / cs * eps_cs) + inj
+
+
+def eps_draw(cs, eps_cs, dcp, inj=EPS_INJ):
+    """D36 per-draw |eps_eff|: signed random sum, eps_inj at its worst sign against the draw."""
+    e = eps_signed(cs, eps_cs, dcp)
+    return abs(e) + inj
 
 
 def cmrr_eval(p, eps, vin_cms=VIN_CMS, flip=False):
@@ -500,7 +520,9 @@ def main():
     for g, fl in gates:
         print(f"GATE {g}: {'REJECT (%d)' % len(fl) if fl else 'ACCEPT'}")
     hand, code, parts, hok, db3 = eps_summary(mcs)
-    print(f"eps_eff (D33) at 3 sigma allocation: code {code:.3e}, hand {hand:.3e} (dCp/Cs {parts[0]:.2e} + Cp/Cs*eps_Cs {parts[1]:.2e} + inj {parts[2]:.2e}); agree within 10 %: {'yes' if hok else 'NO'}; sys-off {db3:.1f} dB, margin vs 60 dB gate {db3 - CMRR_OFF_DB:+.1f} dB, vs {CMRR_OFF_TARGET_DB:g} dB design target {db3 - CMRR_OFF_TARGET_DB:+.1f} dB (informational)")
+    lin = mcs[0]["eps_eff_3sigma_linear"]
+    print(f"eps_eff (D36) superseded D33 linear sum: {lin:.3e} = {20*math.log10(1/lin):.1f} dB (superseded by D36, shown for the record)")
+    print(f"eps_eff (D36, RSS + inj) at 3 sigma allocation: code {code:.3e}, hand {hand:.3e} (dCp/Cs/(1+Cp/Cs) {parts[0]:.2e}, Cp/Cs*eps_Cs/(1+Cp/Cs) {parts[1]:.2e}, inj {parts[2]:.2e}); agree within 10 %: {'yes' if hok else 'NO'}; sys-off {db3:.1f} dB, margin vs 60 dB gate {db3 - CMRR_OFF_DB:+.1f} dB, vs {CMRR_OFF_TARGET_DB:g} dB design target {db3 - CMRR_OFF_TARGET_DB:+.1f} dB (informational)")
     print(f"CMRR sys-off = 1/eps_eff (D33; old eps_Cs term superseded): eps needed for {CMRR_OFF_DB:g} dB = {EPS_FOR_OFF_GATE*100:.2g} % ({EPS_FOR_OFF_GATE*1e6:.0f} uV/V); old eps_Cs-only term at {EPS_3SIGMA*100:g} % gave {20*math.log10(1/EPS_3SIGMA):.1f} dB (superseded)")
     print(verdict)
     for f in fails:
@@ -539,8 +561,9 @@ def _marg(r, k):
 def hand_check(mcs):
     """Hand calculation of eps_eff at the 3 sigma allocation (plain arithmetic from the C4 numbers, independent of eps_eff())."""
     cs = mcs[0]["cs"]
-    t1, t2, t3 = 0.25e-15 / cs, 20e-15 / cs * 0.0075, 2.8e-4
-    hand = t1 + t2 + t3
+    k = 1 + 20e-15 / cs
+    t1, t2, t3 = 0.25e-15 / cs / k, 20e-15 / cs * 0.0075 / k, 2.8e-4      # D36: both random terms divided by (1 + Cp/Cs)
+    hand = (t1 ** 2 + t2 ** 2) ** 0.5 + t3                                  # RSS of the random terms + |inj|
     code = mcs[0]["eps_eff_3sigma"]
     return hand, code, (t1, t2, t3), abs(code / hand - 1) <= 0.10
 
@@ -601,22 +624,20 @@ def write_report(a, rows, wt, mcs, fast, fails, verdict, t_grid, t_mc, total, wi
     wdb = min(c["off_db"] for c in allrows)
     L += ["## CMRR (D30, D33: on the D12 residual eps_eff)", "",
           "**This models the hypothesis; WO-08 checks it in SPICE.** D33 (REVIEW-S4S5b C-M3): D12 cancels the Cs+/Cs- mismatch term to first order, so the CM->diff coefficient is the D12 residual "
-          "eps_eff = |dCp,top/Cs| + |(Cp,top/Cs) eps_Cs| + eps_inj, signs combined worst-case until WO-09 settles them. A CM change dVcm = Vin_cm - VREF_CM "
+          "eps_eff = ((Cp,top/Cs) eps_Cs - dCp,top/Cs) / (1 + Cp,top/Cs) + eps_inj (D36: sign '-' confirmed by WO-09 --cm2, deck vs closed form 0.0 % in 12 cases). MC: signed per-draw sum of the two independent Gaussians, eps_inj at its worst sign against the draw; 3 sigma corner rows: RSS of the two random terms + |eps_inj| linearly. A CM change dVcm = Vin_cm - VREF_CM "
           f"(VREF_CM = {VREF_CM:g} V ASSUMED, SPEC 3.0 does not fix it) gives a differential term eps_eff*dVcm. "
           f"Allocation (C4): Cp,top {CP_TOP*1e15:g} fF per side (fixed), dCp,top Gaussian 3 sigma {DCP_TOP_3S*1e15:g} fF, eps_Cs Gaussian 3 sigma 0.75 %, eps_inj {EPS_INJ:g} (fixed, worst sign). "
-          "Corner points use the 3 sigma values; the worst-draw row uses the largest eps_eff of the MC draws. "
+          "Corner points use the 3 sigma values; the worst-draw row uses the largest per-draw |eps_eff| of the MC draws. "
           "Hypothesis for the sys-chop behaviour (unchanged): the pin-side swap does not change the pin CM, so the term is fixed in the modulator frame, with the same sign in both halves of a sys pair (like an OTA offset); "
           "it is modelled as an additive term e on the sampled input after the swap, u_in = s*u + e, demodulated exactly as the chip does (conversion with sys_sign +1 and -1, residue-corrected, averaged). "
           "Sys chop off: the term stays, error = eps_eff*dVcm (tested to 2 %). The --nonvac copy with the term flipping with the input fails the sys-on gate. "
           "CMRR = 20 log10(dVcm / input-referred error). Errors below 1e-12 V are capped (240 dB). Sets: tt/27 (both fs) and the worst-INL / worst-offset points.", "",
           "### Theory check (hand calculation)", "",
-          f"At tt, Cs = {mcs[0]['cs']*1e12:g} pF: dCp,top/Cs = 0.25 fF / {mcs[0]['cs']*1e12:g} pF = {t1:.2e}; (Cp,top/Cs) eps_Cs = (20 fF / {mcs[0]['cs']*1e12:g} pF) x 0.0075 = {t2:.2e}; eps_inj = {t3:.2e}. "
-          f"Linear worst-case sum = **{hand:.3e}** = {20*math.log10(1/hand):.1f} dB. Printed 3 sigma eps_eff = {code:.3e} = {db3:.1f} dB. Agreement within 10 %: **{'yes' if hok else 'NO'}**. "
-          f"MC eps_eff: mean {ee.mean():.0f} uV/V, max of draws {ee.max():.0f} uV/V (eps_Cs-only mean {cm.mean():.0f}, max {cm.max():.0f}).", "",
-          "**Finding (inconsistent expectation in WO-10 / the review).** The review's 5.6e-4 (65 dB) is the RSS of dCp,top/Cs (5.0e-4) and eps_inj (2.8e-4), which drops the third term. "
-          "With the (Cp,top/Cs) eps_Cs term (3.0e-4) and the worst-case linear sum that D33 prescribes, eps_eff at the allocation is "
-          f"{hand:.2e} = {20*math.log10(1/hand):.1f} dB: **below the 60 dB gate** (needs <= 1.0e-3) and {20*math.log10(1/hand) - CMRR_OFF_TARGET_DB:+.1f} dB against the {CMRR_OFF_TARGET_DB:g} dB design target (informational). "
-          "Reaching the gate needs a tighter allocation (e.g. dCp,top 3 sigma <= 0.15 fF at Cs 0.5 pF, or a larger Cs, or sign knowledge from WO-09 to RSS or cancel terms); the gate is not relaxed here.", "",
+          f"At tt, Cs = {mcs[0]['cs']*1e12:g} pF, 1 + Cp,top/Cs = {1 + CP_TOP/mcs[0]['cs']:.2f}: dCp,top/Cs/(1+Cp/Cs) = {t1:.2e}; (Cp,top/Cs) eps_Cs/(1+Cp/Cs) = {t2:.2e}; eps_inj = {t3:.2e}. "
+          f"RSS of the two random terms + |inj| = **{hand:.3e}** = {20*math.log10(1/hand):.1f} dB. Printed 3 sigma eps_eff = {code:.3e} = {db3:.1f} dB. Agreement within 10 %: **{'yes' if hok else 'NO'}**. "
+          f"MC |eps_eff| (signed sum, inj worst sign): mean {ee.mean():.0f} uV/V, max of draws {ee.max():.0f} uV/V (eps_Cs-only mean {cm.mean():.0f}, max {cm.max():.0f}).", "",
+          f"**Superseded (D36): D33 linear worst-case sum** = {mcs[0]['eps_eff_3sigma_linear']:.3e} = {20*math.log10(1/mcs[0]['eps_eff_3sigma_linear']):.1f} dB (REJECT). A linear sum of independent 3 sigma terms is about 4.2 sigma, beyond the MC pass rule; D36 uses RSS of the independent random terms plus |eps_inj|. "
+          f"The result {db3:.1f} dB passes the {CMRR_OFF_DB:g} dB gate ({db3 - CMRR_OFF_DB:+.1f} dB) and misses the {CMRR_OFF_TARGET_DB:g} dB design target ({db3 - CMRR_OFF_TARGET_DB:+.1f} dB, informational). The target stays a C4/C10 layout goal (dCp,top 3 sigma <= 0.15 fF). The gate is not relaxed.", "",
           f"Worst sys-off CMRR over all rows below: {wdb:.1f} dB (gate {CMRR_OFF_DB:g} dB, margin {wdb - CMRR_OFF_DB:+.1f} dB; against the {CMRR_OFF_TARGET_DB:g} dB design target {wdb - CMRR_OFF_TARGET_DB:+.1f} dB, informational).", "",
           cmrr_table(mcs), "",
           "### Superseded (D33): old eps_Cs * dVcm term", "",
