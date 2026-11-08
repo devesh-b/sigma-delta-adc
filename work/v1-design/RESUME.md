@@ -72,6 +72,15 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   8. reviewer pass.
 - It is fine to resume the same coder agents or dispatch fresh ones from the WO files.
 
+## Update 2026-11-08 17:22: sandbox back (rebooted about 17:06)
+- The sandbox has 6 cores and 15 GB. Keep about 5 processes total. Disk / is 95 % full (50 GB free).
+- pytest design+model: 90 passed with the full env (PATH nix, PDK_ROOT /home/mempool/.ciel).
+- Runner: `/home/mempool/regr/tt/run_wo0910.sh` (nohup).
+  - Queue A, WO-09 modes: knees3 cm2 drift rsrc2 xcheck nonvac3. Logs `/home/mempool/regr/tt/WO-09/<mode>.log`.
+  - Queue B, WO-10: s4 (`--procs 2`), then nonvac. Logs `WO-10/s4.log`, `WO-10/nonvac.log`.
+  - `ALLDONE` markers appear in each directory when its queue finishes.
+- Next: read the logs, write results md/json (s5c_tier1, s4_corners), fix any breakage, settle D35(d), then acceptance and reviewer.
+
 ## Resume procedure
 1. `git log --oneline -5`; `git status --short`.
 2. For each of the three outputs above, check whether its file exists.
