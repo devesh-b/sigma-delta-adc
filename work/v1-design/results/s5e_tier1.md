@@ -49,12 +49,16 @@ Current (review M2 rule): **fast 193 µA, precision 118 µA. Inside D31.**
 - **This option meets the targets inside 200 µA, provided OTA2's base loaded GBW is ≥ 15 MHz.**
 - Caveat: the current rule is SR-based. GBW2 15 MHz at OTA2's SR-sized tail (≈ 9.5 µA) needs gm/Id ≈ 14 (moderate inversion). That is plausible, but C1 must confirm it.
 
-## V5(ii): 3 MHz, no boost. **SUSPECT, not used.**
-INL ranges from 110 to 280 ppm across GBW1 {10, 16, 20} × GBW2 {10, 15, 20, 25} MHz.
-- That is worse than 4 MHz with the same OTAs unboosted (option (a): 21–56 ppm), although 3 MHz gives more settling time.
-- It contradicts the review's hand estimate of ≈ 4–13 ppm.
-- The likely cause is a deck timing or phase-plan problem at fs other than 2 and 4 MHz (`knee_thresholds` and the phase plan only branch on fs < 3e6). Not investigated.
-- Needed only if the user prefers a no-boost fast mode.
+## V5(ii): 3 MHz, no boost. **Explained: OTA1 slew-limited at 3 MHz; option dominated by V5(i) and dropped (D39).**
+INL ranges from 110 to 280 ppm across GBW1 {10, 16, 20} x GBW2 {10, 15, 20, 25} MHz.
+- Cause (REVIEW-S5e C-M2, REASONED from scaling against deck data): OTA1 at 12.5 V/us and 3 MHz is equivalent to about 7.9 V/us at 2 MHz, which measured 143 ppm. The earlier "suspect deck / phase plan" label was wrong.
+- Making 3 MHz work unboosted needs OTA1 SR of about 20 V/us always on (about +36 uA in precision mode: about 154 uA instead of 118 uA), so the option is dominated by V5(i).
+- Comparison wording fixed: the 21-56 ppm quoted earlier was the 4 MHz run with the same OTAs *unboosted* (OTA2 at its precision SR, no current boost), not "option (a)" of the fast-mode list (option (a) is the OTA1-only boost).
+- The 3 MHz point at OTA1 20 V/us was not run (WO-14 item 7).
+
+## Scope notes (REVIEW-S5e m5, m6)
+- **xcheck coverage (m5):** the 5 % rel_sym xcheck gate covers only the legacy OTA at N 256 (`tier1_tb.py` xcheck). The fast-mode and SR results above rest on the v2 OTA path, which has no model cross-check.
+- **Sys-on CMRR (m6):** the 205 dB figure is the model's symmetric-pair-mean metric (the real second-order term e^2 f''/2), not a silicon number. A per-point figure (2 a e |u| about 4 nV at u = 1) is about 165-170 dB. Silicon-limited figures: pin-path dR*fs*Cp,top about 116 dB at 50 ohm (R8); tier-1 cm2 deck 137-173 dB. SPEC cites the 100 dB gate and the tier-1 evidence, not 205 dB.
 
 ## Other
 - `fast_task` hand constants updated: β2 0.55, OTA2 SR 27e6 boosted (V7).
