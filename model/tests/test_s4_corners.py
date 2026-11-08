@@ -179,16 +179,18 @@ def test_sys_on_probe_gates_and_nonvacuity():
     assert s4.probe_verdict([])                                             # nothing measured fails
 
 
-def _pair_error(N, e, old=False):
+def _pair_error(N, e, old=False, order=2):
     """Ideal loop (infinite OTA gain, no noise), sys pairs, modulator-frame offset term e: input pin value u_in = s u + e (u' = u + e s).
     Returns max |pair mean - u|. old=True rebuilds the superseded S4 reconstruction (residue added in the modulator frame, no s)."""
     from model import iadc as mm
-    p = mm.Params(order=2, N=N, c1=0.125, c2=0.5, k=0.5, vref=2.048, a0_db=np.inf)
+    p = mm.Params(order=order, N=N, c1=0.125, c2=0.5, k=0.5, vref=2.048, a0_db=np.inf)
     u = -0.5 + (np.arange(24) + 0.5) / 24
     out = []
     for sg in (np.ones(24), -np.ones(24)):
         uh, st = mm.convert(p, u + e * sg, sys_sign=sg, return_state=True)
-        if old:
+        if old and order == 1:
+            out.append(uh + st["x1_final"] / (p.c1 * N))        # superseded frame: residue added after the demodulation by s (no s)
+        elif old:
             out.append(uh + st["x2_final"] / (p.c1 * p.c2) / (N * (N - 1) / 2))
         else:
             out.append(st["u_corr"])
@@ -206,3 +208,18 @@ def test_residue_frame_regression_rejects_old_frame():
     # the superseded _corr (residue added without the sys sign) must FAIL the V1 bound (nonvacuity): ~2 x2_minus/(c1 c2 W), tens of uV at N 256
     for n in (256, 1024, 4096):
         assert _pair_error(n, 0.01, old=True) > 1e-9, n
+
+
+def test_residue_frame_order1_sys_pair_and_old_frame_rejected():
+    # m4 (WO-14): the order-1 branch (u_corr = (u_hat + x1/(c1 N)) s) has the same frame requirement. New frame exact; old frame must FAIL.
+    for n in (64, 256, 1024):
+        for e in (0.0, 0.0005, 0.01):
+            assert _pair_error(n, e, order=1) <= 1e-12, (n, e)
+        assert _pair_error(n, 0.01, old=True, order=1) > 1e-9, n
+
+
+def test_fast_task_constants_derive_from_params():
+    # m3 (WO-14): beta2 = Cint2/(Cint2+Cs2+Ck+Cp,vg) = 1/(1+0.5+0.25+0.262) = 0.497 (hand value), OTA2 boosted SR = 1.5 x 13.5 = 20.25 V/us
+    assert abs(s4.BETA2_FAST - 1.0 / (1.0 + 0.5 + 0.25 + 0.2619)) < 1e-3 and abs(s4.BETA2_FAST - 0.497) < 1e-3
+    assert abs(s4.BETA1_FAST - 0.84) < 1e-9 and abs(s4.SR2_FAST - 20.25e6) < 1
+    assert abs(s4.BETA2_FAST - 0.55) > 0.04                                  # the superseded hand literal is rejected

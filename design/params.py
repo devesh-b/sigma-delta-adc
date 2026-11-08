@@ -117,6 +117,8 @@ TIER1_PAIR_RESID_V = 0.5e-6        # V, sys-chop pair residual budget
 
 # ---- Tier-1 extensions (WO-09 / S5c) ---------------------------------------
 TIER1_SR2 = 25e6                   # V/s diff, OTA2 slew at its SPEC 3.0 value (25 V/us)
+TIER1_SR2_PREC = 13.5e6            # V/s diff, OTA2 precision-mode SR (D39: confirmed by V4)
+FAST_BST2 = 1.5                    # D39 fast mode option A: OTA2 current boost (13.5 -> 20.25 V/us)
 TIER1_KNEE_PPM = 20.0 / 1.5        # ppm FSR: knee criterion = 1/1.5 of the 20 ppm INL budget (REVIEW-S4S5b C-M1, WO-09)
 TIER1_KNEE_MARGIN_MIN = 0.25       # REVIEW-S4S5b: SR_min >= 1.25 x OTA1-only knee
 TIER1_CP_TOP = 15e-15              # F per side, D12 floating top-plate parasitic used for the pin-path case (m6)

@@ -276,6 +276,14 @@ def mc_verdict(r):
 
 
 # ----------------------------------------------------------------------------------------- fast mode
+# hand slew-then-settle constants, all derived from design/params.py (WO-14 m3): feedback factors include the virtual-ground parasitic Cp,vg
+CK_FAST = dp.C2 * dp.K * dp.CINT2                                                   # Ck = c2 k Cint2 (0.25 pF)
+BETA1_FAST = dp.CINT1 / (dp.CINT1 + dp.CS1 + dp.TIER1_CP_VG)                        # 0.84
+BETA2_FAST = dp.CINT2 / (dp.CINT2 + dp.CS2 + CK_FAST + dp.TIER1_CP_VG)              # 0.497
+SR1_FAST = dp.TIER1_SR                                                              # OTA1 unboosted slew in this hand estimate
+SR2_FAST = dp.FAST_BST2 * dp.TIER1_SR2_PREC                                         # 20.25 V/us (option A, D39)
+
+
 def fast_task(a):
     proc, T, V, N, gbw = a
     p, ax = point(proc, T, V, 4e6, N=N)
@@ -289,7 +297,7 @@ def fast_task(a):
     # hand slew-then-settle penalty (ESTIMATE, not simulated): per-cycle error eps = exp(-(t_half - t_slew)/tau_ota),
     # lumped as a finite-gain-equivalent pole error: A_eq = (1 + c)/(eps_pole + eps_settle)
     res = {}
-    for st, (c, beta, dv, sr) in {"1": (C1, 0.84, C1 * 2 * VREF, 12e6), "2": (C2, 0.55, C2 * (0.6 + KK) * VREF, 27e6)}.items():
+    for st, (c, beta, dv, sr) in {"1": (C1, BETA1_FAST, C1 * 2 * VREF, SR1_FAST), "2": (C2, BETA2_FAST, C2 * (0.6 + KK) * VREF, SR2_FAST)}.items():
         tau = 1.0 / (2 * math.pi * beta * gbw)
         t_sl = dv / sr
         eps = math.exp(-max(0.0, t_half - t_sl) / tau)
@@ -698,7 +706,7 @@ def write_report(a, rows, wt, mcs, fast, fails, verdict, t_grid, t_mc, total, wi
     L += ["## Fast mode (fs 4 MHz, informational, not gated)", "",
           "Thermal noise: u = 0, no averaging (k 1, sys-chop pair); at small N it is far below one LSB, so decisions rarely flip and the measured rms can be 0: the quantization column (raw accumulators, rms over a +-0.9 FS sweep) is the real fast-mode resolution limit. INL: ideal-OTA-table model (tables at the corner) with tau_in/tau_ref scaled to the 4 MHz t_half, residue-corrected. "
           "`with settle`: hand slew-then-settle penalty lumped as a finite-gain-equivalent pole error (ESTIMATE, not a simulation): eps = exp(-(t_half - dV/SR)/tau_ota), "
-          "tau_ota = 1/(2 pi beta GBW), OTA1 beta .84, dV .512 V, SR 12 V/us; OTA2 beta .61, dV c2(.6+k)VREF, SR 25 V/us; A_eq = (1+c)/((1+c)/A(1 V) + eps).", ""]
+          f"tau_ota = 1/(2 pi beta GBW), OTA1 beta {BETA1_FAST:.3f}, dV {C1*2*VREF:.3f} V, SR {SR1_FAST/1e6:g} V/us; OTA2 beta {BETA2_FAST:.3f} (incl. Cp,vg), dV c2(.6+k)VREF, SR {SR2_FAST/1e6:g} V/us (option A boosted); A_eq = (1+c)/((1+c)/A(1 V) + eps).", ""]
     body, prop = [], {}
     for f in fast:
         body.append([f["point"], str(f["N"]), f"{f['gbw_MHz']:g}", f"{f['n']:.3g}", f"{f['quant_rms_uv']:.3g}", f"{f['inl_model']:.3g}", f"{f['inl_with_settle']:.3g}", f"{f['gain_with_settle']:.0f}",
