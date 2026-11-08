@@ -143,6 +143,16 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   3. 0.25 MHz/N 4096 at 125 °C.
 - Next after the review: WO-13, covering the iadc Ck default, the `_corr` fix if needed, and the S3/S4 rerun. Then apply the SPEC §3.0 rows (after the user's decisions), then S6.
 
+## Update 2026-11-08 ~19:50
+- REVIEW-S5d saved, D38 recorded (583f955).
+  - S4 sys-on floor = residue-frame bug, C1 (fix in WO-13).
+  - Ck becomes the topology default.
+  - 240 SPS = N1024.
+  - Goldens are ideal-A.
+  - **Corrected my earlier user numbers** (INL ≈ 7 ppm was wrong; boost-both is 2.2/4.2 ppm).
+- WO-13 dispatched (caac987): model fixes, S3/S4 reruns, xcheck 5 % gate, fast-mode runs (OTA2 boost ×1.5; 3 MHz no boost). Outputs in /home/mempool/regr/tt/WO-13.
+- After WO-13: acceptance (direct ssh, frozen copy), then reviewer. Then the user's fast-mode decision with real numbers, then the SPEC §3.0 rows, then S6.
+
 ## Resume procedure
 1. `git log --oneline -5`; `git status --short`.
 2. For each of the three outputs above, check whether its file exists.
