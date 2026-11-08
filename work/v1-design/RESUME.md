@@ -207,3 +207,6 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - WO-14 dispatched (Sonnet, background; 2b5a53d): gm/Id table, V5 rerun with real gm boost, V4 10.8 V/µs point, S3 A/B, order-1 test, fast_task constants, s5e relabel. Waits for sandbox load < 4.
 - WO-13 acceptance still deferred (sandbox load ~6.5 from another project). Run with WO-14 acceptance on one frozen copy.
 - Next: WO-14 result → acceptance (frozen copy) → reviewer → S6 golden vectors (ideal-A; decimator output = bitstream-only u_hat with sys sign, not u_corr; close F7/F8) → S7 SPEC freeze (user OK).
+
+## Update 2026-11-08 23:20
+- D40 (user): 1.8 V input devices + SC CMFB. SPEC rows added; WO-14 coder told to use pfet_01v8/nfet_01v8 for the gm/Id table.
