@@ -81,6 +81,21 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - `ALLDONE` markers appear in each directory when its queue finishes.
 - Next: read the logs, write results md/json (s5c_tier1, s4_corners), fix any breakage, settle D35(d), then acceptance and reviewer.
 
+## Update 2026-11-08 ~17:50
+- **WO-09 runs all ACCEPT** (logs in /home/mempool/regr/tt/WO-09).
+  - **Knees, OTA1 the limiter:**
+    - 2 MHz: knee 8.9 V/µs, so 12 V/µs has 35 % margin.
+    - 4 MHz boost: knee 10.9, 10 % margin.
+    - Boosting OTA1 alone floors at about 12 ppm (> 5 at N 1024).
+  - **ε_eff sign "−" confirmed** (D36).
+  - **Drift:** 344 mV at 0.25 MHz/N 4096, 100 pA per side (FLAG, needs a user/C-stage decision).
+- WO-10 S4 committed eb0b52a (59.3 dB REJECT on the linear sum).
+- WO-11 dispatched: S5c write-up + S4 RSS per D36. After it: Haiku acceptance for WO-09/10/11, then the reviewer.
+- **User decisions pending:**
+  1. SR: 12 V/µs symmetric now has 35 % margin at 2 MHz. Fast mode needs about 13.6 V/µs base for 25 % margin.
+  2. The 200 µA cap; OTA1-only boost is not enough.
+  3. The 0.25 MHz/N 4096 leakage drift.
+
 ## Resume procedure
 1. `git log --oneline -5`; `git status --short`.
 2. For each of the three outputs above, check whether its file exists.
