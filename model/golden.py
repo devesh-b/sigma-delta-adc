@@ -1,4 +1,4 @@
-"""S6 golden-vector generator for the C9 decimator, frame and sequencer (tier 0, ideal-A).
+"""S6b golden-vector generator (v2) for the C9 decimator, frame and sequencer (tier 0, ideal-A).
 
 Tier 0 = model/iadc.py with no noise, no leakage, no OTA non-idealities (Params defaults, xmax opened so nothing
 clips), at the v1 loop coefficients option B (c1 = 1/8, c2 = 1/2, k = 1/2, so k/c1 = 4).
@@ -6,12 +6,13 @@ clips), at the v1 loop coefficients option B (c1 = 1/8, c2 = 1/2, k = 1/2, so k/
 Every u is quantised to a multiple of 2^-20, so every float step of the loop is exact and the bitstream is
 reproducible bit-for-bit by integer arithmetic (the independent checker in tests/test_golden.py does exactly that).
 
-Conventions (see golden/README.md for the full format):
-  - y[0] is forced to +1 at reset release (SPEC 3.6 rule 9, SPEC 3.2). SPEC does not state the value; +1 is what the
-    model produces at x = 0 (comparator tie goes to +1) and is the choice made here.
-  - exclusive S: acc2 += acc1 before acc1 += y.
-  - decimator output is bitstream only (no u_corr), sys sign applied: num_signed = s * num, num = acc2 + 4 acc1
-    (order 2, den = N(N-1)/2) or acc1 (order 1, den = N).
+Conventions are SPEC section 3.7a (D45); see golden/README.md for the file format:
+  - y[0] forced to +1 at reset release; the cycle-0 comparator bit is junk (frame field comp_raw0 = inverse of y[0]).
+  - exclusive S: acc2 += acc1 before acc1 += y; order 1 keeps accumulating acc2 = sum S.
+  - accumulators are emitted in the modulator frame (no sys sign); num_signed = chop_sign * num is a reference value.
+  - 16-bit tag word, MSB first: chop, order, n_code(2), sys_en, ota_en, short, invalid, frame_ctr(8).
+  - config latch on the clock edge that starts the reset window of an even slot; last write before it wins.
+  - invalid: both frames of the first pair after rst_n and of the first pair after a change of the latched set.
 Usage: python -m model.golden [--out golden/s6_vectors.json]
 """
 import argparse
@@ -27,8 +28,13 @@ N_SET = (64, 256, 1024, 4096)
 NCODE = {n: i for i, n in enumerate(N_SET)}
 C1, C2, K = 0.125, 0.5, 0.5
 KC1 = 4                      # k / c1, exact integer for option B
-CHOPS = ("off", "sys", "ota+sys")
+CHOPS = ("off", "sys", "ota+sys", "ota")
 GRID = 2 ** 20
+LATCHED = ("order", "N", "fs_div", "sys_en", "ota_en", "short")
+RST_LEN = 2                  # reset window, fs cycles (D45 i)
+TRACE_FIELDS = ["rst_analog", "acc_clear", "sys_swap", "ota_chop_phase", "y_force", "bit_valid", "raw_pin",
+                "tag_chop", "cfg_latch"]
+_CACHE = {}
 
 
 def q(u):
@@ -42,8 +48,12 @@ def params(order, N):
 
 def cfg(order, N, chop, short, fs_div=0):
     return {"order": order, "N": N, "n_code": NCODE[N], "fs_div": fs_div,
-            "ota_chop": chop == "ota+sys", "sys_chop": chop != "off", "short": bool(short), "chop_mode": chop,
-            "pga": None}
+            "sys_en": int(chop in ("sys", "ota+sys")), "ota_en": int(chop in ("ota", "ota+sys")),
+            "short": int(bool(short)), "chop_mode": chop}
+
+
+def changed(a, b):
+    return any(a[k] != b[k] for k in LATCHED)
 
 
 def hexbits(y):
@@ -51,56 +61,83 @@ def hexbits(y):
     return "%0*x" % (len(b) // 4, int(b, 2))
 
 
-def model_frame(c, u_eff, s):
-    """Run the tier-0 model for one sub-conversion; return the frame payload (no tags)."""
-    p = params(c["order"], c["N"])
-    uh, st = iadc.convert(p, np.array([u_eff]), sys_sign=np.array([float(s)]), return_state=True)
-    y = [int(v) for v in st["y"][:, 0]]
-    assert y[0] == 1, "tier-0 y[0] must be +1 (forced value)"
-    N = c["N"]
-    acc1 = acc2 = 0
+def accumulate(y):
+    a1 = a2 = 0
     for v in y:
-        acc2 += acc1
-        acc1 += v
+        a2 += a1
+        a1 += v
+    return a1, a2
+
+
+def tag_word(t):
+    return ((t["chop"] << 15) | (t["order"] << 14) | (t["n_code"] << 12) | (t["sys_en"] << 11) | (t["ota_en"] << 10)
+            | (t["short"] << 9) | (t["invalid"] << 8) | t["frame_ctr"])
+
+
+def frame_core(c, y, s):
+    """Accumulator words and reference values from a +-1 stream y (list) and sys sign s."""
+    N = c["N"]
+    assert len(y) == N and y[0] == 1
+    a1, a2 = accumulate(y)
     if c["order"] == 2:
-        num, den = acc2 + KC1 * acc1, N * (N - 1) // 2
+        num, den = a2 + KC1 * a1, N * (N - 1) // 2
     else:
-        acc2, num, den = None, acc1, N
-    return {"n": N, "ybits": hexbits(y), "acc1": acc1, "acc2": acc2, "num": num, "den": den,
-            "num_signed": s * num,
-            "model_ref": {"u_hat_signed": float(uh[0]), "u_corr": float(st["u_corr"][0]),
-                          "x1_final": float(st["x1_final"][0]), "x2_final": float(st["x2_final"][0])}}
+        num, den = a1, N
+    return {"n": N, "ybits": hexbits(y), "comp_raw0": 1 if y[0] < 0 else 0, "acc1": a1, "acc2": a2,
+            "num": num, "den": den, "num_signed": s * num}
 
 
-def sign_of(c, slot):
-    return -1 if (c["sys_chop"] and slot % 2 == 1) else 1
+def model_frame(c, u, off, s):
+    """Tier-0 model for one sub-conversion. Modulator input = s*u + off (the offset is added after the swap)."""
+    if c["short"]:
+        u, off = 0.0, 0.0
+    uf = u + s * off                       # input-frame value; the model applies s itself (sys_sign)
+    key = (c["order"], c["N"], uf, s)
+    if key not in _CACHE:
+        p = params(c["order"], c["N"])
+        uh, st = iadc.convert(p, np.array([uf]), sys_sign=np.array([float(s)]), return_state=True)
+        y = [int(v) for v in st["y"][:, 0]]
+        assert y[0] == 1, "tier-0 y[0] must be +1 (forced value)"
+        ref = {"u_hat_signed": float(uh[0]), "u_corr": float(st["u_corr"][0]),
+               "x1_final": float(st["x1_final"][0]), "x2_final": float(st["x2_final"][0]), "u_frame": uf}
+        _CACHE[key] = (y, ref)
+    y, ref = _CACHE[key]
+    d = frame_core(c, y, s)
+    assert abs(ref["u_hat_signed"] * d["den"] - d["num_signed"]) < 1e-6, (key, ref["u_hat_signed"], d)
+    d["model_ref"] = ref
+    return d
+
+
+def tag_fields(c, t, inv):
+    return {"chop": int(bool(c["sys_en"]) and t % 2 == 1), "order": int(c["order"] == 2), "n_code": c["n_code"],
+            "sys_en": c["sys_en"], "ota_en": c["ota_en"], "short": c["short"], "invalid": int(inv),
+            "frame_ctr": t & 255}
 
 
 def sequencer(config0, slots):
-    """Reference sequencer. slots[t] = {"request": cfg or None}; a request written during slot t latches at the
-    next pair boundary (even slot) > t. Returns per-slot (active cfg, tags)."""
-    active, pending = config0, None
-    ctr, pair_idx, inv = 0, 0, False
-    out = []
+    """Reference sequencer (D45 c, d, e). slots[t] = {"writes": [{"off": cycle in slot, "cfg": cfg}]}.
+    Latch: shadow -> active on the clock edge that starts the reset window of an even slot. All writes made
+    before that edge (earlier slots, any offset) count, the last wins; a write in the even slot itself (offset >= 0,
+    on or after the edge) applies to the next pair. Invalid: pair 0 (after rst_n) and the first pair after a change."""
+    active, pending, inv, out = config0, None, False, []
     for t, sl in enumerate(slots):
         if t % 2 == 0:
+            inv = t == 0
             if pending is not None:
-                active, pending, pair_idx, inv = pending, None, 0, True
-            elif t > 0:
-                pair_idx, inv = pair_idx + 1, False
-        tags = {"chop_sign": sign_of(active, t), "order": active["order"], "n_code": active["n_code"],
-                "frame_ctr": ctr % 256, "pair_idx": pair_idx, "invalid": inv}
-        out.append((active, tags))
-        ctr += 1
-        if sl.get("request") is not None:
-            pending = sl["request"]
+                inv = inv or changed(pending, active)
+                active, pending = pending, None
+        out.append((active, tag_fields(active, t, inv)))
+        for w in sorted(sl.get("writes", []), key=lambda w: w["off"]):
+            assert 0 <= w["off"] <= active["N"] + RST_LEN - 1, "write offset outside the slot"
+            pending = w["cfg"]
     return out
 
 
-def make_frame(c, u_eff, t, tags):
-    s = tags["chop_sign"]
-    f = {"slot": t, "tags": tags}
-    f.update(model_frame(c, u_eff, s))
+def make_frame(c, u, off, t, tags):
+    s = -1 if tags["chop"] else 1
+    f = {"slot": t, "tags": tags, "tag_word": tag_word(tags)}
+    f.update(model_frame(c, u, off, s))
+    f["wire"] = "%08x%08x%04x" % (f["acc1"] & 0xFFFFFFFF, f["acc2"] & 0xFFFFFFFF, f["tag_word"])
     return f
 
 
@@ -112,18 +149,27 @@ def u_list(N, rng):
     return [-0.9, -0.5, -1.3 / N, 0.0, 1.3 / N, 0.5, 0.9] + [float(rng.uniform(-0.9, 0.9)) for _ in range(2)]
 
 
-def vector_mode(vid, order, N, chop, short, u_req):
+def vector_mode(vid, kind, order, N, chop, short, u_req, off=0.0):
     c = cfg(order, N, chop, short)
-    u_eff = 0.0 if short else q(u_req)
-    slots = [{}, {}]
-    fr = [make_frame(a, u_eff, t, tags) for t, (a, tags) in enumerate(sequencer(c, slots))]
-    return {"id": vid, "kind": "mode", "config": c, "u_requested": q(u_req), "u": u_eff, "frames": fr,
-            "pair": pair_value(*fr)}
+    u = 0.0 if short else q(u_req)
+    fr = [make_frame(a, u, off, t, tags) for t, (a, tags) in enumerate(sequencer(c, [{}, {}]))]
+    return {"id": vid, "kind": kind, "config": c, "u_requested": q(u_req), "u": u, "off": 0.0 if short else off,
+            "frames": fr, "pair": pair_value(*fr)}
 
 
-def sequence(sid, config0, slots, us, dropped, note):
+def stream_vector(sid, order, y, note):
+    c = cfg(order, 4096, "off", 0)
+    (a, tags), = sequencer(c, [{}])
+    s = 1
+    f = {"slot": 0, "tags": tags, "tag_word": tag_word(tags)}
+    f.update(frame_core(c, y, s))
+    f["wire"] = "%08x%08x%04x" % (f["acc1"] & 0xFFFFFFFF, f["acc2"] & 0xFFFFFFFF, f["tag_word"])
+    return {"id": sid, "kind": "stream", "loop_valid": False, "note": note, "config": c, "frames": [f]}
+
+
+def sequence(sid, config0, slots, us, dropped, note, kind="sequence"):
     tg = sequencer(config0, slots)
-    frames = [make_frame(a, us[t], t, tags) for t, (a, tags) in enumerate(tg)]
+    frames = [make_frame(a, us[t], 0.0, t, tags) for t, (a, tags) in enumerate(tg)]
     recv = [f for f in frames if f["slot"] not in dropped]
     pairs = []
     for a in range(0, len(slots) - 1, 2):
@@ -133,12 +179,35 @@ def sequence(sid, config0, slots, us, dropped, note):
         if complete:
             d.update(pair_value(fa, fb))
         pairs.append(d)
-    return {"id": sid, "kind": "sequence", "note": note, "config0": config0,
-            "slots": [{"request": sl.get("request"), "u": us[i]} for i, sl in enumerate(slots)],
+    return {"id": sid, "kind": kind, "note": note, "config0": config0,
+            "slots": [{"writes": sl.get("writes", []), "u": us[i]} for i, sl in enumerate(slots)],
             "dropped": sorted(dropped), "frames_sent": [f["slot"] for f in recv], "frames": frames, "pairs": pairs}
 
 
+def control_trace(seq):
+    """Cycle-level control trace (D45 i). Slot = reset window (cycles 0, 1) then N conversion cycles (n = c - 2).
+    One 9-character row per fs cycle, field order TRACE_FIELDS:
+      rst_analog 1 on cycles 0-1; acc_clear 1 on cycle 1 (the edge that releases reset clears the accumulators);
+      sys_swap = swap level, set from cycle 0 of the slot (inside the reset window), held to the slot end;
+      ota_chop_phase 0 in reset, then n mod 2 (fch = fs/2) when ota_en, else 0; y_force 1 on n = 0;
+      bit_valid 1 on n = 0..N-1; raw_pin = retimed y (y[0] forced +1), 0 when bit_valid is 0;
+      tag_chop = chop bit of the frame (same flop as sys_swap); cfg_latch 1 on cycle 0 of even slots."""
+    cfgs = sequencer(seq["config0"], [{"writes": sl["writes"]} for sl in seq["slots"]])
+    rows = []
+    for t, (c, tg) in enumerate(cfgs):
+        f = seq["frames"][t]
+        y = [1 if ch == "1" else 0 for ch in bin(int(f["ybits"], 16))[2:].zfill(c["N"])]
+        swap = int(c["sys_en"] and t % 2 == 1)
+        for cyc in range(c["N"] + RST_LEN):
+            n = cyc - RST_LEN
+            rows.append("".join(str(int(v)) for v in (
+                cyc < RST_LEN, cyc == RST_LEN - 1, swap, (n % 2 if c["ota_en"] and n >= 0 else 0), n == 0, n >= 0,
+                (y[n] if n >= 0 else 0), tg["chop"], t % 2 == 0 and cyc == 0)))
+    return {"fields": TRACE_FIELDS, "rst_len": RST_LEN, "rows": rows}
+
+
 def build():
+    _CACHE.clear()
     rng = np.random.default_rng(SEED)
     vecs = []
     for order in (1, 2):
@@ -150,21 +219,73 @@ def build():
                         if short and i != 3:       # internal short: input is CM, u is forced to 0, one vector
                             continue
                         vid = "o%d_%s_N%d_%s_u%d" % (order, chop.replace("+", "p"), N, "short" if short else "in", i)
-                        vecs.append(vector_mode(vid, order, N, chop, short, u))
+                        vecs.append(vector_mode(vid, "mode", order, N, chop, short, u))
+    # m10: dyadic offset added after the swap, u_eff = s*u + off; a correct pair returns u
+    for order in (1, 2):
+        for chop in ("sys", "ota+sys"):
+            for N in (64, 256, 1024):
+                for u in (0.25, -0.5):
+                    for off in (0.125, -0.125):
+                        vid = "off_o%d_%s_N%d_u%s_off%s" % (order, chop.replace("+", "p"), N, u, off)
+                        vecs.append(vector_mode(vid, "offset", order, N, chop, 0, u, off))
+    streams = []
+    n = 4096
+    streams.append(stream_vector("st_o2_allp", 2, [1] * n, "y all +1 (acc1 = 4096, acc2 = N(N-1)/2)"))
+    streams.append(stream_vector("st_o2_pm", 2, [1] + [-1] * (n - 1), "y[0] = +1 then all -1 (acc2 about -N^2/2)"))
+    streams.append(stream_vector("st_o2_alt", 2, [1 if i % 2 == 0 else -1 for i in range(n)], "alternating +1, -1"))
+    streams.append(stream_vector("st_o1_allp", 1, [1] * n, "order 1, y all +1"))
+
     c0 = cfg(2, 64, "sys", 0)
     cA = cfg(1, 256, "ota+sys", 0, fs_div=2)
     cB = cfg(2, 1024, "ota+sys", 0, fs_div=1)
     sl = [{} for _ in range(12)]
-    sl[3]["request"], sl[4]["request"] = cA, cB
+    sl[3]["writes"] = [{"off": 10, "cfg": cA}]
+    sl[4]["writes"] = [{"off": 3, "cfg": cB}]
     seqs = [sequence("seq_cfgchange", c0, sl, [q(0.3)] * 12, [],
-                     "request A written in slot 3 latches at slot 4 (pair 2, invalid); request B written in slot 4 "
-                     "(just after the boundary) latches at slot 6 (pair 3, invalid); slot 5 still runs config A.")]
+                     "write A in slot 3 latches at slot 4 (pair 2, invalid); write B in slot 4 (after the edge) "
+                     "latches at slot 6 (pair 3, invalid); slot 5 still runs config A.")]
     sl = [{} for _ in range(8)]
     seqs.append(sequence("seq_drop", cfg(2, 256, "sys", 0), sl, [q(-0.25)] * 8, [3],
                          "frame of slot 3 is dropped on the link: frame_ctr jumps 2 -> 4; pair 1 is incomplete "
                          "and must be discarded, pairs 0, 2, 3 demodulate."))
-    return {"format": 1, "seed": SEED, "grid": "u multiples of 2^-20",
-            "model": {"c1": C1, "c2": C2, "k": K, "k_over_c1": KC1, "tier": 0}, "vectors": vecs, "sequences": seqs}
+    c64 = cfg(2, 64, "ota+sys", 0)
+    c64s = cfg(2, 64, "ota+sys", 1)
+    sl = [{} for _ in range(10)]
+    sl[2]["writes"] = [{"off": 30, "cfg": c64s}]
+    sl[7]["writes"] = [{"off": 40, "cfg": c64}]
+    seqs.append(sequence("seq_short", c64, sl, [q(0.3)] * 10, [],
+                         "short written mid-slot 2 (first slot of pair 1): pair 1 (slots 2,3) is unchanged and valid, "
+                         "the short applies from slot 4 (pair 2, invalid, u forced to 0). Written back to 0 in slot 7: "
+                         "applies from slot 8 (invalid)."))
+    x1, x2 = cfg(1, 64, "sys", 0), cfg(2, 256, "sys", 0)
+    x3, y = cfg(2, 64, "sys", 0, fs_div=1), cfg(2, 64, "sys", 0, fs_div=2)
+    sl = [{} for _ in range(8)]
+    sl[1]["writes"] = [{"off": 5, "cfg": x1}, {"off": 20, "cfg": x2}, {"off": 40, "cfg": x3}]
+    sl[2]["writes"] = [{"off": 0, "cfg": y}]
+    seqs.append(sequence("seq_multiwrite", c0, sl, [q(0.3)] * 8, [],
+                         "three writes in slot 1: the last (x3, fs_div 1) wins and latches at slot 2 (invalid pair 1). "
+                         "A write in slot 2 at offset 0 (y, fs_div 2) is on the edge or later: it latches at slot 4."))
+    a = cfg(1, 64, "sys", 0)
+    b = cfg(2, 64, "sys", 0, fs_div=3)
+    sl = [{} for _ in range(8)]
+    sl[3]["writes"] = [{"off": 65, "cfg": a}]
+    sl[4]["writes"] = [{"off": 0, "cfg": b}]
+    seqs.append(sequence("seq_edge", c0, sl, [q(0.3)] * 8, [],
+                         "write A at the last cycle of slot 3 (before the slot-4 edge) latches at slot 4; "
+                         "write B at offset 0 of slot 4 (on the edge) latches at slot 6, so A runs in pair 2."))
+    sl = [{} for _ in range(262)]
+    seqs.append(sequence("seq_wrap", cfg(2, 64, "ota+sys", 0), sl, [q(0.3)] * 262, [],
+                         "262 slots (131 pairs) at N 64, constant u: frame_ctr wraps 255 -> 0 at slot 256; "
+                         "the two ybits (s = +1, -1) are reused by every frame."))
+    sl = [{} for _ in range(6)]
+    sl[2]["writes"] = [{"off": 10, "cfg": cfg(1, 64, "ota+sys", 0)}]
+    tr = sequence("trace_ctl", c64, sl, [q(0.3)] * 6, [],
+                  "N 64, sys + ota chop, pairs 0 and 1, write (order 1) in slot 2 latching at slot 4, then pair 2. "
+                  "Control trace per fs cycle, 66 cycles per slot.", kind="trace")
+    tr["trace"] = control_trace(tr)
+    return {"format": 2, "seed": SEED, "grid": "u multiples of 2^-20",
+            "model": {"c1": C1, "c2": C2, "k": K, "k_over_c1": KC1, "tier": 0}, "vectors": vecs, "streams": streams,
+            "sequences": seqs, "traces": [tr]}
 
 
 def dumps(doc):
@@ -182,5 +303,8 @@ if __name__ == "__main__":
     d = build()
     txt = dumps(d)
     open(a.out, "w").write(txt)
-    print(len(d["vectors"]), "mode vectors,", len(d["sequences"]), "sequences,", len(txt), "bytes, sha256",
-          hashlib.sha256(txt.encode()).hexdigest())
+    nfr = (sum(len(v["frames"]) for v in d["vectors"]) + len(d["streams"])
+           + sum(len(s["frames"]) for s in d["sequences"] + d["traces"]))
+    print(len(d["vectors"]), "vectors,", len(d["streams"]), "streams,", len(d["sequences"]), "sequences,",
+          len(d["traces"]), "trace,", nfr, "frames,", len(d["traces"][0]["trace"]["rows"]), "trace cycles,",
+          len(txt), "bytes, sha256", hashlib.sha256(txt.encode()).hexdigest())
