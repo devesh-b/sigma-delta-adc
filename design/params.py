@@ -99,6 +99,22 @@ TIER1_NULL_TOL = 2e-6              # null test, in u (ppm of VREF): 1/10 of the 
 SPICE_OPTIONS_TIER1 = {"method": "gear", "reltol": 1e-3, "chgtol": 1e-14,
                  "vntol": 1e-6, "abstol": 1e-12, "trtol": 7.0, "tmax_ns": 10.0}
 
+# ---- Solver option ladder (D43c / WO-16): O0 = SPICE_OPTIONS_TIER1; each step reltol/10, tmax/2, chgtol/100; O2 also trtol 1.
+#      O1/O2 additionally cap tmax at tau_cl/10 (tau_cl = 1/(2 pi beta1 min(GBW1,GBW2)), applied in gen_tier1.merged via tau_floor_div).
+def option_ladder(level, method=None):
+    k = {"O0": 0, "O1": 1, "O2": 2}[level]
+    o = dict(SPICE_OPTIONS_TIER1)
+    o.update(reltol=o["reltol"] / 10 ** k, tmax_ns=o["tmax_ns"] / 2 ** k, chgtol=o["chgtol"] / 100 ** k)
+    if k == 2:
+        o["trtol"] = 1.0
+    if k:
+        o["tau_floor_div"] = 10.0
+    if method:
+        assert method in ("trap", "gear")
+        o["method"] = method
+    return o
+
+
 # ---- Tier-1 extensions (WO-08 / S5b) ---------------------------------------
 TIER1_BETA1 = 0.84                 # SPEC 3.0 OTA1 feedback factor
 TIER1_CP_VG = CINT1 * (1.0 / TIER1_BETA1 - 1.0) - CS1   # F, virtual-ground parasitic per side giving beta 0.84 (0.262 pF)

@@ -432,3 +432,40 @@ def test_fast4_jobs_and_signed_inl():
     rng = np.random.default_rng(1)
     e, rms, mx = TB.f4_signed(u, u + 2e-6 * rng.standard_normal(101))
     assert rms > 0.5
+
+
+def test_gmid_min_wl_per_device_hand_values():
+    """G-M2: W/L at L 1 um from the committed table vs hand values (id = I_tail/2, gm/Id target, J_max from the sweep): OTA1 ~29, OTA2 x2 ~18, OTA2 x1.5 ~106, +-15 %."""
+    import json, os
+    tbl = json.load(open(os.path.abspath(TB.GMID_JSON)))["min_wl"]
+    hand = {"OTA1 (x2 current, I_tail 35 uA)": 29.0, "OTA2 x2 (I_tail 18.9 uA)": 18.0, "OTA2 x1.5 (I_tail 14.2 uA)": 106.0}
+    for name, h in hand.items():
+        e = tbl[name]
+        assert abs(e["per_L"]["1"]["wl"] / h - 1) <= 0.15, (name, e["per_L"]["1"]["wl"], h)
+        assert abs(e["id_uA"] - {"OTA1": 17.5, "OTA2 x2": 9.45, "OTA2 x1.5": 7.1}[name.split(" (")[0]]) < 1e-6
+    # the old I_tail convention would give twice these values: it must be rejected by the same bounds
+    for name, h in hand.items():
+        assert abs(2 * tbl[name]["per_L"]["1"]["wl"] / h - 1) > 0.15
+    assert TB.per_device_current(35e-6) == 17.5e-6
+
+
+def test_option_ladder_and_converge_rule():
+    o0, o1, o2 = (P.option_ladder(k) for k in ("O0", "O1", "O2"))
+    assert o0 == P.SPICE_OPTIONS_TIER1
+    assert abs(o1["reltol"] - o0["reltol"] / 10) < 1e-15 and o1["tmax_ns"] == o0["tmax_ns"] / 2 and abs(o1["chgtol"] / o0["chgtol"] - 0.01) < 1e-9
+    assert abs(o2["reltol"] - o0["reltol"] / 100) < 1e-15 and o2["tmax_ns"] == o0["tmax_ns"] / 4 and o2["trtol"] == 1.0 and o1["trtol"] == o0["trtol"]
+    assert P.option_ladder("O1", "trap")["method"] == "trap"
+    # tau floor: GBW 10 MHz, beta 0.84 -> tau 18.9 ns -> tmax <= 1.89 ns (O0 10 ns is untouched)
+    cfg = dict(gbw=10e6, gbw2=None, options=o1)
+    assert G.merged(cfg)["tmax"] <= 1.9e-9
+    assert G.merged(dict(gbw=10e6, options=o0))["tmax"] == 10e-9
+    # rule: gate 10; INL 5 -> allow max(0.5, 0.5) = 0.5
+    ok, d, v, ps = TB.converge_verdict(4.8, 5.0, 10.0)
+    assert ok and abs(d - 0.2) < 1e-12 and abs(v - 5.2) < 1e-12 and ps
+    # non-vacuity: an O0 -> O1 step that moves INL by 3 ppm at INL 5 / gate 10 fails the rule
+    ok, d, v, ps = TB.converge_verdict(8.0, 5.0, 10.0)
+    assert not ok and not ps
+    # verdict inflation: converged but INL(1+d/INL) over the gate fails
+    ok, d, v, ps = TB.converge_verdict(9.0, 9.6, 10.0)
+    assert ok and v > 10.0 and not ps
+    assert not TB.converge_verdict(float("nan"), 5.0, 10.0)[0]

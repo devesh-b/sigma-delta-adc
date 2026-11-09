@@ -69,6 +69,10 @@ def merged(cfg):
         c["options"] = dict(P.SPICE_OPTIONS_TIER1)
     if c["tmax"] is None:
         c["tmax"] = c["options"].get("tmax_ns", 10.0) * 1e-9
+        div = c["options"].get("tau_floor_div")
+        if div:       # ladder floor: tmax <= tau_cl / div
+            gb = min(c["gbw"], c["gbw2"] if c["gbw2"] is not None else c["gbw"])
+            c["tmax"] = min(c["tmax"], 1.0 / (6.283185307179586 * P.TIER1_BETA1 * gb) / div)
     return c
 
 

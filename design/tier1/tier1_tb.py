@@ -1460,6 +1460,11 @@ GMID_WBINS = (2.0, 5.0, 20.0)
 GMID_TARGETS = (("OTA1 (x2 current, I_tail 35 uA)", 10.05, 35e-6), ("OTA2 x1.5 (I_tail 14.2 uA)", 13.96, 14.2e-6), ("OTA2 x2 (I_tail 18.9 uA)", 10.47, 18.9e-6))
 
 
+def per_device_current(i_tail):
+    """Differential pair: each input device carries I_tail/2 (G-M2; the old table used I_tail and doubled every W/L)."""
+    return 0.5 * i_tail
+
+
 def gmid_mono_violations(J, g, tol=GMID_MONO_TOL):
     """Count points on the strong-inversion side of the peak where gm/Id rises (or Id falls) between neighbours."""
     pk = int(np.argmax(g))
@@ -1587,7 +1592,7 @@ def mode_gmid(args):
     minwl = {}
     if all(os.path.exists(os.path.join(src, f"gmid_{GMID_PRIMARY}_{c}_T{t}.csv")) for c in GMID_CORNERS for t in GMID_TEMPS):
         for name, tg, ida in GMID_TARGETS:
-            minwl[name] = dict(target=tg, id_uA=ida * 1e6, per_L=gmid_min_wl(src, tg, ida))
+            minwl[name] = dict(target=tg, id_uA=per_device_current(ida) * 1e6, per_L=gmid_min_wl(src, tg, per_device_current(ida)))
     out = dict(rows=rows, worst=worst, op_crosscheck={k: [list(e) for e in v] for k, v in opx.items()}, selftest=selftest, wbin=wbin, min_wl=minwl, problems=bad)
     os.makedirs(os.path.dirname(os.path.abspath(GMID_JSON)), exist_ok=True)
     json.dump(out, open(os.path.abspath(GMID_JSON), "w"), indent=1, default=float)
@@ -1607,7 +1612,7 @@ def mode_gmid(args):
     md += ["", "## Minimum W/L meeting the boosted gm/Id target at every corner and temperature (pfet_01v8)", "",
            "W/L >= Id / J_max(target), worst over ss/tt/ff x -40/27/100/125 C. W.L = (W/L) L^2 [um^2]. `unreachable` = corners whose peak gm/Id is below the target.", ""]
     for name, v in minwl.items():
-        md += [f"### {name}: gm/Id >= {v['target']} at {v['id_uA']:g} uA", "", "| L [um] | W/L | W.L [um^2] | worst corner | unreachable corners |", "|---|---|---|---|---|"]
+        md += [f"### {name}: gm/Id >= {v['target']} at {v['id_uA']:g} uA per input device (I_tail/2)", "", "| L [um] | W/L | W.L [um^2] | worst corner | unreachable corners |", "|---|---|---|---|---|"]
         for k, e in v["per_L"].items():
             md.append(f"| {e['L']:g} | {e['wl']:.1f} | {e['wl_area']:.1f} | {e['corner']}/{e['T']} | {', '.join(e['unreachable']) or 'none'} |" if math.isfinite(e["wl"]) else f"| {e['L']:g} | unreachable | - | - | {', '.join(e['unreachable'])} |")
         md.append("")
@@ -1801,6 +1806,18 @@ def mode_fast4(args):
     return 0 if ok else 1
 
 
+def converge_verdict(inl_o1, inl_o2, gate):
+    """D43c acceptance rule. Converged iff |O2-O1| <= max(10 % INL(O2), 0.1 (gate - INL(O2))); verdict on INL(O2) (1 + |d|/INL(O2)) <= gate.
+    Returns (converged, delta, inl_verdict, passes). NaN in -> not converged, not passing."""
+    if not all(math.isfinite(x) for x in (inl_o1, inl_o2, gate)):
+        return False, float("nan"), float("nan"), False
+    d = abs(inl_o2 - inl_o1)
+    allow = max(0.1 * inl_o2, 0.1 * (gate - inl_o2))
+    conv = d <= allow
+    v = inl_o2 * (1.0 + d / inl_o2) if inl_o2 > 0 else inl_o2 + d
+    return bool(conv), d, v, bool(conv and v <= gate)
+
+
 def main():
     ap = argparse.ArgumentParser()
     for m in ("null", "options", "dc", "sweep", "nonvac", "xcheck", "av", "knees2", "cm", "offsets", "rsrc", "nonvac2",
@@ -1812,11 +1829,25 @@ def main():
     ap.add_argument("--m", type=int, default=None, help="number of DC points")
     ap.add_argument("--out", default=None)
     ap.add_argument("--prev", default=None, help="knees4: knees3.json whose 2 MHz rows are reused")
-    ap.add_argument("--opt", action="append", default=[], help="override a SPICE option, e.g. --opt method=gear")
+    ap.add_argument("--opt", action="append", default=[], help="O0|O1|O2 option ladder (D43c) or override a SPICE option, e.g. --opt method=gear")
+    ap.add_argument("--method", default=None, choices=("trap", "gear"))
+    ap.add_argument("--reltol-only", default=None, choices=("O0", "O1", "O2"), help="ladder characterisation: take only reltol (and chgtol) from this level")
+    ap.add_argument("--tmax-only", default=None, choices=("O0", "O1", "O2"), help="ladder characterisation: take only tmax (with the tau floor) from this level")
     a = ap.parse_args()
     for kv in a.opt:
+        if kv in ("O0", "O1", "O2"):
+            P.SPICE_OPTIONS_TIER1.update(P.option_ladder(kv))
+            continue
         k, v = kv.split("=")
         P.SPICE_OPTIONS_TIER1[k] = v if k == "method" else float(v)
+    if a.reltol_only:
+        lo = P.option_ladder(a.reltol_only)
+        P.SPICE_OPTIONS_TIER1.update(reltol=lo["reltol"], chgtol=lo["chgtol"], trtol=lo["trtol"])
+    if a.tmax_only:
+        lo = P.option_ladder(a.tmax_only)
+        P.SPICE_OPTIONS_TIER1.update(tmax_ns=lo["tmax_ns"], tau_floor_div=lo.get("tau_floor_div", 0))
+    if a.method:
+        P.SPICE_OPTIONS_TIER1["method"] = a.method
     global OUT
     if a.out:
         OUT = a.out
