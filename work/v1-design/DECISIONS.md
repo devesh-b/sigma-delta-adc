@@ -68,3 +68,9 @@
 (3) **0.94 µV @15 SPS governs** (the §3.0 joint model run). 0.71 µV is the kT/C-only Cs-row value.
 
 (4) **The status word reports the frame's boost/trim**, latched with the hold register. Golden v3 item | REVIEW-S7b | option 1 (step gate ε_NL ≤ 3e-7 binding) | 0 |
+| D49 | USER 2026-11-09: **bias-readback oscillator is a conditional C6 item.**
+- Baseline stays manual calibration (D47).
+- The oscillator is added only if the C6 floorplan shows the ≈ 2–3k µm² fits; the tile is 66–89 % full.
+- How it works: a replica bias current charges a ≈ 1 pF MIM cap to a VBG-derived threshold and is counted against the TT clock. f ∝ 1/(R·C) tracks the slew-setting I/C. A count of 0 means the bandgap did not start.
+- Runs only in calibration mode, off during conversions.
+- If added: one config bit plus a counter field in the status word (a golden v3 item) | user | manual only; unconditional | ≈ 2–3k µm² if built |
