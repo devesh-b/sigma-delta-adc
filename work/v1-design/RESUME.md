@@ -524,3 +524,12 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - C1 step 1: WO-20 (OTA1 design note, Opus) dispatched. Next:
   1. reviewer on the note;
   2. C1b: SIZES → netlist → tbs at 45 PVT, plus the in-loop gate (B).
+- WO-20 done: 30ab856 (DESIGN.md + sizes_draft.py) and the spot-check script (committed).
+  - Topology: folded cascode, pfet_01v8 input pair W 40/L 1, g5v0d10v5 protection cascodes, SC CMFB on a short-L load section, chopper, ×2 boost leg.
+  - **Spot sim fails on A0:** tt base 80.3, ff/125 base 75.3, tt boost 71, ss/125 boost 58 dB. Suspect a device leaving saturation.
+  - fp2 at 10–12× GBW (PM 85°): too high against the S5h optimum of ~3×.
+  - The protection-cascode bias needs a negative gate at ss/−40.
+  - Noise 121–157 µV (≤ 250 OK). Current ≈ 52/105 µA base/boost.
+  - MC timed out; some corners crashed or are non-physical (script issues).
+  - Proposed SPEC change-log entries P1–P4: in-loop A(v) gate for boost, booster current, β1 ≥ 0.83, Cs2 bottom-plate rest.
+- Next: reviewer on DESIGN.md (running). Then C1b: op-dump saturation margins, fp2 fix, gain boosters, script fixes. Any SPEC change needs the user's OK.
