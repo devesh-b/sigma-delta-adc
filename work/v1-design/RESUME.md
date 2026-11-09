@@ -322,3 +322,19 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - pytest design/tests: 49 pass, 1 fail (the G-M2 hand test, failing on the old table as intended). After regenerating, 50 pass.
 - gmid_table regenerated from `regr/tt/WO-15/gmid`. W/L at L 1 µm: OTA1 28.2, OTA2 ×2 17.5, OTA2 ×1.5 118.7. WO-16 item 1 done.
 - Remaining WO-16 items: smoke-test the new modes, then items 3–4 (reruns, fp2 window). Waiting for load < 4 unless the user says otherwise.
+
+## Update 2026-11-09 ~13:45 (smoke tests, run at load ~6.6 on user override)
+- Smoke results, `--null` N256 m2 unless noted (outputs in `regr/tt/WO-16-smoke`):
+  - O0 ACCEPT (4.642e-07).
+  - `--tmax-only O2` ACCEPT, same error, so tmax is converged.
+  - O1, O2, `gear+O1` and `--reltol-only O1` REJECT: timestep too small, singular matrix at bkp/bkn.
+  - Split: reltol 1e-4 alone and chgtol 1e-16 alone each pass; the combination fails. chgtol 1e-15 + reltol 1e-4 passes.
+  - The null ideal deck at reltol 1e-5 fails with trtol 1 or chgtol 1e-15. It passes only at chgtol 1e-14 + trtol 7.
+  - trap on the null deck: 6.7e-05, REJECT. This is why the base method is gear.
+  - Spec `--dc` deck m3 with the floor: INL 0.176 / 0.175 / 0.175 ppm at O0/O1/O2, all ACCEPT. The ladder works on the real deck.
+- Fix:
+  - `CHGTOL_FLOOR` 1e-15, chgtol ÷10 per step (commit after RESUME 1); D43c amended.
+  - The null deck is checked at O0/O1 only.
+  - pytest 50 pass. Broken copy (old ÷100) fails the ladder test.
+- Remaining WO-16: items 3–4 (about 30 reruns plus the fp2 sweep). Not started; waiting for load < 4 or a user go-ahead.
+- Note: the trap-vs-gear pair must use the spec deck, not null.
