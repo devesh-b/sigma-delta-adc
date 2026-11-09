@@ -620,3 +620,11 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
     - margins are thin: span 0.01 V, β1 0.001, GBW ~0;
     - no junction caps yet; ideal CMFB.
 - Next: reviewer on rev C, then WO-24 (C1b).
+- REVIEW-C1a-revC (d18f6e8): PROCEED TO C1b WITH CONDITIONS.
+  - RC-M1: precision A0 needs K_P base 10 plus D55.
+  - RC-M2: composite 1:32 references.
+  - RC-M3: per-mode broken copies, now CL-1d.
+  - Also CL-8 (vbpc boost increment) and D56.
+  - Real-load GBW is ~1.5× the 1.4 pF number, so fp2/GBW ≈ 1.5–3.1. C_FOLD_EXTRA stays 0 until gate B.
+- WO-24 (Opus) dispatched: sync, sweep, netlist, op/AC, first gate B point.
+- Pending user items after the WO-24 sweep: is D55's Cc 0.2 pF still needed; does CL-4 β1 become informational if missed.

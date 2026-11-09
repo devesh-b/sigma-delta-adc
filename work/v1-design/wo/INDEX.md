@@ -30,3 +30,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-21 C1a rev B (OTA1 note revision per REVIEW-C1a): dispatched 2026-11-09
 - WO-22 macro/model scans (single-pole GBW, pole order, boost A0 floor): dispatched 2026-11-09
 - WO-23 C1a rev C (A(v) tables through model INL, bias-diode fix, swing fix): dispatched 2026-11-09
+- WO-24 C1b part 1 (sync, precision A0 sweep, netlist generator, op/AC 9 PVT x 2, first gate B point): dispatched 2026-11-10
