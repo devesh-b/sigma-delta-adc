@@ -583,3 +583,8 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - GBW: rev C 26.5 MHz worst; pair 120/0.5 gives 26.9 MHz (β1 0.84); 160/0.5 breaks β1.
 - **User D54:** free route (120/0.5 pair plus fold-cap fp2 placement, gate B decides; current only as a fallback, with OK).
 - Run 3 (K_P 6, split sweep, tables) is running; a watcher is armed. Resume the WO-23 agent when it finishes.
+- Run 3 (K_P 6) done, still REJECT:
+  - load margins are now 0.004–0.05 V (positive, below 50 mV);
+  - 9 copies fail symmetry at 0.53–1.02 dB.
+- The agent was resumed to fix the margin (K_P 7–8), diagnose the symmetry issue, switch to the D54 120/0.5 pair, run table-INL and commit.
+- Watcher lesson: don't use pgrep inside an ssh watcher; it matches its own command line. Wait on EXIT markers only.
