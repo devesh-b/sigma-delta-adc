@@ -85,6 +85,8 @@ The top-level row is the user-approved interpretation of "all corners" (decision
 
 **GATE S → C:** S0–S7 all pass, the review shows no blocking findings, and the user OKs the frozen SPEC.
 
+**GATE S → C PASSED 2026-11-09** (D50). S0–S7 done; REVIEW-S7 + S7b: FREEZE; user OK; SPEC v1 tagged `spec-v1`. Stage C starts with C1 (OTA1 + CMFB).
+
 ---
 
 ## Stage C: component-level design (tier 2, then PEX per block)

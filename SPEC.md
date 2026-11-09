@@ -1,6 +1,6 @@
 # SPEC.md — tt-iadc design specification (incremental ΣΔ ADC, sky130A / Tiny Tapeout)
 
-Status: v1 spec, pre-silicon, freeze candidate. Rev 2026-11-09 (S7, WO-19): REVIEW-S7 edits E1-E24 applied, digital I/O table §3.8a added, no PGA in v1 (D14, D45h), CJC off-chip, corner set §6. §3.0 is authoritative; §2 and §3.1-§3.5 are informative history. Scope: the numbers you design each block to. Anchored on the
+Status: **SPEC v1 FROZEN 2026-11-09** (S7 passed, user OK, D50; git tag `spec-v1`). Changes after the freeze go only through the change log at the end of this file, each with a reason and a decision ID. Rev 2026-11-09 (S7, WO-19): REVIEW-S7 edits E1-E24 applied, digital I/O table §3.8a added, no PGA in v1 (D14, D45h), CJC off-chip, corner set §6. §3.0 is authoritative; §2 and §3.1-§3.5 are informative history. Scope: the numbers you design each block to. Anchored on the
 best-fit application (ratiometric temperature sensing) with secondary modes (DC/ratiometric
 monitoring, thermocouple/shunt (needs a PGA: stretch, not v1), analog entropy-source recovery). Pairs with
 PUBLICATION_PLAN.md (how it gets characterized) and iadc.py (the model that predicts these numbers).
@@ -364,3 +364,8 @@ transferred; input CM anywhere in 0…VREF); REF− = ua3 (D24). **Q2 → 4 MHz 
 fast / low-resolution mode** with its own INL target; precision specs gated at 0.25–2 MHz. **Q3 → shared Cs, no
 PGA in v1** (PGA ×2 moves to stretch). **Q6 → OTA A0 ≥ 80 dB.** **D17 (user D3) → option B (VREF 2.048 V, c1 0.125, k 0.5). D18 (user D4) → keep OTA chop paired with system chop.** Defaults accepted (D21): Vos 9 mV, order-1 characterization only, overload recovery.
 Cs 0.5 pF (D22), N 4096 precision (D23). REF− on ua3 (D24, user OK).
+
+## Change log (post-freeze)
+| Date | Section / row | Change | Reason | Decision |
+|---|---|---|---|---|
+| — | — | none yet | — | — |

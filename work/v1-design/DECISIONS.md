@@ -74,3 +74,4 @@
 - How it works: a replica bias current charges a ≈ 1 pF MIM cap to a VBG-derived threshold and is counted against the TT clock. f ∝ 1/(R·C) tracks the slew-setting I/C. A count of 0 means the bandgap did not start.
 - Runs only in calibration mode, off during conversions.
 - If added: one config bit plus a counter field in the status word (a golden v3 item) | user | manual only; unconditional | ≈ 2–3k µm² if built |
+| D50 | USER 2026-11-09: **SPEC v1 frozen; S → C gate passed.** Basis: REVIEW-S7 and S7b (verdict FREEZE), the freeze review report, 152 tests passing. From now on SPEC changes go only through the SPEC change log, with a reason and a decision ID. Stage C starts with C1 (OTA1 + CMFB) | user | further S-stage review | 0 |

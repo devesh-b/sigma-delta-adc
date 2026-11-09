@@ -143,17 +143,17 @@ How this project keeps the cost (agent tokens, sandbox time) low while staying r
 
 ---
 
-## 8. Open items before S7 (SPEC freeze)
+## 8. Status and open items
 
-- S5g/S5h are closed. Convergence (D43c) holds on every gated row. The slew bases and PM windows are restated at O2. OTA1 stays at 12.5 V/µs (D44).
-- Informational: the T4 101-point rerun at O2 (cubic residual). point.json does not yet record the solver options (REVIEW-S5h H-m7).
-- β2 / Cp_vg2 row (≤ 0.262 pF). C1 confirms it with `.op` Cgg.
-- S6 golden vectors:
-  - ideal-A;
-  - decimator output = bitstream-only u_hat with the sys sign;
-  - F7 mode tag, F8 forced y[0];
-  - cover the order-1 u_corr branch.
-- S7: reviewer pass, then the user's OK.
+- **SPEC v1 is frozen** and the S → C gate passed on 2026-11-09 (D50, tag `spec-v1`). SPEC changes go through the change log.
+- **Stage C order** is by risk:
+  - C1 OTA1 + CMFB;
+  - then C2 OTA2, C3 comparator, C4 switches/input, C6 bias (bandgap + trim), and the rest per PLAN.
+- **C1 key gate:** the transistor OTA1 inside the tier-1 loop.
+  - INL ≤ 1.333 ppm at 2 MHz;
+  - INL ≤ 5 ppm at 4 MHz boost (D48).
+- **Before C9:** golden vectors v3 (boost/trim, status word, read order).
+- **Conditional at C6:** the bias-readback oscillator (D49), if area allows.
 
 ---
 
