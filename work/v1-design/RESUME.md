@@ -497,3 +497,15 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - 0.94 µV governs.
   - Status reports the frame's boost/trim.
 - S7b edit agent dispatched. After it: coordinator check, then **ask the user for the final freeze OK**.
+- S7b edits done:
+  - commits 52842af, 0c0392d, 3427dc7; pytest 152 pass;
+  - stale-string greps all clear;
+  - OTA1 macro ε_dyn is now 4.3e-9 (static A0 term removed); its broken copies REJECT.
+- **Waiting on the user:**
+  - (1) final SPEC v1 freeze OK;
+  - (2) bias-readback oscillator: manual only, or a conditional C6 item.
+- After the OK, in order:
+  1. Mark SPEC v1-frozen and tag it.
+  2. S→C gate.
+  3. Golden v3, a C9 entry item.
+  4. Stage C starts with C1 (OTA).
