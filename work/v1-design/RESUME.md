@@ -544,3 +544,15 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - With the S4 A(v) shape (A0, −5, −10, −20 dB at 0 / 1.4 / 2.0 / 3.1 V), N 1024 INL is 5.37 ppm at 80 dB and still > 3.33 ppm. Flat A0 passes even at 60 dB.
   - So INL is set by the **A(v) droop shape**, not by A0 or N. The CL-1 "≈ 72 dB" premise holds only for a milder droop.
   - Likely restatement of CL-1: gate boost like precision, i.e. model INL with the **measured boost A(v) table** ≤ 5/1.5 ppm at N 1024. Present this to the user when WO-22 lands.
+- WO-21 rev B done (ca8a6f8):
+  - Sizes: pair 80/0.5, m_n 72/4, m_pl 80/4 plus CMFB 15/2, cascodes at L 2, tracking bias, m_pp gate at 0 V, 3.3 V NMOS vg switches.
+  - Spot results (9 PVT × 2 modes):
+    - A0: precision 79.6–82.3 dB (fs/125 base 0.4 dB short); boost 80.8–85.
+    - A(v) min, boost: 73.6 dB.
+    - GBW boost 26.5–41 MHz; PM 77–82°, fp2/GBW 3.8–6.
+    - Every device ≥ 0.09 V above Vdsat.
+    - β1 0.846.
+    - Fast mode ≈ 196 µA, because the bias legs are sized for 500 ns boost-toggle settling.
+- SPEC CL-4/5/6 applied, D52 (790c64a).
+- REVIEW-C1a-revB running. One question for the reviewer: can the 500 ns boost-toggle settling relax to "before the first valid pair"? D45(e) already flags that pair invalid, which would bring fast mode back to ≈ 189 µA.
+- The WO-22 sweeps are running (watcher armed).
