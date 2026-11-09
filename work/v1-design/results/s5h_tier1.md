@@ -131,3 +131,12 @@ INL ep ppm. PM is HAND: two-pole closed loop s^2 tau2 + s + K = 0, K = beta 2 pi
 - r2/r4 rows also run OTA2 GBW at 10 MHz (the SPEC floor); not stated above (H-m6).
 - OTA1-only direct points (2 MHz, sr2 unset): N1024 12.5 V/us O1/O2 0.098/0.101 (verdict 0.104), 13 V/us 0.082/0.083; N256 O2 12.5 → 0.359, 13 → 0.340. User kept 12.5 V/us (D44).
 - Reviewer gap jobs: OTA2 10.8 V/us N1024 O2 0.756 (under 1.333 share, ≥ 25 % margin direct); A′ N256 O1 c 0.403 / d 1.982 (gate 20); trap O1 vs gear O1 at r2 N1024 13.5: 0.253 vs 0.2595 (2.5 %).
+
+## Addendum 2: T4 rerun at O2 (2026-11-09)
+- **Run:** `r6_T4` at the S5F point (4 MHz, OTA2 GBW 20 MHz), N 1024, m 101, O2, deck timeout 14000 s, frozen copy `WO-16-t4-677b39f`, ngspice 2561 s.
+  - The first attempt was lost: the csv was truncated at 12.5 of 25.9 ms when the sandbox disk filled.
+- **Result:** INL 12.40 ppm, gain error −1.47e-4. Informational: this is the s5f ×1.5 characterisation point, not a gated row.
+- **Cubic-fit residual:** rms 2.72 ppm, max 9.14 ppm, lag-1 autocorrelation 0.96.
+  - The residual is **smooth and odd-symmetric** (at u = −1 … +1, every 10th point: −9.1, 4.0, 0.7, −2.4, −2.2, 0.0, 2.2, 2.4, −0.7, −4.0, 9.1).
+  - So the "jagged ~5 ppm" residual seen before was numerical (an O0 artefact, in line with REVIEW-S5h H-m1).
+  - At O2 what remains is a real higher-order (≈ 5th-order) odd nonlinearity of the slew/settling macromodel at this point.

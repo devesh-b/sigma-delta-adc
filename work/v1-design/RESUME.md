@@ -513,3 +513,7 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - Report published (private): https://claude.ai/artifact/X5CESjvvGW8y38bwR3F2oz
   - D49: the oscillator is a conditional C6 item.
 - **Waiting on the user's freeze OK.**
+- T4 rerun done:
+  - INL 12.40 ppm; cubic residual rms 2.72 / max 9.14 ppm;
+  - smooth, odd ≈ 5th-order shape (lag-1 autocorrelation 0.96), so the old "jagged" residual was an O0 artefact;
+  - informational, closed (s5h addendum 2); the csv has been deleted.
