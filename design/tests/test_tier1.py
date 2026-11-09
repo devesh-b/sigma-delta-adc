@@ -452,7 +452,7 @@ def test_gmid_min_wl_per_device_hand_values():
 def test_option_ladder_and_converge_rule():
     o0, o1, o2 = (P.option_ladder(k) for k in ("O0", "O1", "O2"))
     assert o0 == P.SPICE_OPTIONS_TIER1
-    assert abs(o1["reltol"] - o0["reltol"] / 10) < 1e-15 and o1["tmax_ns"] == o0["tmax_ns"] / 2 and abs(o1["chgtol"] / o0["chgtol"] - 0.01) < 1e-9
+    assert abs(o1["reltol"] - o0["reltol"] / 10) < 1e-15 and o1["tmax_ns"] == o0["tmax_ns"] / 2 and abs(o1["chgtol"] / o0["chgtol"] - 0.1) < 1e-9 and P.option_ladder("O2")["chgtol"] >= P.CHGTOL_FLOOR
     assert abs(o2["reltol"] - o0["reltol"] / 100) < 1e-15 and o2["tmax_ns"] == o0["tmax_ns"] / 4 and o2["trtol"] == 1.0 and o1["trtol"] == o0["trtol"]
     assert P.option_ladder("O1", "trap")["method"] == "trap"
     # tau floor: GBW 10 MHz, beta 0.84 -> tau 18.9 ns -> tmax <= 1.89 ns (O0 10 ns is untouched)
