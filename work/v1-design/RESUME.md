@@ -409,3 +409,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - F7 mode tag, F8 forced y[0];
   - order-1 u_corr branch.
 - Then S7 (reviewer pass, then user OK).
+- S6: WO-17 written and dispatched (Sonnet). Then acceptance on a frozen copy, then the reviewer, then S7.
