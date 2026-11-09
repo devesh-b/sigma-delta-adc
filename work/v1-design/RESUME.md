@@ -400,3 +400,12 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - SPEC text (H-M1 slew bases, H-m3/H-m4 PM windows, O2 evidence note);
   - s5h doc fixes (H-m1, H-m6, Q5);
   - T4 rerun (informational) still running.
+- **User: OTA1 SR option A (keep 12.5), recorded as D44.**
+  - SPEC restated at O2: slew bases, PM windows, converged-evidence note (e5603de).
+  - s5h doc fixes (f05db26). DESIGN_GUIDE updated.
+- **Next: S6** (golden vectors for C9):
+  - ideal-A;
+  - bitstream-only u_hat with the sys sign;
+  - F7 mode tag, F8 forced y[0];
+  - order-1 u_corr branch.
+- Then S7 (reviewer pass, then user OK).
