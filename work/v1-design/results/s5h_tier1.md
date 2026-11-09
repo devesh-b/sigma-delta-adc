@@ -19,7 +19,7 @@ Status: 4 of 4 items done except T4 (pending rerun `regr/tt/WO-16-t4-677b39f`).
 
 - **Which knob moves INL:** each of the two moves it alone, from 6.69 to about 17. Reltol 1e-3 -> 1e-4 gives +10.4 ppm with tmax at 10 ns; the tmax cap (here the tau floor, 10 ns -> 1.895 ns) gives +10.3 ppm at reltol 1e-3. The two do not add: together they give 17.28 (O1). The step to O2 then adds +1.5 ppm, all through reltol (rel_O1 -> rel_O2 +1.7; full_O1 -> full_O2 +1.5).
 - `r1_tmax_O1` and `r1_tmax_O2` are bit-identical (16.936...), because the 1.895 ns floor, not the 5 / 2.5 ns option, sets the cap at both levels. So the tmax half of the ladder has converged by O1 on this deck.
-- O0 is optimistic by a factor 2.8 on this row (6.69 vs 18.77). It matches s5f (6.70) and the s5g "tight" value (18.61) within 1 %.
+- O0 is unconverged on this row (6.69 vs 18.77 at O2): its signed INL is jagged noise, while O1/O2 give a smooth odd S-curve, and the gain error doubles. Across rows the O0 error has either sign (high-INL 4 MHz rows rise at O2, low-INL 2 MHz rows fall), so O0 is not systematically optimistic (REVIEW-S5h H-m1). It matches s5f (6.70) and the s5g "tight" value (18.61) within 1 %.
 - trap vs gear at O1: 18.59 vs 17.28 (trap +7.6 %). The O2 gear value (18.77) is above both, so method is not the dominant uncertainty, but the 7.6 % gap is of the same order as the O1->O2 step (8.6 %).
 - Rule on this row, gate 20 (N 256 fast): d = 1.494, allowance 1.877 -> converged; verdict **20.27 ppm > 20, FAIL by 1.4 %**. This is the s5f x1.5 15 MHz base-GBW row, a characterisation row; the SPEC evidence row is the D39 boosted point (section 5), which passes.
 
@@ -60,7 +60,7 @@ Knee = SR at which INL crosses 1.333 (linear interpolation of the O2 points, as 
 - N1024 is the gated N. The directly measured 25 % check is V4m (OTA2 10.8 V/us = 13.5 / 1.25) at N 4096: 0.339 ppm vs 1.333 (section 4). A direct N1024 point at 10.8 V/us was not run.
 - At N 256 the O2 curve sits 13-25 % below the s5d numbers (opposite to the r1 direction), and 13.5 V/us stays below the 25 % rule (needs about 15.4 for knee 12.3). Characterisation only.
 
-**OTA1 (r3, SR2 13.5 V/us fixed), O2 only**
+**OTA1-only (r3: sr2 unset, so OTA2 runs at max(sr, 25 V/us), GBW2 = GBW1 = 10 MHz, gen_tier1.py:256-257), O2 only**
 | N | 9.5 | 10 | 10.5 | knee O2 | s5d knee | margin at 12.5 | SR1 required for 25 % |
 |---|---|---|---|---|---|---|---|
 | 256 | 5.703 | 2.449 | 1.176 | 10.44 | 10.0 | 19.7 % | 13.05 |
@@ -75,7 +75,7 @@ Knee = SR at which INL crosses 1.333 (linear interpolation of the O2 points, as 
 | V4m OTA2 10.8 V/us, N4096 | 1.333 | 0.579 (s5f) | **0.339** | 3.9x |
 | A' (c) cold N1024 (30/34 MHz, 25/27 V/us) | 5 | 0.880 default / 0.188 tight (s5g) | **0.144** | 35x |
 | A' (d) hot N1024 (20/22.5 MHz, 25/27) | 5 | 1.079 default / 1.375 tight | **1.450** | 3.4x |
-| xcheck A60_base (deck vs model, O1) | rel_sym <= 5 % | deck 3.99, model 3.09 (rev) | deck 3.993, model 3.991, rel_sym 0.064 %, ratio 1.0006, 4 checks true, ok | n/a (O1 only) |
+| xcheck A60_base (deck vs model, O1) | rel_sym <= 5 % | deck 3.99 (S5b), S5b pre-Ck-fix model 3.09 | deck 3.993, model 3.991, rel_sym 0.064 %, ratio 1.0006, 4 checks true, ok | n/a (O1 only) |
 - V4/V4m drop by 43 % and 41 % at O2; they have no O1 sibling. Pass with margin larger than any O1->O2 step seen (<= 9 %).
 - A'(d) hot rises to 1.450 (from tight 1.375, +5 %); this is the smallest margin of the A' rows (3.4x), still passing.
 - xcheck note: `model_inl` printed in the json is 3.9907, whereas the review column holds `rev_model_inl` 3.09; I report the json fields as read, and the agreement of deck and model (3.993 vs 3.991) is a property of this run's model value.
@@ -123,6 +123,11 @@ INL ep ppm. PM is HAND: two-pole closed loop s^2 tau2 + s + K = 0, K = beta 2 pi
 - T4 101-point cubic residual at O2: pending rerun.
 - No direct points at OTA1 12.5-13 V/us, or OTA2 at 10.8 V/us N1024, so the margins above rest on interpolation / extrapolation.
 - O2-only rows (r3, r4, r5, r2 N256) have no O1 pair; convergence for them is inferred from the paired rows (steps <= 9 %).
-- The r1 shows a +10 ppm jump at O0 -> O1 from either knob; O0 numbers remain unreliable wherever they are still cited (older N256 rows).
+- The r1 shows a +10 ppm jump at O0 -> O1 from either knob; O0 numbers are unconverged (either sign) and are no longer cited; SPEC rows now cite O2 values.
 - fp2 O2 coverage: only x3, x30 (both OTAs) and OTA2 x1.5; no O2 point at OTA1 x2/x4 around the OTA1 minimum.
-- Unresolved: why the xcheck json `rev_model_inl` (3.09) differs from `model_inl` (3.9907); not investigated.
+- Resolved (REVIEW-S5h Q5): `rev_model_inl` 3.09 is the hard-coded S5b model value from before the Ck fix (`REV["A60_base"][3]`, tier1_tb.py:390), never gated; the current model gives 3.991.
+
+## Addendum 2026-11-09 (after REVIEW-S5h)
+- r2/r4 rows also run OTA2 GBW at 10 MHz (the SPEC floor); not stated above (H-m6).
+- OTA1-only direct points (2 MHz, sr2 unset): N1024 12.5 V/us O1/O2 0.098/0.101 (verdict 0.104), 13 V/us 0.082/0.083; N256 O2 12.5 → 0.359, 13 → 0.340. User kept 12.5 V/us (D44).
+- Reviewer gap jobs: OTA2 10.8 V/us N1024 O2 0.756 (under 1.333 share, ≥ 25 % margin direct); A′ N256 O1 c 0.403 / d 1.982 (gate 20); trap O1 vs gear O1 at r2 N1024 13.5: 0.253 vs 0.2595 (2.5 %).
