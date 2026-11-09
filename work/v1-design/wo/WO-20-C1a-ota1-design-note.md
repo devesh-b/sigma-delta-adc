@@ -39,7 +39,7 @@ The note has these sections:
    - **CMFB loop:** SC CMFB cap values, its loop GBW/PM, and absorbing the per-cycle CM charge to ≤ 10 mV in 0.2·t_half. Start-up from either rail.
    - **Device stress:** list every node at power-up, reset, boost toggle and 1.1·VREF overload; give the protection-cascode bias.
    - **Current:** OTA1 share against the D41/D42 budget (precision ≈ 106–113 µA total, fast ≈ 189 µA worst after trim), base and boost.
-   - **Offset 3σ:** Pelgrom estimate from sky130 mismatch, against ≤ 9 mM 3σ.
+   - **Offset 3σ:** Pelgrom estimate from sky130 mismatch, against ≤ 9 mV 3σ.
 3. **Expected-values table:** every SPEC OTA1 row, with the hand value, the margin, and the corner where it binds.
 4. **Testbench plan** (C1b), per SPEC row:
    - list each tb: op dump, AC, step diagnostic (D48 A definitions), slew, noise, MC offset, CMFB loop, device stress, and current;
