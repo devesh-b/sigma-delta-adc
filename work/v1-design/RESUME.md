@@ -596,3 +596,14 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - The CL-1b broken copy (m_pl L 0.5) is blind (3.02 < 3.33). A PMOS-cascode short copy was added. A CL-1b amendment is proposed and needs the user.
 - Run 4 (K_P 7, pair 120/0.5, vntol fix, new mutant) is running in steps `tab_{2,3|4,0|1|5,6|7,8}.log`; a watcher is armed. Then resume the agent.
 - **Likely user question:** if precision A0 stays below 80 dB while table-INL passes with large margin, either keep 80 dB (next lever: m_plc L 4 + Cc 0.2 pF) or make A0 a health row in precision too.
+- WO-23 run 4:
+  - K_P 7 margins 0.043 / 0.049 V at cold base, so run 5 uses split bias (K_P 8 base / 7 boost).
+  - Span at hot boost 1.41–1.50 V.
+  - Pair 120/0.5: GBW worst 27.0 MHz (fs/125), β1 0.831–0.846.
+  - Precision A0 at K_P 8: 79.5–81.4 dB.
+  - Rev C interim commit 289aec7.
+- **User D55:** keep precision 80 dB and apply m_plc L 4 + Cc 0.2 pF. CL-1c: the broken copy is now a PMOS cascode short (f88de79).
+- Run 5 (final tables) is running; a watcher with a marker file is armed.
+- Plan:
+  1. resume the WO-23 agent only to wrap up run 5 (INL + commit);
+  2. then a fresh WO-24 = C1b: m_plc fix (item 0) + netlist + full 45 PVT tbs + gate B. That agent's context is large (~200k tokens), so start fresh.
