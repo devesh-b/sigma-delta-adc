@@ -27,3 +27,5 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-18 S6b golden v2 (D45 conventions, control trace, edge streams, REVIEW-S6 mutants): dispatched 2026-11-09
 - WO-19 S7 SPEC freeze edits (E1-E24, digital I/O 16-bit bus, step-gate threshold): dispatched 2026-11-09
 - WO-20 C1a OTA1 + CMFB design note (block recipe step 1; reviewed before schematic): dispatched 2026-11-09
+- WO-21 C1a rev B (OTA1 note revision per REVIEW-C1a): dispatched 2026-11-09
+- WO-22 macro/model scans (single-pole GBW, pole order, boost A0 floor): dispatched 2026-11-09

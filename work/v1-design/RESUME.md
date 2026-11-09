@@ -533,3 +533,9 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - MC timed out; some corners crashed or are non-physical (script issues).
   - Proposed SPEC change-log entries P1–P4: in-loop A(v) gate for boost, booster current, β1 ≥ 0.83, Cs2 bottom-plate rest.
 - Next: reviewer on DESIGN.md (running). Then C1b: op-dump saturation margins, fp2 fix, gain boosters, script fixes. Any SPEC change needs the user's OK.
+- REVIEW-C1a (0631fb0): REVISE NOTE FIRST. The A0 failure is headroom (m_pl in triode); fp2 10–12× GBW puts fast 5 ppm at risk; the cascode bias, clamp and input chopper are wrong.
+- User D51: P1 accepted (boost A0 floor from scan), P2 rejected, fast-mode 5 ppm is a must (gm first), P3/P4/P5 accepted → SPEC change log CL-1 to CL-4 (e1fa63c, 659425e).
+- Dispatched:
+  - WO-21 (Opus): note rev B;
+  - WO-22 (Sonnet): GBW sweep, pole-after-tanh, A0 floor.
+- Next: WO-23 = fixed tb tooling and re-spot at 45 PVT × 2 with the rev B sizes, then reviewer.
