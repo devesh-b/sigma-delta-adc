@@ -391,3 +391,12 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - Neighbours at O2: N1024 10 → 1.925, 10.5 → 0.859.
   - Moving from 12.5 to 13 V/µs gains only 0.02 ppm.
   - **Waiting on the user: A (keep 12.5) or B (13).**
+- Reviewer gap jobs, all closed:
+  - **OTA2 at 10.8 V/µs, N1024, O2: 0.756 ppm**, under the 1.333 share. So 13.5 has ≥ 25 % margin at the gated N, measured directly.
+  - **A′ N256 at O1:** c 0.403, d 1.982 against a gate of 20, ≥ 10× under. Below 6.7, so no O2 run needed. H-m2 closed.
+  - **trap vs gear at O1, r2 N1024 13.5:** 0.253 vs 0.2595 (2.5 %). D43c trap/gear check closed for 2 MHz.
+- Left before S7:
+  - the user's OTA1 SR decision;
+  - SPEC text (H-M1 slew bases, H-m3/H-m4 PM windows, O2 evidence note);
+  - s5h doc fixes (H-m1, H-m6, Q5);
+  - T4 rerun (informational) still running.
