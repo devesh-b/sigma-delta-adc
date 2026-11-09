@@ -475,3 +475,17 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   2. WO-19 + INDEX + RESUME;
   3. the WO-19 agent's commits (file lists in its report).
 - Then: reviewer re-check of the S7 edits, then the user's final OK → mark SPEC v1-frozen → S→C gate.
+- WO-19 done:
+  - commits b3b9ea1, 335e960, b9fab0e, 9a15258, e5546f8; pytest 152 pass;
+  - §3.8a digital I/O: 16-bit bus, ui_in fully allocated, 48 MHz fs_div table.
+  - Flag: the step-gate OTA1 ε is an identical 1.6e-8 at 2 MHz and 4 MHz, against the hand estimate of 6e-5. Suspected numerical floor, being re-checked.
+- D47 (5912796):
+  - no extra analog pin;
+  - trim volatile, stored in RP2040 flash, manual calibration;
+  - the bias-readback oscillator is pending the user's choice.
+- Pin pricing fixed (0b13d9a): €40 for pins 1–2, €100 after, so 4 pins = €280 and the total is about €560.
+- Reviewer S7b re-check running → then the user's final OK to freeze.
+- Golden v3 items queued for before C9:
+  - boost/trim config;
+  - status word / overrun;
+  - readout word order.
