@@ -104,7 +104,7 @@ Blocks are ordered by risk. Each one follows the same **block recipe**:
 
 | ID | Block | Key gated metrics (SPEC §3) | Broken copy that must REJECT |
 |---|---|---|---|
-| C1 | **OTA1 + CMFB (critical)** | A0 ≥ 80 dB (≥ 75 dB for |Vout,diff| ≤ 1.4 V), gain vs output swing (a0_drop), loaded GBW ≥ 10 MHz (20 target; boost 20 MHz), PM informational (step settling is the gate, SPEC §3.0: |ε(t_half)| ≤ 6e-5, ε_NL ≤ 6e-5), slew ≥ 12.5 V/µs (boost 25), `.noise` white and 1/f corner, offset MC, CMFB loop PM and CM accuracy, current | input pair halved (noise), cascode removed (gain) |
+| C1 | **OTA1 + CMFB (critical)** | A0 ≥ 80 dB (≥ 75 dB for |Vout,diff| ≤ 1.4 V), gain vs output swing (a0_drop), loaded GBW ≥ 10 MHz (20 target; boost 20 MHz), PM informational (the in-loop gate (B), transistor OTA1 in the tier-1 deck, is authoritative for INL, SPEC §3.0, D48(1); the step tb is a report-only diagnostic: health check |ε_dyn| ≤ 1e-4, watch level ε_NL ≤ 3e-7), slew ≥ 12.5 V/µs (boost 25), `.noise` white and 1/f corner, offset MC, CMFB loop PM and CM accuracy, current | input pair halved (noise), cascode removed (gain) |
 | C2 | OTA2 + CMFB | relaxed A0 and noise per S3 | — same recipe |
 | C3 | StrongARM comparator + latch | offset 3σ ≤ budget (Paul `comp_mc.py`), decision time < 0.3·t_half, kickback onto the integrator node, metastability at 4 MHz | latch tail starved |
 | C4 | Switches, bottom-plate sampling, non-overlap clock generator | TG Ron vs signal at corners, settling τ ≤ 0.2·t_half, charge-injection offset, non-overlap ≥ min at all corners and 4 MHz | phases overlapping |
@@ -112,7 +112,7 @@ Blocks are ordered by risk. Each one follows the same **block recipe**:
 | C6 | Bias / startup | currents across PVT, startup from 0 V ramp (Paul's cold-start ALIVE) | startup device removed |
 | C7 | Level shifters 1.8 ↔ 3.3 V | delay, duty, VDPWR/VAPWR ramp order | — |
 | C8 | Reference input and decap, internal-short mux | settling τ_ref, short-mode leakage | — |
-| C9 | Digital: CoI decimator, config, chop sequencer, shift-out (RTL) | cocotb bit-exact against S6 golden vectors for every mode; `rtl-verification-engineer` plan; mutation testing; LibreLane hardened, STA clean at all digital corners | mutants (acc width, off-by-one N, sign) caught |
+| C9 | Digital: CoI decimator, config, chop sequencer, 16-bit parallel read bus (D46b) (RTL) | cocotb bit-exact against S6 golden vectors for every mode; `rtl-verification-engineer` plan; mutation testing; LibreLane hardened, STA clean at all digital corners | mutants (acc width, off-by-one N, sign) caught. **Entry gate: golden v3 (G3 items 1-4 + D48(4): status reports the frame's boost/trim)** |
 | C10 | Caps (MIM unit arrays) | ratio accuracy (c1, c2) and parasitic Cp/Cs from PEX vs S3 budget | — |
 
 **GATE C → V:** every block `ACCEPT` at 45 PVT + MC on **schematic and PEX**. The tier-0 re-run with extracted worst-corner parameters passes every system spec, and every broken copy `REJECT`s. Reviewer sign-off per block.
@@ -129,7 +129,8 @@ Blocks are ordered by risk. Each one follows the same **block recipe**:
 | V4 | **Mode matrix:** order 1/2 × chop off/OTA/system × N ∈ {64, 256} × internal short, nominal only | tt/27/3.3 | each mode produces the S6-expected code within tolerance |
 | V4a | **OTA-only chop (D45 g, D46a):** (ota_en 1, sys_en 0) transistor-level at N 256, nominal; reads lf·Vos1/(N−1) directly. Also the reset-settling gate: r ≤ 1e-4 within 2 fs cycles at 4 MHz boost and at the slowest corner | tt/27/3.3 + ss/−40, ss/100 | residue measured and inside the SPEC bound; broken copy: reset window 1 cycle ⇒ REJECT |
 | V4b | **Bias-trim calibration (D47, indirect):** sweep trim 0–7 in fast mode (4 MHz, boost, N 1024), inputs −0.9 / 0 / +0.9 FS; pick the lowest code with 3-point bow and gain error within 10 % of the plateau | tt, ss, ff at 27 | knee resolvable (INL falls monotonically with code to a plateau); broken copy: one trim leg open ⇒ non-monotone ⇒ REJECT |
-| V3b | **OTA-only characterisation (D45 g) and fast-mode INL (D28):** V3 at 4 MHz boost for N 256 and N 1024 | extremes per §6 | INL ≤ 20 / 5 ppm |
+| V3b | **Fast-mode INL (D28)** (OTA-only chop is V4a): V3 at 4 MHz boost for N 256 and N 1024 | extremes per §6 | INL ≤ 20 / 5 ppm |
+| V3c | **In-loop transistor OTA gate (B) (D48(1)):** transistor OTA1 (OTA2 behavioural), then transistor OTA2 (OTA1 behavioural) in the tier-1 deck, N 1024, 2 MHz and 4 MHz boost | tt/27/3.3 and ss/−40/3.0 | OTA1: INL ≤ 1.333 ppm (2 MHz) / ≤ 5 ppm (boost), O1/O2 converged; OTA2: same limits (reference); broken copy: OTA1 tail set for 9.5 V/µs ⇒ REJECT |
 | V5 | **Mixed-signal:** transistor-top bitstream → RTL decimator (cocotb / d_cosim) → same result as Python reconstruction | tt + 1 extreme | bit-exact |
 | V6 | **Top PEX acceptance** (Paul's `top_tb.py` pattern): V2 + V3 on the extracted top | extremes per §6 (6–8 points, D2/F10) | same pass criteria; documented gate rationale (measured min − margin, far from failure signatures) |
 | V7 | **Non-vacuity suite:** broken tops (DAC polarity flipped, OTA gain −20 dB, chop sequencer stuck, clock overlap, VREF pin open) | tt | every one `REJECT` |

@@ -218,3 +218,91 @@ Macromodel: gen_tier1 v2 elements (diff gm, tanh tail-current slew, loaded C_L, 
 - Section 4 fast-mode evidence numbers (3.29/3.36, 0.144/1.450, 0.403/1.982) are copied from REVIEW-S7 section 4 without their exact labels; the reviewer should confirm which job each belongs to.
 - C1 transistor limits (6e-5; OTA2 = macro limits) and the section 3.8a register map, fs_div table, status word and debug bus are proposals for coordinator and reviewer review.
 - Not done: E-edit wording was written from the summary, not the reviewer transcript.
+
+## S7b (REVIEW-S7b small edits, D48; WO: apply S7b edits)
+
+Old → new for each edit (long rows abridged to the changed text). Code: `design/tier1/step_settle.py` and `design/tests/test_tier1.py` (commit 52842af).
+
+1. **1 OTA1 row step gate** (`SPEC.md`)  
+   old: `**Definitions (S7-M1):** h = 0.5/fs (half period), g = 0.025/fs (non-overlap), the step is applied at the start of the phase and the error is read at t = h − 2g = t_half (225 ns at 2 MHz, 112.5 ns at 4 MHz). ε(t_half) = 1 − vo(t_half)/step (dynamic residue only, A0 → ∞); ε_NL = max deviation of vo(t_half) from a least-squares line over steps 0.1–1.0 × max, divided by the max step. **Gate: |ε| ≤ ε_macro and ε_NL ≤ ε_NL,macro.** Tier-1 macromodel (OTA 12.5 V/µs / 10 MHz, β 0.84, C_L 1.4 pF at 2 MHz; 25 V/µs / 20 MHz at 4 MHz boost): measured ε 1.6e-8, ε_NL 4.6e-10 (both points), so limits ε_macro = 4e-8, ε_NL,macro = 1e-9 (2 ×, job `design/tier1/step_settle.py`, WO-19; broken copies GBW/2 and ...`  
+   new: `**Definitions (S7-M1, S7b):** h = 0.5/fs, g = 0.025/fs, t_half = h − 2g (225 ns at 2 MHz, 112.5 ns at 4 MHz). **(B) In-loop gate, authoritative for INL (D48(1) option 2):** transistor OTA1 in the tier-1 deck (OTA2 behavioural), N 1024, 2 MHz ≤ 1.333 ppm and 4 MHz boost ≤ 5 ppm, O1/O2 converged, at tt/27 and ss/−40/3.0. Broken copy: tail set for 9.5 V/µs ⇒ REJECT. **(A) Step tb (report-only diagnostic, `design/tier1/step_settle.py`):** steps ±{0.1…1.0} × 0.486 V (= c1(u_max + 1)·VREF) from x1 = 0 and from ±0.72 V; ε_dyn(a) = (vo(t_half + 10τ) − vo(t_half))/a, referenced to the late value so A0 and static gain error drop out; ε_NL = max deviation of a·ε_dyn(a) from its LSQ line, divided by 0.486 V. Health check |ε_dyn| ≤ 1e-4; watch level ε_NL ≤ 3e-7 (≈ 1.333/(1.9·2): the worst-case input-referred INL is 1.9·ε_NL, slot averaging takes off 2–4×; gating it would need ≳ 14 MHz GBW, so it is n...`
+2. **1 OTA2 row step gate** (`SPEC.md`)  
+   old: `gate = closed-loop step settling at β2, both modes, same h, g, ε, ε_NL definitions as the OTA1 row; worst step (loop bound) = c2·|x1|max + (Ck2/Cint2)·VREF = 0.5·1.21 + 0.25·2.048 ≈ 1.12 V diff, slewing since it exceeds SR·τ ≈ 0.43 V. Tier-1 macromodel (13.5 V/µs / 10 MHz at 2 MHz; 27 V/µs / 22.5 MHz at 4 MHz, β2 0.497, C_L 0.7 pF): ε 6.8e-4 / 3.0e-4, ε_NL 1.2e-4 / 6.1e-5, limits (2 ×) ε_macro 1.4e-3 / 6e-4, ε_NL,macro 2.5e-4 / 1.3e-4, C1 limit = the same numbers (open: the 1.12 V bound is not a typical step; coordinator may restate on a typical step)`  
+   new: `gate = closed-loop step settling at β2, both modes, same h, g, t_half and the ε_dyn definition (late-value reference, 10τ) as the OTA1 row (A); start states x2 = 0 and ± half the x2 peak (≈ ±0.6 V diff); worst step (loop bound) = c2·|x1|max + (Ck2/Cint2)·VREF = 0.5·1.21 + 0.25·2.048 ≈ 1.12 V diff, slewing since it exceeds SR·τ ≈ 0.43 V; a typical ≈ 0.5 V step is informational only. Tier-1 macromodel (13.5 V/µs / 10 MHz at 2 MHz; 27 V/µs / 22.5 MHz at 4 MHz, β2 0.497, C_L 0.7 pF): ε_dyn 6.8e-4 / 3.0e-4, ε_NL 1.2e-4 / 6.1e-5 (report-only); limits (2 ×) on ε_dyn: ε_macro 1.4e-3 / 6e-4; C1 limit = the same ε_dyn numbers on the 1.12 V step. **Plus (B)** as a V-row: transistor OTA2 in the in-loop tier-1 deck (OTA1 behavioural or transistor), N 1024, as the OTA1 (B) INL limits, with the same pass numbers used as the reference for the transistor OTA2`
+3. **3 provenance l.127** (`SPEC.md`)  
+   old: `N 1024 3.29 / 3.36 ppm (verdict 3.43 ppm), A′ 0.144 / 1.450 ppm, N 256 0.403 / 1.982 ppm (figures as listed in REVIEW-S7 §4; job names in `results/s5h_tier1.md`)`  
+   new: `D39 control (option-A point, OTA2 20.25 V/µs ≤ A′ 27, conservative): 3.29 / 3.36 ppm O1 / O2, verdict 3.43 ppm; A′ N 1024 (c) cold / (d) hot 0.144 / 1.450 ppm, O2 only; A′ N 256 cold / hot 0.403 / 1.982 ppm, O1 only (gate 20) (labels per REVIEW-S7b m2; job names in `results/s5h_tier1.md`)`
+4. **4 l.216 50 µV** (`SPEC.md`)  
+   old: `sys-only meets 50 µV even at lf 9.3`  
+   new: `sys-only meets the ≤ 2.5 µV @15 SPS target even at lf 9.3`
+5. **4 l.230** (`SPEC.md`)  
+   old: `each word carries chop sign`  
+   new: `each frame carries (tag word) chop sign`
+6. **4 3.7a(c) valid pin** (`SPEC.md`)  
+   old: `The `valid` pin = data-ready strobe for a complete frame.`  
+   new: ``frame_ready` (status[15]; debug uo[2]) marks a complete frame.`
+7. **4 l.22** (`SPEC.md`)  
+   old: `**External / ratiometric only**, no bandgap in v1`  
+   new: `**External / ratiometric only**, no on-chip voltage reference; bandgap-type bias current only (C6)`
+8. **4 3.7a(i) duplicate hold rule** (`SPEC.md`)  
+   old: ` and 0 throughout the reset window (c = 0, 1); it is held at 0 throughout the reset window (rule 7)`  
+   new: ` and 0 throughout the reset window (c = 0, 1) (rule 7)`
+9. **4 §1 noise** (`SPEC.md`)  
+   old: `noise ota+sys 0.71 µV @15 SPS`  
+   new: `noise 0.94 µV @15 SPS governs (joint model, §3.0); 0.71 µV is the kT/C-only Cs-row value`
+10. **5 m6** (`SPEC.md`)  
+   old: `a logic analyser samples the bit stream on the rising edge of the fs bit clock.`  
+   new: `y changes on the **falling** edge of the exported bit clock (half an fs period of setup), so a logic analyser samples the bit stream on the rising edge of the fs bit clock.`
+11. **5 m7** (`SPEC.md`)  
+   old: ``rd` frame-ack: a rising edge clears frame_ready and overrun.`  
+   new: ``rd` frame-ack: `rd` goes through a 2-FF synchroniser and a rising-edge detect; the edge clears frame_ready and overrun **only if frame_ctr is unchanged since the last status read** (otherwise a load between the status read and the rd edge would clear a new, unread frame; in that case the clear is suppressed and the new frame stays flagged).`
+12. **5 m8** (`SPEC.md`)  
+   old: `Slot lengths at N 4096: 2.05 ms (2 MHz), 16.4 ms (0.25 MHz).`  
+   new: `Slot lengths at N 4096: 2.05 ms (2 MHz), 16.4 ms (0.25 MHz). **The host must read every frame** (PIO/DMA, or N ≥ 1024 with MicroPython at 4 MHz): a host whose read takes 1–2 slots can end up reading only even or only odd slots, which gives no complete chop pairs.`
+13. **5 m9 status** (`SPEC.md`)  
+   old: `[12] boost (active), [11:9] trim (active), [8] 0,`  
+   new: `[12:9] boost and trim **of the frame in the hold register** (boost = [12], trim = [11:9], latched with the hold register, D48(4)), [8] 0,`
+14. **5 G3 item 6** (`SPEC.md`)  
+   old: `5. The OTA-only chop mode vectors already exist`  
+   new: `6. Status word [12:9] reports the boost/trim of the frame in the hold register (D48(4)): vectors carry the per-frame boost/trim.
+5. The OTA-only chop mode vectors already exist`
+15. **2 PLAN C1** (`work/v1-design/PLAN.md`)  
+   old: `PM informational (step settling is the gate, SPEC §3.0: |ε(t_half)| ≤ 6e-5, ε_NL ≤ 6e-5)`  
+   new: `PM informational (the in-loop gate (B), transistor OTA1 in the tier-1 deck, is authoritative for INL, SPEC §3.0, D48(1); the step tb is a report-only diagnostic: health check |ε_dyn| ≤ 1e-4, watch level ε_NL ≤ 3e-7)`
+16. **2 PLAN C9 title** (`work/v1-design/PLAN.md`)  
+   old: `config, chop sequencer, shift-out (RTL)`  
+   new: `config, chop sequencer, 16-bit parallel read bus (D46b) (RTL)`
+17. **2 PLAN C9 gate** (`work/v1-design/PLAN.md`)  
+   old: `mutants (acc width, off-by-one N, sign) caught |`  
+   new: `mutants (acc width, off-by-one N, sign) caught. **Entry gate: golden v3 (G3 items 1-4 + D48(4): status reports the frame's boost/trim)** |`
+18. **2 PLAN V3b title** (`work/v1-design/PLAN.md`)  
+   old: `| V3b | **OTA-only characterisation (D45 g) and fast-mode INL (D28):** V3`  
+   new: `| V3b | **Fast-mode INL (D28)** (OTA-only chop is V4a): V3`
+19. **2 PLAN new V-row V3c** (`work/v1-design/PLAN.md`)  
+   old: `(none)`  
+   new: `| V3c | **In-loop transistor OTA gate (B) (D48(1)):** transistor OTA1 (OTA2 behavioural), then transistor OTA2 (OTA1 behavioural) in the tier-1 deck, N 1024, 2 MHz and 4 MHz boost | tt/27/3.3 and ss/−40/3.0 | OTA1: INL ≤ 1.333 ppm (2 MHz) / ≤ 5 ppm (boost), O1/O2 converged; OTA2: same limits (reference); broken copy: OTA1 tail set for 9.5 V/µs ⇒ REJECT |`
+20. **6 DECISIONS D6 append** (`work/v1-design/DECISIONS.md`)  
+   old: `irst-cut scope cuts (ROADMAP/SIZING) | x1–x8 in v1 | cheap |`  
+   new: `rst-cut scope cuts (ROADMAP/SIZING) | x1–x8 in v1 | cheap (Superseded by D14.) |`
+21. **6 DECISIONS D28 append** (`work/v1-design/DECISIONS.md`)  
+   old: `m at 20 MHz | 10 MHz + 100 ppm; bias-boost bit | cheap now |`  
+   new: ` at 20 MHz | 10 MHz + 100 ppm; bias-boost bit | cheap now (Superseded by D31, then D39, then D41.) |`
+22. **6 DECISIONS D31 append** (`work/v1-design/DECISIONS.md`)  
+   old: ` | always-on 20 MHz (+45 µA); 10 MHz + 100 ppm | cheap now |`  
+   new: `| always-on 20 MHz (+45 µA); 10 MHz + 100 ppm | cheap now (198 µA figure superseded by D41: 172 µA fast.) |`
+23. **6 DECISIONS D39 append** (`work/v1-design/DECISIONS.md`)  
+   old: `BW rows only | cheap now; leakage limits checked in C4 PEX |`  
+   new: `W rows only | cheap now; leakage limits checked in C4 PEX (b: superseded by D41, option A′.) |`
+24. **6 DECISIONS D43 append** (`work/v1-design/DECISIONS.md`)  
+   old: `1–G-M3, Q1–Q3 | PM ≥ 60° only; tail-only switching | cheap |`  
+   new: `–G-M3, Q1–Q3 | PM ≥ 60° only; tail-only switching | cheap (a: PM windows superseded by D44.) |`
+
+### Code (m1)
+- `step_settle.py`: ε_dyn from the late value vo(t_half + 10τ) (4.3e-9 OTA1 both points, was 1.6e-8 with the A0 = 1e8 static term; OTA2 6.78e-4 / 2.96e-4 unchanged), start states 0 and ±x0 (OTA1 0.72, OTA2 0.6 V assumed = half the x2 peak ≈ 1.2 V; the macromodel is shift-invariant so the states do not change its numbers), ε_NL report-only ("below solver floor" under 1.2e-8), reltol/10 rerun agreement ≤ 10 % (OTA1 4.293/4.290e-9, OTA2 6.780/6.781e-4: pass), broken-copy discrimination on ε_dyn only: OTA1 limit 1e-8 (GBW/2 6.4e-5 REJECT, SR/2 6.0e-8 REJECT), OTA2 2× macro limits 1.4e-3 / 6e-4 unchanged (GBW/2 2.3e-2 / 1.4e-2, SR/2 8.5e-3 / 5.6e-3 REJECT).
+- pytest on the sandbox (model/tests + design/tests): 152 passed in 63 s. Raw logs stay on the sandbox in /home/mempool/regr/tt/S7b (no csv written).
+
+### Not applied / notes
+- SPEC (B) for OTA2 is worded as a V-row with the OTA1 INL limits as reference numbers; the REVIEW gives no separate OTA2 INL limits, so coordinator to confirm. PLAN row is V3c (new).
+- DECISIONS notes were appended inside the last cell of each row (end of row), nothing else changed.
+- OTA2 start state ±0.6 V is an assumption (x2 peak not stated numerically in the spec).
+
