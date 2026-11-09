@@ -254,6 +254,7 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False, x
     S = np.zeros(B)
     sumS = np.zeros(B)
     xm1 = xm2 = 0.0
+    ys = []                      # S6: per-cycle quantiser decisions (+/-1), exposed via return_state
     xsw = p.vlin_diff / p.vref if p.vlin_diff > 0 else p.xswing
     e2_off = (p.vos2 + p.x1_offset) / p.vref      # 0.0 => skipped (bit-identical)
 
@@ -263,6 +264,7 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False, x
         if p.comp_noise:
             dec = dec + p.comp_noise * rng.standard_normal(B)
         y = np.where(dec >= 0, 1.0, -1.0)
+        ys.append(y)
         sumS += S
         S += y
 
@@ -325,7 +327,7 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False, x
         return u_hat, {"u_corr": u_corr, "x1max": xm1, "x2max": xm2,
                        "x1max_v_side": 0.5 * xm1 * p.vref,
                        "x2max_v_side": 0.5 * xm2 * p.vref,
-                       "x1_final": x1, "x2_final": x2}
+                       "x1_final": x1, "x2_final": x2, "y": np.array(ys)}   # y: (N, B)
     return u_hat
 
 
