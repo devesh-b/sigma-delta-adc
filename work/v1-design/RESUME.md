@@ -588,3 +588,11 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - 9 copies fail symmetry at 0.53–1.02 dB.
 - The agent was resumed to fix the margin (K_P 7–8), diagnose the symmetry issue, switch to the D54 120/0.5 pair, run table-INL and commit.
 - Watcher lesson: don't use pgrep inside an ssh watcher; it matches its own command line. Wait on EXIT markers only.
+- WO-23 run 3 (K_P 6, pair 80/0.5):
+  - **table-INL PASSES at all 9 PVT × 2**: boost N 1024 0.75–2.43 ppm against 3.33; precision 0.51–2.13 ppm against 5.33. Max |x1| is 1.20 V, inside the table.
+  - Span at hot boost 1.48–1.56 V.
+  - **But precision A0 is 68.7–74.7 dB, against the SPEC ≥ 80 dB (D15, user).** Cause: m_pl near triode, so low ro.
+  - Symmetry: the failures were a vntol artefact at |v| ≤ 0.15 V; fixed with vntol 1e-10.
+  - The CL-1b broken copy (m_pl L 0.5) is blind (3.02 < 3.33). A PMOS-cascode short copy was added. A CL-1b amendment is proposed and needs the user.
+- Run 4 (K_P 7, pair 120/0.5, vntol fix, new mutant) is running in steps `tab_{2,3|4,0|1|5,6|7,8}.log`; a watcher is armed. Then resume the agent.
+- **Likely user question:** if precision A0 stays below 80 dB while table-INL passes with large margin, either keep 80 dB (next lever: m_plc L 4 + Cc 0.2 pF) or make A0 a health row in precision too.
