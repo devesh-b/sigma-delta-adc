@@ -24,3 +24,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-15 S5g boosted-point runs, INL-vs-GBW2 trend, gm/Id tooling: dispatched 2026-11-09
 - WO-16 S5h convergence rule + margin-critical reruns + fp2 window + W/L fix: done 2026-11-09 (S5h results, REVIEW-S5h, D44)
 - WO-17 S6 golden vectors (generator, independent checker, mutants, frame tags, order-1 u_corr): dispatched 2026-11-09
+- WO-18 S6b golden v2 (D45 conventions, control trace, edge streams, REVIEW-S6 mutants): dispatched 2026-11-09

@@ -429,3 +429,21 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - **Sandbox disk 100 % full** (201 MB free). Our regr/tt holds 140 GB, of which ~123 GB is raw CSVs. The user OK'd deleting them; my delete was blocked by the permission check, and the user's `!` run did not take effect. Re-ask the user.
   - T4 post-processing is blocked until then (its csv is kept).
   - Future WOs: delete a job's raw csv after its json is written.
+- REVIEW-S6 saved (18961a0): accepted with conditions, 3 Major (M1 forced y[0] untestable at RTL, M2 no control-trace golden, M3 short/mode not latched/tagged), 11 minor; 9 SPEC rows blocked S7.
+- D45 + SPEC §3.7a (f930e94) add the digital conventions:
+  - forced y[0] = +1;
+  - + on even slot, +−−+ dropped;
+  - frame layout 2×32 b + 16-bit tag;
+  - shadow latch at the even-slot reset edge;
+  - invalid after rst_n;
+  - order-1 acc2 = ΣS;
+  - OTA-only allowed (characterisation);
+  - PGA field removed;
+  - reset window 2 fs cycles, fch = fs/2;
+  - accumulators unsigned by chop on chip.
+  - **The user confirms (e), (g), (i) at S7.**
+- WO-18 (golden v2) dispatched. It is needed before C9, not before S7.
+- Open questions for the C stage (REVIEW-S6 §5):
+  - How is order 1 built in the analog?
+  - Is the raw pin defined during reset?
+  - Frame double-buffering?
