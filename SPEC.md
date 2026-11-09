@@ -231,9 +231,23 @@ Second integrator: same topology, relaxed gain/noise (its noise divides by first
   swapped sub-conversions (reset depth r ≤ 2.2e-3 at N=1024, ≤ 1.4e-4 at N=64).
 - 1.8↔3.3 V level shifters between analog macro and digital.
 
+### 3.7a Digital conventions bound to the S6 golden vectors (D45, REVIEW-S6 §5)
+| # | Item | Rule |
+|---|---|---|
+| a | Forced y[0] | y[0] = +1 at reset release. The cycle-0 comparator output (and anything it outputs during the reset window) is ignored. The forced bit drives the DAC, the decimator and the raw bitstream pin from one retimed FF (F8) |
+| b | Chop-sign order | sub-conversion slot parity: even slot = +1 (direct), odd = −1 (swapped). The +−−+ ordering of rule (12) is dropped from v1 |
+| c | Frame layout | per frame: acc1 (32 b, two's complement), acc2 (32 b), then a 16-bit tag word, MSB first: `chop` (1 b: 0 = +1, 1 = −1), `order` (1 b: 0 = order 1), `n_code` (2 b: 0..3 = N 64/256/1024/4096), `sys_en`, `ota_en`, `short` (1 b each), `invalid` (1 b), `frame_ctr` (8 b, +1 per sub-conversion, wraps 255 → 0, never reset by config changes, reset to 0 only by rst_n). No pair_idx: frame_ctr[0] marks slot a/b. The `valid` pin = data-ready strobe for a complete frame. The `invalid` tag marks frames not to be used. The two are independent |
+| d | Config latch | writes go to a shadow register. The shadow is copied to active on the clock edge that starts the reset window of an even slot. A write on or after that edge applies to the next pair. The last write before the edge wins. Latched set: order, N, fs divider, sys_en, ota_en, short |
+| e | Invalid scope | both frames of the first pair after any change of the latched set, **and** the first pair after rst_n release (start-up: CMFB, decap, bias) |
+| f | Order-1 acc2 | keeps accumulating ΣS exactly as in order 2 (defined value, not don't-care); firmware ignores it |
+| g | OTA-only chop | (ota_en 1, sys_en 0) allowed, characterisation-only like every sys-off mode (D4: never used for data) |
+| h | PGA | none in v1; the config field is removed |
+| i | Reset window / OTA chop timing | reset window = 2 fs cycles (row "Reset", ≥ 1 µs at 2 MHz), with the sys swap, accumulator clear and y force inside it. Accumulators clear on the edge that releases the analog reset (rule 11). OTA chop runs at fch = fs/2: its phase toggles every fs cycle and is 0 at cycle 0 of every sub-conversion; it is held at 0 throughout the reset window (rule 7) |
+| j | Output frame | accumulators are emitted in the modulator frame, with no sys sign applied on chip; firmware applies the chop tag and demodulates pairs |
+
 ### 3.8 Configuration & I/O
-- Config register (via ui pins or simple SPI): order (1/2), N, fs divider, PGA gain, OTA-chop en,
-  system-chop en, mode.
+- Config register (via ui pins or simple SPI): order (1/2), N, fs divider, OTA-chop en,
+  system-chop en, internal short (no PGA field: no PGA in v1, D45h).
 - **Internal-short input mode** (mux VIN to CM) — required to measure the ADC's own noise floor.
 - ua3 is VREF− (D24). An integrator/supply monitor would need ua4 (not in v1; leakage observability via the internal-short mode instead).
 
