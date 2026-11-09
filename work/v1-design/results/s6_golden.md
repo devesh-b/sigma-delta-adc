@@ -40,3 +40,32 @@ Also: the checker rejects a corrupted copy (acc2 +1, invalid tag flipped).
 
 ## Model change
 `model/iadc.py`: `convert(..., return_state=True)` now also returns `y` (N, B) decisions; default outputs unchanged (all existing tests pass; `test_iadc_y_exposed`).
+
+## v2 (WO-18, S6b): D45 conventions plus REVIEW-S6 gaps
+
+Generator: `python -m model.golden --out golden/s6_vectors.json` (sandbox). Mutant table: `python model/tests/test_golden.py`. Pytest (`model/tests design/tests`, sandbox): 147 passed, 2 skipped, 56 s.
+File `golden/s6_vectors.json`: 776,948 bytes (< 1 MB), sha256 f08faffe17ceea91f31920f66bf3d4ac263c62e4b575432b5154aea7b90c938f (pinned; regeneration is byte-identical).
+
+Counts: 368 vectors (320 mode incl. OTA-only and 32 short, 48 offset), 4 RTL-only streams (N 4096, `loop_valid: false`), 6 sequences (cfgchange, drop, short, multiwrite, edge, wrap 262 slots), 1 control trace (396 cycles); 1054 frames. Independent checker: 1054/1054 frames and 396/396 trace cycles bit-exact (acc words, 32-bit wire word, 16-bit tag word, comp_raw0, tags, pairs), plus `u_hat_signed*den == num_signed` on every loop frame.
+
+| Mutant | Result (differences) |
+|---|---|
+| inclusive S / N-1 / N+1 / y flipped / acc2 23-bit / no sign | REJECT (919 / 1050 / 1050 / 986 / 47 / 330 of 1054) |
+| y0 free (F8) / y0 pass-through of comp_raw0 (M1) / y0 = -1 loop / swap late (loop) | REJECT (1054 / 1054 / 1050 / 661) |
+| RTL truncate by 1 / extend by 1, den fixed | REJECT (1054 / 1054) |
+| acc1 13-bit | REJECT (2 frames, the N 4096 all-+1 streams only) |
+| accumulators not cleared between sub-conversions | REJECT (643) |
+| acc2 24-bit, acc1 14-bit | ACCEPT (0), as required |
+| immediate (mid-pair) latch / invalid on first frame only / frame_ctr reset on change / no invalid after rst_n / edge write counted before the edge | REJECT (19 / 384 / 31 / 761 / 8 mismatches) |
+| trace: swap one clock late / acc_clear early / acc_clear late / OTA phase free-running (not held at 0 in reset) / tag inverted vs swap | REJECT (5 / 12 / 12 / 6 / 396 rows) |
+| offset pairs: chop sign stuck / inverted | REJECT (return about off / about -u, 48/48 vectors) |
+
+D45 points that were ambiguous at cycle level, with the choice made:
+1. acc_clear timing: asserted on cycle 1 (the last reset-window cycle), so the clearing edge is the one that releases rst_analog. Window = cycles 0-1; conversion cycle n = c - 2.
+2. sys_swap changes on cycle 0 of the slot (first cycle of the reset window), the earliest instant inside the window.
+3. raw_pin outside bit_valid is 0 (idle low); y_force is a single-cycle strobe on n = 0.
+4. Two columns were added to the trace (`tag_chop`, `cfg_latch`) so the tag-flop and latch-edge rules are observable.
+5. OTA phase mutant: a phase flop that is not held in reset toggles on cycle 1. A mutant that merely free-runs over N+2 (even) cycles would be indistinguishable at the slot start, so reset-window hold is what the trace tests.
+6. A write that equals the active config is not a "change", so it would give a valid pair. No vector covers this case; if C9 flags any write, SPEC should say so.
+7. Writes carry a cycle offset in the slot; only the slot of the write and its order matter (earlier slot = before the edge, even slot itself = on/after it). The last cycle of the previous slot is offset N+1.
+8. Order-1 acc2 = sum S, so the unused word is defined; `num` for order 1 stays acc1, den N.
