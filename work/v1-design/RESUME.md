@@ -539,3 +539,8 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - WO-21 (Opus): note rev B;
   - WO-22 (Sonnet): GBW sweep, pole-after-tanh, A0 floor.
 - Next: WO-23 = fixed tb tooling and re-spot at 45 PVT × 2 with the rev B sizes, then reviewer.
+- WO-22 partial: b4fb3d2 (fp2-after-tanh option + test). 16 sweep jobs are running in `regr/tt/WO-22-b4fb3d2` (DONE files; csv auto-deleted). A watcher is armed; resume the agent when all 16 are done.
+- **Key early finding (A0 scan, `model/studies/c1_a0_scan.py`, uncommitted):**
+  - With the S4 A(v) shape (A0, −5, −10, −20 dB at 0 / 1.4 / 2.0 / 3.1 V), N 1024 INL is 5.37 ppm at 80 dB and still > 3.33 ppm. Flat A0 passes even at 60 dB.
+  - So INL is set by the **A(v) droop shape**, not by A0 or N. The CL-1 "≈ 72 dB" premise holds only for a milder droop.
+  - Likely restatement of CL-1: gate boost like precision, i.e. model INL with the **measured boost A(v) table** ≤ 5/1.5 ppm at N 1024. Present this to the user when WO-22 lands.
