@@ -411,6 +411,8 @@ def xcheck_rows(no_ck=False, tagpfx="xc_"):
     rows, ok = [], True
     try:
         for name, dk, mk in cases + diag:
+            if XCHECK_ONLY and name not in XCHECK_ONLY:
+                continue
             gated = name in REV or name in XCHECK_GATED_EXTRA
             cfg = dict(IDEAL_OTA, n=256, u_list=U)
             cfg.update(dk)
@@ -446,10 +448,15 @@ def xcheck_rows(no_ck=False, tagpfx="xc_"):
 
 
 CUR_K, CUR_C2 = [P.K], [P.C2]
+XCHECK_ONLY = set()       # WO-16: --xcheck --only A60_base restricts the rows
 
 
 def mode_xcheck(args):
     rows, ok = xcheck_rows()
+    if XCHECK_ONLY:      # WO-16: row-only rerun (the noise deck is a null-style deck and does not converge at O1)
+        jdump(dict(rows=rows), "xcheck.json")
+        print("ACCEPT (rows only)" if ok else "REJECT (rows only)")
+        return 0 if ok else 1
     # noise transfer: trnoise at OTA1 input, per-cycle white, ~30 conversions
     nconv, sig = 32, 2e-3
     cfg = dict(IDEAL_OTA, a0_db=120.0, n=256, u_list=(0.0,) * nconv, noise1=sig)
@@ -1806,6 +1813,27 @@ def mode_fast4(args):
     return 0 if ok else 1
 
 
+def parse_point(spec):
+    """WO-16 --point 'k=v,k=v' -> cfg extras (all floats)."""
+    return {k.strip(): float(v) for k, v in (kv.split("=") for kv in spec.split(",") if kv.strip())}
+
+
+def mode_point(args):
+    """One v2 deck at an explicit operating point (WO-16 reruns): --point 'fs=2e6,sr=12.5e6,sr2=13.5e6,fp2_mult1=3' --n N --m M."""
+    e = parse_point(args.point)
+    r = dc_metrics(v2_cfg(e, n=args.n, m=args.m), "pt")
+    row = strip(r)
+    row["point"] = e
+    if r.get("u_in"):
+        sg, rms, mx = f4_signed(r["u_in"], r["u_hat"])
+        row.update(signed_ppm=sg.tolist(), cubic_resid_rms_ppm=rms, cubic_resid_max_ppm=mx)
+    ok = bool(r.get("ok")) and math.isfinite(r.get("inl_ep_ppm", float("nan")))
+    print(f"point {e} N{args.n} m{args.m} options {P.SPICE_OPTIONS_TIER1}: INL ep {r.get('inl_ep_ppm', float('nan')):.4f} ppm gain_err {r.get('gain_err', float('nan')):+.3e} runtime {r.get('runtime_s', 0):.0f}s problems {r.get('problems')}")
+    jdump(row, "point.json")
+    print("run-health ACCEPT" if ok else "run-health REJECT")
+    return 0 if ok else 1
+
+
 def converge_verdict(inl_o1, inl_o2, gate):
     """D43c acceptance rule. Converged iff |O2-O1| <= max(10 % INL(O2), 0.1 (gate - INL(O2))); verdict on INL(O2) (1 + |d|/INL(O2)) <= gate.
     Returns (converged, delta, inl_verdict, passes). NaN in -> not converged, not passing."""
@@ -1825,6 +1853,7 @@ def main():
         ap.add_argument(f"--{m}", action="store_true")
     ap.add_argument("--only", default=None, help="fast2: comma list of V4,V5i,V5ii")
     ap.add_argument("--src", default=None, help="gmid: directory with the gmid_*.csv files")
+    ap.add_argument("--point", default=None, help="WO-16: run one v2 deck at 'k=v,k=v' cfg extras (floats), with --n/--m")
     ap.add_argument("--n", type=int, default=256)
     ap.add_argument("--m", type=int, default=None, help="number of DC points")
     ap.add_argument("--out", default=None)
@@ -1852,6 +1881,11 @@ def main():
     if a.out:
         OUT = a.out
     os.makedirs(OUT, exist_ok=True)
+    if a.only and a.xcheck:
+        XCHECK_ONLY.update(a.only.split(","))
+    if a.point:
+        a.m = a.m or 21
+        return mode_point(a)
     if a.m is None:
         a.m = {"null": 5, "options": 5, "dc": 11, "nonvac": 5}.get(next((m for m in ("null", "options", "dc", "nonvac") if getattr(a, m)), ""), 5)
     if a.null:

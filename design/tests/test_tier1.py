@@ -469,3 +469,21 @@ def test_option_ladder_and_converge_rule():
     ok, d, v, ps = TB.converge_verdict(9.0, 9.6, 10.0)
     assert ok and v > 10.0 and not ps
     assert not TB.converge_verdict(float("nan"), 5.0, 10.0)[0]
+
+
+def _cf(deck, k):
+    import re
+    return float(re.search(rf"^Cf{k} f{k} 0 (\S+)", deck, re.M).group(1))
+
+
+def test_fp2_mult_per_ota_and_point_parser():
+    base, _ = G.build_deck(TB.v2_cfg({}, n=8, m=2))
+    d, _ = G.build_deck(TB.v2_cfg({"fp2_mult1": 30.0}, n=8, m=2))
+    e, _ = G.build_deck(TB.v2_cfg({"fp2_mult2": 6.0}, n=8, m=2))
+    # default unchanged; Cf is 1/fp2: x30 vs x3 -> Cf/10 on the chosen OTA only
+    assert abs(_cf(d, 1) / _cf(base, 1) - 0.1) < 1e-6 and _cf(d, 2) == _cf(base, 2)
+    assert abs(_cf(e, 2) / _cf(base, 2) - 0.5) < 1e-6 and _cf(e, 1) == _cf(base, 1)
+    assert TB.parse_point("fs=2e6, sr=9.5e6,fp2_mult1=3") == {"fs": 2e6, "sr": 9.5e6, "fp2_mult1": 3.0}
+    # non-vacuity: a point that sets nothing equals the base deck
+    z, _ = G.build_deck(TB.v2_cfg(TB.parse_point(""), n=8, m=2))
+    assert _cf(z, 1) == _cf(base, 1)
