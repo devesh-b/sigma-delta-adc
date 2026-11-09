@@ -62,6 +62,8 @@ class Params:
                                  # tabulated gain: ((|Vout,diff| [V], gain [dB]), ...), V ascending. Replaces
                                  # a0_db/a0_drop for that stage; a stage with no table uses a0_db(2)/a0_drop(2).
                                  # Gain is held at the end values outside the table range. x [vref] * vref = V diff.
+    av_strict: bool = False      # WO-23 (CL-1b): if True, a table lookup outside the table's V range raises
+                                 # AvTableRangeError instead of the silent np.interp end-value clamp. Default off.
     r_ext_ref: float = 0.0       # external DC resistance per reference pin [ohm]. Reference current per pin
                                  # I = fs*Cs*(vref/2)*u^2, so delivered ref = 1 - 2*R*I/vref = 1 - R*fs*Cs*u_s^2
     reset_r: float = 0.0         # fraction of final x1/x2 left after reset; carried across consecutive
@@ -129,6 +131,21 @@ class Params:
 
 def with_(p, **kw):
     return replace(p, **kw)
+
+
+class AvTableRangeError(ValueError):
+    """Strict mode (Params.av_strict): an integrator state left the measured A(v) table range."""
+
+
+# Max |x1| / |x2| of the last convert() call, differential volts (x * vref); WO-23 report hook.
+LAST_RUN = {"x1max_v": float("nan"), "x2max_v": float("nan")}
+
+
+def _check_range(x, table, vref, stage):
+    vmax = float(table[-1][0])
+    xv = float(np.max(np.abs(x))) * vref
+    if xv > vmax * (1 + 1e-12):
+        raise AvTableRangeError(f"stage {stage}: |x| {xv:.4f} V diff outside A(v) table range {vmax:.4f} V (no extrapolation)")
 
 
 def _leaky(a0_db, c, x=None, drop=0.0, xswing=1.0, table=None, vref=1.0, cp=0.0):
@@ -297,6 +314,11 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False, x
         if p.vres:
             e = e + ng * p.vres
 
+        if p.av_strict:
+            if p.av_table1 is not None:
+                _check_range(x1, p.av_table1, p.vref, 1)
+            if p.av_table2 is not None and p.order == 2:
+                _check_range(x2, p.av_table2, p.vref, 2)
         if dyn1:
             p1, g1 = _leaky(p.a0_db, p.c1, x1, p.a0_drop, xsw, p.av_table1, p.vref, p.cp_hold1)
         if dyn2:
@@ -311,6 +333,12 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False, x
             x2 = np.clip(p2 * x2 + g2 * p.c2 * x2in, -p.xmax * 2, p.xmax * 2)
             xm2 = max(xm2, float(np.max(np.abs(x2))))
 
+    if p.av_strict:   # the final state is an OTA output level too
+        if p.av_table1 is not None:
+            _check_range(x1, p.av_table1, p.vref, 1)
+        if p.av_table2 is not None and p.order == 2:
+            _check_range(x2, p.av_table2, p.vref, 2)
+    LAST_RUN.update(x1max_v=xm1 * p.vref, x2max_v=xm2 * p.vref)
     if p.order == 1:
         u_hat = S / N
     else:
