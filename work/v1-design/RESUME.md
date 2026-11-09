@@ -569,3 +569,9 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - OTA1 GBW needed for ≤ 3.33 ppm at N 1024 / 4 MHz: ≈ 27 MHz at fp2 ×10, ≈ 28.5 MHz at ×30. Rev B worst is 26.5 MHz, just short.
   - Pole-after-tanh: the optimum stays at ×3 (3.58 ppm at 20 MHz), so the S5h result transfers.
   - S4-shape A0 scan: ≈ 84 dB would be needed, and the droop shape sets INL (consistent with CL-1b).
+- **WO-22 done** (b4fb3d2, 86d1890; pytest 153):
+  - GBW needed for ≤ 3.33 ppm: 26.9 MHz at fp2 ×10, 28.4 MHz at ×30 (O2).
+  - Pole-after-tanh optimum at fp2/GBW ≈ 2.5 (1.2 ppm); the window is only 2.2–3.0.
+  - S4-shape A0 would need 84 dB; flat passes at 60 dB.
+  - Passed to WO-23: route (i) GBW ≥ 28.5 MHz, or (ii) fp2 ≈ 2.5× via C_FOLD_EXTRA.
+- WO-23 is running. It committed cf81c5b (model strict A(v) range check).
