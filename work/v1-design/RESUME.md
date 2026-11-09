@@ -607,3 +607,16 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - Plan:
   1. resume the WO-23 agent only to wrap up run 5 (INL + commit);
   2. then a fresh WO-24 = C1b: m_plc fix (item 0) + netlist + full 45 PVT tbs + gate B. That agent's context is large (~200k tokens), so start fresh.
+- **WO-23 closed** (cf81c5b, 289aec7, 61ca6a7).
+  - Run 5:
+    - all 18 copies pass margins (worst 0.067 V);
+    - span at hot boost 1.41 / 1.48 / 1.50 V;
+    - symmetry ≤ 0.002 dB;
+    - **table-INL PASS at all 9 PVT**: boost 0.38–2.31 ppm against 3.33, precision 0.31–0.81 ppm against 5.33;
+    - the PMOS-cascode-short copy is REJECTED at the boost gate (9.86 ppm).
+  - **Open:**
+    - precision A0 fails at 3 of 9 points (fs/−40 78.4, fs/125 79.3, ff/−40 79.5 dB); D55 fix → WO-24;
+    - **the precision-gate broken copy is blind** (cascode short 3.4 ppm < 5.33): a gross gain loss is flat, so its INL stays low. The A0 row catches it, but the table-INL precision gate needs a droop-type mutant (e.g. K_P lowered so the load triodes at large swing);
+    - margins are thin: span 0.01 V, β1 0.001, GBW ~0;
+    - no junction caps yet; ideal CMFB.
+- Next: reviewer on rev C, then WO-24 (C1b).
