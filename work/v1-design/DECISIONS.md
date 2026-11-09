@@ -55,3 +55,16 @@
 - Reset state: trim 100, boost 0. Untrimmed worst case ≈ 160 µA, inside the D46c budget.
 - Calibration is a manual bench sweep: fast mode, inputs ±0.9 / 0 FS, lowest code within 10 % of the plateau.
 - Pending user choice: an on-chip bias-readback oscillator (replica I charging a MIM cap to a VBG threshold, counted digitally, f ∝ 1/RC; ≈ 2–3k µm²), which would also detect bandgap start-up | user 2026-11-09 | ua4 monitor pin | 0 (oscillator ≈ 2–3k µm² if chosen) |
+| D48 | Coordinator (reversible), REVIEW-S7b answers.
+
+(1) **OTA1 step gate: option 2.**
+- The in-loop gate (B) is authoritative: transistor OTA1 in the tier-1 deck, N 1024, ≤ 1.333 ppm at 2 MHz and ≤ 5 ppm at 4 MHz boost, O1/O2 converged, tt/27 and ss/−40/3.0, broken copy at 9.5 V/µs.
+- The step tb (A) is a report-only diagnostic: |ε_dyn| ≤ 1e-4 is a health check, ε_NL ≤ 3e-7 a watch level.
+- Reason: the 1.9·ε_NL bound is worst-case (slot averaging takes off 2–4×), and the step test cannot see the in-loop slew knee (S7b-M2). Gating (A) at 3e-7 would force GBW ≳ 14 MHz, costing current inside a 189/200 µA budget, on a conservative bound.
+- OTA2: keep the 1.117 V step with the 2× macro limits and the ε_dyn definition.
+
+(2) **"D39 control" is NOT the A′ point.** It is the D39 option-A point (OTA2 20.25 V/µs, 22.5 MHz); A′ has 27 V/µs. Label it as conservative versus A′.
+
+(3) **0.94 µV @15 SPS governs** (the §3.0 joint model run). 0.71 µV is the kT/C-only Cs-row value.
+
+(4) **The status word reports the frame's boost/trim**, latched with the hold register. Golden v3 item | REVIEW-S7b | option 1 (step gate ε_NL ≤ 3e-7 binding) | 0 |
