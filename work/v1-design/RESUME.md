@@ -509,3 +509,7 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   2. S→C gate.
   3. Golden v3, a C9 entry item.
   4. Stage C starts with C1 (OTA).
+- User: hold the freeze until they have reviewed a report.
+  - Report published (private): https://claude.ai/artifact/X5CESjvvGW8y38bwR3F2oz
+  - D49: the oscillator is a conditional C6 item.
+- **Waiting on the user's freeze OK.**
