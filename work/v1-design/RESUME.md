@@ -368,3 +368,13 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - Jobs (`jobs_sr1.txt`, `done_sr1` marks the end, same run dir): `r3d_N{256,1024}_sr1_{12.5,13}_O2` plus `r3d_N1024_sr1_{12.5,13}_O1` for the convergence pair.
   - Then present the INL margin to the user. **The SR decision stays with the user.**
 - T4 rerun still running (`WO-16-t4-677b39f`).
+- REVIEW-S5h saved. G-M3 closed for all gated rows. S6 is not blocked. 1 Major (H-M1: SPEC slew bases cite O0 numbers) and 7 minors.
+- Reviewer gap jobs (`jobs_gap.txt`, 1 at a time, `done_gap` marks the end):
+  - OTA2 10.8 V/µs N1024 O2;
+  - A′ c/d N256 O1;
+  - trap O1 on r2 N1024 13.5.
+- Open after the jobs:
+  - user's OTA1 SR decision (A keep 12.5 / B 13);
+  - SPEC text (slew bases, PM windows OTA1 "72–77° at 20 MHz", OTA2 ~70–85°, O2 evidence note);
+  - s5h doc fixes;
+  - then S6.
