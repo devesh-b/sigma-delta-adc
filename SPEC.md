@@ -244,6 +244,7 @@ Second integrator: same topology, relaxed gain/noise (its noise divides by first
 | h | PGA | none in v1; the config field is removed |
 | i | Reset window / OTA chop timing | reset window = 2 fs cycles (row "Reset", ≥ 1 µs at 2 MHz), with the sys swap, accumulator clear and y force inside it. Accumulators clear on the edge that releases the analog reset (rule 11). OTA chop runs at fch = fs/2: its phase toggles every fs cycle and is 0 at cycle 0 of every sub-conversion; it is held at 0 throughout the reset window (rule 7) |
 | j | Output frame | accumulators are emitted in the modulator frame, with no sys sign applied on chip; firmware applies the chop tag and demodulates pairs |
+| k | Cycle level (WO-18, golden v2) | a slot is N + 2 fs cycles: the reset window is cycles 0–1, and conversion cycle n = c − 2. `sys_swap` changes on cycle 0 and is held for the slot. `acc_clear` is high on cycle 1, so the clearing edge is the one that releases `rst_analog`. `y_force` is a 1-cycle strobe at n = 0. `raw_pin` = 0 while `bit_valid` = 0. OTA-chop phase = 0 in reset, then n mod 2. Config write timing: a write at offset 0 of an even slot (on the edge) goes to the next pair; a write in the last cycle of the previous slot latches. A write equal to the active config is not a change (no invalid flag). An applied short forces u and the offset to 0 |
 
 ### 3.8 Configuration & I/O
 - Config register (via ui pins or simple SPI): order (1/2), N, fs divider, OTA-chop en,
