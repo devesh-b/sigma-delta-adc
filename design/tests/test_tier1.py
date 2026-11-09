@@ -520,19 +520,28 @@ def test_step_settle_window_is_spec_t_half():
 
 def test_step_settle_metrics_and_gate_fail_when_broken():
     a = np.array(SS.FRACS) * 0.486
-    lim = dict(eps=1e-6, eps_nl=1e-7)
-    good = SS.eps_metrics(a * (1 - 1e-8), 0.486)            # linear residue only
+    lim = dict(eps=1e-6)
+    good = SS.eps_metrics(a * 1e-8, 0.486)                  # dv = vo(late) - vo(t_half): linear residue only
     assert SS.gate(good, lim)
-    assert not SS.gate(SS.eps_metrics(a * (1 - 1e-4), 0.486), lim)           # settling error too large
-    assert not SS.gate(SS.eps_metrics(a - 2e-5 * a ** 2 / 0.486, 0.486), lim)  # amplitude-dependent (nonlinear) error
-    assert not SS.gate(SS.eps_metrics(np.full(len(a), np.nan), 0.486), lim)    # NaN must fail
+    assert not SS.gate(SS.eps_metrics(a * 1e-4, 0.486), lim)                 # settling error too large
+    assert not SS.gate(SS.eps_metrics(np.full(len(a), np.nan), 0.486), lim)  # NaN must fail
+    # eps_NL is report-only: a strongly nonlinear residue does not fail the gate but is reported
+    nl = SS.eps_metrics(a * 1e-8 + 2e-8 * a ** 2 / 0.486, 0.486)
+    assert nl["eps_nl"] > 1e-9 and SS.gate(nl, lim)
+    # below-floor reporting and the reltol/10 agreement rule
+    fl = SS.eps_metrics(a * 1e-8, 0.486, floor_v=1e-3)
+    assert "below solver floor" in SS.fmt_nl(fl)
+    m1, m2 = dict(eps=1.00e-6, floor=1e-8), dict(eps=1.05e-6, floor=1e-8)
+    assert SS.converged(m1, m2) and not SS.converged(m1, dict(eps=1.5e-6, floor=1e-8))
 
 
 @pytest.mark.skipif(not HAVE_NGSPICE, reason="ngspice not installed")
 def test_step_settle_gate_points_and_broken_copies(tmp_path):
     for name, pt in SS.POINTS.items():
         m = SS.run_point(pt, name, str(tmp_path))
+        m2 = SS.run_point(pt, name + "_rel10", str(tmp_path), opts=SS.tight_div(SS.OPTS_TIGHT))
         assert SS.gate(m, SS.LIMITS[name]), (name, m)
+        assert SS.converged(m, m2), (name, m, m2)
         for bn, kw in SS.BROKEN.items():
             mb = SS.run_point(pt, f"{name}_{bn}", str(tmp_path), **kw)
             assert not SS.gate(mb, SS.LIMITS[name]), (name, bn, mb)
