@@ -15,7 +15,7 @@ Each decision is tagged with its D-number so you can trace it.
 |---|---|---|
 | Goal | Learn by building a better ΣΔ ADC than prior Tiny Tapeout attempts (all 1st order, none with an on-chip decimator). Case-study target: MCP3421 (18-bit, 3.75–240 SPS) | Sets the bar: µV-level noise and ppm-level INL, at low speed |
 | Process | sky130A, TT analog **2×2 tile** (334 × 225 µm ≈ 75,000 µm²), VAPWR 3.3 V, VDPWR 1.8 V, met5 forbidden | Area, devices and supply are all fixed |
-| Pins | ua0/ua1 VIN±, ua2 VREF+, ua3 VREF− (D24) | Every extra analog pin costs about €40 |
+| Pins | ua0/ua1 VIN±, ua2 VREF+, ua3 VREF− (D24) | Analog pins: €40 each for the first 2, then €100 each, so 4 pins = €280; a 5th (ua4) would be +€100 (none planned, D47) |
 | Current | ≤ 200 µA analog in every mode, at every corner (D31, D42) | Couples speed, slew and bias to each other |
 | Corners | tt/ss/ff/sf/fs (+ ss_hh, ff_ll) × −40/27/125 °C × 3.0/3.3/3.6 V × VDPWR ±10 % + MC (≥ 200 at tt, ≥ 50 at worst) × fs 0.25/2/4 MHz (D2, D7) | **A spec passes only if it passes at every corner** (D1) |
 

@@ -59,7 +59,7 @@ No extra pin is needed.
 - **Finding the trim code on silicon** without a bias-monitor pin:
   - sweep the code and pick the lowest one that meets the SR knee / INL test; or
   - measure the analog supply current per code, if the board allows it.
-  - A monitor pin would cost about €40 (D24 pricing) and is not planned.
+  - A monitor pin would be the 5th analog pin, at €100 (the first two cost €40 each, then €100 each). Not planned: the user ruled out extra analog pins (D47).
 - **Code default at reset:** mid-scale (100), latched only at a pair boundary, like the boost bit (C9).
 - The reference bandgap has no silicon data here. Treat its area as an order-of-magnitude anchor, not a proven cell.
 

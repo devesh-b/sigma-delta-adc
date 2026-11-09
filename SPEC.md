@@ -254,7 +254,7 @@ Second integrator: same topology, relaxed gain/noise (its noise divides by first
   system-chop en, internal short, **boost (1 b, reset 0, D31/D46c), bias trim (3 b, reset 100, D42)** (no PGA field: no PGA in v1, D45h).
 - I/O pin map, read bus, buffering and register map: §3.8a.
 - **Internal-short input mode** (mux VIN to CM) — required to measure the ADC's own noise floor.
-- ua3 is VREF− (D24). An integrator/supply monitor would need ua4 (not in v1; leakage observability via the internal-short mode instead).
+- ua3 is VREF− (D24). An integrator/supply monitor would need ua4, a 5th analog pin at €100 (pins cost €40 each for the first two, then €100 each). Not in v1 (D47); leakage observability comes from the internal-short mode instead.
 
 ### 3.8a Digital I/O (WO-19, D46b; proposal for coordinator review, golden v3 items marked G3)
 Assumed TT clock **clk = 48 MHz**. TT pins: `ui_in[7:0]` in, `uo_out[7:0]` out, `uio[7:0]` all outputs (uio_oe = 0xFF), `rst_n`, `clk`; analog `ua0-ua3` unchanged (§1).

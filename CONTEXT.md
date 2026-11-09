@@ -84,7 +84,7 @@ All repos are Apache-2.0 shallow clones (`--depth 1`).
 - **Cost:**
   - €70 per tile.
   - Analog pins cost €40 each for the first two, then €100 each.
-  - v1 uses 3 pins (VIN+, VIN−, VREF), about **€460** in total.
+  - v1 uses 4 pins (VIN+, VIN−, VREF+, VREF−; D24): pins 40 + 40 + 100 + 100 = €280, plus 4 tiles × €70 = €280, about **€560** in total. A 5th pin (for example ua4) would add €100.
 - **The TT mux selects one project at a time**, so the **decimator must live inside the analog macro**. That means LibreLane hardening and 1.8↔3.3 V level shifters.
 - **Demo board:** currently ETR dbv3 with an RP2350; analog signals are on a 100-mil header. Check pull-downs and errata before measuring.
 - **Shuttle:** ttsky26c closed 2026-09-07. The next sky130 run is probably early–mid 2027; check https://tinytapeout.com/runs.

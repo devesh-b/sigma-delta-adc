@@ -79,8 +79,8 @@ Deliverables (the "research" part):
 | Supply | VAPWR 3.3 V analog, VDPWR 1.8 V digital | |
 | Power | ≤ 200 µA analog | |
 | Output | 16–24-bit word via shift-register/SPI-like on uo, + raw bit + data-ready | I²C slave |
-| Area / pins | 2x2 tile, ua0 VIN+, ua1 VIN−, ua2 VREF (3 pins: 40+40+100 €) | ua3 integrator monitor (debug) |
-| Est. cost | 4 tiles × 70 + 180 = **~460 €** (+ PCB/instruments) | |
+| Area / pins | 2x2 tile, ua0 VIN+, ua1 VIN−, ua2 VREF+, ua3 VREF− (4 pins: 40+40+100+100 €; superseded by D24) | ua3 integrator monitor (debug) |
+| Est. cost | 4 tiles × 70 + 280 = **~560 €** (+ PCB/instruments) | |
 
 The decimator must live **inside** the analog macro (the TT mux selects one project at a time, so an off-chip digital helper project can't be wired to it). Harden the RTL with LibreLane/OpenLane as a sub-macro, or with hand-placed std cells. CoI decimation for an incremental design is just 2 accumulators + a counter, so it's tiny.
 
