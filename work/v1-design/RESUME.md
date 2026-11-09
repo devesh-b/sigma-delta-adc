@@ -356,3 +356,8 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - Next: when `done` exists, a fresh agent analyses the results, writes `results/s5h_tier1.md` and commits. Then acceptance, reviewer, S6.
 - Run at 34/47. `r6_T4_m101_N1024_g2_20_O2` failed: ngspice rc=124, from the internal `run_deck` timeout of 1500 s (`tier1_tb.py:100`), not the job timeout. T4 is informational. Rerun it after the batch, with a longer `run_deck` timeout (needs a `--deck-timeout` knob) or at O1.
 - T4 rerun (user: "just do it"): 677b39f adds `--deck-timeout`, with a test and a broken-copy REJECT check; pytest 52 pass. Running on frozen copy `regr/tt/WO-16-t4-677b39f`: deck timeout 14000 s, job timeout 15000 s, at O2. Launched at load ~7.8 on user OK. That makes 3 of our processes alongside the main batch.
+- **Load gate dropped (user, 2026-11-09):** run without waiting for load; still at most ~5 of our processes.
+- fp2 O1 sweep, INL ppm at D39 4 MHz N1024:
+  - OTA1 (OTA2 at ×3): 1.5 → 68.5, 2 → 10.9, **3 → 3.29**, 4 → 8.06, 6 → 14.7, 10 → 21.0, 30 → 28.3. The minimum at ×3 matches the ≈3.4 prediction.
+  - OTA2 (OTA1 at ×3): **1.5 → 1.38**, 2 → 2.33, 3 → 3.29, 4 → 3.71, 6 → 4.12, 10 → 4.40, 30 → 4.74. Monotone, so the minimum is at the sweep edge.
+  - Added jobs (`jobs_extra.txt`, same run dir; `done_extra` marks the end): `fp2_ota2_1.5_O2`, `fp2_ota2_1_O1`.
