@@ -317,3 +317,8 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   4. smoke-test 1 job per new mode;
   5. dispatch a fresh agent for items 3–4 (WO-16 rerun set).
 - Note: the tau floor makes tmax about 1–2 ns, so O1/O2 runs will be slower.
+
+## Update 2026-11-09 13:15 (user override of load gate: pytest + table)
+- pytest design/tests: 49 pass, 1 fail (the G-M2 hand test, failing on the old table as intended). After regenerating, 50 pass.
+- gmid_table regenerated from `regr/tt/WO-15/gmid`. W/L at L 1 µm: OTA1 28.2, OTA2 ×2 17.5, OTA2 ×1.5 118.7. WO-16 item 1 done.
+- Remaining WO-16 items: smoke-test the new modes, then items 3–4 (reruns, fp2 window). Waiting for load < 4 unless the user says otherwise.
