@@ -506,3 +506,33 @@ def test_deck_timeout_knob(tmp_path, monkeypatch):
     assert seen[-1][4] == "7000"
     TB.run_deck(cfg, "t2", outdir=str(tmp_path), timeout=9)
     assert seen[-1][4] == "9"
+
+
+# ---- WO-19 (S7-M1): OTA closed-loop step-settling gate -------------------------------------------------------------
+import step_settle as SS  # noqa: E402
+
+
+def test_step_settle_window_is_spec_t_half():
+    # h = 0.5/fs, g = 0.025/fs: h - 2g = 225 ns at 2 MHz, 112.5 ns at 4 MHz (SPEC clock row)
+    assert abs(SS.t_set(2e6) - 225e-9) < 1e-12
+    assert abs(SS.t_set(4e6) - 112.5e-9) < 1e-12
+
+
+def test_step_settle_metrics_and_gate_fail_when_broken():
+    a = np.array(SS.FRACS) * 0.486
+    lim = dict(eps=1e-6, eps_nl=1e-7)
+    good = SS.eps_metrics(a * (1 - 1e-8), 0.486)            # linear residue only
+    assert SS.gate(good, lim)
+    assert not SS.gate(SS.eps_metrics(a * (1 - 1e-4), 0.486), lim)           # settling error too large
+    assert not SS.gate(SS.eps_metrics(a - 2e-5 * a ** 2 / 0.486, 0.486), lim)  # amplitude-dependent (nonlinear) error
+    assert not SS.gate(SS.eps_metrics(np.full(len(a), np.nan), 0.486), lim)    # NaN must fail
+
+
+@pytest.mark.skipif(not HAVE_NGSPICE, reason="ngspice not installed")
+def test_step_settle_gate_points_and_broken_copies(tmp_path):
+    for name, pt in SS.POINTS.items():
+        m = SS.run_point(pt, name, str(tmp_path))
+        assert SS.gate(m, SS.LIMITS[name]), (name, m)
+        for bn, kw in SS.BROKEN.items():
+            mb = SS.run_point(pt, f"{name}_{bn}", str(tmp_path), **kw)
+            assert not SS.gate(mb, SS.LIMITS[name]), (name, bn, mb)
