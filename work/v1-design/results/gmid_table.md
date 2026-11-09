@@ -162,32 +162,32 @@ Columns: gm/Id [1/V] at Id/(W/L) [A]. `peak` = max gm/Id; `1/UT` = n = 1 limit.
 
 W/L >= Id / J_max(target), worst over ss/tt/ff x -40/27/100/125 C. W.L = (W/L) L^2 [um^2]. `unreachable` = corners whose peak gm/Id is below the target.
 
-### OTA1 (x2 current, I_tail 35 uA): gm/Id >= 10.05 at 35 uA
+### OTA1 (x2 current, I_tail 35 uA): gm/Id >= 10.05 at 17.5 uA per input device (I_tail/2)
 
 | L [um] | W/L | W.L [um^2] | worst corner | unreachable corners |
 |---|---|---|---|---|
-| 1 | 56.3 | 56.3 | ss/125 | none |
-| 2 | 55.3 | 221.1 | ss/125 | none |
-| 0.35 | 61.4 | 7.5 | ss/125 | none |
-| 0.5 | 54.4 | 13.6 | ss/125 | none |
+| 1 | 28.2 | 28.2 | ss/125 | none |
+| 2 | 27.6 | 110.6 | ss/125 | none |
+| 0.35 | 30.7 | 3.8 | ss/125 | none |
+| 0.5 | 27.2 | 6.8 | ss/125 | none |
 
-### OTA2 x1.5 (I_tail 14.2 uA): gm/Id >= 13.96 at 14.2 uA
-
-| L [um] | W/L | W.L [um^2] | worst corner | unreachable corners |
-|---|---|---|---|---|
-| 1 | 237.3 | 237.3 | ff/125 | none |
-| 2 | 217.5 | 870.1 | ff/125 | none |
-| 0.35 | 660.6 | 80.9 | ff/125 | none |
-| 0.5 | 216.0 | 54.0 | ff/125 | none |
-
-### OTA2 x2 (I_tail 18.9 uA): gm/Id >= 10.47 at 18.9 uA
+### OTA2 x1.5 (I_tail 14.2 uA): gm/Id >= 13.96 at 7.1 uA per input device (I_tail/2)
 
 | L [um] | W/L | W.L [um^2] | worst corner | unreachable corners |
 |---|---|---|---|---|
-| 1 | 34.9 | 34.9 | ss/125 | none |
-| 2 | 34.4 | 137.5 | ss/125 | none |
-| 0.35 | 38.4 | 4.7 | ss/125 | none |
-| 0.5 | 33.7 | 8.4 | ss/125 | none |
+| 1 | 118.7 | 118.7 | ff/125 | none |
+| 2 | 108.8 | 435.1 | ff/125 | none |
+| 0.35 | 330.3 | 40.5 | ff/125 | none |
+| 0.5 | 108.0 | 27.0 | ff/125 | none |
+
+### OTA2 x2 (I_tail 18.9 uA): gm/Id >= 10.47 at 9.45 uA per input device (I_tail/2)
+
+| L [um] | W/L | W.L [um^2] | worst corner | unreachable corners |
+|---|---|---|---|---|
+| 1 | 17.5 | 17.5 | ss/125 | none |
+| 2 | 17.2 | 68.8 | ss/125 | none |
+| 0.35 | 19.2 | 2.4 | ss/125 | none |
+| 0.5 | 16.8 | 4.2 | ss/125 | none |
 
 ## Numerical gm vs BSIM gm from .op (tt, 27 C; max relative error over the 3 Vsg points x 4 L per device)
 
