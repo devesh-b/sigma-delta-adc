@@ -59,7 +59,7 @@ V  verification (top-level tier 2-3, PEX, non-vacuity)  -> tapeout
 | A8 | **D12: CM-rejecting input switching (top-plate shorting)** (D12, D25, D33) | Only differential charge transferred; input CM anywhere in 0…VREF | First-order CM rejection independent of Cs matching | Residual set by Cp,top and ΔCp,top (layout); per-cycle CM step at the OTA input | Matching-based CMRR (needs ε ≤ 0.1 %; MIM gives 0.75 %) |
 | A9 | **CMRR gates: sys-off ≥ 60 dB, sys-on ≥ 100 dB (120 goal)** (D30, D32, D36, D37) | User: "the more the merrier" | Metric defined (least-squares slope over Vin_cm {0.2, 1.0, 2.0} V, N 4096) | Sys-off is 61.5 dB, only 1.5 dB margin; the 66 dB target rests on layout (ΔCp,top ≤ 0.15 fF) | 40 dB |
 | A10 | **fs 2 MHz precision (0.25–2), 4 MHz fast mode with bias boost** (D13, D31) | Slew-then-settle INL at 4 MHz would force precision current up | Precision mode stays lean | Boost logic, latched at pair boundaries | Always-on 20 MHz GBW (+45 µA) |
-| A11 | **Slew: OTA1 ≥ 12.5, OTA2 ≥ 13.5 V/µs (base)** (D39a) | Tier-1 knee ≈ 10 V/µs with a 25 % margin rule | Proven margin: 25 % (OTA1), 37 % / 3.4× (OTA2), V4m point | Slew current dominates the OTA budget | 15 V/µs both (+11 µA) |
+| A11 | **Slew: OTA1 ≥ 12.5, OTA2 ≥ 13.5 V/µs (base)** (D39a, D44) | Tier-1 knee at O2: OTA1-only 10.23–10.28 V/µs (N 1024); OTA2 knee < 10.8 | OTA1 12.5 = 22 % over knee but INL 0.104 ppm (12.8× under share); OTA2 ≥ 25 % measured directly (10.8 → 0.756 ppm) | OTA1 under the 25 % rule (user accepted, D44); slew current dominates the OTA budget | 13 V/µs OTA1 (+2.4 µA precision, +5 µA fast, 0.02 ppm gain) |
 | A12 | **Fast mode A′: OTA1 tail ×2, OTA2 tail ×2**; gate the *boosted operating point* (OTA1 ≥ 20 MHz / 25 V/µs, OTA2 ≥ 22.5 MHz / 27 V/µs) at every corner (D39b, D41) | gm grows slower than current in moderate inversion (×1.5 current gave ×1.28 gm), so "base × ratio" sizing builds unbuildable pairs | ≈ 172 µA nominal; small OTA2 pair; 33 % SR margin; β2 safe | INL trend vs GBW2 not yet explained (S5g); cold corner runs ≈ 1.5× faster | A (×1.5, needs L 0.5 µm and a large pair); relax N 1024 to 15 ppm |
 | A13 | **1.8 V input pairs on 3.3 V** (D40a) | Better gm/Id and matching per area than thick oxide | Smaller pair, less Cgs → β | Device stress: every terminal pair ≤ 1.98 V over all transients (gate with a broken copy) | Thick-oxide pair |
 | A14 | **Switched-capacitor CMFB** (D40b) | No static CMFB amplifier current (≈ 2.7·I_tail vs 3.4·I_tail) | ≈ 20 % analog current saved | Its caps load the OTA outputs (inside C_L); phases from the clock generator | Continuous-time CMFB |
@@ -114,6 +114,9 @@ V  verification (top-level tier 2-3, PEX, non-vacuity)  -> tapeout
 | S5e/S5f | Boost gives gm ∝ I; 5.3 ppm estimate | gm ratio 1.28–1.42; 7.6–12.5 ppm | Get device data (gm/Id tables) before sizing rules |
 | S5e | 3 MHz result is a deck bug | OTA1 slew-limited (12.5 V/µs at 3 MHz ≈ 7.9 at 2 MHz) | Scale against known points before calling it a bug |
 | S5f | "Raise base GBW" | Unbuildable pairs; gate the boosted operating point | Constrain the quantity that matters, not a bound on it |
+| S5g/S5h | Tier-1 numbers at default solver options (O0) are final | O0 is unconverged in either direction (r1 6.7 → 18.8 ppm at O2; V4 0.56 → 0.32); gear damps settling at 10 ns steps | Run a solver ladder (O0 → O1 → O2) on every gated number; quote converged values |
+| S5h smoke | Ladder chgtol ÷100 per step | chgtol 1e-16 with reltol ≤ 1e-4 aborts the decks | Smoke-test every new solver setting on 1 job first |
+| S5g/S5h | OTA2 optimum at ζ = 1, PM window 75–82° | Optimum near ζ ≈ 0.9 (PM ≈ 72°) for both OTAs | Measure the window before writing it into SPEC |
 
 ---
 
@@ -142,15 +145,17 @@ How this project keeps the cost (agent tokens, sandbox time) low while staying r
 
 ## 8. Open items before S7 (SPEC freeze)
 
-- S5g (WO-15, running):
-  - cold-corner boosted point;
-  - cause of INL rising with OTA2 GBW;
-  - fp2 sensitivity;
-  - gm/Id at L 0.35/0.5 µm;
-  - `.op` gm cross-check.
-- β2 / Cp_vg2 row is added (≤ 0.262 pF). C1 confirms with `.op` Cgg.
-- S6 golden vectors (ideal-A; decimator output = bitstream-only u_hat with the sys sign; F7 mode tag, F8 forced y[0]).
+- S5g/S5h are closed. Convergence (D43c) holds on every gated row. The slew bases and PM windows are restated at O2. OTA1 stays at 12.5 V/µs (D44).
+- Informational: the T4 101-point rerun at O2 (cubic residual). point.json does not yet record the solver options (REVIEW-S5h H-m7).
+- β2 / Cp_vg2 row (≤ 0.262 pF). C1 confirms it with `.op` Cgg.
+- S6 golden vectors:
+  - ideal-A;
+  - decimator output = bitstream-only u_hat with the sys sign;
+  - F7 mode tag, F8 forced y[0];
+  - cover the order-1 u_corr branch.
 - S7: reviewer pass, then the user's OK.
+
+---
 
 ## 9. Where things live
 
