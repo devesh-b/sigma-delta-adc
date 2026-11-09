@@ -338,3 +338,19 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - pytest 50 pass. Broken copy (old ÷100) fails the ladder test.
 - Remaining WO-16: items 3–4 (about 30 reruns plus the fp2 sweep). Not started; waiting for load < 4 or a user go-ahead.
 - Note: the trap-vs-gear pair must use the spec deck, not null.
+
+## Update 2026-11-09 ~14:00 (WO-16 items 3–4 running)
+- Launch agent committed 6a96cb3, which adds `--point "k=v,..."`, per-OTA `fp2_mult1/2` and `--xcheck --only`. pytest: 51 pass.
+- Run: sandbox `regr/tt/WO-16-run-6a96cb3`, 47 jobs, 2 at a time, timeout 7200 per job. Output goes to `summary.txt`; `done` marks the end. Per job: `out/<name>/point.json`.
+- Job groups:
+  - r1: ladder, 9 jobs;
+  - r2: OTA2 knee, 9;
+  - r3: OTA1 knee, 6;
+  - r4: V4 / V4m at N4096;
+  - r5: A′ c/d;
+  - r6: T4 m101;
+  - r7: xcheck;
+  - fp2: 12 O1 + 3 O2;
+  - t3: fp2×30 at O2.
+- Caveat: O2 for the fp2 sweep runs at mult 3 and 30 only. If the O1 minimum is elsewhere, add one `--point` O2 job.
+- Next: when `done` exists, a fresh agent analyses the results, writes `results/s5h_tier1.md` and commits. Then acceptance, reviewer, S6.
