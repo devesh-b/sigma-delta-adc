@@ -1,4 +1,4 @@
-# C1a: OTA1 + CMFB design note, rev B (WO-21)
+# C1a: OTA1 + CMFB design note, rev C (WO-23; rev B WO-21 below)
 
 Status: rev B for `sd-adc-design-reviewer`, before any schematic. Rev A was WO-20; this revision answers REVIEW-C1a-2026-11-09 (M1–M8, m1–m7) under D51 and SPEC CL-1 to CL-4. SPEC v1 is frozen and is not edited here; proposed change-log entries are in §6.
 
@@ -13,6 +13,58 @@ Status: rev B for `sd-adc-design-reviewer`, before any schematic. Rev A was WO-2
 - Bias reference currents are ideal.
 - CMFB is ideal.
 - C1b must add the junction geometry, or use PEX.
+
+## Rev C changes (WO-23)
+
+Evidence: SIM = `design/c1_ota1/revc_check.py` (spot run, **not a C1b gate**; ideal reference currents, **ideal CMFB** B-source on m_plc, no junction caps), runs under `/home/mempool/regr/tt/WO-23/c1/` (run 1 `k_r1/`, run 2 `r2/`, run 3 top level). Table-INL = `design/c1_ota1/revc_inl.py` (model `av_strict`, commit cf81c5b).
+
+| item | rev B | rev C | evidence |
+|---|---|---|---|
+| RB-M1 cascode-bias diodes | 5/16 and 5/10 single fingers, run at I_nc/4, I_nc/8 | **m_bnc 0.625/16 (K_N 8), m_bpc 1.25/6 (K_P 6 nominal)**, both at **I_nc/32** | SIM run 2/3 |
+| Mirror references | 1:4 copies (spot deck) | **1:32 unit-finger**: m_t 1.25/2 ×32 + m_tr ×1, m_n 2.25/4 ×32 + m_nr ×1, m_pl 2.5/4 ×32 + m_plr ×1 (same total W) | SIM run 2: I_fold/I_tail 1.27–1.36 |
+| Swing (Q2) | m_pc 40/2 | **m_pc 80/2** | SIM, below |
+| CMFB split | CMFB_SPLIT 0.5 vs LOAD_FIXED 0.75 | derived 0.25 (RB-m3) | sizes_draft.py |
+| Chopper / island (RB-m3, m4) | input W 2 in the file | input W 4; island = **shunt to V_ICM**, own row (Ron ≤ 5 kΩ, reset residue ≤ 1e-4) | sizes_draft.py |
+| Model | `np.interp` clamp | strict A(v) range check, max \|x1\|, \|x2\| reported | cf81c5b, test_av_strict.py |
+
+**Lesson, run 1 (REJECT, real design error).** The first 1:32 references were single narrow fingers (m_tr 1.25 vs m_t finger 5 µm, m_nr 2.25 vs 4.5, m_plr 2.5 vs 5). The narrow-width Vth shift gave I_fold/I_tail **1.7–2.6** instead of 1.35, A0 45–65 dB, m_plc up to 0.45 V into triode. Mirrors must be unit-finger (reference = one finger of the same WF and L). Run 2 with unit fingers: I_fold/I_tail 1.27–1.36 at all 18 points.
+
+**K sweep, run 2 (hot boost, unit-finger mirrors, m_pc 80/2), margin Vds − Vdsat:**
+
+| variant | ss/125 m_n / m_pl / m_plc | fs/125 | sf/125 | span ss / fs / sf (V) |
+|---|---|---|---|---|
+| K_N 8, K_P 4 (W 1.25 L 4) | 0.275 / −0.039 / −0.042 | 0.277 / −0.055 / −0.069 | 0.217 / −0.037 / −0.038 | 1.62 / 1.67 / 1.71 |
+| K_N 8, K_P 5 | 0.275 / 0.036 / 0.057 | 0.277 / 0.013 / 0.032 | 0.217 / 0.039 / 0.061 | 1.55 / 1.60 / 1.63 |
+| K_N 6, K_P 4 | 0.182 / −0.038 / −0.032 | 0.186 / −0.054 / −0.059 | 0.122 / −0.034 / −0.021 | 1.72 / 1.76 / 1.80 |
+| m_pc 40/2, K_P 4 (W 0.625) | 0.275 / 0.081 / 0.107 | 0.277 / 0.016 / 0.036 | 0.217 / 0.085 / 0.112 | 1.42 / 1.52 / 1.50 |
+
+- The narrow W 1.25 PMOS diode tracks weaker than rev B's full-finger copy: K_P 4 nominal leaves m_pl in triode, K_P 5 only +0.01–0.04 V.
+- HAND interpolation, margin ∝ (√K − 1)·Vov (slope ≈ 0.29–0.32 V per unit √K): **K_P 6** gives m_pl ≈ +0.08–0.10 V and span ≈ 1.49–1.54 V at hot boost. **Rev C uses K_P 6 (m_bpc 1.25/6).** Run 3 checks it.
+- m_n margin with K_N 8 is 0.11–0.28 V at all 18 points; K_N 8 kept.
+- Span with m_pc 80/2 is +0.15–0.20 V over 40/2 at the same K_P, as the review predicted.
+
+**GBW (coordinator item, WO-22: ≤ 3.33 ppm needs ≈ 26.9 MHz at fp2/GBW 10, ≈ 28.4 MHz at 30).** Run 2, C_L 1.4 pF, boost, same current:
+
+| pair (m_in) | ss/125 GBW, β1 | fs/125 GBW, β1 | sf/125 GBW, β1 | fp2/GBW (no junction C) |
+|---|---|---|---|---|
+| 80/0.5 (rev C) | 27.6, 0.851 | **26.5**, 0.853 | 28.1, 0.851 | 5.1–6.3 |
+| 120/0.5 | 28.4, 0.839 | 26.9, 0.842 | 29.3, 0.838 | 4.3–5.5 |
+| 160/0.5 | 28.9, **0.827** ✗ | 27.2, 0.832 | 30.1, **0.826** ✗ | 3.8–4.9 |
+| 120/0.35 | 28.2, 0.850 | 25.3, 0.854 | 29.5, 0.849 | 4.6–6.3 |
+| 160/0.35 | 28.8, 0.841 | 25.4, 0.846 | 30.2, 0.839 | 4.1–5.7 |
+
+(β1 = 4/(4.5 + Cp_vg), Cp_vg scaled from §2.2 by the pair Cgg.)
+
+- **Route (i), GBW ≥ 28.5 MHz worst-case at the same current: not reachable.** The pair is in weak/moderate inversion; the best same-current option (120/0.5) gains +1.5 % at fs/125 (26.9 MHz, β1 ≥ 0.838). 160/0.5 gains +2.6 % but breaks β1 ≥ 0.83 (CL-4) at ss/sf/125. Margin vs 28.5: −7 % (rev C), −5.6 % (120/0.5). Against the ×10 figure 26.9 MHz: −1.5 % (rev C), 0 % (120/0.5).
+- Route (i) **with current** (flagged, not applied): +7.5 % gm at fs/125 needs ≈ +8–12 % tail and fold current, i.e. ≈ +8–12 µA in fast mode (fast ≈ 197–201 µA instead of ≈ 189).
+- **Route (ii)**, fp2/GBW aimed at ≈ 2.5 with C_FOLD_EXTRA: today 5.1–6.3 at hot boost without junction caps; the junction and fold-chopper caps take ≈ 20–30 % off (≈ 3.6–5.0). The hot-boost corner spread of fp2/GBW is about ±10 %, against a ±15 % window, which leaves ≈ ±5 % for the cap tolerance and the junction-cap estimate. Workable only with PEX-level caps; gate B decides.
+- Options: (a) 120/0.5 pair (free, β1 0.838) plus route (ii); (b) route (i) at +8–12 µA, which needs a user decision against D51/D53.
+
+**Bias budget, 1:32 (CL-7/D53).** Base reference legs (boost ×2): btp I_TAIL/32 0.58 µA, bn I_SINK/32 0.78, bp 0.75·I_nc/32 0.37, vbnc I_nc/32 0.49, vbpc I_nc/32 0.49, V_BL0 replica 0.25·I_nc/32 0.12 → **2.84 µA base / 5.67 µA boost**; V_ICM + V_OCM sources 1 µA each (allowance, C6), not boosted → **4.8 / 7.7 µA**.
+- Settling to 0.1 % (7τ, base, gm ≈ 2I/0.25 V, HAND): bn (≈ 1.6 pF) 1.8 µs, bp (≈ 1.1 pF) 2.6 µs, btp 0.4 µs, vbnc 0.6 µs, vbpc (≈ 0.6 pF with m_pc 80/2) 1.1 µs; all ≤ 4 µs (CL-7). At the tb12 broken copy 1:256, bp takes ≈ 21 µs ⇒ REJECT.
+- **Fast mode ≈ 196 − 14.5 + 7.7 ≈ 189 µA** (≈ 187 µA without the V_ICM/V_OCM allowance). Core boost SIM 102–110 µA device sum at hot (rev B 97–98); to be re-read from run 3.
+
+**A(v) tables and table-INL (CL-1b).** Run 2 tables were a tool error: a single −1.8 → +1.8 V sweep started in the clipped state and the servo stayed in the rail state (lock lost at 0.05 V at every corner). Run 3 sweeps outward from 0 V in both directions. Results: §2.10.
 
 ## Rev B changes (summary)
 
@@ -293,6 +345,49 @@ Not re-simulated (WO-23). HAND:
 - Fast-mode system ≈ 188 + 8.5 ≈ **196 µA** after trim. That is inside the 200 µA design budget but over the D46c 189 µA risk figure. **This is an open item for the user** (§6, R5).
 - **Option with the same settling:** bn and bp at 1:16, plus a reset-window pre-charge switch that shorts each bias node to its new-mode replica for the first 100 ns. Bias ≈ 4.4 / 8.9 µA, fast ≈ 191 µA.
 - The CMFB loop re-settles in ≈ 5τ_cm ≈ 110 ns (f_cm ≈ 7 MHz) ✓.
+
+### 2.10 Rev C results (WO-23)
+
+Runs under `/home/mempool/regr/tt/WO-23/c1/`: r3 (K_P 6, pair 80/0.5), r4 (K_P 7 + K_P 8 info rows, pair 120/0.5, D54), run 5 (top level: K_P 8 base / 7 boost, pair 120/0.5). Spot runs, ideal CMFB, no junction caps; not C1b gates.
+
+**Script history (tool errors, not design results).**
+- r2: a single −1.8 → +1.8 V DC sweep starts clipped; the servo stays at the rail. Fixed: two sweeps outward from 0 V.
+- r3: |A+ − A−| up to 1.02 dB, only at |v| ≤ 0.15 V; ≤ 0.16 dB from 0.5 V up. Cause: vin at 0.05 V is ≈ 6 µV and the servo node is resolved to vntol = 1 µV (gains quantised at 76.06 / 78.13 / 79.2 dB). The limit was not relaxed.
+- r4: `vntol 1e-10 abstol 1e-15` broke DC convergence (lock lost at 0.05–0.35 V, fs/−40 AC dead). Fixed in run 5: tolerances back to default, servo node scaled ×1000 (x = 1000·vin), so 1 µV on x is 1 nV on vin.
+- r4 strict-mode check worked as intended: its truncated tables (0.1–0.3 V) REJECTed with "|x| 0.486 V diff outside A(v) table range".
+
+**Margins, span, A0, GBW (r4 .op/.ac, pair 120/0.5; valid: the op/ac do not depend on the DC sweep).**
+
+| corner | K_P 7 base: m_pl margin / A0 | K_P 8 base (info) | K_P 7 boost: m_pl / span / A0 | K_P 8 boost (info): span / A0 | GBW boost / β1 / fp2/GBW |
+|---|---|---|---|---|---|
+| tt/27 | 0.069 / 77.8 | 0.101 / 80.9 | 0.122 / 2.06 / 82.7 | 2.02 / 84.5 | 33.8 / 0.837 / 4.4 |
+| ss/−40 | 0.059 / 77.8 | 0.087 / 81.3 | 0.108 / 1.90 / 83.4 | 1.86 / 85.6 | 43.3 / 0.831 / 3.7 |
+| ss/125 | 0.097 / 79.0 | 0.137 / 81.4 | 0.168 / **1.41** / 81.7 | **1.355** ✗ / 82.9 | 28.5 / 0.839 / 4.8 |
+| fs/125 | 0.076 / 76.5 | 0.112 / **79.5** | 0.133 / 1.48 / 80.1 | 1.43 / 81.8 | **27.0** / 0.842 / 5.4 |
+| sf/125 | 0.099 / 79.0 | 0.139 / 81.0 | 0.171 / 1.50 / 81.6 | 1.44 / 82.7 | 29.4 / 0.838 / 4.3 |
+| ff/−40 | **0.049** / 76.2 | 0.074 / **79.7** | 0.089 / 2.61 / 82.3 | 2.57 / 84.7 | 42.6 / 0.834 / 3.6 |
+| ff/125 | 0.081 / 78.0 | 0.117 / 80.4 | 0.139 / 2.17 / 81.5 | 2.11 / 83.0 | 28.3 / 0.842 / 4.9 |
+| fs/−40 | **0.043** / (ac failed) | (failed) | 0.083 / 1.95 / (ac failed) | — | — |
+| sf/−40 | 0.062 / 77.1 | 0.090 / 80.2 | 0.111 / 1.96 / 82.4 | 1.92 / 84.4 | 40.4 / 0.832 / 3.4 |
+
+- **One K_P cannot serve both modes:** K_P 7 leaves m_pl 0.043 / 0.049 V at fs/−40 and ff/−40 base; K_P 8 cuts the ss/125 boost span to 1.355 V. Base has ≥ 1.8 V span. **Run 5 uses K_P 8 in base and 7 in boost**: same m_bpc 1.25/7, diode current I_NC/28 base and I_NC/16 boost (boost scale 0.875). Cost +0.07 µA base, −0.12 µA boost vs a flat 1:32.
+- **I_fold/I_tail 1.27–1.35, core 47.4–48.7 µA base / 96.4–98.3 µA boost** at all points: the unit-finger 1:32 mirrors hold the ratio.
+- **GBW with the 120/0.5 pair (D54):** worst 27.0 MHz (fs/125 boost), 28.3–29.4 at the other hot corners; β1 0.831–0.846 (min ss/−40 boost, CL-4 ≥ 0.83 with 0.001 margin). fp2/GBW 3.4–6.1 without junction caps. Against WO-22: +0.4 % on 26.9 MHz (fp2/GBW 10), −5 % on 28.4 MHz (×30).
+- **Precision A0 ≥ 80 dB: FAIL.** K_P 7 base 76.2–79.0 dB. K_P 8 base (the run-5 base bias) 79.5–81.4 dB: fs/125 79.5 and ff/−40 79.7 are still below 80; fs/−40 not measured. **Next lever (not applied, user decision):** m_plc L 2 → 4 with Cc 0.2 pF (RB-m2: +1.16 dB on R_up, f_cm ≈ 5.7 MHz, C_L sum 1.40 pF). This would give ≈ 80.7 dB at fs/125. Alternative: m_pl L 4 → 6 (more ro, same W; costs headroom at ≈ +0.03 V Vdsat).
+- **f_cm:** m_plc is unchanged (15/2), so HAND f_cm stays ≈ 7 MHz base / 11 MHz boost (§1.3). With the m_plc L 4 lever it falls to ≈ 4.1 MHz unless Cc 0.2 pF is added (RB-m2).
+
+**Table-INL (CL-1b, model strict, OTA1 table on stage 1, OTA2 ideal).** r3 tables (K_P 6, pair 80/0.5), all 9 PVT, symmetry artefact aside:
+
+| mode, N | gate | range over 9 PVT | worst |
+|---|---|---|---|
+| boost, N 1024, 4 MHz | 3.33 ppm | 0.75–2.43 | ss/125 2.43, fs/125 2.37 |
+| precision, N 1024 | 5.33 ppm | 0.55–2.13 | sf/125 |
+| precision, N 4096 | 5.33 ppm | 0.51–2.12 | sf/125 |
+
+- max |x1| 1.20–1.21 V diff, max |x2| 1.19–1.25 V, inside the 1.8 V tables everywhere.
+- **Broken copy (CL-1b, m_pl and m_plr L 0.5): BLIND.** It lowers A0 by only 4–7 dB (the PMOS cascode still multiplies ro_pl): ss/125 boost 3.02 ppm (≤ 3.33, passes), tt base 0.69 / 0.57 ppm. The gate does respond (+25 %), but this copy cannot prove it.
+- **Destructive copy added: PMOS cascodes shorted D–S** (as rev B's m_nc short): A0 51.5–52 dB, span 0.54–0.92 V (r4 op/ac). Its INL REJECT is checked on the run-5 tables.
+- **Proposed CL-1b amendment (SPEC frozen):** "Broken copy: PMOS cascode D–S short ⇒ REJECT on INL; m_pl L 0.5 kept as a sensitivity row (moves INL ≈ +25 % at ss/125 boost, does not cross the gate)."
 
 ## 3. Expected values (rev B)
 
