@@ -10,3 +10,4 @@
 - [Autonomy](feedback-autonomy.md) — keep working, log decisions, nothing outward-facing
 - [Full context snapshot](../CONTEXT.md) — ~/projects/tt/CONTEXT.md: all decisions, learnings, corrections, model results, next steps
 - [Sandbox incident 2026-11-07](project-sandbox-incident-2026-11-07.md) — first sync deleted AlphaOneSoC files in /home/mempool/tt; tt lives in tt-sd
+- [No load gate](feedback-no-load-gate.md) — don't wait for sandbox load; run now, still ≤5 own procs, nice+timeout
