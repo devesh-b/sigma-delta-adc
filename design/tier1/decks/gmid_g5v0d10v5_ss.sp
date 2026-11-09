@@ -1,4 +1,4 @@
-* WO-14 item 1: gm/Id of sky130 pfet_g5v0d10v5, corner ss, L 1 and 2 um, Vsd 0.5 V, bulk = source, 4 temperatures. Output: gmid_g5v0d10v5_ss_T<temp>.csv (Vsg, Id1, Id2)
+* WO-14/15 item 1: gm/Id of sky130 pfet_g5v0d10v5, corner ss, W 10 um, L 1, 2 um, |Vds| 0.5 V, bulk = source, 4 temperatures. Output: gmid_g5v0d10v5_ss_T<temp>.csv (Vsg, Id1..Id2, L order (1, 2)), gmid_g5v0d10v5_ss_op.csv (BSIM gm and Id from .op, T 27)
 .lib /home/mempool/.ciel/sky130A/libs.tech/ngspice/sky130.lib.spice ss
 Vs s 0 3.3
 Vsg s g 0
