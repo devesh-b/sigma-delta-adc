@@ -562,3 +562,10 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - User D53: CL-7 (boost-toggle settling 4 µs) and CL-1b (boost gain gated by table-INL) accepted (bfb7e92).
 - The WO-22 sweeps finished; the agent was resumed for the O2 reruns and results.
 - WO-23 (Opus, rev C) dispatched. After it: WO-24 = netlist + full 45 PVT tbs + gate B (needs C_FOLD_EXTRA from WO-22).
+- 2026-11-10: the usage limit hit at ~19:50 stopped WO-23. After the reset both agents were resumed:
+  - WO-23 continues rev C;
+  - WO-22 finishes its O2 refinement, pytest, results and commit 2.
+- WO-22 first pass (O1):
+  - OTA1 GBW needed for ≤ 3.33 ppm at N 1024 / 4 MHz: ≈ 27 MHz at fp2 ×10, ≈ 28.5 MHz at ×30. Rev B worst is 26.5 MHz, just short.
+  - Pole-after-tanh: the optimum stays at ×3 (3.58 ppm at 20 MHz), so the S5h result transfers.
+  - S4-shape A0 scan: ≈ 84 dB would be needed, and the droop shape sets INL (consistent with CL-1b).
