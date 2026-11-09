@@ -489,3 +489,11 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - boost/trim config;
   - status word / overrun;
   - readout word order.
+- Disk freed by the user (322 csv deleted, 115 GB free).
+- The old T4 csv was truncated (12.5 of 25.9 ms) → rerun launched in the T4 frozen dir; the csv is deleted after post-processing.
+- REVIEW-S7b + D48 (3651718): small edits, then freeze.
+  - Step gate option 2: in-loop transistor gate authoritative, step tb diagnostic.
+  - The D39 control is not A′.
+  - 0.94 µV governs.
+  - Status reports the frame's boost/trim.
+- S7b edit agent dispatched. After it: coordinator check, then **ask the user for the final freeze OK**.
