@@ -517,3 +517,10 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - INL 12.40 ppm; cubic residual rms 2.72 / max 9.14 ppm;
   - smooth, odd ≈ 5th-order shape (lag-1 autocorrelation 0.96), so the old "jagged" residual was an O0 artefact;
   - informational, closed (s5h addendum 2); the csv has been deleted.
+
+## Update 2026-11-09 — SPEC v1 FROZEN (D50), Stage C started
+- Freeze: e2c025a, local tag `spec-v1`. SPEC changes now go only through the SPEC change log.
+- PLAN marks the S → C gate as passed. DESIGN_GUIDE §8 updated.
+- C1 step 1: WO-20 (OTA1 design note, Opus) dispatched. Next:
+  1. reviewer on the note;
+  2. C1b: SIZES → netlist → tbs at 45 PVT, plus the in-loop gate (B).
