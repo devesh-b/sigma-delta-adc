@@ -556,3 +556,9 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - SPEC CL-4/5/6 applied, D52 (790c64a).
 - REVIEW-C1a-revB running. One question for the reviewer: can the 500 ns boost-toggle settling relax to "before the first valid pair"? D45(e) already flags that pair invalid, which would bring fast mode back to ≈ 189 µA.
 - The WO-22 sweeps are running (watcher armed).
+- REVIEW-C1a-revB (71bd8c4): proceed to C1b with conditions.
+  - RB-M1: the bias diodes are inconsistent with K.
+  - RB-M2: the hot-boost A(v) droop is likely > 5 ppm.
+- User D53: CL-7 (boost-toggle settling 4 µs) and CL-1b (boost gain gated by table-INL) accepted (bfb7e92).
+- The WO-22 sweeps finished; the agent was resumed for the O2 reruns and results.
+- WO-23 (Opus, rev C) dispatched. After it: WO-24 = netlist + full 45 PVT tbs + gate B (needs C_FOLD_EXTRA from WO-22).
