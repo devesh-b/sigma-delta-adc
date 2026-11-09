@@ -575,3 +575,11 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - S4-shape A0 would need 84 dB; flat passes at 60 dB.
   - Passed to WO-23: route (i) GBW ≥ 28.5 MHz, or (ii) fp2 ≈ 2.5× via C_FOLD_EXTRA.
 - WO-23 is running. It committed cf81c5b (model strict A(v) range check).
+- WO-23 run 1: the narrow single-finger mirror references broke the ratio; fixed with unit-finger 1:32 mirrors (I_fold/I_tail 1.27–1.36 confirmed).
+- WO-23 run 2:
+  - K_P 4 put m_pl/m_plc ~0.04 V into triode, so K_P goes to 6 (interpolated);
+  - the A(v) sweep stuck at the rail (script), now split into 0→±1.8 V;
+  - span at K_P 5 is 1.55–1.63 V.
+- GBW: rev C 26.5 MHz worst; pair 120/0.5 gives 26.9 MHz (β1 0.84); 160/0.5 breaks β1.
+- **User D54:** free route (120/0.5 pair plus fold-cap fp2 placement, gate B decides; current only as a fallback, with OK).
+- Run 3 (K_P 6, split sweep, tables) is running; a watcher is armed. Resume the WO-23 agent when it finishes.
