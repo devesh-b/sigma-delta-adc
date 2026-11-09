@@ -447,3 +447,12 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - How is order 1 built in the analog?
   - Is the raw pin defined during reset?
   - Frame double-buffering?
+- **WO-18 done** (93e3528, 0de07b4, 95564bc).
+  - 1054 frames plus a 396-cycle control trace, 777 KB, sha f08faffe….
+  - Every mutant (data, sequencer, trace, offset) REJECTs. 24-bit acc2 and 14-bit acc1 ACCEPT, as required.
+  - Coordinator acceptance:
+    - pytest 147 pass, 2 skip;
+    - hash matches;
+    - own trace-bit flips (sys_swap, acc_clear, raw_pin) all caught.
+  - Cycle-level choices recorded as SPEC D45(k).
+- **Next: S7** = reviewer pass over SPEC v1 (all review findings closed? consistent?), then the user's OK, which includes D45 (e), (g), (i).
