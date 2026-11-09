@@ -53,6 +53,7 @@ DEFAULT = dict(
     sr2=None, gbw2=None,    # v2: OTA2's own SR [V/s] and GBW [Hz] (C-M1). None: sr2 = max(sr, TIER1_SR2 = 25 V/us), gbw2 = gbw
     boost1_only=False,      # v2: with boost, only OTA1 is boosted (OTA2 stays at its base bias)
     bstgm1=None, bstgm2=None,  # v2 (WO-14, C-M1): per-OTA gm boost factor, separate from the tail-current boost bst (gm scales sub-linearly with current). None: = bst
+    fp2_fixed=None,         # v2 (WO-15 m3): None = second pole = fp2_mult*GBW*bstgm (tracks the boost); (g1, g2) [Hz] = hold the pole at fp2_mult*g_k, i.e. at the base gm
     bst1=None, bst2=None,   # v2: explicit per-OTA boost factor (gm and tail current x bst); None = derived from boost/boost1_only (2.0 or 1.0)
     cptop=0.0, dcptop=0.0,  # D12 floating top-plate parasitic to ground, stage 1 [F]: Cp+ = cptop + dcptop/2, Cp- = cptop - dcptop/2
     rbl=1e12, rfl=1e13,     # island bleeders: vg -> cm (0 = removed) and floating plates -> cm (0 = removed)
@@ -254,7 +255,10 @@ def build_deck(cfg=None, rawfile=None):
         ip = bst * sr_k * cl                       # diff SR = I_tail / C_side
         im = ip * c["sr_asym"]
         g0 = gmk / a0
-        cf = 1.0 / (6.283185307179586 * c["fp2_mult"] * gbw_k * bstgm * 1e3)
+        if c["fp2_fixed"] is None:
+            cf = 1.0 / (6.283185307179586 * c["fp2_mult"] * gbw_k * bstgm * 1e3)
+        else:
+            cf = 1.0 / (6.283185307179586 * c["fp2_mult"] * float(c["fp2_fixed"][k - 1]) * 1e3)
         gcm = 6.283185307179586 * c["cmfb_bw"] * cl
         gtot = gcm * (1.0 + 10 ** (-c["cmfb_db"] / 20.0))
         w(f"Bdr{k} dr{k} 0 V = {vd_expr(k)}")

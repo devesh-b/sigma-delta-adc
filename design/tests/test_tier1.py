@@ -331,10 +331,104 @@ def test_bstgm_default_is_bit_identical_and_separates_gm_from_current():
 
 
 def test_gmid_ratio_helper_nonvacuous():
-    # synthetic curve: gm/Id = 25/(1+J/1e-7)^0.5, monotone. Ratio at k=2 must lie between 1 and 2 and below sqrt-law-free limit; a flat curve gives 1.
-    J = np.logspace(-9, -4, 400)
+    # synthetic curve gm/Id = 25/sqrt(1+J/1e-7). Analytic: base 10 -> J0 = 5.25e-7; gm/Id(2 J0) = 25/sqrt(11.5) = 7.372; ratio = 2 * 7.372 / 10 = 1.4744
+    J = np.logspace(-9, -4, 4000)
     g = 25.0 / np.sqrt(1.0 + J / 1e-7)
     r = TB.gm_ratio(J, g, 10.0, 2.0)
-    assert 1.2 < r < 2.0
+    assert abs(r / (2.0 * 25.0 / np.sqrt(1.0 + 2 * 5.25) / 10.0) - 1) < 0.01          # 1.474 +- 1 %
+    assert abs(r - 1.474) < 0.015
     assert abs(TB.gm_ratio(J, 1e-6 / J, 10.0, 2.0) - 1.0) < 0.01          # gm independent of Id (gm/Id = c/J) -> ratio 1
-    assert abs(TB.gm_ratio(J, np.linspace(30, 1, 400) * 0 + np.linspace(30, 1, 400), 10.0, 2.0) - 1.0) > 0.01
+    assert abs(TB.gm_ratio(J, np.linspace(30, 1, 4000), 10.0, 2.0) - 1.0) > 0.01
+
+
+def test_gmid_ratio_plateau_curve():
+    # pfet-like plateau: gm/Id rises slightly (20.9 -> 21.3) below the peak, then falls. The strong-inversion search must ignore the rising front.
+    J = np.logspace(-9, -4, 4000)
+    g_front = np.where(J < 1e-7, 20.9 + 0.4 * np.log10(J / 1e-9) / 2.0, 21.3 * np.sqrt(1.0 + 1e-7 / 1e-7) / np.sqrt(1.0 + J / 1e-7))
+    g_flat = np.where(J < 1e-7, 21.3, g_front)
+    for base in (10.0, 15.0):
+        assert abs(TB.gm_ratio(J, g_front, base, 2.0) - TB.gm_ratio(J, g_flat, base, 2.0)) < 1e-6
+    assert not np.isfinite(TB.gm_ratio(J, g_front, 25.0, 2.0))                  # base above the peak: unreachable, not extrapolated
+
+
+def test_gmid_checks_reject_broken_copies():
+    J = np.logspace(-9, -5, 400)
+    g = 25.0 / np.sqrt(1.0 + J / 1e-7)
+    assert TB.gmid_mono_violations(J, g) == 0
+    gb = g.copy()
+    gb[250] *= 1.2                                                              # bump on the strong-inversion side
+    assert TB.gmid_mono_violations(J, gb) > 0
+    Jr = J[::-1].copy()                                                         # Id decreasing with Vsg after the peak (wrong column / orientation)
+    assert TB.gmid_mono_violations(Jr, g) > 0
+
+
+def test_gmid_op_check_synthetic(tmp_path):
+    # square-law-ish synthetic device: Id = k (Vsg-0.4)^2, gm = 2 k (Vsg - 0.4); the check passes on a faithful op file and rejects shifted / foreign columns
+    n = len(TB.GMID_LS)
+    v = np.arange(0, 1.8 + 1e-9, 0.005)
+    ks = [1e-3 * (1 + c) for c in range(n)]
+    ids = [k * np.clip(v - 0.4, 0, None) ** 2 for k in ks]
+    np.savetxt(tmp_path / "gmid_01v8_tt_T27.csv", np.column_stack([v] + ids))
+    def op_file(name, scale=1.0, order=None):
+        rows = []
+        for vop in TB.GMID_OP_V["01v8"]:
+            gm = [2 * k * (vop - 0.4) * scale for k in ks]
+            idv = [k * (vop - 0.4) ** 2 for k in ks]
+            vals = gm + idv
+            rows.append(sum(([0.0, x] for x in vals), []))
+        np.savetxt(tmp_path / name, np.array(rows))
+    op_file("gmid_01v8_tt_op.csv")
+    e, msg = TB.gmid_op_errors(str(tmp_path), "01v8")
+    assert not msg and max(x[4] for x in e) < 0.005
+    e2, _ = TB.gmid_op_errors(str(tmp_path), "01v8", shift=1)
+    assert max(x[4] for x in e2) > TB.GMID_OP_TOL
+    op_file("gmid_n01v8_tt_op.csv", scale=1.1)                                   # a "foreign" op file 10 % off
+    e3, _ = TB.gmid_op_errors(str(tmp_path), "01v8", op_dev="n01v8")
+    assert max(x[4] for x in e3) > TB.GMID_OP_TOL
+
+
+def test_gmid_min_wl_target(tmp_path):
+    # gm/Id = 25/sqrt(1+J/1e-7) at all corners: target 10 at J_max = 5.25e-7 -> W/L = Id/J_max
+    J = np.logspace(-10, -4, 600)
+    g = 25.0 / np.sqrt(1.0 + J / 1e-7)
+    for c in TB.GMID_CORNERS:
+        for t in TB.GMID_TEMPS:
+            wl = TB.GMID_W / np.array(TB.GMID_LS)
+            ids = np.column_stack([J * w for w in wl])
+            # build an Id(Vsg) table whose per-L gm/Id(J) is g: Id = J*W/L, gm = g*Id; integrate gm over Vsg
+            v = np.cumsum(np.gradient(J) / (g * J))                              # dV = dJ / (gm/Id * J)
+            np.savetxt(tmp_path / f"gmid_{TB.GMID_PRIMARY}_{c}_T{t}.csv", np.column_stack([v] + [ids[:, k] for k in range(len(wl))]))
+    out = TB.gmid_min_wl(str(tmp_path), 10.0, 35e-6)
+    assert abs(out["1"]["wl"] / (35e-6 / 5.25e-7) - 1) < 0.03
+    out2 = TB.gmid_min_wl(str(tmp_path), 30.0, 35e-6)                            # above the peak 25: unreachable
+    assert not np.isfinite(out2["1"]["wl"])
+
+
+def test_fp2_fixed_default_bit_identical_and_holds_pole():
+    e = dict(fs=4e6, bst1=1.0, bst2=1.0, gbw=20e6, sr=25e6, gbw2=22.5e6, sr2=20.25e6)
+    d0, _ = G.build_deck(TB.v2_cfg(e, n=8, m=2))
+    d1, _ = G.build_deck(TB.v2_cfg(dict(e, fp2_fixed=None), n=8, m=2))
+    assert d0 == d1
+    d2, _ = G.build_deck(TB.v2_cfg(dict(e, fp2_fixed=(20e6, 22.5e6)), n=8, m=2))
+    assert d2 == d0                                                              # held at the same gm as the absolute point: identical
+    d3, _ = G.build_deck(TB.v2_cfg(dict(e, fp2_fixed=(10e6, 15e6)), n=8, m=2))
+    assert d3 != d0
+    cf0 = [l for l in d0.splitlines() if l.startswith("Cf1 ")][0].split()[-1]
+    cf3 = [l for l in d3.splitlines() if l.startswith("Cf1 ")][0].split()[-1]
+    assert abs(float(cf3) / float(cf0) - 2.0) < 1e-5                             # pole at half the frequency -> twice the capacitor
+
+
+def test_fast4_jobs_and_signed_inl():
+    jobs = TB.f4_jobs()
+    assert {j[0] for j in jobs} == {"A", "T1", "T2", "T3", "T4", "S", "Z"}
+    assert len([j for j in jobs if j[0] == "A"]) == 8
+    ctl = [j for j in jobs if j[0] == "A" and j[1] == "a_D39_hot"]
+    assert all(j[3]["gbw"] == 20e6 and j[3]["gbw2"] == 22.5e6 and j[3]["sr2"] == 20.25e6 and j[3]["bst1"] == 1.0 for j in ctl)
+    assert all(j[5] == 101 for j in jobs if j[0] == "T4")
+    # signed INL: a pure cubic error is removed by the third-order fit (resid ~ 0); a jagged error is not
+    u = np.linspace(-0.9, 0.9, 101)
+    e, rms, mx = TB.f4_signed(u, u + 1e-6 * (u ** 3 - 0.5 * u))
+    assert rms < 1e-6 and mx < 1e-6
+    rng = np.random.default_rng(1)
+    e, rms, mx = TB.f4_signed(u, u + 2e-6 * rng.standard_normal(101))
+    assert rms > 0.5

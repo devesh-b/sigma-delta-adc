@@ -1401,7 +1401,7 @@ GMID_DEVS = ("01v8", "n01v8", "g5v0d10v5")      # D40: pfet_01v8 primary, nfet_0
 GMID_PRIMARY = "01v8"
 GMID_CORNERS = ("tt", "ss", "ff")
 GMID_TEMPS = (-40, 27, 100, 125)
-GMID_LS = (1.0, 2.0)
+GMID_LS = (1.0, 2.0, 0.35, 0.5)
 GMID_W = 10.0
 GMID_J = (1e-9, 1e-8, 1e-7, 3e-7, 1e-6, 3e-6, 1e-5)     # Id/(W/L) [A] columns of the table
 GMID_BASES = {"OTA1": ((10.0,), (2.0,)), "OTA2": ((14.0, 17.0), (1.5, 2.0))}
@@ -1446,24 +1446,90 @@ def gm_ratio(J, g, base, k):
     return k * g1 / base if math.isfinite(g1) else float("nan")
 
 
+GMID_LS_DEV = {"g5v0d10v5": (1.0, 2.0)}      # pfet_g5v0d10v5 has no model bin below L 0.5 um at W 10 (0.35 fails to load): L 1 and 2 only
+
+
+def gmid_ls(dev):
+    return GMID_LS_DEV.get(dev, GMID_LS)
+
+
+GMID_OP_V = {"01v8": (0.6, 0.9, 1.3), "n01v8": (0.6, 0.9, 1.3), "g5v0d10v5": (0.9, 1.4, 2.2)}    # Vsg of the .op points (must match the decks)
+GMID_OP_TOL = 0.02          # numerical gm vs BSIM gm from .op
+GMID_MONO_TOL = 0.01        # strong-inversion side of the gm/Id peak must not rise by more than this (relative) between points
+GMID_WBINS = (2.0, 5.0, 20.0)
+GMID_TARGETS = (("OTA1 (x2 current, I_tail 35 uA)", 10.05, 35e-6), ("OTA2 x1.5 (I_tail 14.2 uA)", 13.96, 14.2e-6), ("OTA2 x2 (I_tail 18.9 uA)", 10.47, 18.9e-6))
+
+
+def gmid_mono_violations(J, g, tol=GMID_MONO_TOL):
+    """Count points on the strong-inversion side of the peak where gm/Id rises (or Id falls) between neighbours."""
+    pk = int(np.argmax(g))
+    gg, jj = g[pk:], J[pk:]
+    return int(np.sum(gg[1:] > gg[:-1] * (1.0 + tol)) + np.sum(jj[1:] < jj[:-1] * (1.0 - tol)))
+
+
+def gmid_op_errors(src, dev, corner="tt", T=27, shift=0, op_dev=None):
+    """Relative error numerical gm (dId/dVsg of the sweep) vs BSIM gm from .op, per (L, Vsg). shift/op_dev build the broken copies (wrong column / wrong device)."""
+    n = len(gmid_ls(dev))
+    od = op_dev or dev
+    if len(gmid_ls(od)) != n:
+        return None, [f"{od} and {dev} have different L sets"]
+    op = np.loadtxt(os.path.join(src, f"gmid_{od}_{corner}_op.csv"), ndmin=2)
+    if op.shape[1] != 4 * n:
+        return None, [f"{od} op file has {op.shape[1]} columns, expected {4 * n}"]
+    y = op[:, 1::2]
+    gm_b = np.abs(y[:, :n])
+    d = np.loadtxt(os.path.join(src, f"gmid_{dev}_{corner}_T{T}.csv"))
+    v = d[:, 0]
+    errs = []
+    for k, vop in enumerate(GMID_OP_V[od]):
+        i0 = int(np.argmin(np.abs(v - vop)))
+        for col in range(n):
+            gn = np.gradient(np.abs(d[:, 1 + (col + shift) % n]), v)[i0]
+            errs.append((gmid_ls(dev)[col], float(v[i0]), float(gn), float(gm_b[k, col]), abs(gn / gm_b[k, col] - 1.0)))
+    return errs, []
+
+
+def gmid_min_wl(src, target, id_a, dev=GMID_PRIMARY):
+    """Minimum W/L meeting gm/Id >= target at every corner/T for Id = id_a: W/L >= id_a / J_max(target), worst over corners; per L."""
+    out = {}
+    for col, L in enumerate(GMID_LS):
+        worst, nanc = None, []
+        for c in GMID_CORNERS:
+            for t in GMID_TEMPS:
+                J, g = gmid_curve(os.path.join(src, f"gmid_{dev}_{c}_T{t}.csv"), col)
+                jm = j_for_gmid(J, g, target)
+                if not math.isfinite(jm):
+                    nanc.append(f"{c}/{t}")
+                    continue
+                wl = id_a / jm
+                if worst is None or wl > worst[0]:
+                    worst = (wl, c, t)
+        out[f"{L:g}"] = dict(L=L, wl=(worst[0] if worst and not nanc else float("nan")), wl_ex_unreachable=(worst[0] if worst else float("nan")), corner=(worst[1] if worst else ""), T=(worst[2] if worst else 0),
+                             wl_area=((worst[0] * L * L) if worst and not nanc else float("nan")), unreachable=nanc)
+    return out
+
+
 def mode_gmid(args):
     src = args.src or os.path.join(OUT, "gmid")
-    rows, peaks, bad = [], [], []
+    rows, bad, wbin = [], [], []
     for dev in GMID_DEVS:
         for c in GMID_CORNERS:
             for t in GMID_TEMPS:
                 f = os.path.join(src, f"gmid_{dev}_{c}_T{t}.csv")
-                for col, L in enumerate(GMID_LS):
-                    if not os.path.exists(f):
-                        bad.append(f"missing {f}")
-                        continue
+                if not os.path.exists(f):
+                    bad.append(f"missing {f}")
+                    continue
+                for col, L in enumerate(gmid_ls(dev)):
                     J, g = gmid_curve(f, col)
                     ut = 8.617333e-5 * (t + 273.15)
                     bound = 1.0 / ut                                    # n = 1 (physical limit gm/Id < 1/(n UT), n >= 1)
                     pkv = float(np.max(g))
                     if not (np.all(np.isfinite(g)) and pkv < bound):
                         bad.append(f"{dev} {c} {t} L{L:g}: peak gm/Id {pkv:.2f} not below 1/UT {bound:.2f}")
-                    rows.append(dict(dev=dev, corner=c, T=t, L=L, peak=pkv, bound=bound, n_eff=bound / pkv,
+                    nv = gmid_mono_violations(J, g)
+                    if nv:
+                        bad.append(f"{dev} {c} {t} L{L:g}: {nv} monotonicity violation(s) on the strong-inversion side")
+                    rows.append(dict(dev=dev, corner=c, T=t, L=L, peak=pkv, bound=bound, n_eff=bound / pkv, mono_violations=nv,
                                      gmid={f"{j:g}": gmid_at(J, g, j) for j in GMID_J},
                                      ratios={f"{o}_{b:g}_x{k:g}": gm_ratio(J, g, b, k) for o, (bs, ks) in GMID_BASES.items() for b in bs for k in ks}))
     worst = {}
@@ -1476,26 +1542,57 @@ def mode_gmid(args):
             nan = [v for v in vals if not math.isfinite(v[0])]
             w = min(fin) if fin else (float("nan"), "", 0, 0)
             worst[dev][key] = dict(ratio=w[0], corner=w[1], T=w[2], L=w[3], unreachable_corners=len(nan))
-    # OTA2 base gm/Id needed for boosted loaded GBW >= 22.5 MHz: ratio >= 22.5/base_gbw, largest base gm/Id that still satisfies it (g5, worst corner)
-    need = {}
-    rr = [r for r in rows if r["dev"] == GMID_PRIMARY]
-    for gb in (15.0, 20.0):
-        req = 22.5 / gb
-        best = None
-        for b in np.arange(4.0, 24.01, 0.5):
-            ratios = []
-            for r in rr:
-                f = os.path.join(src, f"gmid_{GMID_PRIMARY}_{r['corner']}_T{r['T']}.csv")
-                J, g = gmid_curve(f, GMID_LS.index(r["L"]))
-                ratios.append(gm_ratio(J, g, float(b), 1.5))
-            if all(math.isfinite(x) for x in ratios) and min(ratios) >= req:
-                best = float(b)
-        need[f"gbw_base_{gb:g}"] = dict(required_ratio=req, max_base_gm_over_id=best)
-    out = dict(rows=rows, worst=worst, need_22p5=need, problems=bad)
+    # .op cross-check (3 Vsg points per device and L, tt, 27 C)
+    opx = {}
+    for dev in GMID_DEVS:
+        errs, msgs = gmid_op_errors(src, dev) if os.path.exists(os.path.join(src, f"gmid_{dev}_tt_op.csv")) else (None, [f"missing {dev} op file"])
+        bad += msgs
+        if errs:
+            opx[dev] = errs
+            m = max(e[4] for e in errs)
+            if not m <= GMID_OP_TOL:
+                bad.append(f"{dev}: numerical gm vs BSIM .op gm max error {m:.3%} > {GMID_OP_TOL:.0%}")
+    # broken copies: each must be flagged
+    selftest = {}
+    if "01v8" in opx:
+        e1, _ = gmid_op_errors(src, "01v8", shift=1)                  # wrong column
+        e2, _ = gmid_op_errors(src, "01v8", op_dev="n01v8")           # nfet BSIM gm against the pfet sweep
+        selftest["wrong_column_maxerr"] = max(e[4] for e in e1)
+        selftest["nfet_op_vs_pfet_maxerr"] = max(e[4] for e in e2)
+        Jb, gb = gmid_curve(os.path.join(src, "gmid_01v8_tt_T27.csv"), 0)
+        gbump = gb.copy()
+        gbump[int(np.argmax(gb)) + int(np.argmax(gb[int(np.argmax(gb)):] < 0.6 * np.max(gb)))] *= 1.2          # bump (below the peak) on the strong-inversion side
+        selftest["bumped_curve_violations"] = gmid_mono_violations(Jb, gbump)
+        selftest["clean_curve_violations"] = gmid_mono_violations(Jb, gb)
+        for k, okk in (("wrong column", selftest["wrong_column_maxerr"] > GMID_OP_TOL), ("nfet vs pfet", selftest["nfet_op_vs_pfet_maxerr"] > GMID_OP_TOL), ("bumped curve", selftest["bumped_curve_violations"] > 0)):
+            if not okk:
+                bad.append(f"broken copy '{k}' was NOT rejected")
+    # W-bin check (pfet_01v8, tt)
+    for t in GMID_TEMPS:
+        f = os.path.join(src, f"gmid_wbin_01v8_tt_T{t}.csv")
+        if not os.path.exists(f):
+            bad.append(f"missing {f}")
+            continue
+        d = np.loadtxt(f)
+        for k, (lj, w) in enumerate((l, w) for l in (1.0, 2.0) for w in GMID_WBINS):
+            v, i = d[:, 0], np.abs(d[:, 1 + k])
+            gm = np.gradient(i, v)
+            ok_ = i > 1e-13
+            J, g = i[ok_] / (w / lj), gm[ok_] / i[ok_]
+            nv = gmid_mono_violations(J, g)
+            if nv or not np.all(np.isfinite(g)):
+                bad.append(f"wbin W{w:g} L{lj:g} T{t}: {nv} monotonicity violation(s) or non-finite")
+            wbin.append(dict(T=t, L=lj, W=w, peak=float(np.max(g)), gmid={f"{j:g}": gmid_at(J, g, j) for j in GMID_J}))
+    # boosted-point minimum W/L (m1)
+    minwl = {}
+    if all(os.path.exists(os.path.join(src, f"gmid_{GMID_PRIMARY}_{c}_T{t}.csv")) for c in GMID_CORNERS for t in GMID_TEMPS):
+        for name, tg, ida in GMID_TARGETS:
+            minwl[name] = dict(target=tg, id_uA=ida * 1e6, per_L=gmid_min_wl(src, tg, ida))
+    out = dict(rows=rows, worst=worst, op_crosscheck={k: [list(e) for e in v] for k, v in opx.items()}, selftest=selftest, wbin=wbin, min_wl=minwl, problems=bad)
     os.makedirs(os.path.dirname(os.path.abspath(GMID_JSON)), exist_ok=True)
     json.dump(out, open(os.path.abspath(GMID_JSON), "w"), indent=1, default=float)
     jdump(out, "gmid_table.json")
-    md = ["# gm/Id table (WO-14 item 1)", "", "sky130A pfet_01v8 (primary, D40), nfet_01v8 and pfet_g5v0d10v5 (comparison), W 10 um, L 1 and 2 um, |Vds| 0.5 V, bulk at source, `.option gmin=1e-18`, DC sweep of Vsg. gm = dId/dVsg (numerical).",
+    md = ["# gm/Id table (WO-14 item 1, extended in WO-15)", "", "sky130A pfet_01v8 (primary, D40), nfet_01v8 and pfet_g5v0d10v5 (comparison), W 10 um, L 1, 2, 0.35 and 0.5 um, |Vds| 0.5 V, bulk at source, `.option gmin=1e-18`, DC sweep of Vsg. gm = dId/dVsg (numerical).",
           "Columns: gm/Id [1/V] at Id/(W/L) [A]. `peak` = max gm/Id; `1/UT` = n = 1 limit.", ""]
     for dev in GMID_DEVS:
         md += [f"## {'nfet_01v8' if dev == 'n01v8' else 'pfet_' + dev}", "", "| corner | T | L | peak | 1/UT | " + " | ".join(f"{j:g}" for j in GMID_J) + " |", "|---|---|---|---|---|" + "---|" * len(GMID_J)]
@@ -1503,17 +1600,27 @@ def mode_gmid(args):
             if r["dev"] == dev:
                 md.append(f"| {r['corner']} | {r['T']} | {r['L']:g} | {r['peak']:.1f} | {r['bound']:.1f} | " + " | ".join(f"{v:.1f}" for v in r["gmid"].values()) + " |")
         md.append("")
-    md += ["## gm(xk)/gm(base) at the worst corner (same W/L, Id x k)", "", "| device | key | ratio | corner | T | L | unreachable corners |", "|---|---|---|---|---|---|---|"]
+    md += ["## gm(xk)/gm(base) at the worst corner (same W/L, Id x k; worst over all L)", "", "| device | key | ratio | corner | T | L | unreachable corners |", "|---|---|---|---|---|---|---|"]
     for dev in GMID_DEVS:
         for key, w in worst[dev].items():
             md.append(f"| {dev} | {key} | {w['ratio']:.3f} | {w['corner']} | {w['T']} | {w['L']:g} | {w['unreachable_corners']} |")
-    md += ["", "## OTA2 base gm/Id needed for boosted loaded GBW >= 22.5 MHz (x1.5 current, pfet_01v8, worst corner)", ""]
-    for k, v in need.items():
-        md.append(f"- {k} MHz: needs gm ratio >= {v['required_ratio']:.3f}; largest base gm/Id meeting it: {v['max_base_gm_over_id']}")
+    md += ["", "## Minimum W/L meeting the boosted gm/Id target at every corner and temperature (pfet_01v8)", "",
+           "W/L >= Id / J_max(target), worst over ss/tt/ff x -40/27/100/125 C. W.L = (W/L) L^2 [um^2]. `unreachable` = corners whose peak gm/Id is below the target.", ""]
+    for name, v in minwl.items():
+        md += [f"### {name}: gm/Id >= {v['target']} at {v['id_uA']:g} uA", "", "| L [um] | W/L | W.L [um^2] | worst corner | unreachable corners |", "|---|---|---|---|---|"]
+        for k, e in v["per_L"].items():
+            md.append(f"| {e['L']:g} | {e['wl']:.1f} | {e['wl_area']:.1f} | {e['corner']}/{e['T']} | {', '.join(e['unreachable']) or 'none'} |" if math.isfinite(e["wl"]) else f"| {e['L']:g} | unreachable | - | - | {', '.join(e['unreachable'])} |")
+        md.append("")
+    md += ["## Numerical gm vs BSIM gm from .op (tt, 27 C; max relative error over the 3 Vsg points x 4 L per device)", ""]
+    for dev, errs in opx.items():
+        md.append(f"- {dev}: {max(e[4] for e in errs):.3%} (limit {GMID_OP_TOL:.0%}); points: " + ", ".join(f"L{e[0]:g}@{e[1]:.3f} V {e[4]:.2%}" for e in errs))
+    md += ["", f"Broken copies (must exceed the limit / flag): {selftest}", "", "## W-bin check (pfet_01v8 tt): gm/Id at J = Id/(W/L)", "", "| T | L | W | peak | " + " | ".join(f"{j:g}" for j in GMID_J) + " |", "|---|---|---|---|" + "---|" * len(GMID_J)]
+    for w_ in wbin:
+        md.append(f"| {w_['T']} | {w_['L']:g} | {w_['W']:g} | {w_['peak']:.1f} | " + " | ".join(f"{v:.1f}" for v in w_["gmid"].values()) + " |")
     md += ["", f"Problems: {bad if bad else 'none'}"]
     open(os.path.abspath(GMID_JSON).replace(".json", ".md"), "w").write("\n".join(md) + "\n")
-    print("\n".join(md[-12:]))
-    print("gmid ACCEPT" if not bad and rows else "gmid REJECT")
+    print("\n".join(l for l in md if l.startswith(("###", "| 0.", "| 1", "| 2", "- ", "Broken", "Problems"))))
+    print("gmid ACCEPT" if not bad and rows else "gmid REJECT: " + "; ".join(bad[:6]))
     return 0 if (not bad and rows) else 1
 
 
@@ -1576,10 +1683,128 @@ def mode_fast3(args):
     return 0 if ok else 1
 
 
+# ---- WO-15 (S5g): boosted operating points (absolute), trend discrimination, fp2 sensitivity
+F4_FS = 4e6
+F4_PTS = {  # absolute operating points: label -> (GBW1 [Hz], SR1 [V/s], GBW2 [Hz], SR2 [V/s]); bst = bstgm = 1 (absolute)
+    "a_D39_hot": (20e6, 25e6, 22.5e6, 20.25e6),
+    "b_cold_A": (30e6, 25e6, 34e6, 20.25e6),
+    "c_cold_Ap": (30e6, 25e6, 34e6, 27e6),
+    "d_hot_Ap": (20e6, 25e6, 22.5e6, 27e6),
+}
+F4_CONTROL_PPM = 3.686          # s5f NV_same row (bstgm = bst), N 1024
+F4_BASE_FP2 = (10e6, 15e6)      # base GBW1, GBW2 [Hz] whose gm sets the held second pole (fp2_fixed rows)
+F4_S5F_R1, F4_S5F_R2 = 1.423, 1.283    # s5f worst-corner gm ratios (OTA1 x2 at gm/Id 10, OTA2 x1.5 at gm/Id 14)
+F4_S5F_REF = {(15e6, 256): 6.70, (15e6, 1024): 9.95, (20e6, 256): 14.4, (20e6, 1024): 12.5}   # s5f INL [ppm], 21 points, default options
+F4_NS = (256, 1024)
+
+
+def f4_abs(label, **kw):
+    g1, s1, g2, s2 = F4_PTS[label]
+    return dict(fs=F4_FS, bst1=1.0, bst2=1.0, gbw=g1, sr=s1, gbw2=g2, sr2=s2, **kw)
+
+
+def f4_s5f(g2, **kw):
+    return dict(fs=F4_FS, bst1=2.0, bst2=1.5, bstgm1=F4_S5F_R1, bstgm2=F4_S5F_R2, sr=12.5e6, sr2=13.5e6, gbw=10e6, gbw2=g2, **kw)
+
+
+def f4_jobs():
+    jobs = []      # (group, kind, key, extra, n, m)
+    for n in F4_NS:
+        for lab in F4_PTS:
+            jobs.append(("A", lab, (n,), f4_abs(lab), n, 21))
+    for n in F4_NS:
+        for g2 in (15e6, 20e6, 25e6):
+            jobs.append(("T1", "ideal_ota1", (n, g2), dict(fs=F4_FS, bst1=1.0, bst2=1.0, gbw=1e9, sr=1e9, gbw2=g2, sr2=20.25e6), n, 21))
+    tight = dict(P.SPICE_OPTIONS_TIER1, reltol=1e-5, tmax_ns=P.SPICE_OPTIONS_TIER1["tmax_ns"] / 2)
+    for n in F4_NS:
+        for g2 in (15e6, 20e6):
+            jobs.append(("T2", "tight", (n, g2), f4_s5f(g2, options=dict(tight)), n, 21))
+            jobs.append(("T3", "fp2x30", (n, g2), f4_s5f(g2, fp2_mult=30.0), n, 21))
+            jobs.append(("T4", "m101", (n, g2), f4_s5f(g2), n, 101))
+    for n in F4_NS:
+        for lab in ("a_D39_hot", "c_cold_Ap"):
+            jobs.append(("S", lab + "_fp2base", (n,), f4_abs(lab, fp2_fixed=F4_BASE_FP2), n, 21))
+    for n in F4_NS:      # extra (not in the WO): item-1 rows again at reltol 1e-5, maxstep halved, because T2 shows the default options move the s5f rows by several ppm
+        for lab in F4_PTS:
+            jobs.append(("Z", lab + "_tight", (n,), f4_abs(lab, options=dict(tight)), n, 21))
+    return jobs
+
+
+def f4_signed(u, uh):
+    """Signed endpoint-line residual [ppm FSR] vs u and the residual after a third-order fit of that error."""
+    u, uh = np.asarray(u, float), np.asarray(uh, float)
+    i0, i1 = np.argmin(u), np.argmax(u)
+    ep = uh[i0] + (uh[i1] - uh[i0]) / (u[i1] - u[i0]) * (u - u[i0])
+    e = (uh - ep) / FS_FULL * 1e6
+    res = e - np.polyval(np.polyfit(u, e, 3), u)
+    return e, float(np.sqrt(np.mean(res ** 2))), float(np.max(np.abs(res)))
+
+
+def mode_fast4(args):
+    jobs = f4_jobs()
+    only = getattr(args, "only", None)
+    if only:
+        jobs = [j for j in jobs if j[0] in only.split(",")]
+    print(f"fast4: {len(jobs)} deck jobs")
+
+    def one(j):
+        grp, kind, key, e, n, m = j
+        return dc_metrics(v2_cfg(e, n=n, m=m), f"f4_{grp}_{kind}_" + "_".join(f"{x:g}" for x in key))
+    with ThreadPoolExecutor(2) as ex_:
+        out = list(ex_.map(one, jobs))
+    rows = []
+    for (grp, kind, key, e, n, m), o in zip(jobs, out):
+        r = dict(group=grp, kind=kind, key=list(key), n=n, m=m, ok=bool(o.get("ok")), inl_ep_ppm=o.get("inl_ep_ppm", float("nan")), inl_bf_ppm=o.get("inl_bf_ppm", float("nan")),
+                 gain_err=o.get("gain_err", float("nan")), runtime_s=o.get("runtime_s", float("nan")), problems=o.get("problems", []),
+                 extra={k: v for k, v in e.items() if k != "options"})
+        if grp == "T4" and o.get("u_in"):
+            sg, rms, mx = f4_signed(o["u_in"], o["u_hat"])
+            r.update(u=o["u_in"], signed_ppm=sg.tolist(), cubic_resid_rms_ppm=rms, cubic_resid_max_ppm=mx)
+        rows.append(r)
+    problems = []
+    tgt = lambda n: V5_TARGET[n]
+    print("\nItem 1: absolute boosted points, 4 MHz (GBW/SR are the boosted values; bst = bstgm = 1), INL endpoint ppm")
+    for r in rows:
+        if r["group"] == "A":
+            n = r["n"]
+            print(f"  {r['kind']:<10} OTA1 {r['extra']['gbw']/1e6:g} MHz/{r['extra']['sr']/1e6:g}, OTA2 {r['extra']['gbw2']/1e6:g} MHz/{r['extra']['sr2']/1e6:g}: N{n} INL {r['inl_ep_ppm']:.3f} vs {tgt(n):g}: {'PASS' if r['inl_ep_ppm'] <= tgt(n) else 'FAIL'}")
+    ctl = next((r for r in rows if r["group"] == "A" and r["kind"] == "a_D39_hot" and r["n"] == 1024), None)
+    if ctl:
+        okc = abs(ctl["inl_ep_ppm"] - F4_CONTROL_PPM) <= 0.02 * F4_CONTROL_PPM
+        print(f"  control (a) N1024 {ctl['inl_ep_ppm']:.3f} vs s5f {F4_CONTROL_PPM} (2 %): {'ok' if okc else 'MISMATCH'}")
+        if not okc:
+            problems.append("control (a) not within 2 % of 3.686 ppm")
+    for r in rows:
+        if r["group"] == "Z":
+            n = r["n"]
+            base = next((x for x in rows if x["group"] == "A" and x["kind"] + "_tight" == r["kind"] and x["n"] == n), None)
+            print(f"  [tight options] {r['kind']:<16} N{n} INL {r['inl_ep_ppm']:.3f} vs {tgt(n):g}: {'PASS' if r['inl_ep_ppm'] <= tgt(n) else 'FAIL'}" + (f" (default options {base['inl_ep_ppm']:.3f})" if base else ""))
+    print("\nItem 2: trend discrimination (4 MHz)")
+    for r in rows:
+        if r["group"] in ("T1", "T2", "T3"):
+            n, g2 = r["key"]
+            ref = F4_S5F_REF.get((g2, int(n)))
+            print(f"  {r['group']} {r['kind']:<10} N{int(n)} GBW2 {g2/1e6:g} MHz: INL {r['inl_ep_ppm']:.3f} ppm" + (f" (s5f default-options 21-pt: {ref})" if ref and r['group'] != 'T1' else ""))
+    for r in rows:
+        if r["group"] == "T4":
+            n, g2 = r["key"]
+            print(f"  T4 m101 N{int(n)} GBW2 {g2/1e6:g} MHz: INL ep {r['inl_ep_ppm']:.3f} ppm; signed min/max {min(r['signed_ppm']):+.3f}/{max(r['signed_ppm']):+.3f}; cubic-fit residual rms {r['cubic_resid_rms_ppm']:.4f}, max {r['cubic_resid_max_ppm']:.4f} ppm")
+    print("\nItem 3: second pole held at the base gm (GBW 10 / 15 MHz x fp2_mult), INL ppm vs second pole tracking")
+    for r in rows:
+        if r["group"] == "S":
+            n = r["n"]
+            base = next((x for x in rows if x["group"] == "A" and x["kind"] == r["kind"].replace("_fp2base", "") and x["n"] == n), None)
+            print(f"  {r['kind']} N{n}: {r['inl_ep_ppm']:.3f}" + (f" vs tracking {base['inl_ep_ppm']:.3f}" if base else ""))
+    ok = all(r["ok"] for r in rows) and all(math.isfinite(r["inl_ep_ppm"]) for r in rows) and len(rows) == len(jobs) and not problems
+    jdump(dict(rows=rows, problems=problems), "fast4" + ("_" + only.replace(",", "") if only else "") + ".json")
+    print("run-health ACCEPT" if ok else "run-health REJECT: " + "; ".join(problems))
+    return 0 if ok else 1
+
+
 def main():
     ap = argparse.ArgumentParser()
     for m in ("null", "options", "dc", "sweep", "nonvac", "xcheck", "av", "knees2", "cm", "offsets", "rsrc", "nonvac2",
-              "knees3", "cm2", "drift", "rsrc2", "nonvac3", "nonvac4", "knees4", "fast2", "nonvac5", "fast3", "gmid"):
+              "knees3", "cm2", "drift", "rsrc2", "nonvac3", "nonvac4", "knees4", "fast2", "nonvac5", "fast3", "gmid", "fast4"):
         ap.add_argument(f"--{m}", action="store_true")
     ap.add_argument("--only", default=None, help="fast2: comma list of V4,V5i,V5ii")
     ap.add_argument("--src", default=None, help="gmid: directory with the gmid_*.csv files")
@@ -1610,7 +1835,7 @@ def main():
         return mode_nonvac(a)
     for nm, fn in (("xcheck", mode_xcheck), ("av", mode_av), ("knees2", mode_knees2), ("cm", mode_cm), ("offsets", mode_offsets),
                    ("rsrc", mode_rsrc), ("nonvac2", mode_nonvac2), ("knees3", mode_knees3), ("cm2", mode_cm2),
-                   ("drift", mode_drift), ("rsrc2", mode_rsrc2), ("nonvac3", mode_nonvac3), ("nonvac4", mode_nonvac4), ("knees4", mode_knees4), ("fast2", mode_fast2), ("nonvac5", mode_nonvac5), ("fast3", mode_fast3), ("gmid", mode_gmid)):
+                   ("drift", mode_drift), ("rsrc2", mode_rsrc2), ("nonvac3", mode_nonvac3), ("nonvac4", mode_nonvac4), ("knees4", mode_knees4), ("fast2", mode_fast2), ("nonvac5", mode_nonvac5), ("fast3", mode_fast3), ("gmid", mode_gmid), ("fast4", mode_fast4)):
         if getattr(a, nm):
             return fn(a)
     ap.print_help()
