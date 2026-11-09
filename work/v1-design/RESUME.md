@@ -456,3 +456,22 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
     - own trace-bit flips (sys_swap, acc_clear, raw_pin) all caught.
   - Cycle-level choices recorded as SPEC D45(k).
 - **Next: S7** = reviewer pass over SPEC v1 (all review findings closed? consistent?), then the user's OK, which includes D45 (e), (g), (i).
+- REVIEW-S7 (1b6bca3): FREEZE WITH EDITS.
+  - All 46 prior Critical/Major findings closed.
+  - New Majors:
+    - S7-M1: step gate has no threshold;
+    - S7-M2: boost/trim not latched or tagged;
+    - S7-M3: digital I/O undefined;
+    - S7-M4: §3.4 caps wrong.
+  - Plus E1–E24 text edits.
+- User answers → D46 (uncommitted: 1Password LOCKED):
+  - D45 e/g/i confirmed;
+  - **16-bit parallel readout on uo + uio**;
+  - 200 µA is a design budget;
+  - full freeze.
+- WO-19 written (uncommitted) and dispatched. The agent leaves its work uncommitted if signing stays locked.
+- **Commit once unlocked:**
+  1. D46 (`DECISIONS.md`);
+  2. WO-19 + INDEX + RESUME;
+  3. the WO-19 agent's commits (file lists in its report).
+- Then: reviewer re-check of the S7 edits, then the user's final OK → mark SPEC v1-frozen → S→C gate.
