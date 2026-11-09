@@ -348,7 +348,7 @@ Not re-simulated (WO-23). HAND:
 
 ### 2.10 Rev C results (WO-23)
 
-Runs under `/home/mempool/regr/tt/WO-23/c1/`: r3 (K_P 6, pair 80/0.5), r4 (K_P 7 + K_P 8 info rows, pair 120/0.5, D54), run 5 (top level: K_P 8 base / 7 boost, pair 120/0.5). Spot runs, ideal CMFB, no junction caps; not C1b gates.
+Runs under `/home/mempool/regr/tt/WO-23/c1/`: r3 (K_P 6, pair 80/0.5), r4 (K_P 7 + K_P 8 info rows, pair 120/0.5, D54), run 5 (`r5`/top level: K_P 8 base / 7 boost, pair 120/0.5). Spot runs, ideal CMFB, no junction caps; not C1b gates.
 
 **Script history (tool errors, not design results).**
 - r2: a single −1.8 → +1.8 V DC sweep starts clipped; the servo stays at the rail. Fixed: two sweeps outward from 0 V.
@@ -388,6 +388,33 @@ Runs under `/home/mempool/regr/tt/WO-23/c1/`: r3 (K_P 6, pair 80/0.5), r4 (K_P 7
 - **Broken copy (CL-1b, m_pl and m_plr L 0.5): BLIND.** It lowers A0 by only 4–7 dB (the PMOS cascode still multiplies ro_pl): ss/125 boost 3.02 ppm (≤ 3.33, passes), tt base 0.69 / 0.57 ppm. The gate does respond (+25 %), but this copy cannot prove it.
 - **Destructive copy added: PMOS cascodes shorted D–S** (as rev B's m_nc short): A0 51.5–52 dB, span 0.54–0.92 V (r4 op/ac). Its INL REJECT is checked on the run-5 tables.
 - **Proposed CL-1b amendment (SPEC frozen):** "Broken copy: PMOS cascode D–S short ⇒ REJECT on INL; m_pl L 0.5 kept as a sensitivity row (moves INL ≈ +25 % at ss/125 boost, does not cross the gate)."
+
+**Run 5 (final rev C sizes: pair 120/0.5, K_P 8 base / 7 boost, servo node ×1000). All 18 copies ACCEPT in revc_check (EXIT 0, 4 logs).**
+
+| corner | base: m_pl margin / A0 / A(v)min ≤1.4 V | boost: m_pl / span / A0 / A(v)min | sym max (dB) | INL boost N1024 (≤ 3.33) | INL prec N1024 / N4096 (≤ 5.33) |
+|---|---|---|---|---|---|
+| tt/27/3.3 | 0.100 / 80.8 / 79.9 | 0.122 / 2.06 / 82.7 / 80.7 | 0.001 | 0.68 | 0.44 / 0.42 |
+| ss/−40/3.0 | 0.086 / 81.2 / 80.5 | 0.108 / 1.90 / 83.4 / 82.0 | 0.001 | 0.47 | 0.34 / 0.33 |
+| ss/125/3.0 | 0.135 / 81.3 / 79.6 | 0.168 / **1.41** / 81.7 / 74.4 | 0.002 | **2.20** | 0.74 / 0.73 |
+| fs/125/3.0 | 0.109 / **79.3** ✗ / 77.8 | 0.133 / 1.48 / 80.1 / 73.5 | 0.001 | **2.31** | 0.81 / 0.79 |
+| sf/125/3.0 | 0.137 / 81.0 / 79.4 | 0.171 / 1.50 / 81.6 / 76.8 | 0.001 | 1.61 | 0.74 / 0.73 |
+| ff/−40/3.6 | 0.073 / **79.5** ✗ / 79.0 | 0.089 / 2.61 / 82.3 / 81.3 | 0.002 | 0.38 | 0.33 / 0.31 |
+| ff/125/3.6 | 0.115 / 80.3 / 79.0 | 0.139 / 2.17 / 81.5 / 77.3 | 0.001 | 1.38 | 0.64 / 0.63 |
+| fs/−40/3.0 | 0.067 / **78.4** ✗ / 77.8 | 0.083 / 1.95 / 81.0 / 79.9 | 0.002 | 0.52 | 0.40 / 0.39 |
+| sf/−40/3.0 | 0.089 / 80.1 / 79.4 | 0.111 / 1.96 / 82.4 / 81.2 | 0.001 | 0.52 | 0.43 / 0.41 |
+
+- Every table reaches ±1.8 V with A ≥ 40 dB and lock; symmetry ≤ 0.002 dB (the r3 asymmetry was the vin resolution, now gone). max |x1| 1.200–1.209 V diff, max |x2| 1.17–1.25 V: inside every table, strict mode never raised.
+- **Table-INL: PASS at all 9 PVT × both modes** (boost worst 2.31 ppm fs/125, 69 % of gate; precision worst 0.81 ppm). GBW 27.0 MHz worst (fs/125 boost), β1 0.831–0.846.
+- **Precision A0 ≥ 80 dB: FAIL at 3 of 9** (fs/−40 78.4, fs/125 79.3, ff/−40 79.5 dB); 80.1–81.3 elsewhere.
+- **Broken copies (table-INL):**
+  - PMOS cascode short, ss/125 boost: 9.86 ppm > 3.33 ⇒ **REJECTED (good)**.
+  - PMOS cascode short, tt base (precision gate): 3.37 / 3.04 ppm ≤ 5.33 ⇒ **PASSED: the precision gate is blind to this copy** (A0 52 dB, span 0.92 V still gives ≤ 3.4 ppm at the base-mode swing). Needs a precision-mode broken copy that crosses 5.33 ppm (WO-24).
+  - m_pl + m_plr L 0.5: ss/125 boost 3.13 ppm, tt base 0.60 / 0.57 ppm ⇒ PASSED (sensitivity row only, per CL-1c).
+- Evidence: `work/v1-design/results/wo23/r5_*.json` (tables + `r5_table_inl.json`); command `PYTHONPATH=/home/mempool/regr/tt/WO-23 python revc_inl.py out_tab`.
+
+**Next actions (D55, user 2026-11-10; not implemented here).**
+- Precision A0 ≥ 80 dB is kept. Fix in **WO-24** (fresh agent): m_plc L 2 → 4 with Cc 0.2 pF (RB-m2; ≈ +1.16 dB, f_cm ≈ 5.7 MHz), then rerun the tables and table-INL.
+- **SPEC CL-1c:** the PMOS cascode D–S short is the required broken copy for the INL gate; m_pl L 0.5 becomes a sensitivity row. Open point from run 5: at the precision gate (tt base) this copy is not rejected (3.37 ppm ≤ 5.33); WO-24 needs a precision-mode broken copy that is.
 
 ## 3. Expected values (rev B)
 
