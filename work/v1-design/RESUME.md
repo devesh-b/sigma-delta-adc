@@ -300,3 +300,20 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - The agent edits code locally, and runs only when the load is below 4.
   - If the load stays high, it commits the untested code and stops with a report.
 - Next: WO-16 result, then acceptance on a frozen copy, then the reviewer, then S6.
+
+## Update 2026-11-09 ~10:00 (WO-16 partial, load-blocked)
+- The sandbox load stayed at about 8–10 from AlphaOneSoC jobs, against the gate of below 4.
+- WO-16 committed b9e924c, untested:
+  - G-M2 `per_device_current()` + hand-value test;
+  - `P.option_ladder` O0–O2, `--opt` / `--method` / `--reltol-only` / `--tmax-only`;
+  - `TB.converge_verdict` + test.
+- `test_gmid_min_wl_per_device_hand_values` FAILS until `gmid_table` is regenerated (the JSON still holds I_tail values).
+- Items 3 and 4 (reruns, fp2 window) not started.
+- The agent left local wait loops behind, one of them a broken `until` that spammed ssh. Coordinator killed them. Lesson for WOs: no shell-side wait loops; check once, then stop.
+- **Resume when load < 4**, in this order:
+  1. sync;
+  2. pytest;
+  3. `tier1_tb.py --gmid --src <gmid CSV dir>`, then pytest again;
+  4. smoke-test 1 job per new mode;
+  5. dispatch a fresh agent for items 3–4 (WO-16 rerun set).
+- Note: the tau floor makes tmax about 1–2 ns, so O1/O2 runs will be slower.
