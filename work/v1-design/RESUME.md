@@ -354,3 +354,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - t3: fp2×30 at O2.
 - Caveat: O2 for the fp2 sweep runs at mult 3 and 30 only. If the O1 minimum is elsewhere, add one `--point` O2 job.
 - Next: when `done` exists, a fresh agent analyses the results, writes `results/s5h_tier1.md` and commits. Then acceptance, reviewer, S6.
+- Run at 34/47. `r6_T4_m101_N1024_g2_20_O2` failed: ngspice rc=124, from the internal `run_deck` timeout of 1500 s (`tier1_tb.py:100`), not the job timeout. T4 is informational. Rerun it after the batch, with a longer `run_deck` timeout (needs a `--deck-timeout` knob) or at O1.
