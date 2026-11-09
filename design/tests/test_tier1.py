@@ -487,3 +487,22 @@ def test_fp2_mult_per_ota_and_point_parser():
     # non-vacuity: a point that sets nothing equals the base deck
     z, _ = G.build_deck(TB.v2_cfg(TB.parse_point(""), n=8, m=2))
     assert _cf(z, 1) == _cf(base, 1)
+
+
+def test_deck_timeout_knob(tmp_path, monkeypatch):
+    """--deck-timeout: run_deck passes DECK_TIMEOUT_S to timeout(1); an explicit timeout= still wins."""
+    seen = []
+
+    class R:
+        returncode = 124
+        stdout = stderr = ""
+
+    monkeypatch.setattr(TB.subprocess, "run", lambda cmd, **kw: (seen.append(cmd), R())[1])
+    cfg = TB.v2_cfg({}, n=8, m=2)
+    TB.run_deck(cfg, "t0", outdir=str(tmp_path))
+    assert seen[-1][4] == "1500"  # default unchanged
+    monkeypatch.setattr(TB, "DECK_TIMEOUT_S", 7000)
+    TB.run_deck(cfg, "t1", outdir=str(tmp_path))
+    assert seen[-1][4] == "7000"
+    TB.run_deck(cfg, "t2", outdir=str(tmp_path), timeout=9)
+    assert seen[-1][4] == "9"

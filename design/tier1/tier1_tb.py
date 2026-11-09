@@ -97,13 +97,17 @@ def audit_netlist(deck):
     return (not msgs), counts, msgs
 
 
-def run_deck(cfg, tag, outdir=None, timeout=1500):
+DECK_TIMEOUT_S = 1500   # per-deck ngspice timeout; --deck-timeout overrides
+
+
+def run_deck(cfg, tag, outdir=None, timeout=None):
     """Run one deck; return dict with bits/x2 per conversion and all WORKFLOW-11 checks."""
     outdir = outdir or OUT
     os.makedirs(outdir, exist_ok=True)
     csv = os.path.join(outdir, f"{tag}.csv")
     cir = os.path.join(outdir, f"{tag}.cir")
     log = os.path.join(outdir, f"{tag}.log")
+    timeout = DECK_TIMEOUT_S if timeout is None else timeout
     deck, meta = G.build_deck(cfg, rawfile=csv)
     open(cir, "w").write(deck)
     ok_net, counts, nmsgs = audit_netlist(deck)
@@ -1860,9 +1864,13 @@ def main():
     ap.add_argument("--prev", default=None, help="knees4: knees3.json whose 2 MHz rows are reused")
     ap.add_argument("--opt", action="append", default=[], help="O0|O1|O2 option ladder (D43c) or override a SPICE option, e.g. --opt method=gear")
     ap.add_argument("--method", default=None, choices=("trap", "gear"))
+    ap.add_argument("--deck-timeout", type=float, default=None, help="per-deck ngspice timeout in s (default DECK_TIMEOUT_S)")
     ap.add_argument("--reltol-only", default=None, choices=("O0", "O1", "O2"), help="ladder characterisation: take only reltol (and chgtol) from this level")
     ap.add_argument("--tmax-only", default=None, choices=("O0", "O1", "O2"), help="ladder characterisation: take only tmax (with the tau floor) from this level")
     a = ap.parse_args()
+    global DECK_TIMEOUT_S
+    if a.deck_timeout:
+        DECK_TIMEOUT_S = a.deck_timeout
     for kv in a.opt:
         if kv in ("O0", "O1", "O2"):
             P.SPICE_OPTIONS_TIER1.update(P.option_ladder(kv))
