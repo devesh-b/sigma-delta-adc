@@ -361,3 +361,10 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - OTA1 (OTA2 at ×3): 1.5 → 68.5, 2 → 10.9, **3 → 3.29**, 4 → 8.06, 6 → 14.7, 10 → 21.0, 30 → 28.3. The minimum at ×3 matches the ≈3.4 prediction.
   - OTA2 (OTA1 at ×3): **1.5 → 1.38**, 2 → 2.33, 3 → 3.29, 4 → 3.71, 6 → 4.12, 10 → 4.40, 30 → 4.74. Monotone, so the minimum is at the sweep edge.
   - Added jobs (`jobs_extra.txt`, same run dir; `done_extra` marks the end): `fp2_ota2_1.5_O2`, `fp2_ota2_1_O1`.
+
+## Update 2026-11-09 (S5h analysed, OTA1 SR option 3)
+- S5h results committed as 95844d9; coordinator spot-checked 8/8 values against the json. Opus reviewer running → REVIEW-S5h-2026-11-09.md.
+- User chose OTA1 SR **option 3**: direct points before deciding 12.5 vs 13 V/µs.
+  - Jobs (`jobs_sr1.txt`, `done_sr1` marks the end, same run dir): `r3d_N{256,1024}_sr1_{12.5,13}_O2` plus `r3d_N1024_sr1_{12.5,13}_O1` for the convergence pair.
+  - Then present the INL margin to the user. **The SR decision stays with the user.**
+- T4 rerun still running (`WO-16-t4-677b39f`).
