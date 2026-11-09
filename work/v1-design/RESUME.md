@@ -378,3 +378,16 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - SPEC text (slew bases, PM windows OTA1 "72–77° at 20 MHz", OTA2 ~70–85°, O2 evidence note);
   - s5h doc fixes;
   - then S6.
+- OTA1-only direct points (2 MHz, sr2 unset), INL ppm:
+
+  | Point | O1 | O2 |
+  |---|---|---|
+  | N1024, 12.5 V/µs | 0.098 | 0.101 |
+  | N1024, 13 V/µs | 0.082 | 0.083 |
+  | N256, 12.5 V/µs | — | 0.359 |
+  | N256, 13 V/µs | — | 0.340 |
+
+  - At N1024 12.5 V/µs: converged, verdict 0.104 against the 1.333 slew share, **12.8× under**.
+  - Neighbours at O2: N1024 10 → 1.925, 10.5 → 0.859.
+  - Moving from 12.5 to 13 V/µs gains only 0.02 ppm.
+  - **Waiting on the user: A (keep 12.5) or B (13).**
