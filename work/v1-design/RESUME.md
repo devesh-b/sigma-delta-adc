@@ -410,3 +410,22 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - order-1 u_corr branch.
 - Then S7 (reviewer pass, then user OK).
 - S6: WO-17 written and dispatched (Sonnet). Then acceptance on a frozen copy, then the reviewer, then S7.
+- **S6 done (WO-17)**: commits a34b809 (model), 13f9692 (golden), 8b095d3 (results).
+  - 240 mode vectors plus 2 sequences, 500 frames, `golden/s6_vectors.json` (sha256 b8bd7a93…).
+  - Independent integer checker 500/500 bit-exact. Mutants 9/9 REJECT; the 24-bit accumulator ACCEPTs, as required.
+  - Coordinator acceptance (in place on tt-sd, since the disk is full):
+    - pytest model+design 131 pass;
+    - hash matches;
+    - own corruptions (acc1+1, y bit flip, frame_ctr) all caught.
+  - SPEC ambiguities the agent resolved, which need SPEC rows at S7:
+    - forced y[0] = +1;
+    - tags: chop_sign ±1, n_code 0..3, 8-bit frame_ctr;
+    - pair_idx, invalid flag on both frames, latch at the next even slot;
+    - order-1 acc2 null;
+    - chop-off still emits pairs.
+  - The OTA-chop phase mutant cannot be expressed at tier 0.
+  - Note: a sync without `golden/` present locally deletes it on the sandbox (rsync --delete).
+- Reviewer (S6) running → REVIEW-S6-2026-11-09.md.
+- **Sandbox disk 100 % full** (201 MB free). Our regr/tt holds 140 GB, of which ~123 GB is raw CSVs. The user OK'd deleting them; my delete was blocked by the permission check, and the user's `!` run did not take effect. Re-ask the user.
+  - T4 post-processing is blocked until then (its csv is kept).
+  - Future WOs: delete a job's raw csv after its json is written.
