@@ -104,7 +104,7 @@ Blocks are ordered by risk. Each one follows the same **block recipe**:
 
 | ID | Block | Key gated metrics (SPEC §3) | Broken copy that must REJECT |
 |---|---|---|---|
-| C1 | **OTA1 + CMFB (critical)** | A0 ≥ 75 dB, gain vs output swing (a0_drop), GBW ≥ 10 MHz (20 target), PM ≥ 60°, slew ≥ 10 V/µs, `.noise` white and 1/f corner, offset MC, CMFB loop PM and CM accuracy, current | input pair halved (noise), cascode removed (gain) |
+| C1 | **OTA1 + CMFB (critical)** | A0 ≥ 80 dB (≥ 75 dB for |Vout,diff| ≤ 1.4 V), gain vs output swing (a0_drop), loaded GBW ≥ 10 MHz (20 target; boost 20 MHz), PM informational (step settling is the gate, SPEC §3.0: |ε(t_half)| ≤ 6e-5, ε_NL ≤ 6e-5), slew ≥ 12.5 V/µs (boost 25), `.noise` white and 1/f corner, offset MC, CMFB loop PM and CM accuracy, current | input pair halved (noise), cascode removed (gain) |
 | C2 | OTA2 + CMFB | relaxed A0 and noise per S3 | — same recipe |
 | C3 | StrongARM comparator + latch | offset 3σ ≤ budget (Paul `comp_mc.py`), decision time < 0.3·t_half, kickback onto the integrator node, metastability at 4 MHz | latch tail starved |
 | C4 | Switches, bottom-plate sampling, non-overlap clock generator | TG Ron vs signal at corners, settling τ ≤ 0.2·t_half, charge-injection offset, non-overlap ≥ min at all corners and 4 MHz | phases overlapping |
@@ -124,11 +124,14 @@ Blocks are ordered by risk. Each one follows the same **block recipe**:
 | ID | Test | Corners | Pass |
 |---|---|---|---|
 | V1 | Top-schematic assembly + `xcheck` (top golden netlist vs schematic) | — | device-for-device equivalent |
-| V2 | **ALIVE / cold start:** VAPWR/VDPWR ramp, reset, first conversion completes; integrators inside the linear range | 5 top extremes | ones density in range, data-ready toggles, no rail lock |
-| V3 | **DC transfer at transistor level:** ~9 DC points, order 2, N = 256 (short window) | 5 extremes | codes within budgeted error of the theory value; gain-error sign and size match S3 |
+| V2 | **ALIVE / cold start:** VAPWR/VDPWR ramp, reset, first conversion completes; integrators inside the linear range | extremes per §6 (6–8 points, D2/F10) | ones density in range, data-ready toggles, no rail lock |
+| V3 | **DC transfer at transistor level:** ~9 DC points, order 2, N = 256 (short window) | extremes per §6 (6–8 points, D2/F10) | codes within budgeted error of the theory value; gain-error sign and size match S3 |
 | V4 | **Mode matrix:** order 1/2 × chop off/OTA/system × N ∈ {64, 256} × internal short, nominal only | tt/27/3.3 | each mode produces the S6-expected code within tolerance |
+| V4a | **OTA-only chop (D45 g, D46a):** (ota_en 1, sys_en 0) transistor-level at N 256, nominal; reads lf·Vos1/(N−1) directly. Also the reset-settling gate: r ≤ 1e-4 within 2 fs cycles at 4 MHz boost and at the slowest corner | tt/27/3.3 + ss/−40, ss/100 | residue measured and inside the SPEC bound; broken copy: reset window 1 cycle ⇒ REJECT |
+| V4b | **Bias-trim calibration (D47, indirect):** sweep trim 0–7 in fast mode (4 MHz, boost, N 1024), inputs −0.9 / 0 / +0.9 FS; pick the lowest code with 3-point bow and gain error within 10 % of the plateau | tt, ss, ff at 27 | knee resolvable (INL falls monotonically with code to a plateau); broken copy: one trim leg open ⇒ non-monotone ⇒ REJECT |
+| V3b | **OTA-only characterisation (D45 g) and fast-mode INL (D28):** V3 at 4 MHz boost for N 256 and N 1024 | extremes per §6 | INL ≤ 20 / 5 ppm |
 | V5 | **Mixed-signal:** transistor-top bitstream → RTL decimator (cocotb / d_cosim) → same result as Python reconstruction | tt + 1 extreme | bit-exact |
-| V6 | **Top PEX acceptance** (Paul's `top_tb.py` pattern): V2 + V3 on the extracted top | 5 extremes | same pass criteria; documented gate rationale (measured min − margin, far from failure signatures) |
+| V6 | **Top PEX acceptance** (Paul's `top_tb.py` pattern): V2 + V3 on the extracted top | extremes per §6 (6–8 points, D2/F10) | same pass criteria; documented gate rationale (measured min − margin, far from failure signatures) |
 | V7 | **Non-vacuity suite:** broken tops (DAC polarity flipped, OTA gain −20 dB, chop sequencer stuck, clock overlap, VREF pin open) | tt | every one `REJECT` |
 | V8 | Physical: layout-report (DRC 0, LVS clean), antenna, framecheck (tied outputs, no met5, info.yaml), TT precheck in CI | — | all clean |
 | V9 | **System re-proof:** tier 0 with PEX per-corner parameters, 45 PVT + MC → final predicted spec sheet (feeds PUBLICATION_PLAN F2/F9 "predicted") | 45 + MC | every v1 spec passes |
@@ -162,12 +165,12 @@ Total ≈ 18–22 weeks. Check the next sky130 shuttle date at tinytapeout.com/r
 - **S1:** option B = c1 0.125 / k 0.5 (bit-identical to A); option-A c2 = 0.25 variant (E1).
 - **S3:** OTA white-noise spec from a ktc_excess sweep (E2); A0 vs INL margin (F5, user Q6).
 - **S5:** **simulator null test.** An ideal deck must reproduce the theory to < 1/10 of the INL target. Freeze reltol, chgtol and method in params.spice. The B-source OTA gets GBW and slew terms; run spec_sweep on them (F3).
-- **S6:** golden vectors pin the exclusive-S convention (m2). They include frame tags (F4) and PGA ×2 if chosen (F6).
+- **S6:** golden vectors pin the exclusive-S convention (m2). They include frame tags (F4); no PGA in v1 (D14, D45 h).
 - **C1/C2:** CMFB start-up with `.ic` outputs at 0 V and at VAPWR, every corner. Virtual-ground leakage measured for tier 0 (offset = I_leak/(fs·Cs)).
 - **C3:** test at Δ = 0, 4 MHz, ss/−40; gate on the probability that the DAC and decimator disagree (F8). Numeric kickback gate: disturbance on x2 ≤ a fraction of the minimum x2 step.
 - **C4:** input-CM sweep (F2); TG sized at ss/−40/3.0 (m4).
 - **C9:** assert the chop swap happens only in the reset window, plus a "swap one cycle late" mutant. Frame tags.
-- **C10:** PGA ratio check (if PGA ×2).
+- **C10:** c1/c2 ratio and Cp/Cs checks (no PGA in v1, D14).
 - **V2/V3/V6:** every top-level testbench includes the TT pad model (500 Ω, 5 pF, ESD) on VIN± and VREF, plus a 10 kΩ source case.
 - **V3/V6:** INL uses residue reconstruction with x2[N] (F9). Plain N = 256 codes have a ≈ 244 ppm floor, which would make the check vacuous. The OTA −20 dB copy must REJECT.
 - **New V-tests:**
@@ -177,6 +180,6 @@ Total ≈ 18–22 weeks. Check the next sky130 shuttle date at tinytapeout.com/r
   - overload 1.0–1.1·FS with recovery (m3)
   - input-CM sweep
   - ground-bounce injection if REF− is chip ground (F7)
-  - PGA ×2 in V4
+  - boost/trim vectors (golden v3) and OTA-only chop (V4a), trim calibration (V4b)
 - **V9:** lists the un-simulated risks: MIM VCC and bottom-plate parasitic, substrate coupling.
 - **V8 additions (pd-expert, REVIEW-WO01-pd-2026-11-07.md):** GDS digital tie + Verilog-vs-GDS consistency; LVS with device-parameter matching; antenna via magic antennacheck (TT precheck antenna is gf180-only); 3.3 V SOA ERC (CVC); latch-up tap/guard rules; floating well/gate ERC; fill vs matched MIM (ask TT); ESD clamp + series R on ua pins; IR drop on the met4 VAPWR stripe. Precheck runs under TT's own `tools/precheck/default.nix` nix-shell (magic 8.3.568, klayout 0.30.8) and is re-run on tt-support-tools main before submission.
