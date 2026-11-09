@@ -261,3 +261,42 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 ## Update 2026-11-09 03:00
 - D42 recorded (bandgap current ref + 3-bit trim), SPEC C6 rows (b8f89e2). DESIGN_GUIDE.md added (global rationale doc; keep it updated at each decision).
 - WO-15 still running in background.
+
+## Update 2026-11-09 ~04:10: WO-15 done, UNCOMMITTED (1Password LOCKED)
+- The WO-15 coder finished 4/4 items. Its 3 commits failed: "1Password: failed to fill whole buffer". Commit 1 files are staged (decks, gmid_table); the rest is in the working tree (tier1_tb.py, gen_tier1.py, test_tier1.py, results/s5g_tier1.md).
+- Planned commits:
+  1. `design: gm/Id decks (L 0.35/0.5, op-gm, W-bin) and boosted-point W/L table`
+  2. `design: fast4 mode (boosted operating points, trend discrimination, fp2 sensitivity), gm/Id checks + tests`
+  3. `v1-design: S5g results`
+- Results:
+  - all A′ boosted points pass (hot 1.08 ppm, cold 0.88 ppm at N 1024);
+  - **solver options matter**: default reltol 1e-3 shifts INL by up to ~12 ppm;
+  - fp2 must track the boosted gm (177 ppm if held at base);
+  - fp2×30 gives 101–113 ppm (suspect).
+- Reviewer dispatched on S5g (returns text, save as REVIEW-S5g-2026-11-09.md). Key question: which earlier tier-1 verdicts used default options, and what convergence rule to adopt.
+- Next:
+  1. Ask the user to unlock 1Password, then make the commits.
+  2. Coordinator acceptance on a frozen copy.
+  3. Act on the review: convergence-rule reruns, then S6.
+
+## Update 2026-11-09 ~04:40 (still LOCKED)
+- REVIEW-S5g saved (working tree).
+  - A′ closes the cold-corner question.
+  - fp2×30 is physics, not a bug: the deck needs PM ≈ 75° on OTA1, so SPEC "PM ≥ 60°" was too loose.
+  - The min-W/L table is 2× too big (G-M2).
+  - Solver convergence is not shown (G-M3).
+- D43 (coordinator, reversible): step-settling gate per OTA; one switched bias leg feeding all mirrors; convergence rule O0–O2; 2 MHz N256 not gated. SPEC rows edited (working tree).
+- WO-16 written (`wo/WO-16-S5h-convergence.md`). **Dispatch only after the WO-15 commits land**, because it touches the same files.
+- **Commit order once unlocked:**
+  1. WO-15 c1/c2/c3 (see the update above; the c1 files are staged);
+  2. `v1-design: REVIEW-S5g, D43, WO-16` (REVIEW-S5g, DECISIONS, SPEC, wo/WO-16, wo/INDEX);
+  3. RESUME.
+- Then dispatch WO-16, run acceptance on a frozen copy, then S6.
+
+## Update 2026-11-09 (unlocked)
+- Committed: eee7b7a, fdc4f56, b4f93e6 (WO-15 c1–c3) and 0c719d5 (REVIEW-S5g, D43, WO-16).
+- WO-16 dispatched (Sonnet, background).
+  - Sandbox load was ~10 at dispatch, from AlphaOneSoC jobs (not ours; don't touch them).
+  - The agent edits code locally, and runs only when the load is below 4.
+  - If the load stays high, it commits the untested code and stops with a report.
+- Next: WO-16 result, then acceptance on a frozen copy, then the reviewer, then S6.
