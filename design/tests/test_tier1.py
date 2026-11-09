@@ -545,3 +545,18 @@ def test_step_settle_gate_points_and_broken_copies(tmp_path):
         for bn, kw in SS.BROKEN.items():
             mb = SS.run_point(pt, f"{name}_{bn}", str(tmp_path), **kw)
             assert not SS.gate(mb, SS.LIMITS[name]), (name, bn, mb)
+
+
+def test_fp2_after_tanh_option():
+    """WO-22: default deck unchanged (explicit False == absent); option on moves the Rf/Cf pole behind the tanh stage."""
+    a, _ = G.build_deck(TB.v2_cfg(dict(), n=8, m=2))
+    b, _ = G.build_deck(TB.v2_cfg(dict(fp2_after1=False, fp2_after2=False), n=8, m=2))
+    assert a == b
+    c, _ = G.build_deck(TB.v2_cfg(dict(fp2_after1=True), n=8, m=2))
+    assert c != a
+    # OTA1: pole behind the tanh (Rf1 to ground, source Bq1); OTA2 untouched
+    assert "Bq1 0 f1 I =" in c and "Rf1 f1 0 1k" in c and "Rf1 dr1 f1 1k" not in c
+    assert "Rf2 dr2 f2 1k" in c and "Bq2" not in c
+    # the tanh argument no longer reads the filtered node
+    assert "V(f1))" not in "".join(l for l in c.splitlines() if l.startswith("Bq1"))
+    assert "Bgp1 0 o1p I = -0.5*V(f1)/1k" in c

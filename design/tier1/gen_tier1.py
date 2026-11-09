@@ -54,6 +54,7 @@ DEFAULT = dict(
     boost1_only=False,      # v2: with boost, only OTA1 is boosted (OTA2 stays at its base bias)
     bstgm1=None, bstgm2=None,  # v2 (WO-14, C-M1): per-OTA gm boost factor, separate from the tail-current boost bst (gm scales sub-linearly with current). None: = bst
     fp2_mult1=None, fp2_mult2=None,   # WO-16: per-OTA override of fp2_mult (None = fp2_mult)
+    fp2_after1=False, fp2_after2=False,   # WO-22: place the Rf/Cf second pole AFTER the tanh stage (folded-cascode style, in the current path); False = before (S5h default)
     fp2_fixed=None,         # v2 (WO-15 m3): None = second pole = fp2_mult*GBW*bstgm (tracks the boost); (g1, g2) [Hz] = hold the pole at fp2_mult*g_k, i.e. at the base gm
     bst1=None, bst2=None,   # v2: explicit per-OTA boost factor (gm and tail current x bst); None = derived from boost/boost1_only (2.0 or 1.0)
     cptop=0.0, dcptop=0.0,  # D12 floating top-plate parasitic to ground, stage 1 [F]: Cp+ = cptop + dcptop/2, Cp- = cptop - dcptop/2
@@ -268,10 +269,19 @@ def build_deck(cfg=None, rawfile=None):
         gcm = 6.283185307179586 * c["cmfb_bw"] * cl
         gtot = gcm * (1.0 + 10 ** (-c["cmfb_db"] / 20.0))
         w(f"Bdr{k} dr{k} 0 V = {vd_expr(k)}")
-        w(f"Rf{k} dr{k} f{k} 1k")
-        w(f"Cf{k} f{k} 0 {cf:.6e}")
-        x = f"{gmk:.9e}*V(f{k})"
-        idx = (f"(u({x})*{ip:.9e}*tanh(({x})/{ip:.9e})+(1-u({x}))*{im:.9e}*tanh(({x})/{im:.9e}))")
+        if c["fp2_after%d" % k]:
+            # pole after the tanh: unit-gain current lowpass (1k, Cf) on the tanh output current
+            x = f"{gmk:.9e}*V(dr{k})"
+            idx = (f"(u({x})*{ip:.9e}*tanh(({x})/{ip:.9e})+(1-u({x}))*{im:.9e}*tanh(({x})/{im:.9e}))")
+            w(f"Bq{k} 0 f{k} I = {idx}")
+            w(f"Rf{k} f{k} 0 1k")
+            w(f"Cf{k} f{k} 0 {cf:.6e}")
+            idx = f"V(f{k})/1k"
+        else:
+            w(f"Rf{k} dr{k} f{k} 1k")
+            w(f"Cf{k} f{k} 0 {cf:.6e}")
+            x = f"{gmk:.9e}*V(f{k})"
+            idx = (f"(u({x})*{ip:.9e}*tanh(({x})/{ip:.9e})+(1-u({x}))*{im:.9e}*tanh(({x})/{im:.9e}))")
         w(f"Bgp{k} 0 o{k}p I = -0.5*{idx}")
         w(f"Bgn{k} 0 o{k}n I = 0.5*{idx}")
         vo = f"(V(o{k}p)-V(o{k}n))"
