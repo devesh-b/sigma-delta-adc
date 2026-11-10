@@ -102,7 +102,9 @@ SWQ = {"sci1": "nfet_g5v0d10v5", "sci3": "nfet_g5v0d10v5", "sisl1": "nfet_g5v0d1
 BIASQ = {"mbpd": "m_bpd", "mbpds": "m_bpd", "mbnd": "m_bnd"}
 INTQ = {"mia1": "m_ia", "mia2": "m_ia", "mit": "m_it", "mil1": "m_il", "mil2": "m_il"}   # WO-28 slow-path integrator
 REPQ = {"mrn": "m_rn", "mrnc": "m_rnc", "mrcb": "m_rcb"}                                  # WO-28 item 4 replica margins
-NODES = ("tail", "da", "fa", "xa", "sa", "ctl", "ibn", "ibp", "ivbnc", "ivbpc", "ivbl0", "rnd", "rcb", "bli", "cid", "cit")
+NODES = ("tail", "da", "fa", "xa", "sa", "ctl", "rnd", "rcb", "bli", "cid", "cit")   # subckt-internal only (ports: top level)
+BRK_MAX = 1e-3          # WO-28 run 2: cm_open loop break must be DC-transparent, |V(ctlg) - V(ctl)| <= 1 mV
+HELPER_DCTL, HELPER_DOCM = 1e-3, 0.1e-3   # helper op vs closed-loop op: |dV_ctl| <= 1 mV, |dV_OCM| <= 0.1 mV
 FZ_RATIO = 10.0          # WO-28: slow-path PI zero f_z <= f_cm / 10
 PEAK_MAX_DB = 1.0        # WO-28: closed-loop CM |T / (1 + T)| peaking
 
@@ -169,7 +171,9 @@ def deck(c, t, v, tag, copies):
     L += [".control", "set wr_singlescale", "set wr_vecnames", "op"]
     for x, b, cl, mut in copies:
         L.append(f"print i(vdd_{x})")
-        L += [f"print v(x{x}.{n})" for n in NODES] + [f"print v(outp_{x}) v(outn_{x}) v(s_{x})"]
+        L += [f"print v(x{x}.{n})" for n in NODES] + [f"print v(outp_{x}) v(outn_{x}) v(s_{x}) v(ivbpc_{x})"]
+        if "cm_open" in NL.toks(mut):
+            L.append(f"print v(x{x}.ctlg)")
         L += [f"print {par(x, i, S.SIZES[k]['dev'], q)}" for i, k in CORE.items() for q in DEVQ]
         L += [f"print {par(x, i, d, q)}" for i, d in SWQ.items() for q in ("cgg", "cdd")]
         L += [f"print {par(x, i, S.SIZES[k]['dev'], 'id')}" for i, k in BIASQ.items()]
@@ -197,7 +201,9 @@ def run(text, tag, out):
             except ValueError:
                 pass
     lint = [l.strip() for l in (r.stdout + r.stderr).splitlines()
-            if re.search(r"(error|unknown|singular|no convergence|timestep too small|could not find)", l, re.I)]
+            if re.search(r"(error|unknown|singular|no convergence|timestep too small|could not find|transient op)", l, re.I)]
+    # WO-28 run 2: "transient op" = Newton, gmin and source stepping all failed and ngspice took the op from a transient
+    # ramp; huge caps (cm_open 1 F break, servo 1e9 F) then keep their initial charge, so the op is not a DC point -> lint
     return vals, r, lint
 
 
@@ -221,7 +227,11 @@ def analyse(vals, x, b, cl, mut, ac, k, vdd, hot):
     if not (abs(vod) <= 1e-3 and abs(res["servo_s"]) / 1000 < 0.299):
         fails.append(f"servo lost: vod {vod * 1e3:.3f} mV, s {res['servo_s']:.4g}")
     res["V_ocm_err_mV"] = (0.5 * (op_ + on) - S.V_OCM) * 1e3
-    res["V_rnd"], res["V_fa"] = v("rnd"), v("fa")   # sink-replica drain vs m_n drain (D59 replica fix)
+    res["V_fa"], res["V_ctl"] = v("fa"), v("ctl")
+    if "cm_open" in NL.toks(mut):   # loop break must not move the DC op
+        res["V_ctlg_minus_ctl_mV"] = (v("ctlg") - v("ctl")) * 1e3
+        if not abs(v("ctlg") - v("ctl")) <= BRK_MAX:
+            fails.append(f"loop-break DC |V_ctlg - V_ctl| {abs(v('ctlg') - v('ctl')) * 1e3:.3g} mV > {BRK_MAX * 1e3:.0f}")
     res["bottom"] = v("xa") + abs(d["mnc1"]["vdsat"]) + 0.05
     res["top"] = v("sa") - abs(d["mpc1"]["vdsat"]) - 0.05
     res["span"] = res["top"] - res["bottom"]
@@ -279,10 +289,11 @@ def analyse(vals, x, b, cl, mut, ac, k, vdd, hot):
         res["sig_vocm_mV"] = math.sqrt(s_pair ** 2 + s_load ** 2 + s_res ** 2) * 1e3
     if "kp_fixed" not in t_:   # WO-28 item 4: sink-replica drain vs m_n drain, margins of m_rn / m_rnc / m_rcb
         rq = {i: {q: g(par(x, i, S.SIZES[k]["dev"], q)) for q in ("id", "vdsat")} for i, k in REPQ.items()}
+        res["V_rnd"] = v("rnd")   # sink-replica drain vs m_n drain (D59 replica fix); kp_fixed has no replica
         res["V_rnd_minus_V_fa_mV"] = (v("rnd") - v("fa")) * 1e3
         if not abs(v("rnd") - v("fa")) <= S.REPLICA_DV_MAX:
             fails.append(f"replica drain |V_rnd - V_fa| {abs(v('rnd') - v('fa')) * 1e3:.0f} mV > {S.REPLICA_DV_MAX * 1e3:.0f}")
-        for i_, vv in {"mrn": v("rnd"), "mrnc": v("ivbpc") - v("rnd"), "mrcb": v("rcb")}.items():
+        for i_, vv in {"mrn": v("rnd"), "mrnc": g(f"v(ivbpc_{x})") - v("rnd"), "mrcb": v("rcb")}.items():
             res["margins"][i_] = vv - abs(rq[i_]["vdsat"])
             if not res["margins"][i_] >= 0.05:
                 fails.append(f"{i_} margin {res['margins'][i_]:.3f}")
@@ -361,10 +372,12 @@ def analyse(vals, x, b, cl, mut, ac, k, vdd, hot):
 
 
 def fcm(ac, kc, ko):
+    """Both vectors from one AC csv (vector indices kc, ko)."""
+    return fcm_z(ac[:, 0], ac[:, 1 + 2 * kc] + 1j * ac[:, 2 + 2 * kc], ac[:, 1 + 2 * ko] + 1j * ac[:, 2 + 2 * ko])
+
+
+def fcm_z(f, zc, zo):
     """CM loop gain from the closed- and open-loop CM output impedance (same CM current injection), unity crossing and PM."""
-    f = ac[:, 0]
-    zc = ac[:, 1 + 2 * kc] + 1j * ac[:, 2 + 2 * kc]
-    zo = ac[:, 1 + 2 * ko] + 1j * ac[:, 2 + 2 * ko]
     t_ = zo / zc - 1.0
     m = np.abs(t_)
     i = int(np.argmax((m[:-1] >= 1) & (m[1:] < 1))) + 1
@@ -423,32 +436,53 @@ def run_deck_group(c, t, v, tag, cps, out):
         ac = np.loadtxt(fn, skiprows=1)
         os.remove(fn)
     except Exception as e:
-        return [], lint, dict(corner=tag, fails=[f"no data {e!r}"], lint=lint[:5], stderr=r.stderr[-600:])
+        return [], lint, dict(corner=tag, fails=[f"no data {e!r}"], lint=lint[:5], stderr=r.stderr[-600:]), None
     rows = []
     for k, (x, b, cl, mut) in enumerate(cps):
         try:
             res, fails = analyse(vals, x, b, cl, mut, ac, k, v, (c, t) in HOT)
         except Exception as e:
             res, fails = {}, [f"analysis error {e!r}"]
-        if x in OPEN:   # WO-27 f_cm / CM PM: return ratio T = Z_ol / Z_cl - 1 (Blackman, gm of m_plc as reference)
-            ko = [i for i, cp_ in enumerate(cps) if cp_[0] == OPEN[x]][0]
-            try:
-                res.update(fcm(ac, len(cps) + k, len(cps) + ko))
-                ld = [l_ for l_ in LOADS if abs(LOADS[l_] - cl) < 1e-18]
-                if not res["PM_cm_deg"] >= PMCM_MIN:
-                    fails.append(f"CM PM {res['PM_cm_deg']:.1f} deg < {PMCM_MIN:.0f}")
-                if b and ld and ld[0] in FCM_LOADS and not res["f_cm_MHz"] * 1e6 >= FCM_MIN:
-                    fails.append(f"f_cm {res['f_cm_MHz']:.2f} MHz < {FCM_MIN / 1e6:.1f} (boost, {ld[0]})")
-                if not res["cm_peak_dB"] <= PEAK_MAX_DB:
-                    fails.append(f"CM peaking {res['cm_peak_dB']:.2f} dB > {PEAK_MAX_DB:.0f}")
-                if "f_z_MHz" in res and not res["f_z_MHz"] * FZ_RATIO <= res["f_cm_MHz"]:
-                    fails.append(f"f_z {res['f_z_MHz']:.3f} MHz > f_cm / {FZ_RATIO:.0f}")
-            except Exception as e:
-                fails.append(f"f_cm analysis error {e!r}")
         if lint:
             fails.append(f"lint: {lint[:3]}")
         rows.append((x, b, cl, mut, res, fails))
-    return rows, lint, None
+    return rows, lint, None, ac
+
+
+def cm_rows(grows, acmap):
+    """WO-27/28 f_cm / CM PM rows for every closed copy with a cm_open twin. WO-28 run 2: the twin may sit in another deck
+    (acmap: copy -> (ac, vector index of its CM output)); its op must equal the closed-loop op (else the return ratio is
+    taken around a different bias point: run 1 found the twins 1.7 V off after a transient op), and a lint / loop-break
+    failure of the twin invalidates the row."""
+    byx = {r[0]: r for r in grows}
+    for x, b, cl, mut, res, fails in grows:
+        if x not in OPEN or OPEN[x] not in byx:
+            continue
+        xo = OPEN[x]
+        ro, fo = byx[xo][4], byx[xo][5]
+        bad = [f_ for f_ in fo if f_.startswith(("lint", "loop-break", "analysis error"))]
+        dctl = abs(ro.get("V_ctl", float("nan")) - res.get("V_ctl", float("nan")))
+        docm = abs(ro.get("V_ocm_err_mV", float("nan")) - res.get("V_ocm_err_mV", float("nan"))) * 1e-3
+        res["helper_dV_ctl_mV"], res["helper_dV_ocm_mV"] = dctl * 1e3, docm * 1e3
+        if bad or not (dctl <= HELPER_DCTL and docm <= HELPER_DOCM):
+            fails.append(f"f_cm helper invalid ({xo}: dV_ctl {dctl * 1e3:.3g} mV, dV_OCM {docm * 1e3:.3g} mV, {bad[:2]})")
+            continue
+        try:
+            (ac, kc), (aco, ko) = acmap[x], acmap[xo]
+            if not (ac.shape[0] == aco.shape[0] and np.allclose(ac[:, 0], aco[:, 0], rtol=1e-9)):
+                raise ValueError("AC frequency grids differ")
+            res.update(fcm_z(ac[:, 0], ac[:, 1 + 2 * kc] + 1j * ac[:, 2 + 2 * kc], aco[:, 1 + 2 * ko] + 1j * aco[:, 2 + 2 * ko]))
+            ld = [l_ for l_ in LOADS if abs(LOADS[l_] - cl) < 1e-18]
+            if not res["PM_cm_deg"] >= PMCM_MIN:
+                fails.append(f"CM PM {res['PM_cm_deg']:.1f} deg < {PMCM_MIN:.0f}")
+            if b and ld and ld[0] in FCM_LOADS and not res["f_cm_MHz"] * 1e6 >= FCM_MIN:
+                fails.append(f"f_cm {res['f_cm_MHz']:.2f} MHz < {FCM_MIN / 1e6:.1f} (boost, {ld[0]})")
+            if not res["cm_peak_dB"] <= PEAK_MAX_DB:
+                fails.append(f"CM peaking {res['cm_peak_dB']:.2f} dB > {PEAK_MAX_DB:.0f}")
+            if "f_z_MHz" in res and not res["f_z_MHz"] * FZ_RATIO <= res["f_cm_MHz"]:
+                fails.append(f"f_z {res['f_z_MHz']:.3f} MHz > f_cm / {FZ_RATIO:.0f}")
+        except Exception as e:
+            fails.append(f"f_cm analysis error {e!r}")
 
 
 RATIO_KEYS = ("ratio_tr", "ratio_nr", "ratio_plr", "ratio_bl0")
@@ -492,15 +526,25 @@ def main():
     for ci in idx.split(","):
         c, t, v = CORNERS9[int(ci)]
         tag = f"c1b_{c}_{t}_{v}".replace("-", "m").replace(".", "p")
-        groups = [(tag, copies_for(c, t))]
+        cps = copies_for(c, t)
+        if "--merged-open" in sys.argv:   # broken copy of the deck split: run-1 structure, helpers in the nominal deck
+            groups = [(tag + "_merged", cps)]
+        else:   # WO-28 run 2: cm_open helpers in their own decks (per mode), never in the nominal deck
+            groups = [(tag, [q for q in cps if q[3] != "cm_open"])] + [
+                (f"{tag}_open{m}", [q for q in cps if q[3] == "cm_open" and q[1] == bb]) for m, bb in (("b", False), ("f", True))]
         if mutant_copies(c, t):
             groups.append((tag + "_mut", mutant_copies(c, t)))
-        for gtag, cps in groups:
-            grows, lint, err = run_deck_group(c, t, v, gtag, cps, out)
+        grows, acmap = [], {}
+        for gtag, gcps in groups:
+            gr, lint, err, ac = run_deck_group(c, t, v, gtag, gcps, out)
             if err:
                 print(json.dumps(err))
                 nfail += 1
                 continue
+            grows += gr
+            acmap.update({q[0]: (ac, len(gcps) + k) for k, q in enumerate(gcps)})
+        cm_rows(grows, acmap)
+        if True:
             kp = {x: res.get("K_P_eff", float("nan")) for x, b, cl, mut, res, fails in grows}
             for x, b, cl, mut, res, fails in grows:
                 if x in TRACK:
@@ -517,7 +561,7 @@ def main():
                 elif mrow:
                     target = mrow[2]
                     a0 = res.get("A0_dB", float("nan"))
-                    converged = bool(not lint and res and math.isfinite(res.get("I_vdd_uA", float("nan"))))
+                    converged = bool(not any(f_.startswith("lint") for f_ in fails) and res and math.isfinite(res.get("I_vdd_uA", float("nan"))))
                     hit = any(f_.startswith(target) for f_ in fails)
                     res["mutant_target_row"] = target
                     if converged and math.isfinite(a0) and hit:
