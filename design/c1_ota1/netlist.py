@@ -42,6 +42,15 @@ mirror finger; V_BL0 replica = 1 m_plc unit finger), no trim. Replica: 2 tail + 
 cascoded by one m_nc unit finger (gate REPLICA_CASC_GATE = rcb: diode m_rcb fed by one m_pl finger, gate ibp) so its drain sits near the fold node. Bank switch in the
 gate path: the boost-only fingers mbpds / mbpxs have their gates on gbk; TG Sbk gbk <-> ivbpc (closed in boost) and the
 pull-up mbku gbk -> vdd (on in base). The static switch states are wired to the rails per build(boost=...).
+WO-27 (D60): CM error amplifier (sizes_draft CM_AMP, DESIGN.md 1.3a). Cc / Cr now sense onto node cms (Cr refreshed to
+(vocm, vocm)); the amp (pair m_ca, tail m_cat on ibn, loads m_cad / m_cam / m_cal) drives ctl. Start-up clamps (rstb low):
+ctl -> ivbl0 (D57, kept) and cms -> vocm. Tokens: cm_unity (broken copy: amp replaced by an ideal unity buffer
+ctl = V(cms) - V(vocm) + V(ivbl0), the old passive loop), cm_open (AC loop break: m_plc gates on ctlg, 1 GOhm from ctl,
+1 F to ground; DC unchanged, used for the f_cm return ratio), cc_div4 (Cc / 4), cmbw4 (CM_BW4_CAP on ctl), ibtp95.
+WO-28 (D61): dual-path CMFB. Cc on ctl, Cr refreshed to (vocm, bli); gm-C follower-integrator ctl -> bli (m_ia / m_il /
+m_it, C_INT to vdd); start-up clamps (rstb low) ctl, bli -> ivbl0 and outp, outn -> vocm. Tokens: int_off (broken copy:
+bli tied to ivbl0, the WO-26 passive loop), cm_open (now with a dummy m_plc pair on ctl), cc_div4, vbl0x2 (ivbl0 x2).
+The WO-27 tokens cm_unity / cmbw4 and node cms are gone.
 mut is a '+'-joined token list: structural tokens nc_short, ref_composite (D58 4x4 composites, broken copy of the D59
 ratio rows), kp_fixed; bias-scaling tokens (bias_currents only) ibn105 (ibn x1.05), ibtp90 / ibtp112 (ibtp x0.90 /
 x1.12), vbl0x4 (ivbl0 x4).
@@ -124,6 +133,7 @@ def build(name="ota1", cmfb="sc", fs=4e6, mut=None, sizes=None, boost=False):
          f".subckt {name} {PORTS}"]
     w = L.extend
     mt = toks(mut)
+    gplc = "ctlg" if "cm_open" in mt else "ctl"
     # bias: composite 1:32 references (tail, sink, fixed load) and the cascode-bias diodes (K-density, single finger)
     w(ref("m_tr", "mtr", "ibtp", "vdd", "vdd", z, mut))
     w(ref("m_nr", "mnr", "ibn", "vss", "vss", z, mut))
@@ -160,24 +170,42 @@ def build(name="ota1", cmfb="sc", fs=4e6, mut=None, sizes=None, boost=False):
     w([dev("m_nc", "mnc1", "outn", "ivbnc", "xa", "vss", z), dev("m_nc", "mnc2", "outp", "ivbnc", "xb", "vss", z),
        dev("m_pc", "mpc1", "outn", "ivbpc", "sa", "sa", z), dev("m_pc", "mpc2", "outp", "ivbpc", "sb", "sb", z),
        dev("m_pl", "mpl1", "sa", "ibp", "vdd", "vdd", z), dev("m_pl", "mpl2", "sb", "ibp", "vdd", "vdd", z),
-       dev("m_plc", "mplc1", "sa", "ctl", "vdd", "vdd", z), dev("m_plc", "mplc2", "sb", "ctl", "vdd", "vdd", z)])
+       dev("m_plc", "mplc1", "sa", gplc, "vdd", "vdd", z), dev("m_plc", "mplc2", "sb", gplc, "vdd", "vdd", z)])
     if "nc_short" in mt:
         w(["Rmut1 outn xa 1", "Rmut2 outp xb 1"])
     if S.C_FOLD_EXTRA:
         w([f"Cfx1 fa vss {S.C_FOLD_EXTRA:g}", f"Cfx2 fb vss {S.C_FOLD_EXTRA:g}"])
-    # CMFB
-    cc, cr = S.C_CMFB_SENSE, S.C_CMFB_REFRESH
+    # CMFB, WO-28 (D61) dual path: fast passive SC path onto ctl (Cc, Cr refreshed to (vocm, bli)), slow gm-C
+    # follower-integrator ctl -> bli (sizes_draft INTEG, DESIGN.md 1.3b)
+    cc, cr = S.C_CMFB_SENSE / (4.0 if "cc_div4" in mt else 1.0), S.C_CMFB_REFRESH
     w([f"Ccp outp ctl {cc:g}", f"Ccn outn ctl {cc:g}"])
-    c = S.CTL_RST
-    w([mos("mrst", "ctl", "rstb", "ivbl0", "vdd", c["dev"], c["W"], c["L"])])
+    c, c2, co = S.CTL_RST, S.BLI_RST, S.OUT_RST
+    w([mos("mrst", "ctl", "rstb", "ivbl0", "vdd", c["dev"], c["W"], c["L"]),
+       mos("mrsb", "bli", "rstb", "ivbl0", "vdd", c2["dev"], c2["W"], c2["L"]),
+       mos("mrsop", "outp", "rstb", "vocm", "vdd", co["dev"], co["W"], co["L"]),
+       mos("mrson", "outn", "rstb", "vocm", "vdd", co["dev"], co["W"], co["L"])])
+    if "cm_open" in mt:   # DC: ctlg = ctl; AC: m_plc gates grounded. Dummy m_plc pair keeps the ctl gate load (gate ctl,
+        # drain forced to V(sa)/V(sb) by B sources, so Cgs/Cgd on ctl see the same AC voltages as in the closed copy)
+        pc = z["m_plc"]
+        w(["Rbrk ctl ctlg 1e9", "Cbrk ctlg vss 1", "Bdsa dsa vss V = V(sa)", "Bdsb dsb vss V = V(sb)",
+           mos("mplcd1", "dsa", "ctl", "vdd", "vdd", pc["dev"], pc["WF"], pc["L"], pc["M"]),
+           mos("mplcd2", "dsb", "ctl", "vdd", "vdd", pc["dev"], pc["WF"], pc["L"], pc["M"])])
+    if "int_off" in mt:   # broken copy: no slow path, bli = V_BL0 replica (the WO-26 passive loop)
+        w(["Rio bli ivbl0 1"])
+    else:
+        w([dev("m_it", "mit", "cit", "ibn", "vss", "vss", z),
+           dev("m_ia", "mia1", "cid", "ctl", "cit", "vss", z), dev("m_ia", "mia2", "bli", "bli", "cit", "vss", z),
+           dev("m_il", "mil1", "cid", "cid", "vdd", "vdd", z), dev("m_il", "mil2", "bli", "cid", "vdd", "vdd", z),
+           f"Cint bli vdd {S.C_INT:g}"])
     if cmfb == "sc":
         for s_, o in (("p", "outp"), ("n", "outn")):
             w([f"Cr{s_} ra{s_} rb{s_} {cr:g}"])
-            w(tg(f"Sr1a{s_}", f"ra{s_}", "vocm", "ph1", "ph1b") + tg(f"Sr1b{s_}", f"rb{s_}", "ivbl0", "ph1", "ph1b")
+            w(tg(f"Sr1a{s_}", f"ra{s_}", "vocm", "ph1", "ph1b") + tg(f"Sr1b{s_}", f"rb{s_}", "bli", "ph1", "ph1b")
               + tg(f"Sr2a{s_}", f"ra{s_}", o, "ph2", "ph2b") + tg(f"Sr2b{s_}", f"rb{s_}", "ctl", "ph2", "ph2b"))
-    elif cmfb == "dc":
+    elif cmfb == "dc":   # averaged Cr pair: i = (V_outcm - V_ctl - V_vocm + V_bli) / R into ctl and out of bli
         r = 1.0 / (fs * 2 * cr)
-        w([f"Bcmt cmt vss V = 0.5*(V(outp)+V(outn)) - V(vocm) + V(ivbl0)", f"Rcmeq cmt ctl {r:.6g}"])
+        e = f"(0.5*(V(outp)+V(outn)) - V(ctl) - V(vocm) + V(bli))/{r:.6g}"
+        w([f"Bscc vss ctl I = {e}", f"Bscb bli vss I = {e}"])
     else:
         raise ValueError(cmfb)
     L.append(f".ends {name}")
@@ -194,7 +222,8 @@ def bias_currents(boost, mut=None):
     t = toks(mut)
     if "kp_fixed" in t:
         out["ivbpc"], out["ivbnc"] = m * S.I_NC * S.I_BPD_FRAC, m * S.I_NC * S.I_BND_FRAC
-    for tok, port, f in (("ibn105", "ibn", 1.05), ("ibtp90", "ibtp", 0.90), ("ibtp112", "ibtp", 1.12), ("vbl0x4", "ivbl0", 4.0)):
+    for tok, port, f in (("ibn105", "ibn", 1.05), ("ibtp90", "ibtp", 0.90), ("ibtp112", "ibtp", 1.12), ("vbl0x4", "ivbl0", 4.0),
+                         ("ibtp95", "ibtp", 0.95), ("vbl0x2", "ivbl0", 2.0)):
         if tok in t:
             out[port] *= f
     return out

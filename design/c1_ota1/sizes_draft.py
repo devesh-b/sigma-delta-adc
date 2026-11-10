@@ -1,4 +1,4 @@
-"""C1 OTA1 SIZES, rev C + WO-24 (C1b part 1) candidate. Fully differential folded cascode, PMOS pfet_01v8 input pair on 3.3 V.
+"""C1 OTA1 SIZES, rev C (+ WO-27 / D60 at the end of this docstring) + WO-24 (C1b part 1) candidate. Fully differential folded cascode, PMOS pfet_01v8 input pair on 3.3 V.
 
 Status legend per entry (the "src" field):
   hand  = hand-derived in design/c1_ota1/DESIGN.md, not yet simulated
@@ -50,6 +50,16 @@ WO-26 (D59, user 2026-11-10; supersedes the D58 trim, the D58 replica cascode bi
     to m_bnd, K_N 8, no extra copy-leg current);
   - bank switch in the GATE path: the boost-only fingers of m_bpd / m_bpx (KP_BANK boost - base) have their gates on
     node gbk, a TG to ivbpc (closed in boost) and a pull-up to vdd (on in base); no switch in series with a diode.
+
+WO-27 (D60, user 2026-11-10):
+  - I_REF_btp recentred +1.9 % (BTP_RECENTRE); the mirror-ratio rows are info-only (systematic CLM/DIBL accepted);
+  - hand-Pelgrom mismatch allotments (A_VT_HV, A_B_HV, N_SIGMA) on the SR / ceiling / V_OCM rows (DESIGN.md 2.11);
+  - continuous-time CM error amplifier inside the SC CMFB loop (CM_AMP, DESIGN.md 1.3a); m_rcb narrowed to W 0.47.
+
+WO-28 (D61, user 2026-11-10):
+  - CMFB = dual path (INTEG, DESIGN.md 1.3b): passive SC fast path onto ctl + gm-C follower-integrator ctl -> bli (the Cr
+    refresh level); the WO-27 CM amp is removed. Start-up clamps ctl / bli -> ivbl0 and outputs -> vocm (rstb low);
+  - tail unit finger 1.25/2 -> 3.75/6 (m_t and, derived, m_tr / m_rt): reference area x9 at the same current density.
 """
 
 BOOST = 2.0
@@ -76,7 +86,7 @@ CMFB_SPLIT = 1.0 - LOAD_FIXED   # share in the CMFB-driven section m_plc (0.25);
 # Reference ratios (reference diode current : mirrored current). 1:32 everywhere (CL-7 / D53: 0.1 % in <= 4 us).
 RATIO = 8                # WO-26 (D59): 1:8 parallel-only unit-finger references (was 1:32 composites)
 I_REF = dict(            # base reference currents [A]; boost x2. src hand (settling: DESIGN.md 2.9)
-    btp=I_TAIL / RATIO,                 # tail reference m_tr          2.313 uA
+    btp=I_TAIL / RATIO * 1.019,         # tail reference m_tr          2.357 uA (D60: recentred +1.9 %, BTP_RECENTRE)
     bn=I_SINK / RATIO,                  # sink reference m_nr          3.122 uA
     bp=I_NC * LOAD_FIXED / RATIO,       # fixed-load reference m_plr   1.475 uA
     vbnc=0.0,                           # WO-25 (D58): replica-fed (m_bpx -> m_bnd), no reference current
@@ -96,7 +106,9 @@ SIZES = dict(
     # Mirrors are unit-finger: the reference diode is ONE finger of the mirrored device (same WF, L), the device has
     # 32 fingers -> 1:32. (First rev C K run used narrower single-finger references with WF != device WF: the
     # narrow-width Vth shift gave I_fold/I_tail 1.7-2.6 instead of 1.35 and put m_pl/m_plc in triode. REJECTed, fixed.)
-    m_t=dict(dev="pfet_g5v0d10v5",  WF=1.25, M=32, L=2.0, src="op"),  # tail W 40 L 2, 32 unit fingers
+    m_t=dict(dev="pfet_g5v0d10v5",  WF=3.75, M=32, L=6.0, src="hand"),  # tail W 120 L 6, 32 unit fingers. WO-28 (D61):
+    # unit finger x3 in W and L (was 1.25/2: same W/L, same current density, 9x area) -> m_t 720 um2, m_tr 90 um2,
+    # sigma(I_tail) / 2.9 for the SR - 3 sigma / ceiling + 3 sigma rows
     m_n=dict(dev="nfet_g5v0d10v5",  WF=2.25, M=32, L=4.0, src="op"),  # fold sinks W 72 L 4 (M1), 32 unit fingers
     m_nc=dict(dev="nfet_g5v0d10v5", WF=5,   M=4,  L=2.0, src="op"),   # NMOS cascodes W 20 L 2
     m_pc=dict(dev="pfet_g5v0d10v5", WF=5,   M=16, L=2.0, src="op"),   # PMOS cascodes W 80 L 2 (rev C, was 40/2)
@@ -140,6 +152,15 @@ C_CMFB_REFRESH = 0.025e-12  # Cr per side, switched between (V_OCM, V_BL0) and (
 CMFB_SW = dict(n=dict(dev="nfet_g5v0d10v5", W=1.0, L=0.5), p=dict(dev="pfet_g5v0d10v5", W=2.0, L=0.5), src="hand")  # TG, 3.3 V
 CTL_RST = dict(dev="pfet_g5v0d10v5", W=1.0, L=0.5, src="hand")   # ctl -> V_BL0 clamp while rst (gate rst_b low = closed)
 
+BTP_RECENTRE = 1.019   # D60 (WO-27): I_REF_btp +1.9 % (mirror ratio m_t/m_tr sits ~2 % low, systematic CLM/DIBL, accepted)
+
+# D60 (WO-27) mismatch allotments, HAND Pelgrom (REVIEW-WO26 M1: the sky130 HV MC has no Vth term, vth0_slope = 0).
+# sigma(dVT) = A_VT * sqrt(1/WL_a + 1/WL_b) [V, um^2]; sigma(dI/I) = sqrt((gm/I * sigma_dVT)^2 + (A_B * sqrt(..))^2).
+A_VT_HV = 12e-3      # V.um, g5v0d10v5 (conservative end of 8-12 mV.um); the rows gate at this value
+A_VT_HV_LO = 8e-3    # V.um, info column (optimistic end)
+A_B_HV = 0.01        # 1 %.um current-factor mismatch
+N_SIGMA = 3.0
+
 # D59 references (WO-26): parallel-only unit fingers of the mirror, 1:RATIO. DERIVED, do not size by hand.
 for _ref, _mir in (("m_tr", "m_t"), ("m_nr", "m_n"), ("m_plr", "m_pl"), ("m_bl0", "m_plc")):
     assert SIZES[_mir]["M"] % RATIO == 0, _mir
@@ -150,7 +171,7 @@ I_REF["vbl0"] = I_NC * CMFB_SPLIT / RATIO   # V_BL0 replica, 1 m_plc unit finger
 REPLICA = dict(tail=2, sink=4)
 REPLICA_CASC_GATE = "rcb"     # WO-26 run 2 (run 1: "vicm", rejected)
 SIZES["m_rcp"] = dict(SIZES["m_pl"], M=1, src="hand")    # rcb feed: 1 m_pl unit finger, gate ibp
-SIZES["m_rcb"] = dict(SIZES["m_bnc"], src="hand")        # rcb diode: m_bnc geometry 0.625/16
+SIZES["m_rcb"] = dict(SIZES["m_bnc"], WF=0.47, src="hand")   # rcb diode: m_bnc L 16, W 0.47 (WO-27 review minor: was 0.625)
 SIZES["m_rt"] = dict(SIZES["m_t"], M=REPLICA["tail"], src="hand")
 SIZES["m_rn"] = dict(SIZES["m_n"], M=REPLICA["sink"], src="hand")
 SIZES["m_rnc"] = dict(SIZES["m_nc"], M=1, src="hand")
@@ -174,3 +195,25 @@ C_FOLD_EXTRA = 0.0
 # WO-25 (D58): replica bank switching and reference trim
 KP_BANK = dict(base=4, boost=7)   # m_bpd / m_bpx unit fingers per mode (D59: K_P 12.5 base -> 7.14 boost, CL-8 step x1.75)
 # D59: REF_TRIM removed (parallel-only 1:8 references track by construction)
+
+# WO-28 (D61): DUAL-PATH CMFB (DESIGN.md 1.3b). The WO-27 CT CM amp is removed.
+#  fast path = the passive SC CMFB of WO-26: Cc (outputs -> ctl, m_plc gates), Cr refreshed to (V_OCM, bli) and shared
+#    with (out, ctl): averaged, ctl = V_outcm - V_OCM + V(bli);
+#  slow path = gm-C follower-integrator from ctl into bli: a 5T NMOS-pair OTA (pair m_ia, gate ctl -> diode side cid,
+#    gate bli -> drain bli; PMOS mirror loads m_il; tail = INTEG["tail"] m_n unit fingers on ibn, x2 in boost with the
+#    sink reference) with C_INT from bli to vdd. At DC bli = ctl - V_os,int - (V_need - V_dio)/A_int, so
+#    V_outcm - V_OCM = V_os,int + (V_need - V_dio)/A_int: the integrator pair offset is the V_OCM sigma, everything the
+#    passive loop used to pass 1:1 (V_BL0 replica error, sink / load / tail mismatch, PVT drift of V_need) is divided by
+#    A_int. In the CM loop the slow path is a PI zero at f_z = gm_ia / (2 pi C_INT), kept <= f_cm / 10.
+#  loads are sized at the m_plc current density (V_dio ~ V_need: small systematic term) and long L (low gm_il / gm_ia).
+#  Start-up (rstb low, D57 start-up clamp, tb9 fix): ctl -> ivbl0, bli -> ivbl0 and both outputs -> vocm, so Cc stores
+#    the operating charge (V_OCM - V_BL0) and Cr / C_INT start at the operating point (WO-27 tb9: the unclamped output
+#    CM sat at 2.9 V during the clamp and relaxed at the Cr refresh rate).
+INTEG = dict(tail=1)
+SIZES["m_ia"] = dict(dev="nfet_g5v0d10v5", WF=2.5, M=2, L=14.0, src="hand")    # pair, W 5 L 14 (70 um2) per side
+SIZES["m_il"] = dict(dev="pfet_g5v0d10v5", WF=3.0, M=2, L=16.0, src="hand")    # loads, W 6 L 16 (96 um2) per side
+SIZES["m_it"] = dict(SIZES["m_n"], M=INTEG["tail"], src="hand")                 # tail: m_n unit finger(s), gate ibn
+C_INT = 2.0e-12          # bli MIM to vdd (~1000 um2): f_z = gm_ia / (2 pi C_INT) ~0.4 MHz base / ~0.75 MHz boost (hand, <= f_cm / 10)
+BLI_RST = dict(CTL_RST)  # bli -> ivbl0 clamp while rstb low (start-up only, D57)
+OUT_RST = dict(dev="pfet_g5v0d10v5", W=4.0, L=0.5, src="hand")   # outp / outn -> vocm while rstb low (start-up only)
+REPLICA_DV_MAX = 0.15    # WO-28 item 4: |V_rnd - V_fa| (sink replica drain vs m_n drain) [V]

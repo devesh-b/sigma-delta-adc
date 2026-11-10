@@ -144,6 +144,49 @@ Everything except m_in is a 3.3 V device, so only m_in needs the D40 stress proo
 - **ro cost (HAND):** ro ∝ L/I. Load ro (80/4 at 75 %) ∥ section ro (15/2 at 25 %) = 0.80 × a full 107/4 load, so R_up −1.9 dB. With R_dn/R_up ≈ 1.6–1.8 (SIM), this costs **A0 ≈ −1.2 dB**. This is included in the SIM A0.
 - **Start-up:** `ctl` is clamped to V_BL0 by the reset switch while rst_n is low or the bias is invalid (same default-closed rule as §2.8). **The clamp is start-up only (D57 Q1):** it is tied to global rst_n / bias-invalid, not to the per-conversion reset. The CMFB keeps running through every conversion reset, and gate B decks model it that way (`rstb` low only for the first nrst−1 cycles, one discarded dummy first conversion).
 
+### 1.3a CM error amplifier in the SC CMFB loop (D60, WO-27) — superseded by 1.3b (removed from the netlist in WO-28)
+
+- **Why:** the passive SC CMFB has unity gain from the sensed CM to `ctl`, so the V_BL0 replica mismatch (single
+  m_plc finger, σ ≈ 3–6 mV) and every fold-node current error pass 1:1 into V_OCM (WO-26: 30.8 mV systematic at ff/125
+  base, 7.2 mV from the 38 mV bound). f_cm was ≈ 8 MHz against the 9.4 MHz tb9 needs in boost.
+- **Sense:** Cc (0.1 pF per side) and Cr (25 fF) now sense onto a new node `cms`, not `ctl`. Cr is refreshed to
+  (V_OCM, V_OCM), so at DC `cms` = V_out,cm. A MIM C_CMS (0.4 pF) on `cms` sets the Cc divider, which is the f_cm knob;
+  the divider does not touch DC accuracy (the refresh sets DC).
+- **Amp:** HV NMOS pair m_ca (20/2 per side), gate `cms` → drain `cmd`, gate `vocm` → drain `ctl`. Tail m_cat =
+  5 m_n unit fingers on `ibn` (no new reference current; ×2 in boost with the sink reference): ≈ 3.9 µA base / 7.8 µA
+  boost. Loads are m_plc unit fingers at the m_plc current density: diode on `cmd` (4), mirror `cmd`→`ctl` (2), diode on
+  `ctl` (2). The quiescent `ctl` therefore equals the m_plc gate voltage at the design current, so the amp itself is
+  the CM level reference (V_BL0 now only feeds the start-up clamp).
+- **Gain:** A_cm ≈ ½(1 + n_m/n_1)·gm_ca/gm_ctl-diode ≈ 3–4. Static V_OCM error = pair offset (1:1) + (load, fold-node
+  and ctl-diode terms)/A_cm (§2.11).
+- **Start-up (D57 kept):** while `rstb` is low, `ctl` is clamped to V_BL0 and `cms` to V_OCM; the CMFB runs through
+  every per-conversion reset.
+- **Checks:** op/AC f_cm and CM PM by return ratio T = Z_ol/Z_cl − 1 (CM current injection; open copy with the m_plc
+  gates AC-grounded through a 1 MH / 1 F break), V_OCM |err| + 3σ ≤ 10 mV; tb9 (`c1b_tb9.py`) transient.
+  Broken copies: `cm_unity` (ideal unity buffer = WO-26 passive loop) ⇒ V_OCM REJECT at ff/125; `cc_div4` ⇒ f_cm REJECT
+  (op/AC) and tb9 REJECT; `cmbw4` (ctl + 0.45 pF, amp bandwidth ÷ ≈ 4) ⇒ tb9 REJECT.
+
+### 1.3b Dual-path CMFB (D61, WO-28): supersedes 1.3a
+
+- **Why:** the 1.3a CM amp reached A_cm ≈ 3 within 4/8 µA (V_OCM |err| + 3σ = 63 / 21 mV against 10 mV; WO-27).
+- **Fast path (f_cm):** the WO-26 passive SC CMFB, unchanged values: Cc 0.1 pF per side, outputs → `ctl` (m_plc gates);
+  Cr 25 fF refreshed to (V_OCM, `bli`) on ph1 and shared with (out, `ctl`) on ph2. Averaged: `ctl` = V_out,cm − V_OCM + V(`bli`).
+- **Slow path (DC accuracy):** 5T gm-C follower-integrator from `ctl` into `bli`. HV NMOS pair m_ia (W 5 L 14 per side;
+  gate `ctl` → diode side `cid`, gate = drain = `bli`), PMOS mirror loads m_il (W 6 L 16, near the m_plc current
+  density so V_dio ≈ V_need), tail m_it = 1 m_n unit finger on `ibn` (0.78 µA base / 1.56 µA boost, no new reference),
+  C_INT 2 pF `bli` → vdd. At DC: V_out,cm − V_OCM = V_os,int + (V_need − V_dio)/A_int. Everything the passive loop passed
+  1:1 (V_BL0 replica, sink / load / tail mismatch, PVT drift of the m_plc gate voltage) is divided by A_int.
+- **Loop:** the slow path is a PI zero at f_z = gm_ia/(2π C_INT) (≈ 0.4 MHz base / 0.75 MHz boost, hand), kept ≤ f_cm/10.
+  Cost on the fast path: the m_ia gate on `ctl` adds ≈ 30–50 fF to the Cc divider (f_cm −5…−10 %, hand).
+- **σ (hand, A_VT 12 mV·µm):** pair 12·√(2/70) = 2.0 mV, loads ×gm_il/gm_ia ≈ 0.8 mV, residual σ_passive/A_int < 0.1 mV:
+  σ ≈ 2.2 mV, 3σ ≈ 6.5 mV; ≈ 3.5 mV left for the systematic term (SC charge injection is in tb9 / gate B, not in op/AC).
+- **Start-up (D57, tb9 fix):** while `rstb` is low, `ctl` and `bli` are clamped to V_BL0 and both outputs to V_OCM
+  (PMOS W 4 L 0.5), so Cc starts with the operating charge and Cr / C_INT at the operating point.
+- **Checks:** op/AC: f_cm, CM PM, CM peaking |T/(1+T)| ≤ 1 dB, f_z ≤ f_cm/10, V_OCM |err| + 3σ ≤ 10 mV; the return-ratio
+  extraction is validated first on a hand-solvable behavioural loop (`fcm_hand`); the open copy keeps the `ctl` gate
+  load with a dummy m_plc pair. Broken copies: `int_off` (bli = V_BL0, WO-26 passive loop) ⇒ V_OCM REJECT at ff/125 and
+  (with ivbl0 ×2) tb9 start-up REJECT; `cc_div4` ⇒ f_cm REJECT and tb9 event REJECT.
+
 ### 1.4 OTA chopper (D4/D18, E2) and vg island switches (M5, D51 Q1/Q4)
 
 - **Input chopper:** at the gates (vg side), **nfet_g5v0d10v5 W 4/L 0.5**, gates driven 0/VAPWR from C8 level shifters.
@@ -430,6 +473,28 @@ Runs under `/home/mempool/regr/tt/WO-23/c1/`: r3 (K_P 6, pair 80/0.5), r4 (K_P 7
 **Next actions (D55, user 2026-11-10; not implemented here).**
 - Precision A0 ≥ 80 dB is kept. Fix in **WO-24** (fresh agent): m_plc L 2 → 4 with Cc 0.2 pF (RB-m2; ≈ +1.16 dB, f_cm ≈ 5.7 MHz), then rerun the tables and table-INL.
 - **SPEC CL-1c:** the PMOS cascode D–S short is the required broken copy for the INL gate; m_pl L 0.5 becomes a sensitivity row. Open point from run 5: at the precision gate (tt base) this copy is not rejected (3.37 ppm ≤ 5.33); WO-24 needs a precision-mode broken copy that is.
+
+### 2.11 Mismatch allotments (D60, WO-27)
+
+The sky130 HV MC has no Vth term (`vth0_slope = 0` for both g5v0d10v5 devices; REVIEW-WO26 M1), so MC under-reports
+offsets. Every row that depends on a mirror or a matched pair carries a **hand Pelgrom** 3σ allotment, computed per corner
+from the simulated gm/I (`c1b_opac.py`, `sig_vt` / `sig_i`):
+
+- σ(ΔVT) = A_VT·√(1/WL_a + 1/WL_b), A_VT = **12 mV·µm** (gating; 8 mV·µm as an info column), A_β = 1 %·µm.
+- σ(ΔI/I) = √((gm/I·σ(ΔVT))² + (A_β·√(1/WL_a + 1/WL_b))²).
+
+| row | pair(s) | allotment | gate |
+|---|---|---|---|
+| SR (SPEC row 95, 1.4 pF) | m_t (32 × 1.25/2, 80 µm²) vs m_tr (4 fingers, 10 µm²) | I_tail·(1 − 3σ) | ≥ 12.5 / 25 V/µs |
+| I_tail ceiling | same | I_tail·(1 + 3σ) | ≤ 1.08 × design |
+| V_OCM, passive SC CMFB (before the CM amp) | m_bl0 (1 m_plc finger) vs m_plc (both sides); fold-node current error δI (m_pl/m_plr, m_n/m_nr, m_t/m_tr ÷ 2) over gm_plc | \|err\| + 3σ | ≤ 38 mV (CL-2) |
+| V_OCM with the CM amp (§1.3a) | amp pair (1:1), amp loads and the δI / gm_plc term ÷ A_cm | \|err\| + 3σ | ≤ 10 mV (D60 target) |
+| K_P tracking | perturbation copies ibn ×1.05 and ibtp ×0.95 | — | \|ΔK_P\| ≤ 2 % |
+
+- The mirror-ratio rows (m_tr, m_nr, m_plr, V_BL0) are **info only** (D60): their ~2–5 % offsets are systematic
+  CLM/DIBL from the Vds difference between diode and mirror, deterministic and covered by PVT.
+- I_REF_btp is recentred by **+1.9 %** (`BTP_RECENTRE`, D60).
+- Results per corner: `work/v1-design/results/wo27/README.md`.
 
 ## 3. Expected values (rev B; rev C run-5 values in §2.10, WO-24 netlisted values in `work/v1-design/results/wo24/`)
 
