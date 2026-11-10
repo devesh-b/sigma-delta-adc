@@ -664,3 +664,5 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - **Gate B (composite-ref netlist, fs/125 boost, N1024 m21 O1, 6 parts): all ACCEPT, INL ep 1.82–2.29 ppm (max 2.291) against gate 5.0 and share 3.33.** Still to do: check endpoint agreement across the parts, run the sr95 broken copy, and rerun after D58.
 - Sandbox ssh DNS failed ("Could not resolve hostname mempool.lan") at the gate B check; retry.
 - WO-25 written (wo/WO-25-C1b-ref-fix.md). Dispatch once sandbox reachable (local DNS cannot resolve mempool.lan; network changed).
+- 2026-11-10 11:55: sandbox reachable again (VPN off). sr95 broken copy launched in WO-24-8ef9a7e (s5.sh → S5DONE, logs out/gbsr_p*.log). WO-25 items 1–4 dispatched to an Opus design agent (it does not touch item 0).
+- pthomas learnings triaged → `LEARNINGS-pthomas-2026-11-10.md`. Determinism check s6.sh (WO-24-8ef9a7e, S6DONE): two identical smoke runs at PDK num_threads=8; compare INL digits.
