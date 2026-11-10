@@ -309,10 +309,12 @@ def summary(out):
             sp = (max(v) - min(v)) if v else float("nan")
             tsp = max([abs(r1[k] - r2[k]) for r1 in rb for r2 in rb if r1["corner"] == r2["corner"]
                        and r1["temp"] != r2["temp"]] or [float("nan")])
+            tt = [r[k] for r in rb if r["corner"] == "tt"]
+            dtt = max(abs(x / tt[0] - 1) for x in v) if tt else float("nan")   # info: deviation from the tt/27 value
             ok = len(v) == 9 and sp <= RATIO_SPREAD and (tsp <= RATIO_SPREAD)
             nf += not ok
             print(f"{'boost' if b else 'base '} {k:9s} n={len(v)} min {min(v):.4f} max {max(v):.4f} spread {sp * 100:.2f} % "
-                  f"temp spread {tsp * 100:.2f} % {'OK' if ok else 'FAIL'}")
+                  f"temp spread {tsp * 100:.2f} % max dev from tt {dtt * 100:.2f} % (info) {'OK' if ok else 'FAIL'}")
     print("SUMMARY", "ACCEPT" if nf == 0 else f"REJECT ({nf})")
     return nf
 

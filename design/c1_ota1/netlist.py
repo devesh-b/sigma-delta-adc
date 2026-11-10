@@ -39,7 +39,7 @@ bank m_bpx (gate ivbpc) feeds the same current to the vbnc diode m_bnd. ivbpc / 
 
 WO-26 (D59): references are parallel-only unit fingers at 1:8 (one instance, m = M_mirror/8, same WF/L/bulk as the
 mirror finger; V_BL0 replica = 1 m_plc unit finger), no trim. Replica: 2 tail + 4 sink unit fingers, the sink replica
-cascoded by one m_nc unit finger (gate REPLICA_CASC_GATE = vicm) so its drain sits near the fold node. Bank switch in the
+cascoded by one m_nc unit finger (gate REPLICA_CASC_GATE = rcb: diode m_rcb fed by one m_pl finger, gate ibp) so its drain sits near the fold node. Bank switch in the
 gate path: the boost-only fingers mbpds / mbpxs have their gates on gbk; TG Sbk gbk <-> ivbpc (closed in boost) and the
 pull-up mbku gbk -> vdd (on in base). The static switch states are wired to the rails per build(boost=...).
 mut is a '+'-joined token list: structural tokens nc_short, ref_composite (D58 4x4 composites, broken copy of the D59
@@ -138,7 +138,8 @@ def build(name="ota1", cmfb="sc", fs=4e6, mut=None, sizes=None, boost=False):
     sp = S.BANK_SW["p"]
     w(tg("Sbk", "gbk", "ivbpc", on, off) + [mos("mbku", "gbk", on, "vdd", "vdd", sp["dev"], sp["W"], sp["L"])])
     if "kp_fixed" not in mt:   # D58/D59 replica of the folded branch (kp_fixed = old wiring: ports fed from fixed I_REF)
-        w([dev("m_rt", "mrt", "ivbpc", "ibtp", "vdd", "vdd", z),
+        w([dev("m_rcp", "mrcp", "rcb", "ibp", "vdd", "vdd", z), dev("m_rcb", "mrcb", "rcb", "rcb", "vss", "vss", z),
+           dev("m_rt", "mrt", "ivbpc", "ibtp", "vdd", "vdd", z),
            dev("m_rnc", "mrnc", "ivbpc", S.REPLICA_CASC_GATE, "rnd", "vss", z),
            dev("m_rn", "mrn", "rnd", "ibn", "vss", "vss", z),
            mos("mbpx", "ivbnc", "ivbpc", "vdd", "vdd", bx["dev"], bx["WF"], bx["L"], nb0),

@@ -43,8 +43,10 @@ WO-26 (D59, user 2026-11-10; supersedes the D58 trim, the D58 replica cascode bi
     8 x 1.875/2 (same W 15 L 2) so the V_BL0 replica is 1 unit finger (1:8). Layout intent: DESIGN.md 1.1 (C7);
   - K_P base 12.5 (KP_BANK base 5 -> 4), boost stays 7 fingers (K_P 7.14);
   - replica: REPLICA tail 2 / sink 4 unit fingers (2x WO-25), derived from m_t / m_n in code; the sink replica is cascoded
-    by one m_nc unit finger (m_rnc, gate V_ICM: not the ivbnc loop, which would add a zero-current state) so its drain
-    sits near the fold node instead of ~2 V; m_bpd unit 1.5/15 (I_NC/8), copy bank m_bpx 0.75/15 (half width -> I_NC/16
+    by one m_nc unit finger (m_rnc) so its drain sits near the fold node instead of ~2 V. m_rnc gate = rcb, an NMOS
+    diode with the m_bnc geometry (K_N ~6) fed by ONE m_pl unit finger (gate ibp, I_NC*0.75/32, +0.37 uA base): it
+    tracks ivbnc over PVT and boost without the ivbnc loop (an ivbnc-gated cascode adds a zero-current state). WO-26 run 1
+    used gate V_ICM: the replica drain fell to 0.09-0.16 V in boost / cold while fa rose (K_P boost 3.6-6.2, REJECTED); m_bpd unit 1.5/15 (I_NC/8), copy bank m_bpx 0.75/15 (half width -> I_NC/16
     to m_bnd, K_N 8, no extra copy-leg current);
   - bank switch in the GATE path: the boost-only fingers of m_bpd / m_bpx (KP_BANK boost - base) have their gates on
     node gbk, a TG to ivbpc (closed in boost) and a pull-up to vdd (on in base); no switch in series with a diode.
@@ -146,7 +148,9 @@ I_REF["vbl0"] = I_NC * CMFB_SPLIT / RATIO   # V_BL0 replica, 1 m_plc unit finger
 # D59 replica (WO-26): REPLICA unit fingers of m_t / m_n (sink = 2 x tail so I(m_bpd) = tail x I_NC/16); sink replica
 # cascoded by one m_nc unit finger with gate REPLICA_CASC_GATE. DERIVED from m_t / m_n / m_nc, do not size by hand.
 REPLICA = dict(tail=2, sink=4)
-REPLICA_CASC_GATE = "vicm"
+REPLICA_CASC_GATE = "rcb"     # WO-26 run 2 (run 1: "vicm", rejected)
+SIZES["m_rcp"] = dict(SIZES["m_pl"], M=1, src="hand")    # rcb feed: 1 m_pl unit finger, gate ibp
+SIZES["m_rcb"] = dict(SIZES["m_bnc"], src="hand")        # rcb diode: m_bnc geometry 0.625/16
 SIZES["m_rt"] = dict(SIZES["m_t"], M=REPLICA["tail"], src="hand")
 SIZES["m_rn"] = dict(SIZES["m_n"], M=REPLICA["sink"], src="hand")
 SIZES["m_rnc"] = dict(SIZES["m_nc"], M=1, src="hand")

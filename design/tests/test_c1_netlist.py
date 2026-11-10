@@ -62,10 +62,10 @@ def test_device_count():
     assert c.get("pfet_01v8") == 2
     assert c.get("nfet_01v8") == 4
     # m_n 2, m_nc 2, refs m_nr 1, m_bnd 1, replica m_rn + cascode m_rnc 2, input chopper 4, island 2, CMFB TG n 8, bank TG n 1
-    assert c.get("nfet_g5v0d10v5") == 2 + 2 + 1 + 1 + 2 + 4 + 2 + 8 + 1
+    assert c.get("nfet_g5v0d10v5") == 2 + 2 + 1 + 1 + 2 + 4 + 2 + 8 + 1 + 1   # + rcb diode m_rcb
     # m_t 1, m_pp 2, m_pc 2, m_pl 2, m_plc 2, refs m_tr/m_plr/mbl0 3, mbpd/mbpds 2, mbpx/mbpxs 2, m_rt 1, bank TG p 1,
     # pull-up mbku 1, CMFB TG p 8, ctl reset 1
-    assert c.get("pfet_g5v0d10v5") == 1 + 2 + 2 + 2 + 2 + 3 + 2 + 2 + 1 + 1 + 1 + 8 + 1
+    assert c.get("pfet_g5v0d10v5") == 1 + 2 + 2 + 2 + 2 + 3 + 2 + 2 + 1 + 1 + 1 + 8 + 1 + 1   # + rcb feed m_rcp
 
 
 def test_geometry_on_every_device():
@@ -92,10 +92,10 @@ def test_bias_boost_kp():
 
 
 def replica_ok(text):
-    """D59: tail replica on ibtp, sink replica (ibn) cascoded by mrnc (gate vicm, not the ivbnc loop), both on ivbpc; copy
+    """D59: tail replica on ibtp, sink replica (ibn) cascoded by mrnc (gate rcb from the ibp leg, not the ivbnc loop), both on ivbpc; copy
     bank m_bpx (gate ivbpc) and its switched fingers feed ivbnc."""
     f = lambda pat: re.search(pat, text, re.M) is not None
-    return (f(r"^Xmrt ivbpc ibtp vdd vdd ") and f(rf"^Xmrnc ivbpc {S.REPLICA_CASC_GATE} rnd vss ")
+    return (f(r"^Xmrcp rcb ibp vdd vdd ") and f(r"^Xmrcb rcb rcb vss vss ") and f(r"^Xmrt ivbpc ibtp vdd vdd ") and f(rf"^Xmrnc ivbpc {S.REPLICA_CASC_GATE} rnd vss ")
             and f(r"^Xmrn rnd ibn vss vss ") and f(r"^Xmbpx ivbnc ivbpc vdd vdd ") and f(r"^Xmbpxs ivbnc gbk vdd vdd ")
             and S.REPLICA_CASC_GATE != "ivbnc")
 
@@ -106,7 +106,7 @@ def test_replica_bias():
 
 def test_replica_bias_fails_on_old_wiring():
     assert not replica_ok(NL.build(mut="kp_fixed"))
-    assert not replica_ok(NL.build().replace("Xmrnc ivbpc vicm rnd", "Xmrnc ivbpc ivbnc rnd"))   # zero-state loop
+    assert not replica_ok(NL.build().replace("Xmrnc ivbpc rcb rnd", "Xmrnc ivbpc ivbnc rnd"))   # zero-state loop
 
 
 def bank_ok(text, boost):
