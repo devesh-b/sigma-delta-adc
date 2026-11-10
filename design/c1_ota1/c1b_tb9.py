@@ -23,13 +23,13 @@ WO-30 rows (D63 basis; expected values from SPEC row 98 / D63 / CL-2 / CL-7 / SP
     10 ns charge pulse at the period start. The WO-27..29 0.8 V step overstated the per-cycle charge by 1.65x and was still
     slewing at +22.5 ns; at the sampling instants slewing has ended. TB9_DV_DIFF overrides (info runs).
   * Start-up (gate): outputs pre-charged to VDD / 0, integrator held in reset, start-up clamp (rstb low: ctl, bli -> V_BL0,
-    outputs -> V_OCM) held 8 T (= 2 us at 4 MHz; D57: the clamp is held while rst_n is low or the bias is invalid, and
-    power-up bias settling alone is >= CL-7 4 us, so 8 T is a conservative minimum); |V_cm - V_OCM| <= 10 mV over the last
-    clock period before 4 us. Copies with the old 2 T clamp and a Cr x 2 copy run as info (WO-30 item 2 evidence).
+    outputs -> V_OCM) held 2 T (WO-31, D64: with Cr 0.05 pF the Cc charge mode decays fast enough; an 8 T copy, sulo8,
+    runs as info); |V_cm - V_OCM| <= 10 mV over the last clock period before 4 us.
   Events start at 3.0 us (2.5 us after the 2 T clamp release of the ev copies; the Cc charge mode decays with
-  tau = T Cc / Cr ~ 1.1 us, WO-30), run to 5.5 us.
+  tau = T Cc / Cr, ~1.1 us at the old Cr 0.025 pF, WO-30), run to 5.5 us.
 Broken copies (own deck, each must REJECT on the stated row): mcc4 = Cc / 4 (any row; the ph1 static row: the charge
-packet / 2 Cc grows 4x), masy = 1e-4 of the CM-step charge onto one island (CM-to-DM row), mio = int_off + vbl0x2 (start-up).
+packet / 2 Cc grows 4x), masy = 1e-4 of the CM-step charge onto one island (CM-to-DM row), mio = int_off + vbl0x2 (start-up),
+mcr05 = Cr / 2 = the pre-D64 0.025 pF with the 2 T clamp (start-up; WO-30 measured 14-34 mV).
 Setup per copy: OTA1 (cmfb="sc", boost, fs 4 MHz, ph1 / ph2 non-overlapping by g = 0.025/fs), Cint 4 pF out -> island
 (negative feedback, WO-29), Cs1 0.5 pF island -> ground, output routing C_RT; reset = island shunt to V_ICM (isl) + ideal
 output short (gen_tier1 style); chopper static.
@@ -67,14 +67,11 @@ DIAG = os.environ.get("TB9_DIAG", "")                       # diagnosis copies "
 TSTOP_RUN = float(os.environ.get("TB9_TSTOP", T_EVSTOP))
 DIAG_VEC = bool(DIAG) or bool(os.environ.get("TB9_VEC"))    # also log ctl / bli
 # kinds: ev, ev0 (twin without CM step), su_hi / su_lo (+ "8": 8 T clamp). info copies are reported, not gated.
-NOM = [("ev", "ev", None), ("ev0", "ev0", None), ("suhi", "su_hi8", None), ("sulo", "su_lo8", None),
-       ("suvb", "su_lo8", "vbl0x2"), ("sulo2t", "su_lo", None), ("suvb2t", "su_lo", "vbl0x2"), ("sulocr2", "su_lo", "cr_x2")]
-if os.environ.get("TB9_SET") == "cr2":   # WO-30 candidate (option, not adopted): Cr x 2 everywhere, 2 T start-up clamp
-    NOM = [("ev", "ev", "cr_x2"), ("ev0", "ev0", "cr_x2"), ("suhi", "su_hi", "cr_x2"), ("sulo", "su_lo", "cr_x2"),
-           ("suvb", "su_lo", "vbl0x2+cr_x2")]
-INFO = {"ev0", "sulo2t", "suvb2t", "sulocr2", "masy0"}
-MUT = [("mcc4", "ev", "cc_div4"), ("masy", "ev", "cm_asym"), ("masy0", "ev0", None), ("mio", "su_hi8", "int_off+vbl0x2")]
-EXPECT = {"mcc4": "", "masy": "CM-to-DM", "mio": "start-up"}
+NOM = [("ev", "ev", None), ("ev0", "ev0", None), ("suhi", "su_hi", None), ("sulo", "su_lo", None),
+       ("suvb", "su_lo", "vbl0x2"), ("sulo8", "su_lo8", None)]   # WO-31 (D64): Cr 0.05 pF default, 2 T clamp gates
+INFO = {"ev0", "sulo8", "masy0"}
+MUT = [("mcc4", "ev", "cc_div4"), ("masy", "ev", "cm_asym"), ("masy0", "ev0", None), ("mio", "su_hi8", "int_off+vbl0x2"), ("mcr05", "su_lo", "cr_x05")]
+EXPECT = {"mcc4": "", "masy": "CM-to-DM", "mio": "start-up", "mcr05": "start-up"}
 TWIN = {"ev": "ev0", "masy": "masy0"}
 
 

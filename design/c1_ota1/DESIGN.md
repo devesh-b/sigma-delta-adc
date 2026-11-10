@@ -102,7 +102,7 @@ Per side: tail → input → protection cascode → fold node → NMOS cascode �
 | m_nc | nfet_g5v0d10v5 | **20/2** | NMOS cascode |
 | m_pc | pfet_g5v0d10v5 | **80/2** | PMOS cascode |
 | m_pl / m_plr | pfet_g5v0d10v5 | **80/4** (32 × 2.5/4) / composite 4 × 4 of 2.5/4 | load, fixed mirror half, 75 % of I_LOAD; reference 1:32 |
-| m_plc | pfet_g5v0d10v5 | **15/2** (3 × 5/2) | load, CMFB section, 25 % of I_LOAD, gate = ctl (D58: D55 reverted, Cc 0.1 pF, Cr 25 fF) |
+| m_plc | pfet_g5v0d10v5 | **15/2** (3 × 5/2) | load, CMFB section, 25 % of I_LOAD, gate = ctl (D58: D55 reverted, Cc 0.1 pF; Cr 50 fF per D64) |
 | m_bl0 | pfet_g5v0d10v5 | 5 series m_plc fingers (5/10) | V_BL0 replica diode, I_NC·0.25/15 = 0.262 µA base (× REF_TRIM) |
 | m_rt / m_rn | pfet / nfet_g5v0d10v5 | 1 × 1.25/2 / 2 × 2.25/4 (unit fingers of m_t / m_n) | D58 folded-branch replica on ivbpc: (2 I_SINK − I_TAIL)/32 = I_NC/16 of the actual mirrors |
 | m_bpd | pfet_g5v0d10v5 | 5 (base) / 7 (boost) × 0.75/15 diode bank | m_pc gate bias at I_NC/16: K_P 10 base / 7.14 boost (CL-8 step = bank switch) |
@@ -170,7 +170,7 @@ Everything except m_in is a 3.3 V device, so only m_in needs the D40 stress proo
 
 - **Why:** the 1.3a CM amp reached A_cm ≈ 3 within 4/8 µA (V_OCM |err| + 3σ = 63 / 21 mV against 10 mV; WO-27).
 - **Fast path (f_cm):** the WO-26 passive SC CMFB, unchanged values: Cc 0.1 pF per side, outputs → `ctl` (m_plc gates);
-  Cr 25 fF refreshed to (V_OCM, `bli`) on ph1 and shared with (out, `ctl`) on ph2. Averaged: `ctl` = V_out,cm − V_OCM + V(`bli`).
+  Cr 50 fF (D64, WO-31; was 25 fF) refreshed to (V_OCM, `bli`) on ph1 and shared with (out, `ctl`) on ph2. Averaged: `ctl` = V_out,cm − V_OCM + V(`bli`).
 - **Slow path (DC accuracy):** 5T gm-C follower-integrator from `ctl` into `bli`. HV NMOS pair m_ia (W 5 L 14 per side;
   gate `ctl` → diode side `cid`, gate = drain = `bli`), PMOS mirror loads m_il (W 6 L 16, near the m_plc current
   density so V_dio ≈ V_need), tail m_it = 1 m_n unit finger on `ibn` (0.78 µA base / 1.56 µA boost, no new reference),
@@ -191,11 +191,12 @@ Everything except m_in is a 3.3 V device, so only m_in needs the D40 stress proo
   ≤ 10 mV from the settled per-phase CM; static rows |CM_ss(ph2) − V_OCM| ≤ 10 mV and |CM_ss(ph1) − V_OCM| ≤ 28 mV
   (CL-2 38 mV − 10 mV allotment); CM-to-DM twin row (ev vs ev0 without the CM step, at the ph2 ends after the CM step)
   ≤ 0.256 µV = 0.1 × 5 ppm × 2 c1 VREF (S-model: a per-sample x1 error d is an input error d/(c1 VREF), INL in ppm of
-  FSR 2); diff step = the loop-bound worst step c1 (u_max + 1) VREF = 0.486 V; start-up clamp 8 T (D57: held while the
-  bias is invalid). The 22.5 ns value stays as info. Broken copies: `cc_div4`, CM-step n/p imbalance 1e-4 (CM-to-DM row),
-  `int_off` + vbl0×2 (start-up).
+  FSR 2); diff step = the loop-bound worst step c1 (u_max + 1) VREF = 0.486 V; start-up clamp 2 T (WO-31, D64; the 8 T
+  copy runs as info). The 22.5 ns value stays as info. Broken copies: `cc_div4`, CM-step n/p imbalance 1e-4 (CM-to-DM row),
+  `int_off` + vbl0×2 (start-up), `cr_x05` (Cr / 2 = pre-D64 0.025 pF, start-up).
 - **Cc charge mode (WO-30):** a charge error on Cc (outputs vs `ctl`) is only removed by the Cr refresh, factor
-  ≈ Cc/(Cc + Cr) per cycle, τ ≈ T·Cc/Cr ≈ 1.1 µs at 4 MHz. The slow path does not act on it (it tracks `ctl`).
+  ≈ Cc/(Cc + Cr) per cycle, τ ≈ T·Cc/Cr ≈ 1.1 µs at 4 MHz with Cr 25 fF. The slow path does not act on it (it tracks
+  `ctl`). D64 (WO-31): Cr 25 → 50 fF per side, 0.67 per cycle, τ ≈ 0.6 µs, so the 2 T start-up clamp meets 10 mV at 4 µs.
 
 ### 1.4 OTA chopper (D4/D18, E2) and vg island switches (M5, D51 Q1/Q4)
 

@@ -148,7 +148,7 @@ BETA1 = 0.84       # SPEC (CL-4 proposal >= 0.83); design value 0.846 (Cp_vg 0.2
 
 # SC CMFB (DESIGN.md 1.3); src hand, all open until the C1b CMFB tb. Drives m_plc only (CMFB_SPLIT of the load).
 C_CMFB_SENSE = 0.10e-12     # Cc per side, output -> CMFB control node (inside C_L); D58: D55 reverted (back to rev C)
-C_CMFB_REFRESH = 0.025e-12  # Cr per side, switched between (V_OCM, V_BL0) and (out, ctl) every cycle; D58 (rev C value)
+C_CMFB_REFRESH = 0.05e-12   # Cr per side, switched between (V_OCM, V_BL0) and (out, ctl) every cycle; D64 (WO-31): 0.025 -> 0.05 pF (start-up, 2 T clamp)
 CMFB_SW = dict(n=dict(dev="nfet_g5v0d10v5", W=1.0, L=0.5), p=dict(dev="pfet_g5v0d10v5", W=2.0, L=0.5), src="hand")  # TG, 3.3 V
 CTL_RST = dict(dev="pfet_g5v0d10v5", W=1.0, L=0.5, src="hand")   # ctl -> V_BL0 clamp while rst (gate rst_b low = closed)
 

@@ -50,7 +50,7 @@ ctl = V(cms) - V(vocm) + V(ivbl0), the old passive loop), cm_open (AC loop break
 WO-28 (D61): dual-path CMFB. Cc on ctl, Cr refreshed to (vocm, bli); gm-C follower-integrator ctl -> bli (m_ia / m_il /
 m_it, C_INT to vdd); start-up clamps (rstb low) ctl, bli -> ivbl0 and outp, outn -> vocm. Tokens: int_off (broken copy:
 bli tied to ivbl0, the WO-26 passive loop), cm_open (now with a dummy m_plc pair on ctl), cc_div4, vbl0x2 (ivbl0 x2),
-cr_x2 (WO-30 info: Cr x 2).
+cr_x2 (WO-30 info: Cr x 2). cr_x05 (WO-31: Cr / 2 = the pre-D64 0.025 pF, tb9 start-up broken copy).
 The WO-27 tokens cm_unity / cmbw4 and node cms are gone.
 mut is a '+'-joined token list: structural tokens nc_short, ref_composite (D58 4x4 composites, broken copy of the D59
 ratio rows), kp_fixed; bias-scaling tokens (bias_currents only) ibn105 (ibn x1.05), ibtp90 / ibtp112 (ibtp x0.90 /
@@ -178,9 +178,10 @@ def build(name="ota1", cmfb="sc", fs=4e6, mut=None, sizes=None, boost=False):
         w([f"Cfx1 fa vss {S.C_FOLD_EXTRA:g}", f"Cfx2 fb vss {S.C_FOLD_EXTRA:g}"])
     # CMFB, WO-28 (D61) dual path: fast passive SC path onto ctl (Cc, Cr refreshed to (vocm, bli)), slow gm-C
     # follower-integrator ctl -> bli (sizes_draft INTEG, DESIGN.md 1.3b)
-    # WO-30: cr_x2 = Cr x 2 (tb9 info copy: the Cc charge mode decays with tau = T Cc / Cr)
+    # WO-30: cr_x2 = Cr x 2 (info; the Cc charge mode decays with tau = T Cc / Cr). WO-31 (D64 default Cr 0.05 pF):
+    # cr_x05 = Cr / 2 = the old 0.025 pF (tb9 start-up broken copy)
     cc = S.C_CMFB_SENSE / (4.0 if "cc_div4" in mt else 1.0)
-    cr = S.C_CMFB_REFRESH * (2.0 if "cr_x2" in mt else 1.0)
+    cr = S.C_CMFB_REFRESH * (2.0 if "cr_x2" in mt else 0.5 if "cr_x05" in mt else 1.0)
     w([f"Ccp outp ctl {cc:g}", f"Ccn outn ctl {cc:g}"])
     c, c2, co = S.CTL_RST, S.BLI_RST, S.OUT_RST
     w([mos("mrst", "ctl", "rstb", "ivbl0", "vdd", c["dev"], c["W"], c["L"]),
