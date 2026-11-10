@@ -663,3 +663,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - **D58 (user):** ref fix = scale I_REF by the measured ratio + replica-derived cascode bias; D55 reverted to p15, f_cm gets its own lever later.
 - **Gate B (composite-ref netlist, fs/125 boost, N1024 m21 O1, 6 parts): all ACCEPT, INL ep 1.82–2.29 ppm (max 2.291) against gate 5.0 and share 3.33.** Still to do: check endpoint agreement across the parts, run the sr95 broken copy, and rerun after D58.
 - Sandbox ssh DNS failed ("Could not resolve hostname mempool.lan") at the gate B check; retry.
+- WO-25 written (wo/WO-25-C1b-ref-fix.md). Dispatch once sandbox reachable (local DNS cannot resolve mempool.lan; network changed).
