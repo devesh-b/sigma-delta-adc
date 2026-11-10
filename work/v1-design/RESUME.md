@@ -681,3 +681,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - every broken copy REJECTED.
 - Item-1 ratio exit fails: ratios 0.944–1.031 from the Vds offset; spread over T up to 2.85 %. The rcb leg adds 0.37 / 0.74 µA outside D59 and needs the user's OK.
 - Gate B running: `WO-26-b177d23/gb.sh`, 30 parts in waves of 3, status `out/gb_status`, marker `GB_DONE`, up to about 30 h. Reviewer pass on WO-26 running.
+- REVIEW-WO26: proceed, wait for gate B. Open for the user: item-1 ratio (a/a+c/b), V_OCM mismatch fix, rcb leg OK. Coordinator: sr95 also at sf/−40 after the current gate B; C6 line for boost-control level shift / break-before-make.
