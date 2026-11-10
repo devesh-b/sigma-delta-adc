@@ -102,10 +102,13 @@ Per side: tail → input → protection cascode → fold node → NMOS cascode �
 | m_nc | nfet_g5v0d10v5 | **20/2** | NMOS cascode |
 | m_pc | pfet_g5v0d10v5 | **80/2** | PMOS cascode |
 | m_pl / m_plr | pfet_g5v0d10v5 | **80/4** (32 × 2.5/4) / composite 4 × 4 of 2.5/4 | load, fixed mirror half, 75 % of I_LOAD; reference 1:32 |
-| m_plc | pfet_g5v0d10v5 | **30/4** (6 × 5/4) | load, CMFB section, 25 % of I_LOAD, gate = ctl (D55; rev C 15/2) |
-| m_bl0 | pfet_g5v0d10v5 | 5 series m_plc fingers (5/20) | V_BL0 replica diode, I_NC·0.25/30 = 0.131 µA base |
-| m_bnc | nfet_g5v0d10v5 | 0.625/16 diode | m_nc gate bias, I_NC/32 (K_N 8) |
-| m_bpc | pfet_g5v0d10v5 | 1.25/7 diode | m_pc gate bias, I_NC/22.4 base (K_P 10) / I_NC/16 boost (K_P 7) |
+| m_plc | pfet_g5v0d10v5 | **15/2** (3 × 5/2) | load, CMFB section, 25 % of I_LOAD, gate = ctl (D58: D55 reverted, Cc 0.1 pF, Cr 25 fF) |
+| m_bl0 | pfet_g5v0d10v5 | 5 series m_plc fingers (5/10) | V_BL0 replica diode, I_NC·0.25/15 = 0.262 µA base (× REF_TRIM) |
+| m_rt / m_rn | pfet / nfet_g5v0d10v5 | 1 × 1.25/2 / 2 × 2.25/4 (unit fingers of m_t / m_n) | D58 folded-branch replica on ivbpc: (2 I_SINK − I_TAIL)/32 = I_NC/16 of the actual mirrors |
+| m_bpd | pfet_g5v0d10v5 | 5 (base) / 7 (boost) × 0.75/15 diode bank | m_pc gate bias at I_NC/16: K_P 10 base / 7.14 boost (CL-8 step = bank switch) |
+| m_bpx → m_bnd | pfet / nfet_g5v0d10v5 | copy bank as m_bpd → 1.25/16 diode | m_nc gate bias at I_NC/16 (K_N 8, both modes) |
+
+D58 (WO-25): the I_REF ports (btp, bn, bp, vbl0) carry REF_TRIM = 1 / (composite-to-mirror ratio at tt/27 base), measured by `c1b_opac.py`. Legacy m_bpc 1.25/7 and m_bnc 0.625/16 stay in `sizes_draft.py` for the revc spot deck only.
 
 Everything except m_in is a 3.3 V device, so only m_in needs the D40 stress proof.
 

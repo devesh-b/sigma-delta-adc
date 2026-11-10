@@ -44,8 +44,8 @@ def test_device_count():
     # switches: input chopper 4 + island 2 (3.3 V n), fold chopper 4 (nfet_01v8), CMFB 8 TGs (n + p), ctl reset 1 (p)
     assert c.get("pfet_01v8") == 2
     assert c.get("nfet_01v8") == 4
-    assert c.get("nfet_g5v0d10v5") == 2 + 2 + s_ + 1 + 4 + 2 + 8
-    assert c.get("pfet_g5v0d10v5") == 1 + 2 + 2 + 2 + 2 + 2 * s_ + 1 + S.VBL0_SERIES + 8 + 1
+    assert c.get("nfet_g5v0d10v5") == 2 + 2 + s_ + 2 + 4 + 2 + 8   # WO-25: m_bnd + sink replica m_rn
+    assert c.get("pfet_g5v0d10v5") == 1 + 2 + 2 + 2 + 2 + 2 * s_ + 3 + S.VBL0_SERIES + 8 + 1   # m_bpd, m_rt, m_bpx
 
 
 def test_geometry_on_every_device():
@@ -64,4 +64,26 @@ def test_dc_cmfb_has_no_switches_and_mutant_shorts_nc():
 def test_bias_boost_kp():
     b, f = NL.bias_currents(False), NL.bias_currents(True)
     assert f["ibtp"] == pytest.approx(2 * b["ibtp"])
-    assert f["ivbpc"] / b["ivbpc"] == pytest.approx(S.BOOST * S.BOOST_SCALE["vbpc"])   # CL-8 x1.4
+    assert b["ivbpc"] == 0 and b["ivbnc"] == 0           # D58: replica-fed, no reference current
+    kf = NL.bias_currents(True, "kp_fixed")
+    assert kf["ivbpc"] == pytest.approx(2 * S.I_NC / 16)  # broken copy: old wiring, fixed current
+
+
+def replica_ok(text):
+    """D58: tail replica on ibtp and sink replica on ibn both land on ivbpc; copy bank m_bpx (gate ivbpc) feeds ivbnc."""
+    return (re.search(r"^Xmrt ivbpc ibtp vdd vdd ", text, re.M) is not None
+            and re.search(r"^Xmrn ivbpc ibn vss vss ", text, re.M) is not None
+            and re.search(r"^Xmbpx ivbnc ivbpc vdd vdd ", text, re.M) is not None)
+
+
+def test_replica_bias():
+    assert replica_ok(NL.build())
+
+
+def test_replica_bias_fails_on_old_wiring():
+    assert not replica_ok(NL.build(mut="kp_fixed"))
+
+
+def test_kp_bank_switch():
+    m = lambda t: int(re.search(r"^Xmbpd .* m=(\d+) ", t, re.M).group(1))
+    assert (m(NL.build()), m(NL.build(boost=True))) == (S.KP_BANK["base"], S.KP_BANK["boost"])

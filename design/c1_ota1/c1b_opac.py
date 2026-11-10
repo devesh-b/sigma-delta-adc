@@ -11,6 +11,13 @@ converged, A0 is finite and A0 < A0_MIN; anything else (lint, NaN, no data) is I
 CMFB DC equivalent: netlist.py docstring (R = 1/(fs*2Cr) on ctl, CM only); fs 2 MHz base, 4 MHz boost.
 Chopper static (chp, chlp high); island shunt open; rstb high.
 
+WO-25 (D58) rows: the four composite-to-mirror ratios (I_mirror / (fingers x I_port): m_tr -> m_t, m_nr -> m_n, m_plr ->
+m_pl, V_BL0 replica -> m_plc via a top-level probe copy of m_plc with gate ivbl0 and drain forced to V(sa)); I_tail
+within +-3 % of I_TAIL (x BOOST); effective K_P = (I_bpd / (W/L)_bpd) / (I_pc / (W/L)_pc) within +-10 % of
+K_BIAS_P x KP_BANK base / fingers (10 base, 7.14 boost); K_N (I_bnd vs I_nc, target K_BIAS_N) reported.
+Broken copies, each in its own deck, each must fail its TARGET row with a converged op: tt nc_short -> precision A0;
+tt ref_single -> I_tail; ff/-40 kp_fixed (old wiring) -> K_P.
+
 Rows (expected values from SPEC / CL / RC-M1, not from this code):
   op converges, no NaN; core device margins Vds - Vdsat >= 50 mV (switches are triode by design, composite-reference
   inner fingers are triode by design: excluded); I_fold/I_tail >= 1.2; base span >= 1.6 V (RC-M1); boost span >= 1.40 V
@@ -44,10 +51,14 @@ LOADS = {"lump": 1.4e-12,
          "hold": CINT1 * CP_VG_DES / (CINT1 + CP_VG_DES) + P.CS2 + S.C_CMFB_SENSE + S.C_CMFB_REFRESH + C_RT}
 C_ROUTE = 0.035e-12      # vg routing estimate per side (CL-4; pair 12 fingers, ~100 um met2 to Cs1/Cint, top-plate parasitics)
 A0_MIN = 80.3
+I_TAIL_TOL, K_TOL = 0.03, 0.10
+MUTANTS = {("tt", 27): [("mutnc", "nc_short", "precision A0"), ("mutrs", "ref_single", "I_tail")],
+           ("ff", -40): [("mutkp", "kp_fixed", "K_P")]}
 DEVQ = ("gm", "gds", "gmbs", "id", "vdsat", "cgg", "cdd")
 CORE = {"min1": "m_in", "mpp1": "m_pp", "mt": "m_t", "mn1": "m_n", "mnc1": "m_nc", "mpc1": "m_pc", "mpl1": "m_pl",
         "mplc1": "m_plc"}
 SWQ = {"sci1": "nfet_g5v0d10v5", "sci3": "nfet_g5v0d10v5", "sisl1": "nfet_g5v0d10v5"}
+BIASQ = {"mbpd": "m_bpd", "mbnd": "m_bnd"}
 NODES = ("tail", "da", "fa", "xa", "sa", "ctl", "ibn", "ibp", "ivbnc", "ivbpc", "ivbl0")
 
 
@@ -55,11 +66,11 @@ def par(x, inst, dev, q):
     return f"@m.x{x}.x{inst}.msky130_fd_pr__{dev}[{q}]"
 
 
-def copy_lines(x, boost, cl, sub):
+def copy_lines(x, boost, cl, sub, mut=None):
     vd = "vdd_" + x
     L = [f"X{x} {vd} 0 inp_{x} inn_{x} outp_{x} outn_{x} vicm vocm ibtp_{x} ibn_{x} ibp_{x} ivbnc_{x} ivbpc_{x} ivbl0_{x} "
          f"{vd} 0 lv 0 0 0 {vd} 0 {vd} {vd} {sub}"]
-    for p_, i_ in NL.bias_currents(boost).items():
+    for p_, i_ in NL.bias_currents(boost, mut).items():
         L.append(f"I{p_}_{x} {p_}_{x} 0 {i_:.6e}" if p_ in NL.SINK_PORTS else f"I{p_}_{x} {vd} {p_}_{x} {i_:.6e}")
     ce = cl - S.C_CMFB_SENSE
     L += [f"Cxp_{x} outp_{x} 0 {ce:g}", f"Cxn_{x} outn_{x} 0 {ce:g}",
@@ -67,7 +78,17 @@ def copy_lines(x, boost, cl, sub):
           f"Bin_{x} inn_{x} 0 V = V(icm) - 0.5*(V(d) - max(min(V(s_{x})/1000, 0.3), -0.3))",
           f"Bs_{x} 0 s_{x} I = 1e-3*(V(outp_{x}) - V(outn_{x}))", f"Rs_{x} s_{x} 0 1e12", f"Cs_{x} s_{x} 0 1e9",
           f".nodeset v(s_{x})=0 v(outp_{x})={S.V_OCM} v(outn_{x})={S.V_OCM}"]
+    pc = S.SIZES["m_plc"]   # V_BL0 ratio probe: m_plc copy, gate ivbl0, drain forced to V(sa), own supply
+    L += [f"Vprb_{x} vprb_{x} 0 {vd_val(x)}", f"Bdp_{x} dp_{x} 0 V = v(x{x}.sa)",
+          NL.mos(f"prb_{x}", f"dp_{x}", f"ivbl0_{x}", f"vprb_{x}", f"vprb_{x}", pc["dev"], pc["WF"], pc["L"], pc["M"])]
     return L
+
+
+VDD_NOW = {}
+
+
+def vd_val(x):
+    return VDD_NOW["v"]
 
 
 def copies_for(c, t):
@@ -77,11 +98,12 @@ def copies_for(c, t):
 
 def mutant_copies(c, t):
     """Own deck (REVIEW-C1b M5): a mutant must not share a deck with the nominal corner copies."""
-    return [("mutnc", False, LOADS["lump"], "nc_short")] if (c, t) == ("tt", 27) else []
+    return [(x, False, LOADS["lump"], m) for x, m, _ in MUTANTS.get((c, t), [])]
 
 
 def deck(c, t, v, tag, copies):
-    L = [f"* WO-24 c1b_opac {tag}", f".lib {LIB} {c}", f".temp {t}", ".option gmin=1e-15 reltol=1e-6",
+    VDD_NOW["v"] = v
+    L = [f"* WO-25 c1b_opac {tag}", f".lib {LIB} {c}", f".temp {t}", ".option gmin=1e-15 reltol=1e-6",
          f"Vicm vicm 0 {S.V_ICM}", f"Vicm2 icm 0 {S.V_ICM}", f"Vocm vocm 0 {S.V_OCM}", "Vlv lv 0 1.8", "Vd d 0 dc 0 ac 1"]
     subs = {}
     for x, b, cl, mut in copies:
@@ -89,15 +111,17 @@ def deck(c, t, v, tag, copies):
         if key not in subs:
             nm = f"ota1_{'f' if b else 'b'}{'_' + mut if mut else ''}"
             subs[key] = nm
-            L.append(NL.build(nm, cmfb="dc", fs=FS[b], mut=mut))
+            L.append(NL.build(nm, cmfb="dc", fs=FS[b], mut=mut, boost=b))
         L.append(f"Vdd_{x} vdd_{x} 0 {v}")
-        L += copy_lines(x, b, cl, subs[key])
+        L += copy_lines(x, b, cl, subs[key], mut)
     L += [".control", "set wr_singlescale", "set wr_vecnames", "op"]
     for x, b, cl, mut in copies:
         L.append(f"print i(vdd_{x})")
         L += [f"print v(x{x}.{n})" for n in NODES] + [f"print v(outp_{x}) v(outn_{x}) v(s_{x})"]
         L += [f"print {par(x, i, S.SIZES[k]['dev'], q)}" for i, k in CORE.items() for q in DEVQ]
         L += [f"print {par(x, i, d, q)}" for i, d in SWQ.items() for q in ("cgg", "cdd")]
+        L += [f"print {par(x, i, S.SIZES[k]['dev'], 'id')}" for i, k in BIASQ.items()]
+        L.append(f"print @m.xprb_{x}.msky130_fd_pr__{S.SIZES['m_plc']['dev']}[id]")
     L += ["ac dec 40 1 1e10", "wrdata " + tag + "_ac.csv " + " ".join(f"v(outp_{x},outn_{x})" for x, *_ in copies),
           "quit", ".endc", ".end"]
     return "\n".join(L) + "\n"
@@ -146,6 +170,26 @@ def analyse(vals, x, b, cl, mut, ac, k, vdd, hot):
     res["I_fold_over_I_tail"] = abs(d["mn1"]["id"]) / abs(d["mt"]["id"])
     res["I_vdd_uA"] = abs(g(f"i(vdd_{x})")) * 1e6
     res["I_tail_uA"] = abs(d["mt"]["id"]) * 1e6
+    # D58 rows: composite-to-mirror ratios, I_tail, effective K_P / K_N
+    ib = NL.bias_currents(b, mut)
+    z = S.SIZES
+    res["ratio_tr"] = abs(d["mt"]["id"]) / (z["m_t"]["M"] * ib["ibtp"])
+    res["ratio_nr"] = abs(d["mn1"]["id"]) / (z["m_n"]["M"] * ib["ibn"])
+    res["ratio_plr"] = abs(d["mpl1"]["id"]) / (z["m_pl"]["M"] * ib["ibp"])
+    res["ratio_bl0"] = abs(g(f"@m.xprb_{x}.msky130_fd_pr__{z['m_plc']['dev']}[id]")) / (z["m_plc"]["M"] * S.VBL0_SERIES * ib["ivbl0"])
+    nb = S.KP_BANK["boost" if b else "base"]
+    wl = lambda k_, m_=None: z[k_]["WF"] * (m_ or z[k_]["M"]) / z[k_]["L"]
+    i_bpd = abs(g(par(x, "mbpd", z["m_bpd"]["dev"], "id")))
+    i_bnd = abs(g(par(x, "mbnd", z["m_bnd"]["dev"], "id")))
+    res["I_bpd_uA"], res["I_bnd_uA"] = i_bpd * 1e6, i_bnd * 1e6
+    res["K_P_eff"] = (i_bpd / wl("m_bpd", nb)) / (abs(d["mpc1"]["id"]) / wl("m_pc"))
+    res["K_P_target"] = S.K_BIAS_P * S.KP_BANK["base"] / nb
+    res["K_N_eff"] = (i_bnd / wl("m_bnd")) / (abs(d["mnc1"]["id"]) / wl("m_nc"))
+    it_t = S.I_TAIL * (S.BOOST if b else 1.0)
+    if not abs(res["I_tail_uA"] * 1e-6 / it_t - 1) <= I_TAIL_TOL:
+        fails.append(f"I_tail {res['I_tail_uA']:.2f} uA vs {it_t * 1e6:.2f} (+-3 %)")
+    if not abs(res["K_P_eff"] / res["K_P_target"] - 1) <= K_TOL:
+        fails.append(f"K_P {res['K_P_eff']:.2f} vs {res['K_P_target']:.2f} (+-10 %)")
     # hand A0
     gi = d["min1"]["gm"]
     r_l = 1 / (d["mpl1"]["gds"] + d["mplc1"]["gds"])
@@ -237,9 +281,12 @@ def main():
                 continue
             for x, b, cl, mut, res, fails in grows:
                 if mut:
+                    target = {m: r_ for _, m, r_ in MUTANTS[(c, t)]}[mut]
                     a0 = res.get("A0_dB", float("nan"))
                     converged = bool(not lint and res and math.isfinite(res.get("I_vdd_uA", float("nan"))))
-                    if converged and math.isfinite(a0) and a0 < A0_MIN:
+                    hit = any(f_.startswith(target) for f_ in fails)
+                    res["mutant_target_row"] = target
+                    if converged and math.isfinite(a0) and hit:
                         res["mutant_verdict"] = "REJECTED (good)"
                     elif converged and math.isfinite(a0):
                         res["mutant_verdict"] = "PASSED (check is blind)"
