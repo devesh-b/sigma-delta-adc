@@ -628,3 +628,22 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - Real-load GBW is ~1.5× the 1.4 pF number, so fp2/GBW ≈ 1.5–3.1. C_FOLD_EXTRA stays 0 until gate B.
 - WO-24 (Opus) dispatched: sync, sweep, netlist, op/AC, first gate B point.
 - Pending user items after the WO-24 sweep: is D55's Cc 0.2 pF still needed; does CL-4 β1 become informational if missed.
+- **WO-24 BLOCKED: 1Password locked** (ssh to the sandbox and commit signing both fail).
+  - All code is written but not run and not committed:
+    - DESIGN.md sync, revc_inl tagging, sizes_draft (K_P 10 base, D55, 4×4 composite refs);
+    - the revc_check kp mode;
+    - netlist.py + test_c1_netlist.py;
+    - c1b_opac.py, c1b_gateb.py;
+    - gen_tier1 `ota1_xtor` hook.
+  - Review Q1: tier-1 cl1 = 1.4 pF total, and macro GBW is defined at the 1.4 pF lump.
+  - **Once unlocked, resume the WO-24 agent** with its resume list (sync → frozen copy → pytest → step 0 → kp sweep → opac → gate B smoke, then full), then the 4 commits.
+- REVIEW-C1b-code (static, nothing run): hold the first run until must-fixes 1–10 are in.
+  - Netlist core OK.
+  - Problems in the tbs and broken copies: gate B rstb per-conversion (M1), sr95 rated at 1.4 pF and fail-open (M2), p15 = p30 (M3), stale loads (M4), opac/revc_inl fail-open (M5/M6).
+  - D57 answers Q1–Q3.
+  - The fix agent (local edits only) is dispatched. Then, once 1Password is unlocked, resume the WO-24 run list.
+- Must-fixes 1–10 + the D57 DESIGN.md changes are applied (local, py_compile OK, untested, uncommitted).
+  - Note: gateb uses β1 0.84 (load 0.86 pF, SR95 scale 0.221) while opac uses 0.846 (0.836 pF). Unify on the measured β1 after the first op/AC.
+- **Once unlocked:**
+  1. commit WO-24 work + the C1b-code review + D57 + RESUME in atomic commits;
+  2. resume the WO-24 agent's run list: sync → frozen copy → pytest → revc_inl step 0 → kp sweep → opac → gate B smoke → full + sr95.
