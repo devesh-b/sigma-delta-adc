@@ -710,3 +710,9 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
     - `mrnc margin nan` in every row; `NaN V_rnd` in the mkp copies.
   - Broken copies: all REJECTED (mutnc, mutrc, mkp5, mtlo, mthi, mcc4 at 2.46 MHz).
   - Fix pass dispatched (WO-28b).
+- WO-28 run 2 (c6bef6d, 48a0773, beea236 reverted in b8196f3, 8278860; results/wo28/README.md):
+  - Testbench bugs fixed. The cause was op non-convergence falling back to "Transient op"; it is now a lint. Helpers run in their own deck.
+  - At 9 PVT: V_OCM sys+3σ ≤ 7.84 mV; SR − 3σ ≥ 12.76 / 25.83; ceiling OK; A0 base 84.1–87.3 dB; CM PM ≥ 78°; peaking ≤ 0.4 dB.
+  - **Boost f_cm 4.1–7.0 MHz < 9.4 at all corners** → user decision.
+  - **tb9:** the CM step settles to 5–7.5 mV, a pass. The switched-cap transient sits +129–167 mV (tt) / +34–42 mV (hot) off V_OCM, against +0.3–0.6 mV in the averaged op. The event rows fail; sulo start-up fails 14–34 mV. Undiagnosed: SC-vs-averaged model mismatch, or the slow path not converged by 1.5 µs.
+  - Open: the cold-corner op falls back to transient op (ff/−40, sf/−40). C6 reference accuracy needs a budget line (base SR − 3σ only 2.1 % above the floor).
