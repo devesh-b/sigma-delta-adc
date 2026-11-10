@@ -52,3 +52,17 @@ Precision exit A0 ≥ 80.3 dB: **fails at fs/−40 (79.47) and ff/−40 (80.23)*
   - Out CM at reset release: 1.538 / 1.553 / 1.551 V against V_OCM 1.50 V. Island CM 1.19–1.20 V.
   - Dummy-conversion out CM is 2.61 V (start-up).
 - Full run: N 1024, m 21, O1, in 6 parts. Pending.
+
+## Diagnosis: composite references (reviewer, confirmed by run)
+- Cause (sd-adc-design-reviewer): the 4∥×4-series composite 1:32 references (bulk on the rail, `netlist.py:60-72,105-107`) mirror about 20 % more current than intended (I_tail 21–23 µA against 18.5). The cascode-bias diodes are fed a fixed current derived from I_NC_design, so effective K_P drops to about 8.8 at cold (boost K about 5.9).
+- Confirmation (`ref1_diag.log`): single-finger references (REF_COMPOSITE P1 S1), all else equal:
+
+| corner | refs | I_tail [µA] | A0 base | A0 boost | I_vdd base/boost [µA] |
+|---|---|---|---|---|---|
+| ff/−40/3.6 | composite 4×4 | 22.05 | 80.23 | 77.97 | 60.8/121.1 |
+| ff/−40/3.6 | single | 18.16–18.64 | **83.80** | 82.74 | 50.5/102.0 |
+| fs/−40/3.0 | composite 4×4 | ≈22 | 79.47 | 75.92 | 62.0/122.2 |
+| fs/−40/3.0 | single | 18.16–18.64 | **83.66** | 81.46 | 50.9/102.5 |
+
+- The REVIEW-C1a-revC answer "composite with bulk at the rail: error < 1 %" does not hold in simulation. The body effect on the stacked fingers shifts the ratio by about +20 % (temperature-dependent, 1.02–1.19).
+- Fix options go to the user. The mismatch benefit of composites (RC-M2) has to be kept in some form.
