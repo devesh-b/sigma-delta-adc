@@ -702,3 +702,11 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - Expected user decision: f_cm likely < 9.4 MHz → Cc 0.3–0.4 pF or a CMFB split.
 - 1Password unlocked; committed 073c076, 0167598, e42898f, d280b07.
 - **WO-26 gate B done: all 4 corners ACCEPT.** fs/125 3.314 ppm (share 3.33), ss/−40 0.797, ss/125 1.686, tt 0.454. sr95: every part 4.4–5.5 % INL, but combine INVALID (endpoint memory 40 ppm). Needs a combine() broken-copy rule. See results/wo26/README.md.
+- WO-28 run 1 (frozen WO-28-29d1fdc, tt only), logs in results/wo28/run1:
+  - pytest 176 passed. fcm_hand check OK (the return-ratio extraction matches analytic within 0.01 %).
+  - Nominal op/AC: A0 86.0 / 83.6 dB; base V_OCM +6.9 mV (3σ 13.9 > 10); boost 0.42 mV (3σ 7.3).
+  - **Testbench bugs:**
+    - the nominal CM-open helper copies are dead (V_OCM 1.7 V, margins negative), so f_cm 0.013 MHz, CM PM 19° and peaking 25 dB are artefacts. Suspect: the helper copies share bias/vocm nets with the nominal copies in the same deck, which would also explain base V_OCM 6.9 mV against 0.26 mV in the mutant decks;
+    - `mrnc margin nan` in every row; `NaN V_rnd` in the mkp copies.
+  - Broken copies: all REJECTED (mutnc, mutrc, mkp5, mtlo, mthi, mcc4 at 2.46 MHz).
+  - Fix pass dispatched (WO-28b).
