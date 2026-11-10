@@ -1,20 +1,38 @@
 #!/usr/bin/env python3
-"""C1b tb9: CMFB loop transient on the NETLISTED OTA1 with the real SC CMFB and the WO-27 CM error amp. Sandbox only:
+"""C1b tb9: CMFB loop transient on the NETLISTED OTA1 with the real SC CMFB (D61 dual path). Sandbox only:
     python c1b_tb9.py OUTDIR CORNER_IDXS [--mut]        # CORNER_IDXS into revc_check.CORNERS9; --mut: broken-copy deck
 
-Limits (expected values from SPEC row 98 / DESIGN.md 4 tb9 / REVIEW-C1a-revC RC-m2 / CL-7, not from this code):
-  * CM error settles within TOL = 10 mV of its settled value by 0.2 t_half (22.5 ns at 4 MHz boost) after each event and
-    stays there until the next event: conversion-reset release, a differential integration step (0.8 V diff), a 30 mV CM
-    charge step at the outputs (Q = 30 mV x integrate-phase load), reset assert, reset release.
-  * Start-up from both rails (outputs pre-charged to VDD and to 0, integrator held in reset, D57 start-up clamp released
-    after 2 T): |V_out,cm - V_OCM| <= 10 mV over the last clock period before the CL-7 4 us.
-  WO-28 (D61 dual path): the start-up clamp (rstb low) now holds ctl / bli at V_BL0 and both outputs at V_OCM, so Cc
-  starts with the operating charge; events start at 1.5 us (after convergence). Copy suvb: start-up with ivbl0 x2
-  (a V_BL0 error the slow path must remove). Broken copies: cc_div4 (event rows) and int_off+vbl0x2 (start-up row).
+WO-30 rows (D63 basis; expected values from SPEC row 98 / D63 / CL-2 / CL-7 / SPEC sec. 3 loop bound, not from this code):
+  Sampling instants t_k = end of each half-phase (0.5 ns before the ph1 / ph2 falling edge). The integrator charge is taken
+  in ph1 (OTA1 integrate) and x1 is sampled by Cs2 in ph2 (OTA1 hold, D25), so both half-phase ends are sampling instants.
+  * Event rows (gate): for each event, every t_k from the end of the first ph1 that starts after the event up to the next
+    event: |V_cm(t_k) - V_cm,ss(phase of t_k)| <= 10 mV. V_cm,ss = the settled per-phase CM (mean of the last two ends of
+    that phase in the run). The 22.5 ns (0.2 t_half) error is kept as info.
+  * Static CM rows (gate): |V_cm,ss(ph2) - V_OCM| <= 10 mV (the instant Cs2 samples x1); |V_cm,ss(ph1) - V_OCM| <= 28 mV
+    (headroom: CL-2 V_OCM bound 38 mV minus the 10 mV static V_OCM allotment of the op/AC row). The end-ph1 offset is a
+    charge packet on ctl (CMFB share switch opening, divided by 2 Cc: WO-30 item 2).
+  * CM-to-DM row (gate): twin copies in the same deck, ev (with the CM step) and ev0 (identical, no CM step), both at the
+    DM operating point left by the diff step. dDM(t_k) = V_dm,ev - V_dm,ev0 at every ph2 end from the first judged instant
+    after the CM step to reset assert. Bound (S-model, model/iadc.py): an error d [V diff] on x1 enters the estimate as an
+    input error d / (c1 VREF) (x1 is in VREF units; u_hat weights a one-sample x1 error by (N - k)/W, summing to 1 when it
+    recurs every sample). INL is in ppm of FSR = 2, so a fully signal-dependent per-sample error gives
+    INL = d / (2 c1 VREF). Limit = 0.1 x the OTA1 boost INL share (5 ppm, SPEC OTA1 GBW row (B)):
+    d <= 0.1 * 5e-6 * 2 * 0.125 * 2.048 V = 0.256 uV per CM-step event (worst case: the CM step treated as recurring every
+    cycle with full signal dependence). The pre-step twin difference is the numerical floor (must be <= limit / 10).
+  * Diff step = the real worst per-cycle step, c1 (u_max + 1) VREF = 0.486 V diff (SPEC OTA1 GBW row; loop bound), as a
+    10 ns charge pulse at the period start. The WO-27..29 0.8 V step overstated the per-cycle charge by 1.65x and was still
+    slewing at +22.5 ns; at the sampling instants slewing has ended. TB9_DV_DIFF overrides (info runs).
+  * Start-up (gate): outputs pre-charged to VDD / 0, integrator held in reset, start-up clamp (rstb low: ctl, bli -> V_BL0,
+    outputs -> V_OCM) held 8 T (= 2 us at 4 MHz; D57: the clamp is held while rst_n is low or the bias is invalid, and
+    power-up bias settling alone is >= CL-7 4 us, so 8 T is a conservative minimum); |V_cm - V_OCM| <= 10 mV over the last
+    clock period before 4 us. Copies with the old 2 T clamp and a Cr x 2 copy run as info (WO-30 item 2 evidence).
+  Events start at 3.0 us (2.5 us after the 2 T clamp release of the ev copies; the Cc charge mode decays with
+  tau = T Cc / Cr ~ 1.1 us, WO-30), run to 5.5 us.
+Broken copies (own deck, each must REJECT on the stated row): mcc4 = Cc / 4 (any row; the ph1 static row: the charge
+packet / 2 Cc grows 4x), masy = CM step with 1e-4 n/p charge imbalance (CM-to-DM row), mio = int_off + vbl0x2 (start-up).
 Setup per copy: OTA1 (cmfb="sc", boost, fs 4 MHz, ph1 / ph2 non-overlapping by g = 0.025/fs), Cint 4 pF out -> island
-(inverting side), Cs1 0.5 pF island -> ground, output routing C_RT; reset = island shunt to V_ICM (isl) + ideal output
-short (gen_tier1 style); chopper static. WO-27 broken copies (superseded by WO-28, below): cc_div4 (Cc / 4) and cmbw4 (amp
-bandwidth / 4 via CM_BW4_CAP on ctl): each must REJECT on an event row with valid data.
+(negative feedback, WO-29), Cs1 0.5 pF island -> ground, output routing C_RT; reset = island shunt to V_ICM (isl) + ideal
+output short (gen_tier1 style); chopper static.
 """
 import json, math, os, re, subprocess, sys
 
@@ -30,100 +48,158 @@ FS = 4e6
 T, G = 1 / FS, 0.025 / FS
 T_HALF = 0.5 / FS - 2 * G
 T_SET, TOL = 0.2 * T_HALF, 10e-3
+TOL_PH1 = 28e-3                     # CL-2 38 mV - 10 mV static V_OCM allotment
 CINT, CS1 = 4e-12, 0.5e-12
-DV_CM, DV_DIFF = 30e-3, 0.8
-T_STOP = 4.0e-6                     # CL-7
+C1, VREF, U_MAX = 0.125, 2.048, 0.9
+DV_CM = 30e-3
+DV_DIFF = float(os.environ.get("TB9_DV_DIFF", C1 * (U_MAX + 1) * VREF))   # 0.486 V, real worst per-cycle step
+INL_SHARE = 5e-6                    # OTA1 boost INL gate (SPEC OTA1 GBW row (B))
+LIM_CMDM = 0.1 * INL_SHARE * 2 * C1 * VREF   # 0.256 uV
+ASYM = 1e-4                         # masy broken copy: CM-step charge imbalance n/p
+T_STOP = 4.0e-6                     # CL-7 (start-up rows)
 T_RST = 216e-9                      # reset window at 4 MHz (CHOP_SW island row)
-DIAG = os.environ.get("TB9_DIAG", "")                       # WO-29 diagnosis copy spec (see main)
-TSTOP_RUN = float(os.environ.get("TB9_TSTOP", T_STOP))      # WO-29: longer runs to tell a slow loop from an offset
-DIAG_VEC = bool(DIAG) or bool(os.environ.get("TB9_VEC"))    # also log ctl / bli per half-phase
-# WO-28: events start after convergence (start-up clamp released at 2 T = 0.5 us, slow path tau <= 0.4 us)
-EV = [("reset release", 1.5e-6), ("diff step", 1.75e-6), ("CM step", 2.25e-6), ("reset assert", 3.0e-6),
-      ("reset release 2", 3.0e-6 + T_RST)]
-# WO-28 broken copies (own deck): Cc / 4 -> event rows; slow path off with a V_BL0 error (ivbl0 x2) -> start-up row
-MUT = [("mcc4", "ev", "cc_div4"), ("mio", "su_hi", "int_off+vbl0x2")]
-NOM = [("ev", "ev", None), ("suhi", "su_hi", None), ("sulo", "su_lo", None), ("suvb", "su_lo", "vbl0x2")]
+N_CLAMP, N_CLAMP_SU = 2, 8          # rstb low: ev copies / start-up gate copies
+T0 = 3.0e-6
+EV = [("reset release", T0), ("diff step", T0 + T), ("CM step", T0 + 3 * T), ("reset assert", T0 + 6 * T),
+      ("reset release 2", T0 + 6 * T + T_RST)]
+T_EVSTOP = T0 + 10 * T
+DIAG = os.environ.get("TB9_DIAG", "")                       # diagnosis copies "x:tok+tok,x:-" (ev kind, no rows)
+TSTOP_RUN = float(os.environ.get("TB9_TSTOP", T_EVSTOP))
+DIAG_VEC = bool(DIAG) or bool(os.environ.get("TB9_VEC"))    # also log ctl / bli
+# kinds: ev, ev0 (twin without CM step), su_hi / su_lo (+ "8": 8 T clamp). info copies are reported, not gated.
+NOM = [("ev", "ev", None), ("ev0", "ev0", None), ("suhi", "su_hi8", None), ("sulo", "su_lo8", None),
+       ("suvb", "su_lo8", "vbl0x2"), ("sulo2t", "su_lo", None), ("suvb2t", "su_lo", "vbl0x2"), ("sulocr2", "su_lo", "cr_x2")]
+INFO = {"ev0", "sulo2t", "suvb2t", "sulocr2", "masy0"}
+MUT = [("mcc4", "ev", "cc_div4"), ("masy", "ev", "cm_asym"), ("masy0", "ev0", None), ("mio", "su_hi8", "int_off+vbl0x2")]
+EXPECT = {"mcc4": "", "masy": "CM-to-DM", "mio": "start-up"}
+TWIN = {"ev": "ev0", "masy": "masy0"}
 
 
 def copy(x, kind, sub, vd, mut=None):
+    rst = "rstb8" if kind.endswith("8") else "rstb"
     L = [f"X{x} vdd 0 inp_{x} inn_{x} outp_{x} outn_{x} vicm vocm ibtp_{x} ibn_{x} ibp_{x} ivbnc_{x} ivbpc_{x} ivbl0_{x} "
-         f"vdd 0 lv 0 isl_{x} ph1 ph1b ph2 ph2b rstb {sub}"]
+         f"vdd 0 lv 0 isl_{x} ph1 ph1b ph2 ph2b {rst} {sub}"]
     for p_, i_ in NL.bias_currents(True, mut).items():
         L.append(f"I{p_}_{x} {p_}_{x} 0 {i_:.6e}" if p_ in NL.SINK_PORTS else f"I{p_}_{x} vdd {p_}_{x} {i_:.6e}")
-    # WO-29: Cint closes NEGATIVE feedback, outp -> inn and outn -> inp, as in gen_tier1 (Xota1 inp = vg1n, Cint1p vg1p-o1p);
-    # inp -> outp is non-inverting (PMOS pair, folded). The WO-27/28 decks wired outp -> inp (positive feedback): the
-    # outputs latched to the rails after reset release and pinned the CM (+156 mV at tt) whatever the CMFB did.
-    # TB9_POL_OLD=1 rebuilds that wiring (broken copy of this fix: the event rows must REJECT).
+    # WO-29: Cint closes NEGATIVE feedback, outp -> inn and outn -> inp (gen_tier1). TB9_POL_OLD=1: old positive wiring.
     a_, b_ = ("inp", "inn") if os.environ.get("TB9_POL_OLD") else ("inn", "inp")
     L += [f"Cip_{x} outp_{x} {a_}_{x} {CINT:g}", f"Cin_{x} outn_{x} {b_}_{x} {CINT:g}",
           f"Csp_{x} inp_{x} 0 {CS1:g}", f"Csn_{x} inn_{x} 0 {CS1:g}",
           f"Crp_{x} outp_{x} 0 {C_RT:g}", f"Crn_{x} outn_{x} 0 {C_RT:g}",
           f"Bcm_{x} cm_{x} 0 V = 0.5*(V(outp_{x})+V(outn_{x}))"]
-    if kind == "ev":
+    if kind in ("ev", "ev0"):
         L += [f"Bisl_{x} isl_{x} 0 V = {vd:g}*V(rsw)", f"Srs_{x} outp_{x} outn_{x} rsw 0 SWM"]
         qd, qc = DV_DIFF / 2 * CINT, DV_CM * LOADS["integ"]
         t1, t2 = EV[1][1], EV[2][1]
         L += [f"Idp_{x} 0 inp_{x} PULSE(0 {qd / 10e-9:.6e} {t1:.6e} 0.1n 0.1n 9.9n 1)",
-              f"Idn_{x} inn_{x} 0 PULSE(0 {qd / 10e-9:.6e} {t1:.6e} 0.1n 0.1n 9.9n 1)",
-              f"Icp_{x} 0 outp_{x} PULSE(0 {qc / 1e-9:.6e} {t2:.6e} 0.1n 0.1n 0.9n 1)",
-              f"Icn_{x} 0 outn_{x} PULSE(0 {qc / 1e-9:.6e} {t2:.6e} 0.1n 0.1n 0.9n 1)"]
+              f"Idn_{x} inn_{x} 0 PULSE(0 {qd / 10e-9:.6e} {t1:.6e} 0.1n 0.1n 9.9n 1)"]
+        if kind == "ev":
+            a = ASYM if "cm_asym" in NL.toks(mut) else 0.0
+            L += [f"Icp_{x} 0 outp_{x} PULSE(0 {qc * (1 + a) / 1e-9:.9e} {t2:.6e} 0.1n 0.1n 0.9n 1)",
+                  f"Icn_{x} 0 outn_{x} PULSE(0 {qc * (1 - a) / 1e-9:.9e} {t2:.6e} 0.1n 0.1n 0.9n 1)"]
     else:   # start-up copy: integrator held in reset, outputs pre-charged to a rail
-        rail = vd if kind == "su_hi" else 0.0
+        rail = vd if kind.startswith("su_hi") else 0.0
         L += [f"Visl_{x} isl_{x} 0 {vd:g}", f"Srs_{x} outp_{x} outn_{x} one 0 SWM",
               f".ic v(outp_{x})={rail:g} v(outn_{x})={rail:g}"]
     return L
 
 
 def deck(c, t, vd, tag, copies):
-    L = [f"* WO-27 c1b_tb9 {tag}", f".lib {LIB} {c}", f".temp {t}", ".option gmin=1e-15 reltol=1e-4",
+    L = [f"* WO-30 c1b_tb9 {tag}", f".lib {LIB} {c}", f".temp {t}", ".option gmin=1e-15 reltol=1e-4",
          f"Vdd vdd 0 {vd}", f"Vicm vicm 0 {S.V_ICM}", f"Vocm vocm 0 {S.V_OCM}", "Vlv lv 0 1.8", "Vone one 0 1",
          ".model SWM sw vt=0.5 vh=0.1 ron=100 roff=1e12",
          f"Vrsw rsw 0 PWL(0 1 {EV[0][1]:.6e} 1 {EV[0][1] + 1e-9:.6e} 0 {EV[3][1]:.6e} 0 {EV[3][1] + 1e-9:.6e} 1 "
          f"{EV[4][1]:.6e} 1 {EV[4][1] + 1e-9:.6e} 0)",
-         f"Vrstb rstb 0 PWL(0 0 {2 * T:.6e} 0 {2 * T + 1e-9:.6e} {vd:g})",
+         f"Vrstb rstb 0 PWL(0 0 {N_CLAMP * T:.6e} 0 {N_CLAMP * T + 1e-9:.6e} {vd:g})",
+         f"Vrstb8 rstb8 0 PWL(0 0 {N_CLAMP_SU * T:.6e} 0 {N_CLAMP_SU * T + 1e-9:.6e} {vd:g})",
          f"Vph1 ph1 0 PULSE(0 {vd:g} {G:.6e} 0.2n 0.2n {T / 2 - 2 * G:.6e} {T:.6e})",
          f"Vph1b ph1b 0 PULSE({vd:g} 0 {G:.6e} 0.2n 0.2n {T / 2 - 2 * G:.6e} {T:.6e})",
          f"Vph2 ph2 0 PULSE(0 {vd:g} {T / 2 + G:.6e} 0.2n 0.2n {T / 2 - 2 * G:.6e} {T:.6e})",
-         f"Vph2b ph2b 0 PULSE({vd:g} 0 {T / 2 + G:.6e} 0.2n 0.2n {T / 2 - 2 * G:.6e} {T:.6e})"]
-    L.append(".model SWI sw vt=1.5 vh=0.1 ron=2k roff=1e14")   # WO-29 diagnosis: ideal CMFB switches (sw_ideal*)
+         f"Vph2b ph2b 0 PULSE({vd:g} 0 {T / 2 + G:.6e} 0.2n 0.2n {T / 2 - 2 * G:.6e} {T:.6e})",
+         ".model SWI sw vt=1.5 vh=0.1 ron=2k roff=1e14"]   # WO-29 diagnosis: ideal CMFB switches (sw_ideal*)
     subs = {}
     for x, kind, mut in copies:
-        if mut not in subs:
-            subs[mut] = f"ota1_t9_{(mut or 'nom').replace('+', '_')}"
-            tk = NL.toks(mut)   # dcavg: the averaged Cr model of the op/AC decks, run in the same transient
-            m2 = "+".join(sorted(tk - {"dcavg"})) or None
-            L.append(NL.build(subs[mut], cmfb="dc" if "dcavg" in tk else "sc", fs=FS, mut=m2, boost=True))
-        L += copy(x, kind, subs[mut], vd, mut)
-    vec = " ".join(f"v(cm_{x})" for x, *_ in copies)
-    if DIAG_VEC:
-        vec += " " + " ".join(f"v(x{x}.ctl) v(x{x}.bli)" for x, *_ in copies)
-        vec += " " + " ".join(f"v(outp_{x},outn_{x})" for x, *_ in copies)   # WO-29: differential output (latch check)
+        tk = NL.toks(mut) - {"cm_asym"}
+        key = "+".join(sorted(tk)) or None
+        if key not in subs:
+            subs[key] = f"ota1_t9_{(key or 'nom').replace('+', '_')}"
+            m2 = "+".join(sorted(tk - {"dcavg"})) or None   # dcavg: averaged Cr model (op/AC) in the same transient
+            L.append(NL.build(subs[key], cmfb="dc" if "dcavg" in tk else "sc", fs=FS, mut=m2, boost=True))
+        L += copy(x, kind, subs[key], vd, mut)
+    vec = vecs(copies)
     L += [".control", "set wr_singlescale", "set wr_vecnames", f"tran 0.1n {TSTOP_RUN:.6e} 0 0.5n",
-          f"wrdata {tag}.csv {vec}", "quit", ".endc", ".end"]
+          f"wrdata {tag}.csv {' '.join(v for _, v in vec)}", "quit", ".endc", ".end"]
     return "\n".join(L) + "\n"
 
 
-def check_ev(tm, cm):
+def vecs(copies):
+    """[(name, ngspice vector)]: cm of every copy, V_dm of ev-kind copies, ctl / bli with DIAG_VEC."""
+    out = [(f"{x}_cm", f"v(cm_{x})") for x, *_ in copies]
+    out += [(f"{x}_dm", f"v(outp_{x},outn_{x})") for x, k, _ in copies if k in ("ev", "ev0")]
+    if DIAG_VEC:
+        out += [(f"{x}_{q}", f"v(x{x}.{q})") for x, *_ in copies for q in ("ctl", "bli")]
+    return out
+
+
+def instants(tstop):
+    """Sampling instants (time, phase, ph1-start of that period), sorted."""
+    k = np.arange(int(round(tstop / T)))
+    t = np.concatenate([k * T + T / 2 - G - 0.5e-9, k * T + T - G - 0.5e-9])
+    ph = np.concatenate([np.ones(len(k), int), 2 * np.ones(len(k), int)])
+    o = np.argsort(t)
+    return t[o], ph[o]
+
+
+def first_judged(te):
+    """End of the first ph1 (integrate) that starts after the event."""
+    k0 = math.ceil((te - G) / T - 1e-9)
+    return k0 * T + T / 2 - G - 0.5e-9
+
+
+def check_ev(tm, cm, dm=None, dm0=None):
+    ts, ph = instants(TSTOP_RUN)
+    v = np.interp(ts, tm, cm)
+    ss = {p: float(np.mean(v[ph == p][-2:])) for p in (1, 2)}
     rows, fails = [], []
     for j, (nm, te) in enumerate(EV):
-        tn = EV[j + 1][1] if j + 1 < len(EV) else T_STOP
+        tn = EV[j + 1][1] if j + 1 < len(EV) else TSTOP_RUN
+        sel = (ts >= first_judged(te) - 1e-12) & (ts < tn)
+        e = np.array([v[i] - ss[ph[i]] for i in np.nonzero(sel)[0]])
+        err = float(np.max(np.abs(e))) if len(e) else float("nan")
+        # info: WO-29 metric (max |cm - mean of last period before the next event| after 0.2 t_half)
         w = (tm >= te + T_SET) & (tm < tn)
         rw = (tm >= tn - min(T, (tn - te) / 2)) & (tm < tn)
-        ref = float(np.mean(cm[rw]))
-        err = float(np.max(np.abs(cm[w] - ref)))
-        pk = float(np.max(np.abs(cm[(tm >= te) & (tm < tn)] - ref)))
-        rows.append(dict(event=nm, settled_cm_mV=(ref - S.V_OCM) * 1e3, err_after_tset_mV=err * 1e3, peak_mV=pk * 1e3))
+        e22 = float(np.max(np.abs(cm[w] - np.mean(cm[rw]))))
+        rows.append(dict(event=nm, n_inst=int(sel.sum()), err_sampling_mV=round(err * 1e3, 3),
+                         err_first_inst_mV=round(float(e[0]) * 1e3, 3) if len(e) else None, info_err_22ns_mV=round(e22 * 1e3, 2)))
         if not err <= TOL:
-            fails.append(f"{nm}: {err * 1e3:.2f} mV > {TOL * 1e3:.0f} mV at +{T_SET * 1e9:.1f} ns")
-    return rows, fails
+            fails.append(f"{nm}: {err * 1e3:.2f} mV > {TOL * 1e3:.0f} mV at the sampling instants")
+    st = dict(cm_ss_ph1_mV=round((ss[1] - S.V_OCM) * 1e3, 3), cm_ss_ph2_mV=round((ss[2] - S.V_OCM) * 1e3, 3))
+    if not abs(ss[2] - S.V_OCM) <= TOL:
+        fails.append(f"static ph2: {st['cm_ss_ph2_mV']} mV > {TOL * 1e3:.0f} mV")
+    if not abs(ss[1] - S.V_OCM) <= TOL_PH1:
+        fails.append(f"static ph1: {st['cm_ss_ph1_mV']} mV > {TOL_PH1 * 1e3:.0f} mV")
+    if dm is not None and dm0 is not None:
+        d = np.interp(ts, tm, dm) - np.interp(ts, tm, dm0)
+        s_ = (ph == 2) & (ts >= first_judged(EV[2][1]) - 1e-12) & (ts < EV[3][1])
+        f_ = (ph == 2) & (ts >= first_judged(EV[1][1]) - 1e-12) & (ts < EV[2][1])
+        dmax, floor = float(np.max(np.abs(d[s_]))), float(np.max(np.abs(d[f_])))
+        st.update(cmdm_uV=round(dmax * 1e6, 4), cmdm_floor_uV=round(floor * 1e6, 4), cmdm_limit_uV=round(LIM_CMDM * 1e6, 4),
+                  cmdm_first_uV=round(float(d[s_][0]) * 1e6, 4))
+        if not dmax <= LIM_CMDM:
+            fails.append(f"CM-to-DM: {dmax * 1e6:.4f} uV > {LIM_CMDM * 1e6:.3f} uV")
+        if not floor <= LIM_CMDM / 10:
+            fails.append(f"CM-to-DM floor {floor * 1e6:.4f} uV > limit/10 (row invalid)")
+    return dict(events=rows, **st), fails
 
 
 def check_su(tm, cm):
-    w = tm >= T_STOP - T
+    w = (tm >= T_STOP - T) & (tm < T_STOP)
     err = float(np.max(np.abs(cm[w] - S.V_OCM)))
-    out = np.abs(cm - S.V_OCM) > TOL
-    t_in = float(tm[np.nonzero(out)[0][-1] + 1]) if out.any() and np.nonzero(out)[0][-1] + 1 < len(tm) else float("nan")
-    return dict(err_last_T_mV=err * 1e3, t_enter_band_us=t_in * 1e6), ([] if err <= TOL else [f"start-up {err * 1e3:.2f} mV"])
+    out = np.nonzero(np.abs(cm - S.V_OCM) > TOL)[0]
+    t_in = float(tm[out[-1] + 1]) if len(out) and out[-1] + 1 < len(tm) else float("nan")
+    return (dict(err_last_T_mV=round(err * 1e3, 3), t_enter_band_us=round(t_in * 1e6, 3)),
+            [] if err <= TOL else [f"start-up {err * 1e3:.2f} mV"])
 
 
 def main():
@@ -134,55 +210,55 @@ def main():
         c, t, vd = CORNERS9[int(ci)]
         tag = f"tb9_{c}_{t}".replace("-", "m") + ("_mut" if mut_deck else "")
         cps = list(MUT if mut_deck else NOM)
-        if DIAG:   # WO-29 diagnosis deck: TB9_DIAG="x:tok+tok,x:tok,..." ev copies only (tok '-' = nominal)
+        if DIAG:
             tag += "_diag"
             cps = [(s.split(":")[0], "ev", None if s.split(":")[1] == "-" else s.split(":")[1]) for s in DIAG.split(",")]
         fn = os.path.join(out, tag + ".csv")
         if os.path.exists(fn):
             os.remove(fn)
         open(os.path.join(out, tag + ".sp"), "w").write(deck(c, t, vd, tag, cps))
-        r = subprocess.run(["ngspice", "-b", tag + ".sp"], cwd=out, capture_output=True, text=True, timeout=5000)
+        r = subprocess.run(["ngspice", "-b", tag + ".sp"], cwd=out, capture_output=True, text=True, timeout=7000)
         lint = [l.strip() for l in (r.stdout + r.stderr).splitlines()
                 if re.search(r"(error|unknown|singular|no convergence|timestep too small|could not find)", l, re.I)]
+        names = [n for n, _ in vecs(cps)]
         try:
             a = np.loadtxt(fn, skiprows=1)
-            if DIAG_VEC:   # per copy and clock period: cm / ctl / bli at the end of ph1 and of ph2 (+ the period index)
-                nc = len(cps)
-                kk = np.arange(int(TSTOP_RUN / T))
-                te1, te2 = kk * T + T / 2 - G - 0.5e-9, kk * T + T - G - 0.5e-9
-                cols = [kk * T]
-                for k in range(nc):
-                    for col in (1 + k, 1 + nc + 2 * k, 2 + nc + 2 * k):
-                        cols += [np.interp(te1, a[:, 0], a[:, col]), np.interp(te2, a[:, 0], a[:, col])]
-                np.savetxt(os.path.join(out, tag + "_phase.txt"), np.column_stack(cols), fmt="%.6g",
-                           header="t0 " + " ".join(f"{x}_{q}{p}" for x, *_ in cps for q in ("cm", "ctl", "bli") for p in (1, 2)))
-                summ = {}
-                for k, (x, *_r) in enumerate(cps):
-                    for t0 in (1.4e-6, 3.9e-6, 7.9e-6, 11.9e-6):
-                        if t0 < TSTOP_RUN:
-                            j = int(t0 / T)
-                            summ[f"{x}@{t0 * 1e6:.1f}us"] = {n_: round((cols[1 + 6 * k + 2 * q + p][j] - (S.V_OCM if q == 0 else 0)) * (1e3 if q == 0 else 1), 4)
-                                                             for q, nq in enumerate(("cm_err_mV", "ctl_V", "bli_V")) for p, n_ in
-                                                             ((0, nq + "_ph1"), (1, nq + "_ph2"))}
-                            summ[f"{x}@{t0 * 1e6:.1f}us"]["vdiff_V"] = round(float(np.interp(t0, a[:, 0], a[:, 1 + 3 * nc + k])), 4)
-                print(json.dumps(dict(diag=tag, **summ)), flush=True)
-                json.dump(summ, open(os.path.join(out, tag + "_phase.json"), "w"), indent=0)
+            col = {n: a[:, 1 + i] for i, n in enumerate(names)}
+            ts, ph = instants(TSTOP_RUN)
+            np.savetxt(os.path.join(out, tag + "_phase.txt"),
+                       np.column_stack([ts, ph] + [np.interp(ts, a[:, 0], col[n]) for n in names]), fmt="%.9g",
+                       header="t ph " + " ".join(names))
             os.remove(fn)
         except Exception as e:
             print(json.dumps(dict(corner=tag, fails=[f"no data {e!r}"], lint=lint[:5], stderr=r.stderr[-600:])))
             nfail += 1
             continue
         tm = a[:, 0]
-        for k, (x, kind, m) in enumerate(cps):
-            cm = a[:, 1 + k]
-            res, fails = check_ev(tm, cm) if kind == "ev" else check_su(tm, cm)
-            row = dict(corner=c, temp=t, vdd=vd, copy=x, mut=m, result=res, fails=fails + ([f"lint {lint[:3]}"] if lint else []))
+        if DIAG:   # per copy: settled end-ph1 / end-ph2 CM before the first event and the ph1 - ph2 ripple
+            pre = (ts < T0) & (ts >= T0 - 2 * T)
+            d = {x: {f"cm_ph{p}_mV": round((float(np.mean(np.interp(ts[pre & (ph == p)], tm, col[x + "_cm"]))) - S.V_OCM) * 1e3, 3)
+                     for p in (1, 2)} for x, *_ in cps}
+            print(json.dumps(dict(diag=tag, **d)), flush=True)
+            json.dump(d, open(os.path.join(out, tag + "_diag.json"), "w"), indent=0)
+            continue
+        for x, kind, m in cps:
+            cm = col[x + "_cm"]
+            if kind == "ev0":
+                continue
+            if kind == "ev":
+                tw = TWIN.get(x)
+                res, fails = check_ev(tm, cm, col.get(x + "_dm"), col.get(f"{tw}_dm") if tw else None)
+            else:
+                res, fails = check_su(tm, cm)
+            row = dict(corner=c, temp=t, vdd=vd, copy=x, mut=m, info=x in INFO, result=res,
+                       fails=fails + ([f"lint {lint[:3]}"] if lint else []))
             if mut_deck:
                 ok = not lint and np.all(np.isfinite(cm))
-                row["mutant_verdict"] = ("REJECTED (good)" if ok and fails else "PASSED (check is blind)" if ok
+                hit = [f for f in fails if EXPECT[x] in f]
+                row["mutant_verdict"] = ("REJECTED (good)" if ok and hit else "PASSED (check is blind)" if ok
                                          else "MUTANT INVALID")
                 nfail += row["mutant_verdict"] != "REJECTED (good)"
-            else:
+            elif not row["info"]:
                 nfail += bool(row["fails"])
             rows.append(row)
             print(json.dumps(row), flush=True)
