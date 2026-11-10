@@ -70,10 +70,49 @@ def cm_at_release(out, tag):
     return rows
 
 
+EP_TOL_PPM = 0.05   # endpoint agreement between parts [ppm of FSR 2]; WO-24 nom parts agree to ~0.008 ppm
+
+
+def combine(paths, k=None, tol_ppm=EP_TOL_PPM):
+    """Combine --part slices (REVIEW-C1b m6). Asserts that every part has the same endpoints (u_in) and that their u_hat
+    agree within tol_ppm (the endpoint conversions are the same codes / residues in each part; a part that drifted or a
+    stale json fails here). Also checks the part set is complete (0..k-1, no duplicates) and that shared interior
+    points agree. Returns max per-part endpoint INL (the gate value) and the INL recomputed on the union grid."""
+    rows = [json.load(open(p)) for p in paths]
+    k = k or len(rows)
+    parts = sorted(int(r["part"].split("/")[0]) for r in rows)
+    assert parts == list(range(k)) and all(int(r["part"].split("/")[1]) == k for r in rows), f"part set {parts} != 0..{k - 1}"
+    pts = {}
+    for r in rows:
+        uin, uh = r["u_in"], r["u_hat"]
+        assert len(uin) == len(uh) >= 3, f"{r['tag']}: no conversions"
+        lo, hi = int(np.argmin(uin)), int(np.argmax(uin))
+        for j in range(len(uin)):
+            pts.setdefault(round(uin[j], 9), []).append((r["tag"], uh[j], j in (lo, hi)))
+    eps = sorted({round(min(r["u_in"]), 9) for r in rows} | {round(max(r["u_in"]), 9) for r in rows})
+    assert len(eps) == 2, f"endpoints differ between parts: {eps}"
+    spread = 0.0
+    for u, lst in pts.items():
+        vals = [v for _, v, _ in lst]
+        sp = (max(vals) - min(vals)) / TB.FS_FULL * 1e6
+        spread = max(spread, sp) if u in eps else spread
+        assert sp <= tol_ppm, f"u={u}: u_hat disagrees by {sp:.4f} ppm > {tol_ppm} across {[t for t, _, _ in lst]}"
+        if u in eps:
+            assert len(lst) == k, f"endpoint u={u} missing from some part"
+    uu = np.array(sorted(pts)); uh = np.array([np.mean([v for _, v, _ in pts[u]]) for u in uu])
+    union = TB.inl_gain(uu, uh)
+    probs = [p for r in rows for p in r.get("problems", [])]
+    inl = max(r["inl_ep_ppm"] for r in rows)
+    healthy = not probs and all(math.isfinite(r["inl_ep_ppm"]) for r in rows)
+    return dict(n_parts=k, n_points=len(uu), endpoint_spread_ppm=spread, inl_ep_ppm=inl,
+                inl_ep_union_ppm=union["inl_ep_ppm"], inl_bf_union_ppm=union["inl_bf_ppm"], problems=probs,
+                healthy=healthy, pass_gate=healthy and inl <= GATE, pass_share=healthy and inl <= GATE_SHARE)
+
+
 def cfg(a):
     c, t, v = CORNERS9[a.corner]
     sub = os.path.join(a.out, "ota1_sc.spice")
-    open(sub, "w").write(NL.build("ota1", cmfb="sc", fs=4e6))
+    open(sub, "w").write(NL.build("ota1", cmfb="sc", fs=4e6, boost=True))
     bias = NL.bias_currents(True)
     if a.copy == "sr95":
         bias = {k: v * SR95_SCALE for k, v in bias.items()}   # M2: all six ports, not the tail alone
@@ -97,7 +136,23 @@ def main():
     ap.add_argument("--corner", type=int, default=3)   # CORNERS9[3] = fs/125/3.0
     ap.add_argument("--part", default=None)
     ap.add_argument("--deck-timeout", type=int, default=7000)
+    ap.add_argument("--combine", type=int, default=0, help="combine K part jsons of this copy/opt/n in OUT, then exit")
     a = ap.parse_args()
+    if a.combine:
+        import glob
+        fs = sorted(glob.glob(os.path.join(a.out, f"gb_{a.copy}_{a.opt}_N{a.n}_p*o{a.combine}.json")))
+        try:
+            r = combine(fs, a.combine)
+        except AssertionError as e:
+            print(f"COMBINE INVALID: {e}")
+            sys.exit(2)
+        print(json.dumps(r))
+        if a.copy == "sr95":
+            v = "REJECTED (good)" if r["healthy"] and r["inl_ep_ppm"] > GATE else ("PASSED (check is blind)" if r["healthy"] else "INVALID")
+            print("broken copy", v)
+            sys.exit(0 if v.startswith("REJ") else 1)
+        print("VERDICT", "ACCEPT" if r["pass_gate"] else "REJECT")
+        sys.exit(0 if r["pass_gate"] else 1)
     os.makedirs(a.out, exist_ok=True)
     P.SPICE_OPTIONS_TIER1.update(P.option_ladder(a.opt))
     TB.DECK_TIMEOUT_S = a.deck_timeout
