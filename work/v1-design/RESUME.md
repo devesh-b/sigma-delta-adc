@@ -672,3 +672,12 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - Determinism check: two identical smoke runs (num_threads=8 from the PDK spinit, under different load, 660 s vs 138 s) gave bit-identical INL 10.4710869922615 ppm, matching the earlier smoke. Our ngspice-45 build is deterministic here; no num_threads change needed. (pthomas item closed for this machine; recheck on any other host.)
 - REVIEW-WO25: hold gate B (queued waiter cancelled). Majors: A0 relies on replica error; V_OCM +58.8 mV > CL-2 ~38 mV; I_tail row = SR floor proxy (±5 % breaks SPEC row 95); K_P row blind; gate B needs 4 corners. User Q1 (ref architecture) / Q2 (K_P) pending.
 - D59 (user): parallel 1:8 refs + common-centroid/dummies layout intent; K_P 12.5 + replica fix. WO-26 dispatched.
+- WO-24 sr95 broken copy, old netlist: parts 0–2 REJECTED (INL 3.1–3.4 % ≫ 5 ppm, healthy). The coordinator stopped parts 3–5 (obsolete netlist).
+- WO-26 done (6dccfd3, 0ed1112, b177d23, 10ffd21; results/wo26). All op/AC exits and new rows pass:
+  - precision A0 ≥ 83.79 dB;
+  - SR min 12.83 / 25.54 V/µs;
+  - V_OCM ≤ 30.8 mV;
+  - K_P tracking ≤ 0.64 %;
+  - every broken copy REJECTED.
+- Item-1 ratio exit fails: ratios 0.944–1.031 from the Vds offset; spread over T up to 2.85 %. The rcb leg adds 0.37 / 0.74 µA outside D59 and needs the user's OK.
+- Gate B running: `WO-26-b177d23/gb.sh`, 30 parts in waves of 3, status `out/gb_status`, marker `GB_DONE`, up to about 30 h. Reviewer pass on WO-26 running.
