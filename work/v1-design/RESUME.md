@@ -733,3 +733,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - Reset-assert closed; ph1 ripple bounded (CMFB switch charge / 2Cc).
   - **Start-up row fails** on the current netlist: the Cc charge error decays only through the Cr refresh, τ ≈ 1.1 µs. Cr ×2 (caps only) passes everywhere, with 0.5 mV margin at fs/125 → user decision.
   - Gate B ready but not launched: `WO-30-6ee1e9d/gb.sh`.
+- D64 (user): Cr ×2. WO-31 dispatched.
