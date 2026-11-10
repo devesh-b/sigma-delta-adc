@@ -356,9 +356,12 @@ def build_deck(cfg=None, rawfile=None):
     w("listing")
     w("run")
     if xt:   # output CM and island CM at each reset release (conversion start), REVIEW-C1b M1 / D57
+        # control-mode meas does not accept par(); build the CM vectors with let first
+        w("let ocm1v = 0.5*(v(o1p)+v(o1n))")
+        w("let icm1v = 0.5*(v(vg1p)+v(vg1n))")
         for m_, t_ in enumerate(t0s):
-            w(f"meas tran ocm1_{m_} find par('0.5*(v(o1p)+v(o1n))') at={t_:.6e}")
-            w(f"meas tran icm1_{m_} find par('0.5*(v(vg1p)+v(vg1n))') at={t_:.6e}")
+            w(f"meas tran ocm1_{m_} find ocm1v at={t_:.6e}")
+            w(f"meas tran icm1_{m_} find icm1v at={t_:.6e}")
     w("echo FINAL_TIME_CHECK")
     w("print time[length(time)-1]")
     w(f"wrdata {rawfile or 'out.csv'} v(yq) v(o2p) v(o2n) v(o1p) v(o1n) " + " ".join(f"v({x})" for x in c["extra"]))
