@@ -736,3 +736,7 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - D64 (user): Cr ×2. WO-31 dispatched.
 - WO-31 runs in WO-31-1cf257d (op/AC 9 PVT + tb9 + mut; markers out/DONE_{1,2,3}). Coordinator: after DONE, check the summary and tb9 VERDICTs, then launch gb.sh.
 - WO-31: op/AC 9 PVT ACCEPT, tb9 ACCEPT (start-up ≤ 9.6 mV; mcr05 rejected at 34 mV). Gate B launched in WO-31-1cf257d (GB_DONE marker).
+- 2026-11-11 02:02: gate B re-scheduled on the user's request. ngspice ran 8 OpenMP threads per job (from the ngspice spinit), so 3 jobs put 24 threads on 6 cores (load 16, about 1.3 cores of work per job).
+  - New `gb2.sh`: single-threaded ngspice via `./.spiceinit num_threads=1` in the frozen copy, and a pool of 5 concurrent parts. It skips parts that are done or still running, then combines. The old driver (gb.sh) was stopped; its 3 running parts continue.
+  - Same marker: GB_DONE.
+  - Determinism note: thread count may change the last bits; the combine endpoint check (0.05 ppm) will show it.
