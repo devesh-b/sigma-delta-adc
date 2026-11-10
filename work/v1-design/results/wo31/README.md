@@ -17,3 +17,10 @@ Commits: 739e3da (Cr 0.05 pF default, cr_x05 token, tb9 2 T start-up gates, mcr0
 ## Item 4: gate B NOT launched (items 2-3 pending)
 Launch from the frozen copy after items 2-3 pass: `cd /home/mempool/regr/tt/WO-31-1cf257d && setsid nohup bash gb.sh >/dev/null 2>&1 &`.
 Markers: out/gb_status, out/gb/*/combine.out (EXIT=), GB_DONE.
+
+## Results (coordinator, after hand-off)
+- op/AC 9 PVT (opac_058/123/467): **VERDICT ACCEPT** in every group. Nominal rows pass. The maxima of CM peaking 1.87 dB and V_OCM 3σ 64 mV come from the broken copies (mcc4, mvo). Min CM PM 65.9°.
+- tb9 (tt, ss125, fs125, sf125 + mut): **VERDICT ACCEPT**.
+  - Start-up err over the last period (limit 10 mV): suhi 7.5–9.3, sulo 6.9–9.6, suvb 7.5–9.3. 8 T sulo (info) 7.3–9.1.
+  - Broken copy mcr05 (old Cr 0.025 pF): sulo 34.0 mV → REJECTED.
+- **Gate B launched** in WO-31-1cf257d: `gb.sh` (fs/125, ss/−40, ss/125, tt/27 + sr95 at fs/125 and sf/−40). Markers `out/gb_status`, `out/gb/*/combine.out`, `GB_DONE`.

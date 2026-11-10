@@ -735,3 +735,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - Gate B ready but not launched: `WO-30-6ee1e9d/gb.sh`.
 - D64 (user): Cr ×2. WO-31 dispatched.
 - WO-31 runs in WO-31-1cf257d (op/AC 9 PVT + tb9 + mut; markers out/DONE_{1,2,3}). Coordinator: after DONE, check the summary and tb9 VERDICTs, then launch gb.sh.
+- WO-31: op/AC 9 PVT ACCEPT, tb9 ACCEPT (start-up ≤ 9.6 mV; mcr05 rejected at 34 mV). Gate B launched in WO-31-1cf257d (GB_DONE marker).
