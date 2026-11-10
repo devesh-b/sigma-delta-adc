@@ -700,3 +700,5 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
     1. commit with explicit paths, in this order: D60/D61/WO-27/WO-28/INDEX/RESUME; then the WO-27 code + results/wo27; then the WO-28 code; then results/wo28;
     2. follow the results/wo28/README pickup steps (sync, frozen copy, pytest, opac idx 0, tb9 0,2,3,4 + --mut, then 9 PVT).
   - Expected user decision: f_cm likely < 9.4 MHz → Cc 0.3–0.4 pF or a CMFB split.
+- 1Password unlocked; committed 073c076, 0167598, e42898f, d280b07.
+- **WO-26 gate B done: all 4 corners ACCEPT.** fs/125 3.314 ppm (share 3.33), ss/−40 0.797, ss/125 1.686, tt 0.454. sr95: every part 4.4–5.5 % INL, but combine INVALID (endpoint memory 40 ppm). Needs a combine() broken-copy rule. See results/wo26/README.md.

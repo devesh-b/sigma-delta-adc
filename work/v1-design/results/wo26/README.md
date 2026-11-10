@@ -74,3 +74,15 @@ Commits: 6dccfd3 (D59 refs, K_P 12.5, replica, gate-path bank switch, tests), 0e
   - per config `out/gb/c{3,1,2,0}_nom/combine.out` and `out/gb/c3_sr95/combine.out`, each ending in `EXIT=`;
   - final marker `GB_DONE`.
 - Launched because every item-4 op/AC exit passed. The item-1 ratio exit failure is flagged above.
+
+## Gate B (WO-26 netlist, boost, N 1024, m 21, O1, 6 parts each, combine())
+| corner | INL ep [ppm] | gate 5 / share 3.33 | endpoint spread [ppm] |
+|---|---|---|---|
+| fs/125 (c3) | **3.314** | ACCEPT / just inside (0.02 margin) | 0.027 |
+| ss/−40 (c1) | 0.797 | ACCEPT | 0.014 |
+| ss/125 (c2) | 1.686 | ACCEPT | 0.001 |
+| tt/27 (c0) | 0.454 | ACCEPT | 0.002 |
+
+- **sr95 broken copy at fs/125:** all 6 parts are healthy with INL 43 600–54 600 ppm (≫ 5). combine() returns **INVALID** (exit 2) because the endpoint u = 0.9 disagrees by 40 ppm across parts: the slew-limited copy carries memory from one conversion to the next, so endpoint results depend on the sequence.
+  - Rejected in substance. combine() needs a broken-copy rule: when every part is healthy and > gate, report REJECTED even if the endpoints disagree.
+- fs/125 INL rose from 2.29 ppm (WO-24 netlist) to 3.31 ppm (WO-26). It is within the 5 ppm gate, but at the 3.33 share. This needs watching on the WO-28 netlist.

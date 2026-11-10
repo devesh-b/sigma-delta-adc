@@ -1,0 +1,16 @@
+start Tuesday 10 November 2026 01:11:07 PM IST 30 jobs
+wave 1 done Tuesday 10 November 2026 02:02:52 PM IST
+wave 2 done Tuesday 10 November 2026 02:54:51 PM IST
+wave 3 done Tuesday 10 November 2026 03:33:21 PM IST
+wave 4 done Tuesday 10 November 2026 04:06:01 PM IST
+wave 5 done Tuesday 10 November 2026 04:43:51 PM IST
+wave 6 done Tuesday 10 November 2026 05:16:12 PM IST
+wave 7 done Tuesday 10 November 2026 05:39:51 PM IST
+wave 8 done Tuesday 10 November 2026 06:01:28 PM IST
+wave 9 done Tuesday 10 November 2026 06:24:41 PM IST
+wave 10 done Tuesday 10 November 2026 06:45:50 PM IST
+c3_nom VERDICT ACCEPT EXIT=0 
+c1_nom VERDICT ACCEPT EXIT=0 
+c2_nom VERDICT ACCEPT EXIT=0 
+c0_nom VERDICT ACCEPT EXIT=0 
+c3_sr95 COMBINE INVALID: u=0.9: u_hat disagrees by 40.1070 ppm > 0.05 across ['gb_sr95_O1_N1024_p0o6', 'gb_sr95_O1_N1024_p1o6', 'gb_sr95_O1_N1024_p2o6', 'gb_sr95_O1_N1024_p3o6', 'gb_sr95_O1_N1024_p4o6', 'gb_sr95_O1_N1024_p5o6'] EXIT=2 

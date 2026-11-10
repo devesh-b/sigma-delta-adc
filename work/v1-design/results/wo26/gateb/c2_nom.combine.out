@@ -1,0 +1,3 @@
+{"n_parts": 6, "n_points": 21, "endpoint_spread_ppm": 0.0009708647219497379, "inl_ep_ppm": 1.6856144845478482, "inl_ep_union_ppm": 1.6851550703189666, "inl_bf_union_ppm": 1.4951005337104917, "problems": [], "healthy": true, "pass_gate": true, "pass_share": true}
+VERDICT ACCEPT
+EXIT=0

@@ -1,0 +1,2 @@
+COMBINE INVALID: u=0.9: u_hat disagrees by 40.1070 ppm > 0.05 across ['gb_sr95_O1_N1024_p0o6', 'gb_sr95_O1_N1024_p1o6', 'gb_sr95_O1_N1024_p2o6', 'gb_sr95_O1_N1024_p3o6', 'gb_sr95_O1_N1024_p4o6', 'gb_sr95_O1_N1024_p5o6']
+EXIT=2
