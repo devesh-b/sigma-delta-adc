@@ -50,7 +50,12 @@ def copy(x, kind, sub, vd, mut=None):
          f"vdd 0 lv 0 isl_{x} ph1 ph1b ph2 ph2b rstb {sub}"]
     for p_, i_ in NL.bias_currents(True, mut).items():
         L.append(f"I{p_}_{x} {p_}_{x} 0 {i_:.6e}" if p_ in NL.SINK_PORTS else f"I{p_}_{x} vdd {p_}_{x} {i_:.6e}")
-    L += [f"Cip_{x} outp_{x} inp_{x} {CINT:g}", f"Cin_{x} outn_{x} inn_{x} {CINT:g}",
+    # WO-29: Cint closes NEGATIVE feedback, outp -> inn and outn -> inp, as in gen_tier1 (Xota1 inp = vg1n, Cint1p vg1p-o1p);
+    # inp -> outp is non-inverting (PMOS pair, folded). The WO-27/28 decks wired outp -> inp (positive feedback): the
+    # outputs latched to the rails after reset release and pinned the CM (+156 mV at tt) whatever the CMFB did.
+    # TB9_POL_OLD=1 rebuilds that wiring (broken copy of this fix: the event rows must REJECT).
+    a_, b_ = ("inp", "inn") if os.environ.get("TB9_POL_OLD") else ("inn", "inp")
+    L += [f"Cip_{x} outp_{x} {a_}_{x} {CINT:g}", f"Cin_{x} outn_{x} {b_}_{x} {CINT:g}",
           f"Csp_{x} inp_{x} 0 {CS1:g}", f"Csn_{x} inn_{x} 0 {CS1:g}",
           f"Crp_{x} outp_{x} 0 {C_RT:g}", f"Crn_{x} outn_{x} 0 {C_RT:g}",
           f"Bcm_{x} cm_{x} 0 V = 0.5*(V(outp_{x})+V(outn_{x}))"]
@@ -92,6 +97,7 @@ def deck(c, t, vd, tag, copies):
     vec = " ".join(f"v(cm_{x})" for x, *_ in copies)
     if DIAG_VEC:
         vec += " " + " ".join(f"v(x{x}.ctl) v(x{x}.bli)" for x, *_ in copies)
+        vec += " " + " ".join(f"v(outp_{x},outn_{x})" for x, *_ in copies)   # WO-29: differential output (latch check)
     L += [".control", "set wr_singlescale", "set wr_vecnames", f"tran 0.1n {TSTOP_RUN:.6e} 0 0.5n",
           f"wrdata {tag}.csv {vec}", "quit", ".endc", ".end"]
     return "\n".join(L) + "\n"
@@ -158,6 +164,7 @@ def main():
                             summ[f"{x}@{t0 * 1e6:.1f}us"] = {n_: round((cols[1 + 6 * k + 2 * q + p][j] - (S.V_OCM if q == 0 else 0)) * (1e3 if q == 0 else 1), 4)
                                                              for q, nq in enumerate(("cm_err_mV", "ctl_V", "bli_V")) for p, n_ in
                                                              ((0, nq + "_ph1"), (1, nq + "_ph2"))}
+                            summ[f"{x}@{t0 * 1e6:.1f}us"]["vdiff_V"] = round(float(np.interp(t0, a[:, 0], a[:, 1 + 3 * nc + k])), 4)
                 print(json.dumps(dict(diag=tag, **summ)), flush=True)
                 json.dump(summ, open(os.path.join(out, tag + "_phase.json"), "w"), indent=0)
             os.remove(fn)
