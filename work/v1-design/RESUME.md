@@ -671,3 +671,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - Note: the frozen copy needs `golden/` for model/tests/test_golden.py (33 errors there are a copy artefact).
 - Determinism check: two identical smoke runs (num_threads=8 from the PDK spinit, under different load, 660 s vs 138 s) gave bit-identical INL 10.4710869922615 ppm, matching the earlier smoke. Our ngspice-45 build is deterministic here; no num_threads change needed. (pthomas item closed for this machine; recheck on any other host.)
 - REVIEW-WO25: hold gate B (queued waiter cancelled). Majors: A0 relies on replica error; V_OCM +58.8 mV > CL-2 ~38 mV; I_tail row = SR floor proxy (±5 % breaks SPEC row 95); K_P row blind; gate B needs 4 corners. User Q1 (ref architecture) / Q2 (K_P) pending.
+- D59 (user): parallel 1:8 refs + common-centroid/dummies layout intent; K_P 12.5 + replica fix. WO-26 dispatched.

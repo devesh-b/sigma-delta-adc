@@ -32,3 +32,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-23 C1a rev C (A(v) tables through model INL, bias-diode fix, swing fix): dispatched 2026-11-09
 - WO-24 C1b part 1 (sync, precision A0 sweep, netlist generator, op/AC 9 PVT x 2, first gate B point): dispatched 2026-11-10; done 2026-11-10 (results/wo24, D58)
 - WO-25 C1b part 2a (D58 ref scale + replica cascode bias, D55 revert, gate B close-out + rerun): written 2026-11-10, waiting on sandbox access
+- WO-26 C1b part 2b (D59 parallel 1:8 refs, K_P 12.5, replica fix, SR/K_P/V_OCM rows, gate B 4 corners): dispatched 2026-11-10
