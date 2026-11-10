@@ -198,10 +198,21 @@ def build(name="ota1", cmfb="sc", fs=4e6, mut=None, sizes=None, boost=False):
            dev("m_il", "mil1", "cid", "cid", "vdd", "vdd", z), dev("m_il", "mil2", "bli", "cid", "vdd", "vdd", z),
            f"Cint bli vdd {S.C_INT:g}"])
     if cmfb == "sc":
+        # WO-29 diagnosis tokens (tb9 only; the deck defines .model SWI): sw_ideal = all CMFB TGs ideal (no charge
+        # injection / feedthrough), sw_ideal_ctl = only the ctl-side share switch Sr2b ideal, sw_ideal_bli = only the
+        # bli-side refresh switch Sr1b ideal, sw_min = every CMFB TG at minimum W (0.42 n and p)
+        def cs(nm, a, b, g, gb):
+            if "sw_ideal" in mt or ("sw_ideal_ctl" in mt and nm.startswith("Sr2b")) or \
+                    ("sw_ideal_bli" in mt and nm.startswith("Sr1b")):
+                return [f"S{nm} {a} {b} {g} vss SWI"]
+            if "sw_min" in mt:
+                n, p = S.CMFB_SW["n"], S.CMFB_SW["p"]
+                return [mos(nm + "n", a, g, b, "vss", n["dev"], 0.42, n["L"]), mos(nm + "p", a, gb, b, "vdd", p["dev"], 0.42, p["L"])]
+            return tg(nm, a, b, g, gb)
         for s_, o in (("p", "outp"), ("n", "outn")):
             w([f"Cr{s_} ra{s_} rb{s_} {cr:g}"])
-            w(tg(f"Sr1a{s_}", f"ra{s_}", "vocm", "ph1", "ph1b") + tg(f"Sr1b{s_}", f"rb{s_}", "bli", "ph1", "ph1b")
-              + tg(f"Sr2a{s_}", f"ra{s_}", o, "ph2", "ph2b") + tg(f"Sr2b{s_}", f"rb{s_}", "ctl", "ph2", "ph2b"))
+            w(cs(f"Sr1a{s_}", f"ra{s_}", "vocm", "ph1", "ph1b") + cs(f"Sr1b{s_}", f"rb{s_}", "bli", "ph1", "ph1b")
+              + cs(f"Sr2a{s_}", f"ra{s_}", o, "ph2", "ph2b") + cs(f"Sr2b{s_}", f"rb{s_}", "ctl", "ph2", "ph2b"))
     elif cmfb == "dc":   # averaged Cr pair: i = (V_outcm - V_ctl - V_vocm + V_bli) / R into ctl and out of bli
         r = 1.0 / (fs * 2 * cr)
         e = f"(0.5*(V(outp)+V(outn)) - V(ctl) - V(vocm) + V(bli))/{r:.6g}"

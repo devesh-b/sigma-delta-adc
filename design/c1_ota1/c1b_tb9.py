@@ -34,6 +34,9 @@ CINT, CS1 = 4e-12, 0.5e-12
 DV_CM, DV_DIFF = 30e-3, 0.8
 T_STOP = 4.0e-6                     # CL-7
 T_RST = 216e-9                      # reset window at 4 MHz (CHOP_SW island row)
+DIAG = os.environ.get("TB9_DIAG", "")                       # WO-29 diagnosis copy spec (see main)
+TSTOP_RUN = float(os.environ.get("TB9_TSTOP", T_STOP))      # WO-29: longer runs to tell a slow loop from an offset
+DIAG_VEC = bool(DIAG) or bool(os.environ.get("TB9_VEC"))    # also log ctl / bli per half-phase
 # WO-28: events start after convergence (start-up clamp released at 2 T = 0.5 us, slow path tau <= 0.4 us)
 EV = [("reset release", 1.5e-6), ("diff step", 1.75e-6), ("CM step", 2.25e-6), ("reset assert", 3.0e-6),
       ("reset release 2", 3.0e-6 + T_RST)]
@@ -77,14 +80,20 @@ def deck(c, t, vd, tag, copies):
          f"Vph1b ph1b 0 PULSE({vd:g} 0 {G:.6e} 0.2n 0.2n {T / 2 - 2 * G:.6e} {T:.6e})",
          f"Vph2 ph2 0 PULSE(0 {vd:g} {T / 2 + G:.6e} 0.2n 0.2n {T / 2 - 2 * G:.6e} {T:.6e})",
          f"Vph2b ph2b 0 PULSE({vd:g} 0 {T / 2 + G:.6e} 0.2n 0.2n {T / 2 - 2 * G:.6e} {T:.6e})"]
+    L.append(".model SWI sw vt=1.5 vh=0.1 ron=2k roff=1e14")   # WO-29 diagnosis: ideal CMFB switches (sw_ideal*)
     subs = {}
     for x, kind, mut in copies:
         if mut not in subs:
-            subs[mut] = f"ota1_t9_{mut or 'nom'}"
-            L.append(NL.build(subs[mut], cmfb="sc", fs=FS, mut=mut, boost=True))
+            subs[mut] = f"ota1_t9_{(mut or 'nom').replace('+', '_')}"
+            tk = NL.toks(mut)   # dcavg: the averaged Cr model of the op/AC decks, run in the same transient
+            m2 = "+".join(sorted(tk - {"dcavg"})) or None
+            L.append(NL.build(subs[mut], cmfb="dc" if "dcavg" in tk else "sc", fs=FS, mut=m2, boost=True))
         L += copy(x, kind, subs[mut], vd, mut)
-    L += [".control", "set wr_singlescale", "set wr_vecnames", f"tran 0.1n {T_STOP:.6e} 0 0.5n",
-          f"wrdata {tag}.csv " + " ".join(f"v(cm_{x})" for x, *_ in copies), "quit", ".endc", ".end"]
+    vec = " ".join(f"v(cm_{x})" for x, *_ in copies)
+    if DIAG_VEC:
+        vec += " " + " ".join(f"v(x{x}.ctl) v(x{x}.bli)" for x, *_ in copies)
+    L += [".control", "set wr_singlescale", "set wr_vecnames", f"tran 0.1n {TSTOP_RUN:.6e} 0 0.5n",
+          f"wrdata {tag}.csv {vec}", "quit", ".endc", ".end"]
     return "\n".join(L) + "\n"
 
 
@@ -119,8 +128,9 @@ def main():
         c, t, vd = CORNERS9[int(ci)]
         tag = f"tb9_{c}_{t}".replace("-", "m") + ("_mut" if mut_deck else "")
         cps = list(MUT if mut_deck else NOM)
-        if os.environ.get("TB9_DIAG"):   # diagnosis: the WO-26 passive loop (slow path off) beside the nominal
-            cps.append(("evu", "ev", "int_off"))
+        if DIAG:   # WO-29 diagnosis deck: TB9_DIAG="x:tok+tok,x:tok,..." ev copies only (tok '-' = nominal)
+            tag += "_diag"
+            cps = [(s.split(":")[0], "ev", None if s.split(":")[1] == "-" else s.split(":")[1]) for s in DIAG.split(",")]
         fn = os.path.join(out, tag + ".csv")
         if os.path.exists(fn):
             os.remove(fn)
@@ -130,10 +140,26 @@ def main():
                 if re.search(r"(error|unknown|singular|no convergence|timestep too small|could not find)", l, re.I)]
         try:
             a = np.loadtxt(fn, skiprows=1)
-            if os.environ.get("TB9_DIAG"):
-                tt_ = np.arange(0, T_STOP, 25e-9)
-                np.savetxt(os.path.join(out, tag + "_diag.txt"), np.column_stack([tt_] + [np.interp(tt_, a[:, 0], a[:, 1 + k])
-                           for k in range(len(cps))]), fmt="%.5g")
+            if DIAG_VEC:   # per copy and clock period: cm / ctl / bli at the end of ph1 and of ph2 (+ the period index)
+                nc = len(cps)
+                kk = np.arange(int(TSTOP_RUN / T))
+                te1, te2 = kk * T + T / 2 - G - 0.5e-9, kk * T + T - G - 0.5e-9
+                cols = [kk * T]
+                for k in range(nc):
+                    for col in (1 + k, 1 + nc + 2 * k, 2 + nc + 2 * k):
+                        cols += [np.interp(te1, a[:, 0], a[:, col]), np.interp(te2, a[:, 0], a[:, col])]
+                np.savetxt(os.path.join(out, tag + "_phase.txt"), np.column_stack(cols), fmt="%.6g",
+                           header="t0 " + " ".join(f"{x}_{q}{p}" for x, *_ in cps for q in ("cm", "ctl", "bli") for p in (1, 2)))
+                summ = {}
+                for k, (x, *_r) in enumerate(cps):
+                    for t0 in (1.4e-6, 3.9e-6, 7.9e-6, 11.9e-6):
+                        if t0 < TSTOP_RUN:
+                            j = int(t0 / T)
+                            summ[f"{x}@{t0 * 1e6:.1f}us"] = {n_: round((cols[1 + 6 * k + 2 * q + p][j] - (S.V_OCM if q == 0 else 0)) * (1e3 if q == 0 else 1), 4)
+                                                             for q, nq in enumerate(("cm_err_mV", "ctl_V", "bli_V")) for p, n_ in
+                                                             ((0, nq + "_ph1"), (1, nq + "_ph2"))}
+                print(json.dumps(dict(diag=tag, **summ)), flush=True)
+                json.dump(summ, open(os.path.join(out, tag + "_phase.json"), "w"), indent=0)
             os.remove(fn)
         except Exception as e:
             print(json.dumps(dict(corner=tag, fails=[f"no data {e!r}"], lint=lint[:5], stderr=r.stderr[-600:])))
