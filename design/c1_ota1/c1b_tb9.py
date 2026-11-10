@@ -29,7 +29,7 @@ WO-30 rows (D63 basis; expected values from SPEC row 98 / D63 / CL-2 / CL-7 / SP
   Events start at 3.0 us (2.5 us after the 2 T clamp release of the ev copies; the Cc charge mode decays with
   tau = T Cc / Cr ~ 1.1 us, WO-30), run to 5.5 us.
 Broken copies (own deck, each must REJECT on the stated row): mcc4 = Cc / 4 (any row; the ph1 static row: the charge
-packet / 2 Cc grows 4x), masy = CM step with 1e-4 n/p charge imbalance (CM-to-DM row), mio = int_off + vbl0x2 (start-up).
+packet / 2 Cc grows 4x), masy = 1e-4 of the CM-step charge onto one island (CM-to-DM row), mio = int_off + vbl0x2 (start-up).
 Setup per copy: OTA1 (cmfb="sc", boost, fs 4 MHz, ph1 / ph2 non-overlapping by g = 0.025/fs), Cint 4 pF out -> island
 (negative feedback, WO-29), Cs1 0.5 pF island -> ground, output routing C_RT; reset = island shunt to V_ICM (isl) + ideal
 output short (gen_tier1 style); chopper static.
@@ -69,6 +69,9 @@ DIAG_VEC = bool(DIAG) or bool(os.environ.get("TB9_VEC"))    # also log ctl / bli
 # kinds: ev, ev0 (twin without CM step), su_hi / su_lo (+ "8": 8 T clamp). info copies are reported, not gated.
 NOM = [("ev", "ev", None), ("ev0", "ev0", None), ("suhi", "su_hi8", None), ("sulo", "su_lo8", None),
        ("suvb", "su_lo8", "vbl0x2"), ("sulo2t", "su_lo", None), ("suvb2t", "su_lo", "vbl0x2"), ("sulocr2", "su_lo", "cr_x2")]
+if os.environ.get("TB9_SET") == "cr2":   # WO-30 candidate (option, not adopted): Cr x 2 everywhere, 2 T start-up clamp
+    NOM = [("ev", "ev", "cr_x2"), ("ev0", "ev0", "cr_x2"), ("suhi", "su_hi", "cr_x2"), ("sulo", "su_lo", "cr_x2"),
+           ("suvb", "su_lo", "vbl0x2+cr_x2")]
 INFO = {"ev0", "sulo2t", "suvb2t", "sulocr2", "masy0"}
 MUT = [("mcc4", "ev", "cc_div4"), ("masy", "ev", "cm_asym"), ("masy0", "ev0", None), ("mio", "su_hi8", "int_off+vbl0x2")]
 EXPECT = {"mcc4": "", "masy": "CM-to-DM", "mio": "start-up"}
@@ -94,9 +97,14 @@ def copy(x, kind, sub, vd, mut=None):
         L += [f"Idp_{x} 0 inp_{x} PULSE(0 {qd / 10e-9:.6e} {t1:.6e} 0.1n 0.1n 9.9n 1)",
               f"Idn_{x} inn_{x} 0 PULSE(0 {qd / 10e-9:.6e} {t1:.6e} 0.1n 0.1n 9.9n 1)"]
         if kind == "ev":
-            a = ASYM if "cm_asym" in NL.toks(mut) else 0.0
-            L += [f"Icp_{x} 0 outp_{x} PULSE(0 {qc * (1 + a) / 1e-9:.9e} {t2:.6e} 0.1n 0.1n 0.9n 1)",
-                  f"Icn_{x} 0 outn_{x} PULSE(0 {qc * (1 - a) / 1e-9:.9e} {t2:.6e} 0.1n 0.1n 0.9n 1)"]
+            L += [f"Icp_{x} 0 outp_{x} PULSE(0 {qc / 1e-9:.9e} {t2:.6e} 0.1n 0.1n 0.9n 1)",
+                  f"Icn_{x} 0 outn_{x} PULSE(0 {qc / 1e-9:.9e} {t2:.6e} 0.1n 0.1n 0.9n 1)"]
+            if "cm_asym" in NL.toks(mut):
+                # WO-30 run 1: an n/p imbalance of the OUTPUT charge left no DM at the sampling instants (masy PASSED,
+                # 0.01 uV): the DM output is set by the island charge, and output-side charge settles out. A CM event
+                # leaks to DM only as island charge, so the broken copy puts ASYM x the CM-step charge on one island
+                # (DM ~ ASYM qc / Cint = 0.58 uV, 2.3x the limit)
+                L += [f"Ica_{x} 0 inp_{x} PULSE(0 {ASYM * qc / 1e-9:.9e} {t2:.6e} 0.1n 0.1n 0.9n 1)"]
     else:   # start-up copy: integrator held in reset, outputs pre-charged to a rail
         rail = vd if kind.startswith("su_hi") else 0.0
         L += [f"Visl_{x} isl_{x} 0 {vd:g}", f"Srs_{x} outp_{x} outn_{x} one 0 SWM",
