@@ -734,3 +734,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - **Start-up row fails** on the current netlist: the Cc charge error decays only through the Cr refresh, τ ≈ 1.1 µs. Cr ×2 (caps only) passes everywhere, with 0.5 mV margin at fs/125 → user decision.
   - Gate B ready but not launched: `WO-30-6ee1e9d/gb.sh`.
 - D64 (user): Cr ×2. WO-31 dispatched.
+- WO-31 runs in WO-31-1cf257d (op/AC 9 PVT + tb9 + mut; markers out/DONE_{1,2,3}). Coordinator: after DONE, check the summary and tb9 VERDICTs, then launch gb.sh.
