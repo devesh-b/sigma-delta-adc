@@ -49,3 +49,9 @@ C one part with a problem → INVALID (not REJECTED); D INL 1 ppm → PASSED (ch
 ## Item 5: gate B NOT launched (item 2 exit not met). `gb.sh` is in the frozen copy, ready.
 Markers for the running op/AC: `WO-29-9e14bed/out/status_{1,2,3}` (`EXIT=` per step), `out/DONE_{1,2,3}`; then
 `python design/c1_ota1/c1b_opac.py --summary out/opac`.
+
+## op/AC 9 PVT on the closed+open pair-per-deck split (coordinator, after hand-off)
+- p058, p123, p467: **VERDICT ACCEPT** at all 9 PVT, including ff/−40 and sf/−40 (no transient-op fallback in the nominal decks).
+- Broken copy `--split-run2` (the run-2 deck structure) at ff/−40: the transient-op lint fires, and its helper is dead (ΔV_ctl 1.78 V) → REJECT. The guard works.
+- The bkt SR rows (ibtp ×0.95 stacked on −3σ) give 12.11–12.42 V/µs. These rows are info by design (K_P-tracking helper). They show that a C6 reference error worse than about −2 % breaks SPEC row 95.
+- Ratio rows (info, D60): spreads 1.2–2.9 %.

@@ -726,3 +726,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - Cold-corner op split: the 9 PVT opac is still running in WO-29-9e14bed (markers DONE_{1,2,3}; summary via `c1b_opac.py --summary out/opac`).
   - Gate B not launched.
 - D63 (user): tb9 CM judged at the sampling instant + CM-to-DM leakage; gate B is the arbiter. WO-30 follows once the WO-29 opac (DONE_1..3) finishes.
+- WO-29 opac 9 PVT on the pair-per-deck split: ACCEPT at all 9 (cold corners converge; the run-2-structure broken copy is rejected). WO-30 dispatched.
