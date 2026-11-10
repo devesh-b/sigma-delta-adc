@@ -727,3 +727,9 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - Gate B not launched.
 - D63 (user): tb9 CM judged at the sampling instant + CM-to-DM leakage; gate B is the arbiter. WO-30 follows once the WO-29 opac (DONE_1..3) finishes.
 - WO-29 opac 9 PVT on the pair-per-deck split: ACCEPT at all 9 (cold corners converge; the run-2-structure broken copy is rejected). WO-30 dispatched.
+- WO-30 (8de9624, 6ee1e9d, 0fb4b5c; results/wo30/README.md): D63 tb9 rows pass at tt, ss125, fs125, sf125.
+  - Rows: CM events 1.8–5.9 mV at the sampling instant; CM→DM ≤ 0.024 µV against the 0.256 µV bound; diff step 0.486 V.
+  - Broken copies all REJECTED (mcc4, island masy, mio).
+  - Reset-assert closed; ph1 ripple bounded (CMFB switch charge / 2Cc).
+  - **Start-up row fails** on the current netlist: the Cc charge error decays only through the Cr refresh, τ ≈ 1.1 µs. Cr ×2 (caps only) passes everywhere, with 0.5 mV margin at fs/125 → user decision.
+  - Gate B ready but not launched: `WO-30-6ee1e9d/gb.sh`.
