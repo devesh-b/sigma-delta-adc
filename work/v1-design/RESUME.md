@@ -682,3 +682,21 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - Item-1 ratio exit fails: ratios 0.944–1.031 from the Vds offset; spread over T up to 2.85 %. The rcb leg adds 0.37 / 0.74 µA outside D59 and needs the user's OK.
 - Gate B running: `WO-26-b177d23/gb.sh`, 30 parts in waves of 3, status `out/gb_status`, marker `GB_DONE`, up to about 30 h. Reviewer pass on WO-26 running.
 - REVIEW-WO26: proceed, wait for gate B. Open for the user: item-1 ratio (a/a+c/b), V_OCM mismatch fix, rcb leg OK. Coordinator: sr95 also at sf/−40 after the current gate B; C6 line for boost-control level shift / break-before-make.
+- D60 (user): ratio row info-only + mismatch allotments, I_REF_btp +1.9 %; CT CM error amp in the CMFB loop; rcb kept. WO-27 dispatched (≤ 2 procs; the WO-26 gate B keeps running).
+- WO-27 agent stopped at the item-3 exit (exploration at tt/27 only, `regr/tt/WO-27-explore`; results/wo27/README.md):
+  - CM amp (3.85 / 7.66 µA): V_OCM systematic + 3σ = 63.3 mV base / 20.7 boost, against the 10 mV target. A_cm is only about 3. Passive-loop σ ≈ 18 mV, so the passive loop also fails 38 mV at 3σ.
+  - SR/ceiling 3σ rows fail: σ(I_tail) 3.4 % base / 2.4 % boost at A_VT 12.
+  - tb9 start-up fails: wrong charge on the sense node, Cr refresh τ ≈ 1 µs.
+  - No nominal f_cm / CM PM yet (loop-break issue).
+  - **Git:** the index holds the coordinator's D60/WO-27 files AND the agent's blobs (DESIGN.md, c1b_opac.py, sizes_draft.py). Commit with explicit paths once 1Password is unlocked. The rest of WO-27 is uncommitted in the working tree.
+  - User decisions pending: CMFB architecture, the SR/ceiling mismatch fix, and the V_OCM bound basis.
+- D61 (user): dual-path CMFB; larger reference area for SR/ceiling 3σ. WO-28 dispatched on top of the WO-27 working tree.
+- WO-28 code written, NOT run: 1Password is locked, which also blocks the sandbox ssh (signing via the 1P agent).
+  - Code: dual-path CMFB (slow gm-C integrator into bli, 2 pF MIM, +0.78 / 1.56 µA; WO-27 CM amp removed), tail unit 3.75/6 (9× area), start-up clamps on ctl/bli/outputs, new rows and broken copies.
+  - Hand estimates: V_OCM 3σ ≈ 6.5 mV; SR − 3σ 13.02 / 26.17 V/µs; ceiling + 3σ 19.52 / 38.46 µA.
+  - Planned commits and paths: results/wo28/README.md.
+  - Agent ran `python3 netlist.py` locally once (text generator only), a rule slip; noted.
+  - **Once unlocked:**
+    1. commit with explicit paths, in this order: D60/D61/WO-27/WO-28/INDEX/RESUME; then the WO-27 code + results/wo27; then the WO-28 code; then results/wo28;
+    2. follow the results/wo28/README pickup steps (sync, frozen copy, pytest, opac idx 0, tb9 0,2,3,4 + --mut, then 9 PVT).
+  - Expected user decision: f_cm likely < 9.4 MHz → Cc 0.3–0.4 pF or a CMFB split.
