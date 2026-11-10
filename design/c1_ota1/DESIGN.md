@@ -186,6 +186,16 @@ Everything except m_in is a 3.3 V device, so only m_in needs the D40 stress proo
   extraction is validated first on a hand-solvable behavioural loop (`fcm_hand`); the open copy keeps the `ctl` gate
   load with a dummy m_plc pair. Broken copies: `int_off` (bli = V_BL0, WO-26 passive loop) ⇒ V_OCM REJECT at ff/125 and
   (with ivbl0 ×2) tb9 start-up REJECT; `cc_div4` ⇒ f_cm REJECT and tb9 event REJECT.
+- **tb9 rows (WO-30, D63 basis; definitions in `c1b_tb9.py`):** CM judged at the sampling instants (end of each
+  half-phase: ph1 = integrate, ph2 = hold, where Cs2 samples x1), from the end of the first ph1 after each event,
+  ≤ 10 mV from the settled per-phase CM; static rows |CM_ss(ph2) − V_OCM| ≤ 10 mV and |CM_ss(ph1) − V_OCM| ≤ 28 mV
+  (CL-2 38 mV − 10 mV allotment); CM-to-DM twin row (ev vs ev0 without the CM step, at the ph2 ends after the CM step)
+  ≤ 0.256 µV = 0.1 × 5 ppm × 2 c1 VREF (S-model: a per-sample x1 error d is an input error d/(c1 VREF), INL in ppm of
+  FSR 2); diff step = the loop-bound worst step c1 (u_max + 1) VREF = 0.486 V; start-up clamp 8 T (D57: held while the
+  bias is invalid). The 22.5 ns value stays as info. Broken copies: `cc_div4`, CM-step n/p imbalance 1e-4 (CM-to-DM row),
+  `int_off` + vbl0×2 (start-up).
+- **Cc charge mode (WO-30):** a charge error on Cc (outputs vs `ctl`) is only removed by the Cr refresh, factor
+  ≈ Cc/(Cc + Cr) per cycle, τ ≈ T·Cc/Cr ≈ 1.1 µs at 4 MHz. The slow path does not act on it (it tracks `ctl`).
 
 ### 1.4 OTA chopper (D4/D18, E2) and vg island switches (M5, D51 Q1/Q4)
 
