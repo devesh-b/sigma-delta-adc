@@ -10,7 +10,7 @@ Source: the ttsky-pthomas session's summary of `repos/sd-analog/ttsky-sigma-delt
 - Separate `.noise` bench (tran has no device noise): tb7 is planned.
 
 ## Act now (C1/C1b)
-1. **ngspice determinism.** The sandbox PDK `.spiceinit` sets `num_threads=8` on a 6-core box, and we run 3–5 decks in parallel. He found that the OpenMP summation order changed results from machine to machine.
+1. **ngspice determinism (checked 2026-11-10: bit-identical on the sandbox, closed).** The sandbox PDK `.spiceinit` sets `num_threads=8` on a 6-core box, and we run 3–5 decks in parallel. He found that the OpenMP summation order changed results from machine to machine.
    - Action: rerun one gate B part and compare INL to the last digit. If it differs, set `num_threads=1` through a per-run `.spiceinit` in the deck cwd. This also removes CPU oversubscription.
    - Add `abstol`, `itl4` and a source R on ideal sources only if the rerun shows drift.
 2. **Bias start-up proof.** Ramp the rails with PWL in both orders (analog first, digital first), with no `.op` handing the bias its state. Check that no start-up leaker stays on after start-up: his "weak always-on" leaker injected 17 % error. Check that the start-up PMOS bulk goes to VDD. This joins REVIEW-C1b m7 and the start-up tb (items 11–15).
