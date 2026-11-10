@@ -384,10 +384,12 @@ def fcm_z(f, zc, zo):
     if not (m[i - 1] >= 1 > m[i]):
         raise ValueError("no CM unity crossing")
     fu = float(np.exp(np.interp(0.0, -np.log(m[i - 1:i + 1]), np.log(f[i - 1:i + 1]))))
-    ph = np.unwrap(np.angle(t_)) * 180 / np.pi
-    ph -= 360.0 * round(ph[0] / 360.0)
+    # WO-28 run 2: PM from the phase LAG at the crossing, lag in [0, 360). The old whole-sweep unwrap anchored at 1 Hz broke
+    # with the dual path: below f_z T is ~1/s^2 (phase near -180 deg, sign ambiguous at 1 Hz), giving PM = 447 deg.
+    a = float(np.interp(np.log(fu), np.log(f[i - 1:i + 1]), np.unwrap(np.angle(t_[i - 1:i + 1])))) * 180 / np.pi
+    lag = (-a) % 360.0
     tc = np.abs(t_ / (1.0 + t_))
-    return {"f_cm_MHz": fu / 1e6, "PM_cm_deg": 180.0 + float(np.interp(np.log(fu), np.log(f), ph)),
+    return {"f_cm_MHz": fu / 1e6, "PM_cm_deg": 180.0 - lag,
             "T_cm_dc_dB": 20 * math.log10(m[0]), "cm_peak_dB": 20 * math.log10(float(np.max(tc)))}
 
 
