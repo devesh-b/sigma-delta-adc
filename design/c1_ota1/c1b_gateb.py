@@ -73,7 +73,7 @@ def cm_at_release(out, tag):
 EP_TOL_PPM = 0.05   # endpoint agreement between parts [ppm of FSR 2]; WO-24 nom parts agree to ~0.008 ppm
 
 
-def combine(paths, k=None, tol_ppm=EP_TOL_PPM):
+def combine(paths, k=None, tol_ppm=EP_TOL_PPM, broken=False):
     """Combine --part slices (REVIEW-C1b m6). Asserts that every part has the same endpoints (u_in) and that their u_hat
     agree within tol_ppm (the endpoint conversions are the same codes / residues in each part; a part that drifted or a
     stale json fails here). Also checks the part set is complete (0..k-1, no duplicates) and that shared interior
@@ -91,20 +91,25 @@ def combine(paths, k=None, tol_ppm=EP_TOL_PPM):
             pts.setdefault(round(uin[j], 9), []).append((r["tag"], uh[j], j in (lo, hi)))
     eps = sorted({round(min(r["u_in"]), 9) for r in rows} | {round(max(r["u_in"]), 9) for r in rows})
     assert len(eps) == 2, f"endpoints differ between parts: {eps}"
-    spread = 0.0
+    spread, disagree = 0.0, []
     for u, lst in pts.items():
         vals = [v for _, v, _ in lst]
         sp = (max(vals) - min(vals)) / TB.FS_FULL * 1e6
         spread = max(spread, sp) if u in eps else spread
-        assert sp <= tol_ppm, f"u={u}: u_hat disagrees by {sp:.4f} ppm > {tol_ppm} across {[t for t, _, _ in lst]}"
         if u in eps:
             assert len(lst) == k, f"endpoint u={u} missing from some part"
+        if not sp <= tol_ppm:
+            msg = f"u={u}: u_hat disagrees by {sp:.4f} ppm > {tol_ppm} across {[t for t, _, _ in lst]}"
+            # WO-29 item 4: a broken copy (slew-limited, memory between conversions) may disagree at the endpoints;
+            # that is info there. A nominal combine still requires agreement.
+            assert broken, msg
+            disagree.append(msg)
     uu = np.array(sorted(pts)); uh = np.array([np.mean([v for _, v, _ in pts[u]]) for u in uu])
     union = TB.inl_gain(uu, uh)
     probs = [p for r in rows for p in r.get("problems", [])]
     inl = max(r["inl_ep_ppm"] for r in rows)
     healthy = not probs and all(math.isfinite(r["inl_ep_ppm"]) for r in rows)
-    return dict(n_parts=k, n_points=len(uu), endpoint_spread_ppm=spread, inl_ep_ppm=inl,
+    return dict(n_parts=k, n_points=len(uu), endpoint_spread_ppm=spread, inl_ep_ppm=inl, disagreement_info=disagree[:6],
                 inl_ep_union_ppm=union["inl_ep_ppm"], inl_bf_union_ppm=union["inl_bf_ppm"], problems=probs,
                 healthy=healthy, pass_gate=healthy and inl <= GATE, pass_share=healthy and inl <= GATE_SHARE)
 
@@ -142,7 +147,7 @@ def main():
         import glob
         fs = sorted(glob.glob(os.path.join(a.out, f"gb_{a.copy}_{a.opt}_N{a.n}_p*o{a.combine}.json")))
         try:
-            r = combine(fs, a.combine)
+            r = combine(fs, a.combine, broken=a.copy == "sr95")   # WO-29: broken copy: healthy parts > gate => REJECTED
         except AssertionError as e:
             print(f"COMBINE INVALID: {e}")
             sys.exit(2)

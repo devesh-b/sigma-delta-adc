@@ -92,7 +92,8 @@ MUTANTS = {("tt", 27): [("mutnc", "nc_short", "precision A0", False), ("mutrc", 
                         ("mtlo", "ibtp90", "SR", True), ("mthi", "ibtp112", "I_tail ceiling", True)],
            ("ff", 125): [("mvo", "int_off", "V_OCM", False)]}   # WO-28: slow path off -> passive loop
 # WO-27: f_cm broken copy (Cc / 4, boost, integrate load) with its loop-break helper; appended to the tt mutant deck
-MUTANTS[("tt", 27)] += [("mcc4", "cc_div4", "f_cm", True, "integ"), ("mcc4o", "cc_div4+cm_open", None, True, "integ")]
+# WO-29 (D62): f_cm is info, so mcc4 is a helper here (no verdict); its broken-copy role is the tb9 event rows (c1b_tb9)
+MUTANTS[("tt", 27)] += [("mcc4", "cc_div4", None, True, "integ"), ("mcc4o", "cc_div4+cm_open", None, True, "integ")]
 OPEN = {"mcc4": "mcc4o"}   # closed copy -> its cm_open twin (nominal pairs added in copies_for)
 TRACK = {"bkp": "blump", "bkt": "blump", "mkp5": "mkp0"}   # K_P tracking pairs: perturbed copy -> its reference copy
 DEVQ = ("gm", "gds", "gmbs", "id", "vdsat", "cgg", "cdd")
@@ -477,12 +478,15 @@ def cm_rows(grows, acmap):
             ld = [l_ for l_ in LOADS if abs(LOADS[l_] - cl) < 1e-18]
             if not res["PM_cm_deg"] >= PMCM_MIN:
                 fails.append(f"CM PM {res['PM_cm_deg']:.1f} deg < {PMCM_MIN:.0f}")
+            # D62: f_cm >= 9.4 MHz and f_z <= f_cm / 10 are info rows (tb9 transient CM settling is authoritative);
+            # CM PM and CM peaking stay gates
+            info = res.setdefault("info", [])
             if b and ld and ld[0] in FCM_LOADS and not res["f_cm_MHz"] * 1e6 >= FCM_MIN:
-                fails.append(f"f_cm {res['f_cm_MHz']:.2f} MHz < {FCM_MIN / 1e6:.1f} (boost, {ld[0]})")
+                info.append(f"f_cm {res['f_cm_MHz']:.2f} MHz < {FCM_MIN / 1e6:.1f} (boost, {ld[0]}; info, D62)")
             if not res["cm_peak_dB"] <= PEAK_MAX_DB:
                 fails.append(f"CM peaking {res['cm_peak_dB']:.2f} dB > {PEAK_MAX_DB:.0f}")
             if "f_z_MHz" in res and not res["f_z_MHz"] * FZ_RATIO <= res["f_cm_MHz"]:
-                fails.append(f"f_z {res['f_z_MHz']:.3f} MHz > f_cm / {FZ_RATIO:.0f}")
+                info.append(f"f_z {res['f_z_MHz']:.3f} MHz > f_cm / {FZ_RATIO:.0f} (info, D62)")
         except Exception as e:
             fails.append(f"f_cm analysis error {e!r}")
 
@@ -531,9 +535,15 @@ def main():
         cps = copies_for(c, t)
         if "--merged-open" in sys.argv:   # broken copy of the deck split: run-1 structure, helpers in the nominal deck
             groups = [(tag + "_merged", cps)]
-        else:   # WO-28 run 2: cm_open helpers in their own decks (per mode), never in the nominal deck
+        elif "--split-run2" in sys.argv:   # WO-28 run 2 structure (cm_open helpers per mode); ff/-40, sf/-40 fell to tran op
             groups = [(tag, [q for q in cps if q[3] != "cm_open"])] + [
                 (f"{tag}_open{m}", [q for q in cps if q[3] == "cm_open" and q[1] == bb]) for m, bb in (("b", False), ("f", True))]
+        else:   # WO-29 item 3: one closed copy + its cm_open twin per deck (small decks converge at the cold corners);
+            # the K_P tracking copies get their own deck (their reference blump is matched across decks by name)
+            byx = {q[0]: q for q in cps}
+            pairs = [x for x in byx if x in OPEN and OPEN[x] in byx]
+            groups = [(f"{tag}_{x}", [byx[x], byx[OPEN[x]]]) for x in pairs] + [
+                (f"{tag}_kp", [q for q in cps if q[0] not in pairs and q[0] not in OPEN.values()])]
         if mutant_copies(c, t):
             groups.append((tag + "_mut", mutant_copies(c, t)))
         grows, acmap = [], {}
