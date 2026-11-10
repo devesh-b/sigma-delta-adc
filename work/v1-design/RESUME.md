@@ -717,3 +717,11 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - **tb9:** the CM step settles to 5–7.5 mV, a pass. The switched-cap transient sits +129–167 mV (tt) / +34–42 mV (hot) off V_OCM, against +0.3–0.6 mV in the averaged op. The event rows fail; sulo start-up fails 14–34 mV. Undiagnosed: SC-vs-averaged model mismatch, or the slow path not converged by 1.5 µs.
   - Open: the cold-corner op falls back to transient op (ff/−40, sf/−40). C6 reference accuracy needs a budget line (base SR − 3σ only 2.1 % above the floor).
 - D62 (user): tb9 authoritative, f_cm info. WO-29 dispatched.
+- WO-29 (b583094, 760d618, 9e14bed, d04a2c6; results/wo29/README.md):
+  - **The tb9 offset was a testbench bug:** Cint was wired outp→inp, positive feedback, so the outputs latched. Fixed, with the old wiring kept as a broken copy.
+  - **D62 was based on the latched bench.** On the fixed bench the CM step misses (14–18 mV at 22.5 ns, against f_cm ≈ 5 MHz) → revisit with the user.
+  - The diff-step row measures slewing (needs redefinition).
+  - Reset-assert hot 25 mV, sulo start-up 14–34 mV and end-ph1 ripple 12 mV are undiagnosed.
+  - combine() broken-copy rule done and verified on the WO-26 sr95 parts.
+  - Cold-corner op split: the 9 PVT opac is still running in WO-29-9e14bed (markers DONE_{1,2,3}; summary via `c1b_opac.py --summary out/opac`).
+  - Gate B not launched.
