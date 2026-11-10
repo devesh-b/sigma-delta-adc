@@ -647,3 +647,15 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - **Once unlocked:**
   1. commit WO-24 work + the C1b-code review + D57 + RESUME in atomic commits;
   2. resume the WO-24 agent's run list: sync → frozen copy → pytest → revc_inl step 0 → kp sweep → opac → gate B smoke → full + sr95.
+
+## Update 2026-11-10 ~09:40 (1Password unlocked; WO-24 runs launched)
+- Committed WO-24 work: 95a8f42, 6ec3622, 5f6939c, a1a1fad, 84aca8c (untested code, review, D57, RESUME).
+- Frozen copy `regr/tt/WO-24-84aca8c`.
+- `s0.sh` → marker `S0DONE`: pytest (design+model) and revc_inl step 0 on r5 tables (`out/inl0` expect exit 0; `out/inl0_swap` with mutpcb2 table swapped to nominal, expect nonzero; `out/inl0_empty` expect nonzero).
+- `s1.sh` → marker `S1DONE`: kp sweep (`out/kp`, logs kp_a/kp_b) then op/AC (`out/opac`, logs opac_a/opac_b), 2 chains. CSVs deleted at end.
+- Next after S1DONE: gate B smoke (`c1b_gateb.py --n 64 --m 3 --deck-timeout 600`), then full N 1024 m 21 O1 in parts, then `--copy sr95`.
+- S0DONE: pytest 163 passed. revc_inl step 0: r5 tables exit 0 (27 nominal ACCEPT, mutpcb2 REJECTED at 9.855 ppm); mutpcb2 swapped to the nominal table → mutant PASSED (blind) → exit 1; empty dir → exit 1. Fix 7 verified.
+- Gate B smoke: first run exposed control-mode `meas ... par()` failure → fixed with `let` vectors (8ef9a7e), new frozen copy `regr/tt/WO-24-8ef9a7e`. Rerun clean (problems []); N64 INL 10.5 ppm is not gate-relevant. Out CM at release: dummy 2.61 V (start-up), then 1.538/1.553/1.551 V; island CM 1.19–1.20 V. Note the ≈ +40–50 mV out-CM offset vs V_OCM for the CMFB rows.
+- `s3.sh` in WO-24-8ef9a7e → `S3DONE`: gate B nom N1024 m21 O1, 6 parts (3 parallel × 2), logs `out/gb_p<i>o6.log`. Combine = max INL over parts after checking endpoint agreement (same endpoint conversions in every part). Then `--copy sr95`.
+- s1 (kp sweep → opac) still running in WO-24-84aca8c.
+- S1DONE (kp sweep + op/AC): see `results/wo24/README.md`. Netlisted precision A0 fails at fs/−40 (79.47 dB) and ff/−40 (80.23 dB); ff/125 I_fold/I_tail 1.192. Spot deck: K10 alone ≥ 82 dB; D55 adds 0.5–0.7 dB but lowers f_cm. Boost fp2/GBW at the real load is 1.08–1.61 (below the WO-22 window). β1 0.831–0.845. All of this goes to the user with the gate B result.

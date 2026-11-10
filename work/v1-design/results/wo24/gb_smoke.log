@@ -1,0 +1,7 @@
+  reset release 0 (dummy, discarded): out CM 2.6085 V, island CM 1.1984 V
+  reset release 1: out CM 1.5378 V, island CM 1.1920 V
+  reset release 2: out CM 1.5528 V, island CM 1.1987 V
+  reset release 3: out CM 1.5508 V, island CM 1.1987 V
+gb_nom_O0_N64 ('fs', 125, 3.0): INL ep 10.471 ppm (gate 5.0, share 3.33) runtime 87s problems []
+VERDICT REJECT
+EXIT=1
