@@ -666,3 +666,6 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - WO-25 written (wo/WO-25-C1b-ref-fix.md). Dispatch once sandbox reachable (local DNS cannot resolve mempool.lan; network changed).
 - 2026-11-10 11:55: sandbox reachable again (VPN off). sr95 broken copy launched in WO-24-8ef9a7e (s5.sh → S5DONE, logs out/gbsr_p*.log). WO-25 items 1–4 dispatched to an Opus design agent (it does not touch item 0).
 - pthomas learnings triaged → `LEARNINGS-pthomas-2026-11-10.md`. Determinism check s6.sh (WO-24-8ef9a7e, S6DONE): two identical smoke runs at PDK num_threads=8; compare INL digits.
+- WO-25 agent done (7de6857, d07bd49, f83d326; results/wo25/README.md). D58 applied, D55 reverted. Precision A0 ≥ 80.3 at all 9 PVT (min 80.43 fs/−40, margin 0.13 dB); I_vdd 52–56 / 106–111 µA. **I_tail ±3 % exit fails at 5/9** (−4.2 % cold, +4.2 % ff/125 boost; composite ratio drifts with T) → user decision. kp_fixed broken copy blind on the K_P row (A0 row catches it). V_OCM error up to +58.8 mV hot. combine() verified (endpoint spread 0.0097 ppm; broken copies exit 2).
+- WO-25 gate B queued on sandbox: starts when WO-24 sr95 writes S5DONE; marker `WO-25-d07bd49/GB_DONE`, verdict `out/gb/combine.out`. Reviewer pass on WO-25 running.
+- Note: the frozen copy needs `golden/` for model/tests/test_golden.py (33 errors there are a copy artefact).
