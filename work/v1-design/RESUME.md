@@ -716,3 +716,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - **Boost f_cm 4.1–7.0 MHz < 9.4 at all corners** → user decision.
   - **tb9:** the CM step settles to 5–7.5 mV, a pass. The switched-cap transient sits +129–167 mV (tt) / +34–42 mV (hot) off V_OCM, against +0.3–0.6 mV in the averaged op. The event rows fail; sulo start-up fails 14–34 mV. Undiagnosed: SC-vs-averaged model mismatch, or the slow path not converged by 1.5 µs.
   - Open: the cold-corner op falls back to transient op (ff/−40, sf/−40). C6 reference accuracy needs a budget line (base SR − 3σ only 2.1 % above the floor).
+- D62 (user): tb9 authoritative, f_cm info. WO-29 dispatched.

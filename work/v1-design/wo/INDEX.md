@@ -35,3 +35,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-26 C1b part 2b (D59 parallel 1:8 refs, K_P 12.5, replica fix, SR/K_P/V_OCM rows, gate B 4 corners): dispatched 2026-11-10
 - WO-27 C1b part 2c (D60 recentre, CM error amp, tb9, mismatch allotments, review minors): dispatched 2026-11-10
 - WO-28 C1b part 2d (D61 dual-path CMFB, larger refs, tb9 start-up fix, WO-27 leftovers): dispatched 2026-11-10
+- WO-29 C1b part 2e (D62 rows, tb9 SC CM offset diagnosis, cold-corner op, combine() broken-copy rule, gate B on WO-28 netlist): dispatched 2026-11-10
