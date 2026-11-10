@@ -124,8 +124,7 @@ def copy_lines(x, boost, cl, sub, mut=None):
           f"Bip_{x} inp_{x} 0 V = V(icm) + 0.5*(V(d) - max(min(V(s_{x})/1000, 0.3), -0.3))",
           f"Bin_{x} inn_{x} 0 V = V(icm) - 0.5*(V(d) - max(min(V(s_{x})/1000, 0.3), -0.3))",
           f"Bs_{x} 0 s_{x} I = 1e-3*(V(outp_{x}) - V(outn_{x}))", f"Rs_{x} s_{x} 0 1e12", f"Cs_{x} s_{x} 0 1e9",
-          f".nodeset v(s_{x})=0 v(outp_{x})={S.V_OCM} v(outn_{x})={S.V_OCM} v(x{x}.ctl)={vd_val(x) - 1.1:.3f} v(x{x}.bli)={vd_val(x) - 1.1:.3f}"
-          + (f" v(x{x}.ctlg)={vd_val(x) - 1.1:.3f}" if "cm_open" in NL.toks(mut) else ""),   # run 2: cold-corner op aid (ctl ~ VDD - 1.1 V)
+          f".nodeset v(s_{x})=0 v(outp_{x})={S.V_OCM} v(outn_{x})={S.V_OCM}",
           f"Icmp_{x} 0 outp_{x} dc 0 ac 1e-6", f"Icmn_{x} 0 outn_{x} dc 0 ac 1e-6",   # WO-27 CM injection (f_cm)
           f"Bcmo_{x} cmo_{x} 0 V = 0.5*(V(outp_{x})+V(outn_{x}))"]
     pc = S.SIZES["m_plc"]   # V_BL0 ratio probe: m_plc copy, gate ivbl0, drain forced to V(sa), own supply
@@ -158,7 +157,7 @@ def mutant_copies(c, t):
 
 def deck(c, t, v, tag, copies):
     VDD_NOW["v"] = v
-    L = [f"* WO-25 c1b_opac {tag}", f".lib {LIB} {c}", f".temp {t}", ".option gmin=1e-15 reltol=1e-6 itl1=500",
+    L = [f"* WO-25 c1b_opac {tag}", f".lib {LIB} {c}", f".temp {t}", ".option gmin=1e-15 reltol=1e-6",
          f"Vicm vicm 0 {S.V_ICM}", f"Vicm2 icm 0 {S.V_ICM}", f"Vocm vocm 0 {S.V_OCM}", "Vlv lv 0 1.8", "Vd d 0 dc 0 ac 1"]
     subs = {}
     for x, b, cl, mut in copies:
