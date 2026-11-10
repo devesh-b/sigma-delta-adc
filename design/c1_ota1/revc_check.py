@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """C1a rev C spot check (WO-23; NOT a C1b gate). Sandbox only:
     python revc_check.py OUTDIR k   CORNER_IDXS     # K / swing / GBW variant sweep: .op + .ac, no DC
+    python revc_check.py OUTDIR kp   CORNER_IDXS    # WO-24 step 1 (RC-M1): K_P base {8..11} x m_plc {15/2, 30/4}, base
+                                                     # .op + .ac; hot corners add boost K_P 7 copies of both m_plc
     python revc_check.py OUTDIR tab  CORNER_IDXS    # rev C sizes, base + boost: .op + .ac + A(v) DC table +-1.8 V
 
 CORNER_IDXS = comma list into CORNERS9. Every corner/copy prints one json line; tab mode writes avtab_<corner>.json
@@ -55,6 +57,17 @@ MUT = {"m_pl": dict(L=0.5), "m_plr": dict(L=0.5)}   # CL-1b broken copy (ref fol
 # Run 3: this copy only drops A0 by 4-7 dB (the PMOS cascode still multiplies ro_pl) and PASSED the INL gate (blind
 # copy, 3.02 ppm vs 3.33 at ss/125 boost). Added a destructive copy: PMOS cascodes shorted D-S (as rev B's m_nc short).
 MUT_PC = {"_short": "pc"}
+# WO-24 step 1: m_plc options. "30/4" = D55 (same W/L, L 2 -> 4) with Cc 0.2 pF, Cr 50 fF; "15/2" = rev C, Cc 0.1, Cr 25 fF.
+PLC = {"p15": ({"m_plc": dict(WF=5, M=3, L=2.0)}, 0.10e-12, 0.025e-12),
+       "p30": ({"m_plc": dict(M=6, L=4.0)}, 0.20e-12, 0.05e-12)}
+assert PLC["p15"][0]["m_plc"] != PLC["p30"][0]["m_plc"]   # REVIEW-C1b M3: p15 must not rebuild the D55 device
+C_L_INT = 0.77e-12   # DESIGN.md 1.3 / 2.1: C_L seen by the CM loop (output-node part)
+
+
+def kp_current(K):
+    """vbpc diode current for density factor K_P against m_pc (m_bpc 1.25/7 vs m_pc 80/2: K = 224 * I/I_NC)."""
+    wl = lambda d: d["WF"] * d["M"] / d["L"]
+    return K * S.I_NC * wl(S.SIZES["m_bpc"]) / wl(S.SIZES["m_pc"])
 
 
 def mos(name, d, g, s, b, p):
@@ -69,6 +82,8 @@ def ota(sfx, vdd, bst, z):
     n = lambda x: x if x in ("0", "vdd", "vpc") else f"{x}_{sfx}"
     X = lambda nm, d, g, s_, b, k: mos(f"X{nm}{sfx}", n(d), n(g), n(s_), n(b), z[k])
     I = {k: v * bst * (S.BOOST_SCALE.get(k, 1.0) if bst > 1 else 1.0) for k, v in S.I_REF.items()}
+    if "_kp" in z:   # K_P set by the diode current (per mode), not by S.I_REF / BOOST_SCALE
+        I["vbpc"] = bst * kp_current(z["_kp"])
     return [X("tr", "btp", "btp", "vdd", "vdd", "m_tr"), f"Itr{sfx} {n('btp')} 0 {I['btp']:.6e}",
             X("t", "tail", "btp", "vdd", "vdd", "m_t"),
             X("in1", "da", "gp", "tail", "tail", "m_in"), X("in2", "db", "gm", "tail", "tail", "m_in"),
@@ -214,7 +229,11 @@ def main():
     for ci in idx.split(","):
         c, t, v = CORNERS9[int(ci)]
         tag = f"{mode}_{c}_{t}_{v}".replace("-", "m").replace(".", "p")
-        if mode == "k":
+        if mode == "kp":
+            copies = [(f"K{K}{p}", 1.0, sz(dict(PLC[p][0], _kp=K))) for K in (8, 9, 10, 11) for p in PLC]
+            if (c, t) in HOT:
+                copies += [(f"B7{p}", 2.0, sz(dict(PLC[p][0], _kp=7))) for p in PLC]
+        elif mode == "k":
             if (c, t) in HOT:
                 copies = [(nm, 2.0, sz(o)) for nm, o in VARIANTS.items()]
             else:
@@ -246,6 +265,14 @@ def main():
                     res.update({kk: tb[kk] for kk in ("vmax", "sym_dB", "Amin_1p4_dB") if kk in tb})
                     tabs[sfx] = dict(tb, corner=c, temp=t, vdd=v, boost=bst, mutant=sfx.startswith("mut"), info=sfx.startswith("var"),
                                      cmfb="ideal B-source (C1b: real SC CMFB)", A0_ac_dB=res.get("A0_dB"))
+                if mode == "kp":
+                    p = sfx[-3:]
+                    cc, cr = PLC[p][1], PLC[p][2]
+                    cg = abs(vals.get(par("plc1" + sfx, z["m_plc"]["dev"], "cgg").lower(), float("nan")))
+                    gmp = abs(vals.get(par("plc1" + sfx, z["m_plc"]["dev"], "gm").lower(), float("nan")))
+                    res["Cc_fF"], res["Cr_fF"], res["cgg_plc_fF"] = cc * 1e15, cr * 1e15, cg * 1e15
+                    res["fcm_hand_MHz"] = gmp * (cc / (cc + cg)) / (2 * math.pi * C_L_INT) / 1e6
+                    res["vbpc_I_uA"] = bst * kp_current(z["_kp"]) * 1e6
                 if bst == 2.0 and (c, t) in HOT and not res["span"] >= 1.40:
                     fails.append(f"span {res['span']:.3f} < 1.40")
             except Exception as e:

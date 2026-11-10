@@ -1,4 +1,4 @@
-"""C1a OTA1 SIZES, rev C (WO-23). Fully differential folded cascode, PMOS pfet_01v8 input pair on 3.3 V.
+"""C1 OTA1 SIZES, rev C + WO-24 (C1b part 1) candidate. Fully differential folded cascode, PMOS pfet_01v8 input pair on 3.3 V.
 
 Status legend per entry (the "src" field):
   hand  = hand-derived in design/c1_ota1/DESIGN.md, not yet simulated
@@ -17,6 +17,14 @@ Rev C (WO-23) vs rev B:
   - reference diodes of the mirrors at 1:32 (CL-7 relaxed toggle settling, D53), narrow single fingers;
   - CMFB split derived from LOAD_FIXED (was CMFB_SPLIT 0.5, inconsistent: RB-m3);
   - chopper input switch W 4 (was 2.0 here, 4 in the note: RB-m3); island switch = shunt to V_ICM (RB-m4).
+
+WO-24 (REVIEW-C1a-revC RC-M1 / RC-M2, D55, D56; src "hand" until the WO-24 sweep / netlisted op confirm it):
+  - K_P base 8 -> 10 (vbpc base I_NC/22.4); boost stays at K_P 7 (BOOST_SCALE vbpc 0.7, CL-8 increment x1.4);
+  - D55 (user): m_plc 15/2 -> 30/4 (WF 5 M 6 L 4, same W/L), Cc 0.1 -> 0.2 pF, Cr 25 -> 50 fF;
+  - RC-M2: the 1:32 mirror references (m_tr, m_nr, m_plr) are series-parallel composites of REF_COMPOSITE unit fingers
+    (same WF and L as the mirror finger): P in parallel x S in series -> W/L of one finger, 16 x the gate area (sigma/4);
+  - V_BL0 replica = VBL0_SERIES m_plc fingers in series (ratio M_plc x VBL0_SERIES : 1), current I_REF["vbl0"];
+  - netlist: design/c1_ota1/netlist.py builds the subckt from this file (no sizes live in the generator).
 """
 
 BOOST = 2.0
@@ -33,7 +41,8 @@ V_ICM = 1.20       # island / input CM [V]; src hand (D34 range 1.1-1.3)
 V_OCM = 1.50       # output CM [V]; src hand
 V_PC = 0.0         # protection-cascode gate [V] (VSS); src hand, M3
 K_BIAS_N = 8.0     # NMOS cascode bias density factor; src op (WO-23 K sweep)
-K_BIAS_P = 7.0     # PMOS cascode bias density factor in BOOST (geometry L 7 at I_NC/16); BASE runs at 8 (I_NC/28); src op
+K_BIAS_P = 10.0    # WO-24: base K_P 10 (RC-M1), boost K_P 7 (BOOST_SCALE vbpc 0.7); rev C was 8 base / 7 boost. Old note:
+                   # PMOS cascode bias density factor in BOOST (geometry L 7 at I_NC/16); BASE runs at 8 (I_NC/28); src op
                    # (run 3 K 6: m_pl 0.015-0.107 V; run 4 K 7 / K 8 rows; WO-23 K run 2: K 4 -> m_pl in
                    # triode by 0.04-0.06 V, K 5 -> +0.01-0.04 V; the narrow W 1.25 diode tracks weaker than the rev B finger copy)
 LOAD_FIXED = 0.75  # share of the load current in the fixed mirror half m_pl
@@ -46,13 +55,13 @@ I_REF = dict(            # base reference currents [A]; boost x2. src hand (sett
     bn=I_SINK / RATIO,                  # sink reference m_nr          0.781 uA
     bp=I_NC * LOAD_FIXED / RATIO,       # fixed-load reference m_plr   0.369 uA
     vbnc=I_NC / RATIO,                  # NMOS cascode bias diode      0.492 uA
-    vbpc=I_NC / 28,                     # PMOS cascode bias diode      0.562 uA base -> K_P 8 base (WO-23 run 4)
-    vbl0=I_NC * CMFB_SPLIT / RATIO,     # V_BL0 replica of the CMFB load section (CMFB refresh level) 0.123 uA; src hand
+    vbpc=I_NC / 22.4,                   # PMOS cascode bias diode      0.702 uA base -> K_P 10 base (WO-24, RC-M1); src hand
+    vbl0=None,                          # V_BL0 replica current, set below from the m_plc geometry
 )
 # Per-reference boost scale on top of BOOST (default 1). vbpc: boost current = 2 x 0.875 x I_NC/28 = I_NC/16
 # -> K_P 7 in boost. Run 4: one K cannot serve both modes: K_P 7 leaves m_pl 0.043/0.049 V at fs/-40 and ff/-40 BASE,
 # K_P 8 cuts the ss/125 BOOST span to 1.355 V (< 1.40). Base has >= 1.8 V span, so base runs at K 8, boost at K 7.
-BOOST_SCALE = dict(vbpc=0.875)
+BOOST_SCALE = dict(vbpc=0.7)   # WO-24: boost current = 2 x 0.7 x I_NC/22.4 = I_NC/16 -> K_P 7 in boost (CL-8: x1.4 step)
 I_VCM_SRC = dict(vicm=1.0e-6, vocm=1.0e-6)   # V_ICM / V_OCM source allowance per OTA1 [A], NOT boosted; src open (C6)
 
 # Devices. Rev C. REV_B / REV_A keep earlier sizes for comparison.
@@ -70,7 +79,7 @@ SIZES = dict(
     m_pc=dict(dev="pfet_g5v0d10v5", WF=5,   M=16, L=2.0, src="op"),   # PMOS cascodes W 80 L 2 (rev C, was 40/2)
     m_pl=dict(dev="pfet_g5v0d10v5", WF=2.5, M=32, L=4.0, src="op"),  # PMOS load, fixed half (75 %), W 80 L 4, 32 unit fingers
     m_plr=dict(dev="pfet_g5v0d10v5", WF=2.5, M=1, L=4.0, src="op"),   # fixed-load reference = 1 unit finger (1:32)
-    m_plc=dict(dev="pfet_g5v0d10v5", WF=5,  M=3,  L=2.0, src="op"),   # PMOS load, CMFB section (25 %), W 15 L 2
+    m_plc=dict(dev="pfet_g5v0d10v5", WF=5,  M=6,  L=4.0, src="hand"), # PMOS load, CMFB section (25 %), W 30 L 4 (D55; rev C 15/2)
     m_bnc=dict(dev="nfet_g5v0d10v5", WF=0.625, M=1, L=16.0, src="op"),  # NMOS cascode bias diode at I_NC/32: K_N 8
     m_bpc=dict(dev="pfet_g5v0d10v5", WF=1.25, M=1, L=7.0, src="op"),    # PMOS cascode bias diode at I_NC/32: K_P 7
 )
@@ -100,8 +109,15 @@ C_L = 1.4e-12      # per side, loaded, incl. feedback network and CMFB caps (SPE
 BETA1 = 0.84       # SPEC (CL-4 proposal >= 0.83); design value 0.846 (Cp_vg 0.23 pF, DESIGN.md 2.2)
 
 # SC CMFB (DESIGN.md 1.3); src hand, all open until the C1b CMFB tb. Drives m_plc only (CMFB_SPLIT of the load).
-C_CMFB_SENSE = 0.10e-12     # Cc per side, output -> CMFB control node (inside C_L)
-C_CMFB_REFRESH = 0.025e-12  # Cr per side, switched between (V_OCM, V_BL0) and (out, ctl) every phase
+C_CMFB_SENSE = 0.20e-12     # Cc per side, output -> CMFB control node (inside C_L); D55 (rev C 0.10)
+C_CMFB_REFRESH = 0.05e-12   # Cr per side, switched between (V_OCM, V_BL0) and (out, ctl) every cycle; D55 scaled (rev C 25 fF)
+CMFB_SW = dict(n=dict(dev="nfet_g5v0d10v5", W=1.0, L=0.5), p=dict(dev="pfet_g5v0d10v5", W=2.0, L=0.5), src="hand")  # TG, 3.3 V
+CTL_RST = dict(dev="pfet_g5v0d10v5", W=1.0, L=0.5, src="hand")   # ctl -> V_BL0 clamp while rst (gate rst_b low = closed)
+
+# RC-M2 composite references and the V_BL0 replica (see docstring)
+REF_COMPOSITE = dict(P=4, S=4)   # parallel x series unit fingers per 1:32 reference (m_tr, m_nr, m_plr)
+VBL0_SERIES = 5                  # m_plc fingers in series in the V_BL0 replica diode
+I_REF["vbl0"] = I_NC * CMFB_SPLIT / (SIZES["m_plc"]["M"] * VBL0_SERIES)   # 0.131 uA base (1:30 density match)
 
 # Chopper and vg switches (DESIGN.md 1.4), 3.3 V devices with 3.3 V clocks (M5)
 CHOP_SW = dict(
