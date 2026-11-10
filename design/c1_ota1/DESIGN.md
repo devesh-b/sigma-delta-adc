@@ -1,6 +1,8 @@
-# C1a: OTA1 + CMFB design note, rev C (WO-23; rev B WO-21 below)
+# C1a/C1b: OTA1 + CMFB design note, rev C (WO-23) + WO-24 netlist candidate (rev B WO-21 below)
 
-Status: rev B for `sd-adc-design-reviewer`, before any schematic. Rev A was WO-20; this revision answers REVIEW-C1a-2026-11-09 (M1–M8, m1–m7) under D51 and SPEC CL-1 to CL-4. SPEC v1 is frozen and is not edited here; proposed change-log entries are in §6.
+**Status (2026-11-10, WO-24).** Rev C passed REVIEW-C1a-revC with conditions (RC-M1..M3). The file of record is `sizes_draft.py`; this note follows it. Current candidate (WO-24, src "hand" until the WO-24 sweep and netlisted op confirm it): pair 120/0.5 (D54); m_pc 80/2; **m_plc 30/4 with Cc 0.2 pF, Cr 50 fF (D55)**; cascode-bias diodes m_bnc 0.625/16 (K_N 8) and m_bpc 1.25/7 run at **K_P 10 base (I_NC/22.4) / K_P 7 boost (BOOST_SCALE 0.7, step ×1.4, CL-8)** (RC-M1); all mirrors 1:32 unit-finger with **composite 4 × 4 references (RC-M2)**; C_FOLD_EXTRA = 0 (D56, RC-m7). Netlist: `netlist.py` (ad/as/pd/ps, composite references, fold chopper, 3.3 V input chopper and island shunts, real SC CMFB, clock ports); op/AC tb `c1b_opac.py`; gate B driver `c1b_gateb.py`.
+
+History: rev B was written for `sd-adc-design-reviewer`, before any schematic. Rev A was WO-20; this revision answers REVIEW-C1a-2026-11-09 (M1–M8, m1–m7) under D51 and SPEC CL-1 to CL-4. SPEC v1 is frozen and is not edited here; proposed change-log entries are in §6.
 
 **Evidence tags.** HAND = hand calculation (formula and inputs given). SIM = WO-21 spot run on the sandbox, **not a C1b gate**:
 - `python design/c1_ota1/op_ac_check.py OUT <corner indexes>`; logs `/home/mempool/regr/tt/WO-21/r1{a,b,c,d}.log`, json `r1/op_ac_revb_*.json`. 9 PVT points (tt/27/3.3, ss/−40/3.0, ss/125/3.0, fs/125/3.0, sf/125/3.0, ff/−40/3.6, ff/125/3.6, fs/−40/3.0, sf/−40/3.0) × base and boost. Rev B sizes, Vdsat-tracking cascode biases, m_pp gate at 0 V, CMFB = ideal B-source on the CMFB load section only, C_L = 1.4 pF per side.
@@ -20,7 +22,7 @@ Evidence: SIM = `design/c1_ota1/revc_check.py` (spot run, **not a C1b gate**; id
 
 | item | rev B | rev C | evidence |
 |---|---|---|---|
-| RB-M1 cascode-bias diodes | 5/16 and 5/10 single fingers, run at I_nc/4, I_nc/8 | **m_bnc 0.625/16 (K_N 8), m_bpc 1.25/6 (K_P 6 nominal)**, both at **I_nc/32** | SIM run 2/3 |
+| RB-M1 cascode-bias diodes | 5/16 and 5/10 single fingers, run at I_nc/4, I_nc/8 | **m_bnc 0.625/16 (K_N 8) at I_nc/32; m_bpc 1.25/7, K_P 8 base (I_nc/28) / 7 boost (I_nc/16)** (run 5; WO-24: K_P 10 base, I_nc/22.4) | SIM run 2–5 |
 | Mirror references | 1:4 copies (spot deck) | **1:32 unit-finger**: m_t 1.25/2 ×32 + m_tr ×1, m_n 2.25/4 ×32 + m_nr ×1, m_pl 2.5/4 ×32 + m_plr ×1 (same total W) | SIM run 2: I_fold/I_tail 1.27–1.36 |
 | Swing (Q2) | m_pc 40/2 | **m_pc 80/2** | SIM, below |
 | CMFB split | CMFB_SPLIT 0.5 vs LOAD_FIXED 0.75 | derived 0.25 (RB-m3) | sizes_draft.py |
@@ -92,16 +94,18 @@ Per side: tail → input → protection cascode → fold node → NMOS cascode �
 
 | device | type | W/L (µm) | role |
 |---|---|---|---|
-| m_t | pfet_g5v0d10v5 | 40/2 | tail, I_TAIL 18.5 µA (37 boost) |
-| m_in | **pfet_01v8**, bulk = tail | **80/0.5** (8 × 10) | input pair |
+| m_t | pfet_g5v0d10v5 | 40/2 (32 × 1.25/2) | tail, I_TAIL 18.5 µA (37 boost) |
+| m_tr | pfet_g5v0d10v5 | composite 4 ∥ × 4 series of 1.25/2 | tail reference, 1:32 (RC-M2) |
+| m_in | **pfet_01v8**, bulk = tail | **120/0.5** (12 × 10) | input pair (D54) |
 | m_pp | pfet_g5v0d10v5 | 10/0.5 | protection cascode, **gate = VSS (V_PC 0 V)** |
-| m_n | nfet_g5v0d10v5 | **72/4** | fold sinks, I_SINK = 1.35·I_TAIL |
+| m_n / m_nr | nfet_g5v0d10v5 | **72/4** (32 × 2.25/4) / composite 4 × 4 of 2.25/4 | fold sinks, I_SINK = 1.35·I_TAIL; reference 1:32 |
 | m_nc | nfet_g5v0d10v5 | **20/2** | NMOS cascode |
-| m_pc | pfet_g5v0d10v5 | **40/2** | PMOS cascode |
-| m_pl | pfet_g5v0d10v5 | **80/4** | load, fixed mirror half, 75 % of I_LOAD |
-| m_plc | pfet_g5v0d10v5 | **15/2** | load, CMFB section, 25 % of I_LOAD, gate = ctl |
-| m_bnc | nfet_g5v0d10v5 | 5/16 diode | m_nc gate bias (K_N 8) |
-| m_bpc | pfet_g5v0d10v5 | 5/10 diode | m_pc gate bias (K_P 5) |
+| m_pc | pfet_g5v0d10v5 | **80/2** | PMOS cascode |
+| m_pl / m_plr | pfet_g5v0d10v5 | **80/4** (32 × 2.5/4) / composite 4 × 4 of 2.5/4 | load, fixed mirror half, 75 % of I_LOAD; reference 1:32 |
+| m_plc | pfet_g5v0d10v5 | **30/4** (6 × 5/4) | load, CMFB section, 25 % of I_LOAD, gate = ctl (D55; rev C 15/2) |
+| m_bl0 | pfet_g5v0d10v5 | 5 series m_plc fingers (5/20) | V_BL0 replica diode, I_NC·0.25/30 = 0.131 µA base |
+| m_bnc | nfet_g5v0d10v5 | 0.625/16 diode | m_nc gate bias, I_NC/32 (K_N 8) |
+| m_bpc | pfet_g5v0d10v5 | 1.25/7 diode | m_pc gate bias, I_NC/22.4 base (K_P 10) / I_NC/16 boost (K_P 7) |
 
 Everything except m_in is a 3.3 V device, so only m_in needs the D40 stress proof.
 
@@ -116,21 +120,22 @@ Everything except m_in is a 3.3 V device, so only m_in needs the D40 stress proo
 - m_pl margin by K:
   - K 4: 0.07…0.15 V
   - K 6: 0.16…0.34 V
-- Chosen **K_N 8, K_P 5**. In-OTA SIM gives m_n 0.09–0.22 V and m_pl 0.11–0.25 V above Vdsat at every point (§2.4 table).
-- Diode currents: I_nc/4 (NMOS) and I_nc/8 (PMOS) in the spot deck. Final ratios are in §2.9.
+- Rev B chose K_N 8, K_P 5 at I_nc/4 and I_nc/8 diode currents (§2.4 table is rev B).
+- **Rev C / WO-24:** diodes at I_nc/32 with narrow geometry (m_bnc 0.625/16, K_N 8; m_bpc 1.25/7). K_P is split by mode through the diode current only (one device, ratioed densities, RC-m1): **K_P 10 base** (RC-M1, A0 sits on the m_pl soft-saturation edge at K_P 8) and **K_P 7 boost** (span ≥ 1.40 V at ss/125). The vbpc step on a boost toggle is ×1.4 (CL-8), not ×2.
 
 ### 1.3 SC CMFB (D40b, m2)
 
-- **Sense caps:** C_c = 0.1 pF per side, from the output to `ctl`.
-- **Refresh caps:** C_r = 25 fF per side.
-- **CMFB device:** `ctl` drives only m_plc, a 15/2 PMOS section carrying 25 % of I_LOAD. The fixed 80/4 half takes its gate from a mirror diode.
+- **Sense caps:** C_c = **0.2 pF** per side (D55; rev C 0.1 pF), from the output to `ctl`.
+- **Refresh caps:** C_r = **50 fF** per side (scaled with C_c).
+- **Switches:** transmission gates (n 1/0.5 + p 2/0.5, 3.3 V, complementary level-shifted clocks): ctl sits ≈ 1.9–2.4 V, where a 3.3 V-gated NMOS alone is weak.
+- **CMFB device:** `ctl` drives only m_plc, now a **30/4** PMOS section (D55, rev C 15/2) carrying 25 % of I_LOAD. The fixed 80/4 half takes its gate from a mirror diode. The rev B/C numbers below are for 15/2; with 30/4 the section Cgg is ≈ 4× larger, which is why C_c doubles (RC-m2: f_cm ≈ 5.1 MHz base / 8 MHz boost, tb9 needs ≥ 9.4 MHz in boost; options Cc 0.25–0.3 pF or m_plc L 3).
   - The section's Cgg is ≈ 30 fF, so k = C_c/(C_c + C_g) ≈ 0.77.
   - HAND f_cm = gm_plc·k/(2π·C_L,int) with gm_plc ≈ 45 µS base gives ≈ 7 MHz base (C_L,int 0.77 pF, §2.1) and ≈ 11 MHz boost.
 - **Phases (m2):** C_r is switched onto (V_OCM, V_BL0) in OTA1's **integrate** phase and onto (out, ctl) in OTA1's **hold** phase. So Cr refresh ≠ Cs2 sample phase, as the review asks. Cs2 samples x1 in hold (D25), and that hold-phase kick is covered by CL-2 (shorted Cs2 plates, ≤ 10 mV).
 - **Range (SIM):** ctl = VAPWR − (0.93…1.42) V over all points, i.e. Vsg,plc 0.92–1.42 V. V_BL0 must come from a replica of m_plc at 25 % of I_LOAD, not from a fixed voltage, so that the SC loop only corrects mirror error.
   - Mirror error budget: sink ±5 % and fixed load ±5 % move the section current from 3.9 µA to 2.1–5.8 µA (54–147 %). It stays positive, so the loop does not run out of range.
 - **ro cost (HAND):** ro ∝ L/I. Load ro (80/4 at 75 %) ∥ section ro (15/2 at 25 %) = 0.80 × a full 107/4 load, so R_up −1.9 dB. With R_dn/R_up ≈ 1.6–1.8 (SIM), this costs **A0 ≈ −1.2 dB**. This is included in the SIM A0.
-- **Start-up:** `ctl` is clamped to V_BL0 by the reset switch while rst_n is low (same default-closed rule as §2.8).
+- **Start-up:** `ctl` is clamped to V_BL0 by the reset switch while rst_n is low or the bias is invalid (same default-closed rule as §2.8). **The clamp is start-up only (D57 Q1):** it is tied to global rst_n / bias-invalid, not to the per-conversion reset. The CMFB keeps running through every conversion reset, and gate B decks model it that way (`rstb` low only for the first nrst−1 cycles, one discarded dummy first conversion).
 
 ### 1.4 OTA chopper (D4/D18, E2) and vg island switches (M5, D51 Q1/Q4)
 
@@ -153,6 +158,7 @@ Everything except m_in is a 3.3 V device, so only m_in needs the D40 stress proo
   - 10 % mismatch into Cint 4 pF gives ≈ 60 µV constant residue, against ≤ 1 mV ✓.
   - Signal dependence: dQ/dvg = W·L·Cox ≈ 6 fF/V times the vg excursion (≤ x/A0 ≈ 0.1 mV) gives ≪ 1 µV ✓.
 - **Noise:** 4kT·2.5 kΩ is 6.4 nV/√Hz per gate, i.e. ≈ 9 nV/√Hz diff against the OTA's ≈ 28 nV/√Hz. That adds ≈ +5 % in power.
+- **Info row (D57 Q3, m8): OTA-chop mode is characterisation-only** (D4, D45g). In that mode the load-device offset (≈ 0.1 mV) and the 1/f noise of the load devices are unchopped. System chop (the data mode) cancels both. Recorded as information, not a gate.
 - **Cp_vg contribution (SIM):**
   - closed switch: Cgg ≈ 4.2 fF, half on each terminal;
   - open switch: Cbd ≈ 1.2 fF;
@@ -329,9 +335,11 @@ Not re-simulated (WO-23). HAND:
 
 ### 2.9 Current, bias legs and boost-toggle settling (m3)
 
-- **Core OTA1 (SIM i(VDD) device sum):** 47.7–48.7 µA base, 96.9–98.4 µA boost. This is unchanged from rev A, because the currents are unchanged.
-- **Bias legs:** the spot deck uses 1:4 references (19.7 / 39.4 µA). That is far too much, and is only for convenience.
-- **m3 sets the minimum ratio.** Each bias node must settle to 0.1 % (7τ) within 500 ns after the boost toggle, from both directions. The base-mode gm is the slow case.
+**Rev C / WO-24 (current).** All references are **1:32** (D53: CL-7 relaxed toggle settling to 0.1 % in ≤ 4 µs), built as composite 4 × 4 unit fingers (RC-M2). Reference currents base: btp 0.578, bn 0.781, bp 0.369, vbnc 0.492, vbpc 0.702 (K_P 10), vbl0 0.131 µA ⇒ **≈ 3.1 µA base / ≈ 5.9 µA boost** of bias legs (vbpc boost ×1.4). Core 47.4–48.7 µA base / 96.4–98.3 µA boost (WO-23 run 5). OTA1 ≈ 51 / 104 µA. The 1:8 / 1:6 table below and the 196 µA figure are rev B history, superseded by D53.
+
+- **Core OTA1 (SIM i(VDD) device sum, rev B):** 47.7–48.7 µA base, 96.9–98.4 µA boost. This is unchanged from rev A, because the currents are unchanged.
+- **Bias legs (rev B):** the spot deck used 1:4 references (19.7 / 39.4 µA), only for convenience.
+- **m3 (rev B) set the minimum ratio:** each bias node settles to 0.1 % (7τ) within 500 ns after the boost toggle. D53 relaxed this to ≤ 4 µs, which allows 1:32.
 
 | node | C on node (HAND/SIM) | ratio | ref I base | gm diode base | 7τ |
 |---|---|---|---|---|---|
@@ -416,7 +424,9 @@ Runs under `/home/mempool/regr/tt/WO-23/c1/`: r3 (K_P 6, pair 80/0.5), r4 (K_P 7
 - Precision A0 ≥ 80 dB is kept. Fix in **WO-24** (fresh agent): m_plc L 2 → 4 with Cc 0.2 pF (RB-m2; ≈ +1.16 dB, f_cm ≈ 5.7 MHz), then rerun the tables and table-INL.
 - **SPEC CL-1c:** the PMOS cascode D–S short is the required broken copy for the INL gate; m_pl L 0.5 becomes a sensitivity row. Open point from run 5: at the precision gate (tt base) this copy is not rejected (3.37 ppm ≤ 5.33); WO-24 needs a precision-mode broken copy that is.
 
-## 3. Expected values (rev B)
+## 3. Expected values (rev B; rev C run-5 values in §2.10, WO-24 netlisted values in `work/v1-design/results/wo24/`)
+
+Rev C deltas: pair 120/0.5 gives boost GBW 27.0–43.3 MHz (fs/125 worst) and β1 0.831–0.846; precision A0 79.3–81.3 dB at K_P 8 (FAIL at 3 of 9; RC-M1 fix K_P 10 + D55); boost table-INL ≤ 2.31 ppm. The table below is the rev B baseline.
 
 | SPEC row | spec | value | margin | binding corner |
 |---|---|---|---|---|
@@ -465,13 +475,13 @@ Runs under `/home/mempool/regr/tt/WO-23/c1/`: r3 (K_P 6, pair 80/0.5), r4 (K_P 7
 
 ## 5. SIZES
 
-`design/c1_ota1/sizes_draft.py`: `SIZES` (rev B, `src` op = WO-21 spot), `REV_A` for comparison.
+`design/c1_ota1/sizes_draft.py`: `SIZES` (rev C + WO-24 candidate; `src` op = WO-23 spot, hand = not yet simulated), `REV_B` / `REV_A` for comparison. `netlist.py` builds the subckt from it.
 
 **Open:**
-- C_FOLD_EXTRA (WO-22 / B);
-- K_P 5 → 4 and m_plc L 4 (C1b);
-- bias ratios (§2.9, user);
-- CMFB caps (tb 9).
+- C_FOLD_EXTRA: 0 until gate B says otherwise (D56, RC-m7);
+- K_P base 10 and m_plc 30/4 / Cc 0.2 pF: WO-24 step-1 sweep (whether Cc 0.2 pF is still needed with K_P 10 is a user option, D56);
+- CMFB caps vs tb9 in boost (RC-m2);
+- β1 CL-4 ≥ 0.83 vs informational (RC-m3, user).
 
 ## 6. Risks and open questions, with proposed change-log entries
 
