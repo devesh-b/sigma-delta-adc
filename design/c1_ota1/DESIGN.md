@@ -110,6 +110,10 @@ Per side: tail → input → protection cascode → fold node → NMOS cascode �
 
 D58 (WO-25): the I_REF ports (btp, bn, bp, vbl0) carry REF_TRIM = 1 / (composite-to-mirror ratio at tt/27 base), measured by `c1b_opac.py`. Legacy m_bpc 1.25/7 and m_bnc 0.625/16 stay in `sizes_draft.py` for the revc spot deck only.
 
+**D59 (WO-26) supersedes the composites and REF_TRIM above.** References m_tr, m_nr, m_plr and the V_BL0 replica m_bl0 are **parallel-only unit fingers at 1:8** (4 / 4 / 4 fingers of the m_t / m_n / m_pl unit; 1 finger of m_plc, which is re-fingered 3 × 5/2 → 8 × 1.875/2, same W 15 L 2). Sizes are derived in code from the mirror unit (`sizes_draft.py`, tested for equality). I_REF = design current / 8 (btp 2.31, bn 3.12, bp 1.48, vbl0 0.49 µA base), no trim. Cascode bias: K_P 12.5 base (m_bpd 4 × 1.5/15 at I_NC/8), 7.14 boost (7 fingers); replica 2 m_t + 4 m_n unit fingers, sink replica cascoded by one m_nc unit finger with gate V_ICM (an ivbnc-gated cascode would add a zero-current state through the m_bpx → m_bnd loop); copy bank m_bpx 0.75/15 (half width → I_NC/16 into m_bnd, K_N 8). The 3 boost-only fingers of each bank have their gates on node gbk, switched in the **gate path** (TG gbk ↔ ivbpc closed in boost, pull-up gbk → vdd in base); nothing switches in series with a diode.
+
+**Layout intent (D59, C7 rule; pd-expert carries it).** Each reference is laid out common-centroid with its mirror: the 4 reference fingers of m_tr / m_nr / m_plr interleaved symmetrically in the 32-finger m_t / m_n / m_pl arrays (both half-circuit mirrors of m_n / m_pl in the same array), m_bl0 at the centre of the 8-finger m_plc array, the replica fingers m_rt / m_rn in the m_t / m_n arrays, same orientation and the same source/drain direction for every finger, and one dummy finger (gate tied off to its source rail) at each array edge. Bulk at the rail for the PMOS refs (as the mirror). Monte Carlo of the ratios and the replica is still open.
+
 Everything except m_in is a 3.3 V device, so only m_in needs the D40 stress proof.
 
 ### 1.2 Vdsat-tracking cascode bias (M1)

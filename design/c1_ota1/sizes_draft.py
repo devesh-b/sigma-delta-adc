@@ -36,6 +36,18 @@ WO-25 (D58, user 2026-11-10):
     fingers (K_P 10 -> 7.14; K_N stays 8 since the copy bank switches with it). The ivbpc / ivbnc ports stay for
     observation; their reference current is 0. Legacy m_bpc / m_bnc stay for the revc spot deck only;
   - D55 reverted: m_plc 30/4 -> 15/2 (WF 5 M 3 L 2), Cc 0.2 -> 0.1 pF, Cr 50 -> 25 fF.
+
+WO-26 (D59, user 2026-11-10; supersedes the D58 trim, the D58 replica cascode bias stays):
+  - references m_tr, m_nr, m_plr and the V_BL0 replica are PARALLEL-ONLY unit fingers at RATIO 1:8 (M_ref = M_mirror / 8,
+    same WF / L / bulk as the mirror finger); REF_TRIM removed; I_REF = design current / 8. m_plc re-fingered 3 x 5/2 ->
+    8 x 1.875/2 (same W 15 L 2) so the V_BL0 replica is 1 unit finger (1:8). Layout intent: DESIGN.md 1.1 (C7);
+  - K_P base 12.5 (KP_BANK base 5 -> 4), boost stays 7 fingers (K_P 7.14);
+  - replica: REPLICA tail 2 / sink 4 unit fingers (2x WO-25), derived from m_t / m_n in code; the sink replica is cascoded
+    by one m_nc unit finger (m_rnc, gate V_ICM: not the ivbnc loop, which would add a zero-current state) so its drain
+    sits near the fold node instead of ~2 V; m_bpd unit 1.5/15 (I_NC/8), copy bank m_bpx 0.75/15 (half width -> I_NC/16
+    to m_bnd, K_N 8, no extra copy-leg current);
+  - bank switch in the GATE path: the boost-only fingers of m_bpd / m_bpx (KP_BANK boost - base) have their gates on
+    node gbk, a TG to ivbpc (closed in boost) and a pull-up to vdd (on in base); no switch in series with a diode.
 """
 
 BOOST = 2.0
@@ -52,7 +64,7 @@ V_ICM = 1.20       # island / input CM [V]; src hand (D34 range 1.1-1.3)
 V_OCM = 1.50       # output CM [V]; src hand
 V_PC = 0.0         # protection-cascode gate [V] (VSS); src hand, M3
 K_BIAS_N = 8.0     # NMOS cascode bias density factor; src op (WO-23 K sweep)
-K_BIAS_P = 10.0    # WO-24: base K_P 10 (RC-M1), boost K_P 7 (BOOST_SCALE vbpc 0.7); rev C was 8 base / 7 boost. Old note:
+K_BIAS_P = 12.5    # WO-26 (D59): base K_P 12.5 (KP_BANK base 4), boost 12.5 x 4 / 7 = 7.14. WO-24: base K_P 10 (RC-M1), boost K_P 7 (BOOST_SCALE vbpc 0.7); rev C was 8 base / 7 boost. Old note:
                    # PMOS cascode bias density factor in BOOST (geometry L 7 at I_NC/16); BASE runs at 8 (I_NC/28); src op
                    # (run 3 K 6: m_pl 0.015-0.107 V; run 4 K 7 / K 8 rows; WO-23 K run 2: K 4 -> m_pl in
                    # triode by 0.04-0.06 V, K 5 -> +0.01-0.04 V; the narrow W 1.25 diode tracks weaker than the rev B finger copy)
@@ -60,11 +72,11 @@ LOAD_FIXED = 0.75  # share of the load current in the fixed mirror half m_pl
 CMFB_SPLIT = 1.0 - LOAD_FIXED   # share in the CMFB-driven section m_plc (0.25); derived, do not set separately
 
 # Reference ratios (reference diode current : mirrored current). 1:32 everywhere (CL-7 / D53: 0.1 % in <= 4 us).
-RATIO = 32
+RATIO = 8                # WO-26 (D59): 1:8 parallel-only unit-finger references (was 1:32 composites)
 I_REF = dict(            # base reference currents [A]; boost x2. src hand (settling: DESIGN.md 2.9)
-    btp=I_TAIL / RATIO,                 # tail reference m_tr          0.578 uA
-    bn=I_SINK / RATIO,                  # sink reference m_nr          0.781 uA
-    bp=I_NC * LOAD_FIXED / RATIO,       # fixed-load reference m_plr   0.369 uA
+    btp=I_TAIL / RATIO,                 # tail reference m_tr          2.313 uA
+    bn=I_SINK / RATIO,                  # sink reference m_nr          3.122 uA
+    bp=I_NC * LOAD_FIXED / RATIO,       # fixed-load reference m_plr   1.475 uA
     vbnc=0.0,                           # WO-25 (D58): replica-fed (m_bpx -> m_bnd), no reference current
     vbpc=0.0,                           # WO-25 (D58): replica-fed (tail + sink replica on ivbpc), no reference current
     vbl0=None,                          # V_BL0 replica current, set below from the m_plc geometry
@@ -83,22 +95,17 @@ SIZES = dict(
     # 32 fingers -> 1:32. (First rev C K run used narrower single-finger references with WF != device WF: the
     # narrow-width Vth shift gave I_fold/I_tail 1.7-2.6 instead of 1.35 and put m_pl/m_plc in triode. REJECTed, fixed.)
     m_t=dict(dev="pfet_g5v0d10v5",  WF=1.25, M=32, L=2.0, src="op"),  # tail W 40 L 2, 32 unit fingers
-    m_tr=dict(dev="pfet_g5v0d10v5", WF=1.25, M=1, L=2.0, src="op"),   # tail reference = 1 unit finger (1:32)
     m_n=dict(dev="nfet_g5v0d10v5",  WF=2.25, M=32, L=4.0, src="op"),  # fold sinks W 72 L 4 (M1), 32 unit fingers
-    m_nr=dict(dev="nfet_g5v0d10v5", WF=2.25, M=1, L=4.0, src="op"),   # sink reference = 1 unit finger (1:32)
     m_nc=dict(dev="nfet_g5v0d10v5", WF=5,   M=4,  L=2.0, src="op"),   # NMOS cascodes W 20 L 2
     m_pc=dict(dev="pfet_g5v0d10v5", WF=5,   M=16, L=2.0, src="op"),   # PMOS cascodes W 80 L 2 (rev C, was 40/2)
     m_pl=dict(dev="pfet_g5v0d10v5", WF=2.5, M=32, L=4.0, src="op"),  # PMOS load, fixed half (75 %), W 80 L 4, 32 unit fingers
-    m_plr=dict(dev="pfet_g5v0d10v5", WF=2.5, M=1, L=4.0, src="op"),   # fixed-load reference = 1 unit finger (1:32)
-    m_plc=dict(dev="pfet_g5v0d10v5", WF=5,  M=3,  L=2.0, src="op"),   # PMOS load, CMFB section (25 %), W 15 L 2 (D58: D55 reverted)
+    m_plc=dict(dev="pfet_g5v0d10v5", WF=1.875, M=8, L=2.0, src="hand"),  # PMOS load, CMFB section (25 %), W 15 L 2; D59: 8 unit fingers
     m_bnc=dict(dev="nfet_g5v0d10v5", WF=0.625, M=1, L=16.0, src="op"),  # NMOS cascode bias diode at I_NC/32: K_N 8
     m_bpc=dict(dev="pfet_g5v0d10v5", WF=1.25, M=1, L=7.0, src="op"),    # PMOS cascode bias diode at I_NC/32: K_P 7
     # WO-25 (D58) replica-fed cascode bias (see docstring). M = base fingers; boost uses KP_BANK["boost"] fingers.
-    m_bpd=dict(dev="pfet_g5v0d10v5", WF=0.75, M=5, L=15.0, src="hand"),  # vbpc diode bank, I_NC/16: K_P 10 base, 7.14 boost
-    m_bpx=dict(dev="pfet_g5v0d10v5", WF=0.75, M=5, L=15.0, src="hand"),  # copy bank (gate vbpc) -> m_bnd, I_NC/16
+    m_bpd=dict(dev="pfet_g5v0d10v5", WF=1.5, M=4, L=15.0, src="hand"),   # vbpc diode bank, I_NC/8: K_P 12.5 base, 7.14 boost
+    m_bpx=dict(dev="pfet_g5v0d10v5", WF=0.75, M=4, L=15.0, src="hand"),  # copy bank (gate vbpc, half width) -> m_bnd, I_NC/16
     m_bnd=dict(dev="nfet_g5v0d10v5", WF=1.25, M=1, L=16.0, src="hand"),  # vbnc diode at I_NC/16: K_N 8
-    m_rt=dict(dev="pfet_g5v0d10v5", WF=1.25, M=1, L=2.0, src="hand"),    # tail replica = 1 m_t unit finger (I_TAIL/32)
-    m_rn=dict(dev="nfet_g5v0d10v5", WF=2.25, M=2, L=4.0, src="hand"),    # sink replica = 2 m_n unit fingers (I_SINK/16)
 )
 
 
@@ -131,10 +138,23 @@ C_CMFB_REFRESH = 0.025e-12  # Cr per side, switched between (V_OCM, V_BL0) and (
 CMFB_SW = dict(n=dict(dev="nfet_g5v0d10v5", W=1.0, L=0.5), p=dict(dev="pfet_g5v0d10v5", W=2.0, L=0.5), src="hand")  # TG, 3.3 V
 CTL_RST = dict(dev="pfet_g5v0d10v5", W=1.0, L=0.5, src="hand")   # ctl -> V_BL0 clamp while rst (gate rst_b low = closed)
 
-# RC-M2 composite references and the V_BL0 replica (see docstring)
-REF_COMPOSITE = dict(P=4, S=4)   # parallel x series unit fingers per 1:32 reference (m_tr, m_nr, m_plr)
-VBL0_SERIES = 5                  # m_plc fingers in series in the V_BL0 replica diode
-I_REF["vbl0"] = I_NC * CMFB_SPLIT / (SIZES["m_plc"]["M"] * VBL0_SERIES)   # 0.262 uA base (1:15 density match, m_plc 15/2)
+# D59 references (WO-26): parallel-only unit fingers of the mirror, 1:RATIO. DERIVED, do not size by hand.
+for _ref, _mir in (("m_tr", "m_t"), ("m_nr", "m_n"), ("m_plr", "m_pl"), ("m_bl0", "m_plc")):
+    assert SIZES[_mir]["M"] % RATIO == 0, _mir
+    SIZES[_ref] = dict(SIZES[_mir], M=SIZES[_mir]["M"] // RATIO, src="hand")
+I_REF["vbl0"] = I_NC * CMFB_SPLIT / RATIO   # V_BL0 replica, 1 m_plc unit finger: 0.492 uA base
+# D59 replica (WO-26): REPLICA unit fingers of m_t / m_n (sink = 2 x tail so I(m_bpd) = tail x I_NC/16); sink replica
+# cascoded by one m_nc unit finger with gate REPLICA_CASC_GATE. DERIVED from m_t / m_n / m_nc, do not size by hand.
+REPLICA = dict(tail=2, sink=4)
+REPLICA_CASC_GATE = "vicm"
+SIZES["m_rt"] = dict(SIZES["m_t"], M=REPLICA["tail"], src="hand")
+SIZES["m_rn"] = dict(SIZES["m_n"], M=REPLICA["sink"], src="hand")
+SIZES["m_rnc"] = dict(SIZES["m_nc"], M=1, src="hand")
+I_BPD_FRAC = REPLICA["tail"] / 16            # I(m_bpd) / I_NC = (sink I_SINK - tail I_TAIL) / 32 / I_NC = 1/8
+I_BND_FRAC = I_BPD_FRAC * SIZES["m_bpx"]["WF"] / SIZES["m_bpd"]["WF"]   # copy bank -> m_bnd: 1/16
+BANK_SW = dict(CMFB_SW, src="hand")          # gate-path bank switch (TG gbk <-> ivbpc) and gbk pull-up (p)
+# Broken-copy geometry only (mut "ref_composite"): the D58 4 x 4 series-parallel composites
+REF_COMPOSITE = dict(P=4, S=4)
 
 # Chopper and vg switches (DESIGN.md 1.4), 3.3 V devices with 3.3 V clocks (M5)
 CHOP_SW = dict(
@@ -148,8 +168,5 @@ CHOP_SW = dict(
 C_FOLD_EXTRA = 0.0
 
 # WO-25 (D58): replica bank switching and reference trim
-KP_BANK = dict(base=5, boost=7)   # m_bpd / m_bpx unit fingers per mode (CL-8 boost step x1.4: K_P 10 -> 7.14)
-# I_REF port scale = 1 / (composite-to-mirror current ratio at tt/27, base), measured by c1b_opac (WO-25 pass 1).
-# WO-25 pass 1 (regr/tt/WO-25-pass1, tt/27 base, untrimmed): ratio m_tr 1.202, m_nr 1.155, m_plr 1.121, V_BL0 1.081
-# (boost 1.185 / 1.153 / 1.134 / 1.105). src op.
-REF_TRIM = dict(btp=1 / 1.202, bn=1 / 1.155, bp=1 / 1.121, vbl0=1 / 1.081)
+KP_BANK = dict(base=4, boost=7)   # m_bpd / m_bpx unit fingers per mode (D59: K_P 12.5 base -> 7.14 boost, CL-8 step x1.75)
+# D59: REF_TRIM removed (parallel-only 1:8 references track by construction)
