@@ -67,6 +67,7 @@ class TB:
         self.missing = [n for n in list(CTL) + ["comp"] if n not in self.ports]
         self.ref = RefA(rst_lat=None, rd_lag=int(os.environ.get("C9_RD_LAG", "1")))
         self.ui, self.rst_n, self.comp = 0, 0, 0
+        self.a_ui, self.a_rst_n = 0, 0       # values actually on the DUT pins at the next rising edge
         self.yb = {}                 # absolute slot -> golden bits for the comparator BFM
         self.comp_mode = os.environ.get("C9_COMP", "window")
         self.rng = random.Random(SEED)
@@ -150,17 +151,17 @@ class TB:
                     self.fail(f"uio_oe = {oe}")
             # release alignment: DUT fs bit clock first rises after release = slot 0 start (CL-19)
             start_now = False
-            if self.rst_n and not r.started and out.get("fs_clk") == 1:
+            if self.a_rst_n and not r.started and out.get("fs_clk") == 1:
                 start_now = True
                 lat = (r.rel_cnt + 1) if not r.in_rst else 0
                 self.lat_hist.append(lat)
                 if lat > 24 + 4 or lat != self.lat_hist[0]:
                     self.fail(f"release-to-slot latency {lat} (history {self.lat_hist}; bound div+4, deterministic)")
                 self.chk("rst_lat")
-            if self.rst_n and not r.started and not start_now and r.rel_cnt > 24 + 6:
+            if self.a_rst_n and not r.started and not start_now and r.rel_cnt > 24 + 6:
                 self.fail("no fs bit clock rise after rst_n release")
                 start_now = True
-            r.step(self.rst_n, self.ui, self.comp, start_now=start_now)
+            r.step(self.a_rst_n, self.a_ui, self.comp, start_now=start_now)
             # ---- control ports, clk-exact
             if not self.missing:
                 k = r.ctl()
@@ -170,7 +171,7 @@ class TB:
                             self.fail(f"{name} dut={out[name]} ref={k[name]}")
                         self.chk(name)
             # ---- bus (fixed lag <= 3)
-            pin_val = r.dbg_word() if (self.ui >> 7) & 1 else r.word(self.ui & 7)
+            pin_val = r.dbg_word() if (self.a_ui >> 7) & 1 else r.word(self.a_ui & 7)
             self.hist.append(pin_val)
             bus = None if None in (uo, uio) else (uo << 8) | uio
             if self.settle > 0:
@@ -205,6 +206,7 @@ class TB:
                     self.tasks.remove(t)
             d.ui_in.value = self.ui
             d.rst_n.value = self.rst_n
+            self.a_ui, self.a_rst_n = self.ui, self.rst_n
             self.tick.set()
             self.tick.clear()
 
@@ -247,6 +249,8 @@ class TB:
             self.settle = 4
 
     async def reset(self, n=10):
+        self.tasks = []                    # no driver or host read survives a reset
+        self.set_ui(0xFF, 0)
         self.rst_n = 0
         await self.clks(n)
         self.rst_n = 1
@@ -803,7 +807,7 @@ async def d_bus02_latency(dut):
         for k in range(1, 8):
             await tb.clks(1)
             if tb.last.get("bus") == tb.ref.word(a):
-                worst = max(worst, k)
+                worst = max(worst, k - 1)      # first tick only applies the pin (test-coroutine write)
                 break
         else:
             tb.fail(f"addr {a}: word never appeared")
