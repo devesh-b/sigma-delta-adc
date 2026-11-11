@@ -3,8 +3,7 @@ import json, sys
 d = json.load(open(sys.argv[1]))
 for v in d['vectors']:
     c = v['config']
-    if v.get('kind') == 'mode' and c['N'] == 4096 and c['order'] == 2 and c['chop_mode'] == 'ota+sys' \
-       and not c['short'] and c['fs_div'] == 1 and c['boost'] == 0 and c['trim'] == 4:
+    if v.get('kind') == 'reset':
         f = v['frames'][0]
         yb = int(f['ybits'], 16)
         nb = 4 * len(f['ybits'])
