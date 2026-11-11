@@ -750,3 +750,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - REVIEW-C1b-final: PROCEED, no Critical. M1 C6 ref accuracy vs SR floor; M2 CM-to-DM row blind. User Q1–Q4 pending. Next-WO order in the review.
 - D65 (user): SR floor re-based on the knee + D47 trim; CM-to-DM bound first, then mismatch copy; start-up at sampling instants + TG clamp. WO-32 written. **Blocked: 1Password locked (ssh + signing).** Uncommitted: gate B results (results/wo31/gateb, README), REVIEW-C1b-final, D65, WO-32, INDEX, RESUME.
 - 1Password unlocked: committed gate B results, REVIEW-C1b-final, D65/WO-32. WO-32 dispatched.
+- User 2026-11-11: start C9 in parallel. WO-33 (golden v3, Sonnet) and WO-34 (verification plan, rtl-verification-engineer) dispatched. RTL coding (WO-35) after both.
