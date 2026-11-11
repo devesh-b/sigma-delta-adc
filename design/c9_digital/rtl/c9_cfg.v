@@ -14,7 +14,10 @@ module c9_cfg (
     output reg         cfg_pending
 );
     localparam [12:0] RST_CFG = {1'b1, 2'd3, 3'd1, 1'b1, 1'b1, 1'b0, 1'b0, 3'd4};
+    // bits 15:13 of the shift register are the reserved field, ignored by design
+    /* verilator lint_off UNUSEDSIGNAL */
     reg [15:0] shift;
+    /* verilator lint_on UNUSEDSIGNAL */
     reg [12:0] shadow;
     reg        ck_p, ld_p;
     wire       ck_rise = cfg_clk_s & ~ck_p;
