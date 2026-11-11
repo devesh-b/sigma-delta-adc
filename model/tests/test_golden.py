@@ -1,4 +1,4 @@
-"""WO-18 / S6b: independent check of the golden vectors v2 + non-vacuity (mutants).
+"""WO-18 / S6b: independent check of the golden vectors v2/v3 + non-vacuity (mutants).
 
 The checker below is written from the SPEC text (3.6 rules 9-11, 3.7, 3.7a D45) and does NOT call model/iadc.py or
 model/golden.py (golden is imported only for the determinism hash). Expected values: acc1 = S, acc2 = sum S with
@@ -17,10 +17,10 @@ from model import golden as G
 HERE = os.path.dirname(os.path.abspath(__file__))
 GOLD = os.path.join(HERE, "..", "..", "golden", "s6_vectors.json")
 # sha256 of the canonical serialisation of the seed-20261109 set (pinned; regenerate => same bytes)
-PINNED_SHA = "f08faffe17ceea91f31920f66bf3d4ac263c62e4b575432b5154aea7b90c938f"
+PINNED_SHA = "27d9d2d36efc6673f9268d059cd73eece157f8a43ebfa76e3b249d1975f2b88e"
 D = 1 << 20
 M32 = 0xFFFFFFFF
-LATCHED = ("order", "N", "fs_div", "sys_en", "ota_en", "short")
+LATCHED = ("order", "N", "fs_div", "sys_en", "ota_en", "short", "boost", "trim")
 
 
 # ---------------- independent reference (integer arithmetic, option B: c1 = 1/8, c2 = 1/2, k = 1/2) ----------------
@@ -94,6 +94,8 @@ def ref_tags(config0, slots, mut=None):
     last wins; writes in the even slot itself are on or after the edge."""
     active, pending, inv, ctr, out = config0, None, False, 0, []
     for t, sl in enumerate(slots):
+        if mut == "boostmid" and t % 2 == 1 and pending is not None:
+            active = dict(active, boost=pending["boost"], trim=pending["trim"])
         edge_writes = sorted(sl.get("writes", []), key=lambda w: w["off"])
         if mut == "latchedge" and t % 2 == 0:
             for w in edge_writes:
@@ -103,7 +105,7 @@ def ref_tags(config0, slots, mut=None):
             if t % 2 == 0:
                 inv = t == 0 and mut != "noinvrst"
             if pending is not None:
-                inv = inv or any(pending[k] != active[k] for k in LATCHED)
+                inv = inv or any(pending[k] != active[k] for k in (LATCHED[:-2] if mut == "bt_noinv" else LATCHED))
                 active, pending = pending, None
                 if mut == "ctrreset":
                     ctr = 0
@@ -444,3 +446,156 @@ if __name__ == "__main__":
     for m in TRACE_MUT:
         b = check_trace(d, m)
         print("trace:%-10s %s  (%d mismatches)" % (m, "REJECT" if b else "ACCEPT", b))
+
+
+# ======================= golden v3 (WO-33, G3): boost/trim, reset, words, status/hold =======================
+GOLD_V2 = os.path.join(HERE, "..", "..", "golden", "s6_vectors_v2.json")
+V2_SHA = "f08faffe17ceea91f31920f66bf3d4ac263c62e4b575432b5154aea7b90c938f"
+# independent constants typed from SPEC 3.8a (not imported from model.golden)
+REF_RESET = {"order": 2, "n_code": 3, "N": 4096, "fs_div": 1, "sys_en": 1, "ota_en": 1, "short": 0, "boost": 0,
+             "trim": 4}
+REF_DEBUG_UO = ["raw_y", "bit_valid", "valid_frame_ready", "fs_bit_clock", "rst_analog", "sys_swap",
+                "ota_chop_phase", "invalid_hold"]
+REF_WORDS = ["acc1_hi", "acc1_lo", "acc2_hi", "acc2_lo", "tag", "status"]
+
+
+def ref_cfg_word(c):
+    w = 0
+    for val, wd in ((0, 3), (c["order"] == 2, 1), (c["n_code"], 2), (c["fs_div"], 3), (c["sys_en"], 1),
+                    (c["ota_en"], 1), (c["short"], 1), (c["boost"], 1), (c["trim"], 3)):
+        w = (w << wd) | (int(val) & ((1 << wd) - 1))
+    return w
+
+
+def ref_status(ready, ov, boost, trim, ctr):
+    return (ready << 15) | (ov << 14) | (boost << 12) | (trim << 9) | (ctr & 255)
+
+
+def ref_words(f, mut=None):
+    a1, a2, tg = f["acc1"] & M32, f["acc2"] & M32, f["tag_word"]
+    w = [a1 >> 16, a1 & 0xFFFF, a2 >> 16, a2 & 0xFFFF, tg]
+    if mut == "wordswap":
+        w[1], w[2] = w[2], w[1]
+    return "".join("%04x" % x for x in w)
+
+
+def ref_hold(sq, mut=None):
+    """Independent hold-register model: load per slot; overrun if the previous frame was never read; rd clears."""
+    out, ready = [], 0
+    for f in sq["frames"]:
+        ov = 1 if (ready and mut != "nooverrun") else 0
+        ready = 1
+        t = f["slot"]
+        rd = t not in sq["dropped"]
+        before = (ready, ov)
+        if rd:
+            ready = 1 if mut == "rdnoclear" else 0
+            ov = 0
+        out.append((before, (ready, ov), rd))
+    return out
+
+
+def all_cfgs(doc):
+    for v in doc["vectors"]:
+        yield v["config"]
+    for st in doc["streams"]:
+        yield st["config"]
+    for sq in doc["sequences"] + doc["traces"]:
+        yield sq["config0"]
+        for sl in sq["slots"]:
+            for w in sl["writes"]:
+                yield w["cfg"]
+
+
+def check_g3(doc, mut=None):
+    bad = check_tags_and_pairs(doc, mut if mut in ("bt_noinv", "boostmid") else None)
+    reset = dict(REF_RESET, trim=3) if mut == "trimreset" else REF_RESET
+    bad += doc["reset"] != reset
+    rv = next(v for v in doc["vectors"] if v["id"] == "rst_default")
+    bad += any(rv["config"][k] != reset[k] for k in reset)
+    bad += any(f["boost"] != reset["boost"] or f["trim"] != reset["trim"] for f in rv["frames"])
+    for c in all_cfgs(doc):
+        bad += c["cfg_word"] != ref_cfg_word(c)
+    tab = doc["fs_div_table"]
+    bad += any(tab[str(i)] != {"div": d, "fs_hz": 48_000_000 // d} or 48_000_000 % d for i, d in
+               enumerate((12, 24, 48, 96, 192))) or tab["reserved_5_7_as"] != 1
+    bad += doc["word_order"] != REF_WORDS or doc["debug_bus"]["uo_out"] != REF_DEBUG_UO
+    for v in doc["vectors"] + doc["streams"]:
+        tg = ref_tags(v["config"], [{}] * len(v["frames"]), mut)
+        for (c, _), f in zip(tg, v["frames"]):
+            bad += _frame_g3(c, f, mut)
+    for sq in doc["sequences"] + doc["traces"]:
+        tg = ref_tags(sq["config0"], sq["slots"], mut)
+        for (c, t), f in zip(tg, sq["frames"]):
+            bad += _frame_g3(c, f, mut)
+        for (c, t), f, h, (before, after, rd) in zip(tg, sq["frames"], sq["hold"], ref_hold(sq, mut)):
+            bad += h["status_word"] != "%04x" % ref_status(before[0], before[1], c["boost"], c["trim"],
+                                                           t["frame_ctr"])
+            bad += h["rd"] != int(rd)
+            bad += h["status_after_rd"] != ("%04x" % ref_status(after[0], after[1], c["boost"], c["trim"],
+                                                                t["frame_ctr"]) if rd else None)
+    return bad
+
+
+def _frame_g3(c, f, mut):
+    return ((f["boost"], f["trim"]) != (c["boost"], c["trim"]) or "".join(f["words"]) != f["wire"]
+            or "".join(f["words"]) != ref_words(f, mut)
+            or f["status_word"] != "%04x" % ref_status(1, 0, c["boost"], c["trim"], f["tags"]["frame_ctr"]))
+
+
+G3_MUT = ["boostmid", "trimreset", "wordswap", "rdnoclear", "nooverrun", "bt_noinv"]
+
+
+def test_g3_nominal(doc):
+    assert doc["format"] == 3
+    assert check_g3(doc) == 0
+    assert check(doc) == 0 and check_trace(doc) == 0
+
+
+@pytest.mark.parametrize("mut", G3_MUT)
+def test_g3_mutant_rejected(doc, mut):
+    assert check_g3(doc, mut) > 0
+
+
+def test_g3_semantics(doc):
+    s = seq(doc, "seq_boosttrim")
+    assert [f["boost"] for f in s["frames"]] == [0, 0, 1, 1, 1, 1, 1, 1, 0, 0]
+    assert [f["trim"] for f in s["frames"]] == [4, 4, 4, 4, 4, 4, 2, 2, 2, 2]
+    assert [f["tags"]["invalid"] for f in s["frames"]] == [1, 1, 1, 1, 0, 0, 1, 1, 1, 1]
+    dr = seq(doc, "seq_drop")
+    assert [h["overrun"] for h in dr["hold"]] == [0, 0, 0, 0, 1, 0, 0, 0]       # slot 3 unread, slot 4 overruns
+    assert dr["hold"][3]["rd"] == 0 and dr["hold"][3]["status_after_rd"] is None
+    assert int(dr["hold"][4]["status_word"], 16) >> 14 == 3                      # ready + overrun
+    assert int(dr["hold"][4]["status_after_rd"], 16) >> 14 == 0                  # rd clears both
+    assert len([v for v in doc["vectors"] if v["kind"] == "boosttrim"]) == 16
+    assert {(v["config"]["boost"], v["config"]["trim"]) for v in doc["vectors"] if v["kind"] == "boosttrim"} == \
+        {(b, t) for b in (0, 1) for t in range(8)}
+    assert all(c["boost"] == 0 and c["trim"] == 4 for v in doc["vectors"] if v["kind"] == "mode"
+               for c in [v["config"]])
+
+
+def subset(a, b):
+    if isinstance(a, dict):
+        return isinstance(b, dict) and all(k in b and subset(a[k], b[k]) for k in a)
+    if isinstance(a, list):
+        return isinstance(b, list) and len(a) == len(b) and all(subset(x, y) for x, y in zip(a, b))
+    return a == b
+
+
+def test_v2_rows_unchanged_in_v3(doc):
+    with open(GOLD_V2) as f:
+        txt = f.read()
+    assert hashlib.sha256(txt.encode()).hexdigest() == V2_SHA
+    v2 = json.loads(txt)
+    assert v2["format"] == 2 and doc["format"] == 3
+    for key in ("vectors", "streams", "sequences", "traces"):
+        new = {r["id"]: r for r in doc[key]}
+        assert len(v2[key]) <= len(new)
+        for r in v2[key]:
+            assert subset(r, new[r["id"]]), (key, r["id"])
+        # order preserved: v2 rows are the leading rows
+        assert [r["id"] for r in doc[key]][:len(v2[key])] == [r["id"] for r in v2[key]]
+    # a broken v3 (one accumulator word changed) must not satisfy the subset relation
+    bad = json.loads(json.dumps(doc))
+    bad["vectors"][10]["frames"][0]["acc1"] += 1
+    assert not subset(v2["vectors"][10], bad["vectors"][10])

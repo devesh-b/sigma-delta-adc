@@ -1,4 +1,4 @@
-# golden/ : S6b golden vectors v2 for the C9 decimator, frame and sequencer
+# golden/ : S6b golden vectors v3 (WO-33; v2 rows unchanged) for the C9 decimator, frame and sequencer
 
 `s6_vectors.json` is produced by `python -m model.golden` (tier 0, ideal-A, seed 20261109) and checked by
 `model/tests/test_golden.py`. Canonical JSON (sorted keys, compact), so regenerating gives identical bytes
@@ -7,7 +7,7 @@
 Loop: option B, c1 = 1/8, c2 = 1/2, k = 1/2, so k/c1 = 4 (integer). Every u is a multiple of 2^-20, so the
 float model and an integer implementation agree bit for bit.
 
-Top level: `format` (2), `seed`, `model`, `vectors`, `streams`, `sequences`, `traces`.
+Top level: `format` (3), `seed`, `model`, `reset`, `clk_hz`, `fs_div_table`, `word_order`, `debug_bus`, `status_layout`, `vectors`, `streams`, `sequences`, `traces`. `s6_vectors_v2.json` is the frozen v2 file (sha f08faffe...), kept only so a test proves every v2 row is a subset of the v3 row (v3 only adds keys and rows).
 
 ## RTL-observable fields (what an RTL testbench must reproduce)
 | Field | Meaning |
@@ -83,3 +83,17 @@ truncate/extend by 1 with den fixed, accumulators not cleared), sequencer (mid-p
 frame_ctr reset on change, no invalid after rst_n, edge write counted before the edge), control trace (swap one clock
 late, acc_clear one clock early / late, OTA phase not restarted, tag from a different flop), tag (stuck / inverted
 chop sign in pair demodulation). Accumulators of 24 bit (acc2) and 14 bit (acc1) must ACCEPT.
+
+## Golden v3 additions (WO-33, SPEC 3.7a(d), 3.8a, G3 items 1-4, 6)
+- **Config** (`config`, `config0`, write `cfg`): new fields `boost` (1 b, reset 0), `trim` (3 b, reset 4 = binary 100) and `cfg_word`
+  (the 16-bit serial register of 3.8a: order 12, n_code 11:10, fs_div 9:7, sys_en 6, ota_en 5, short 4, boost 3, trim 2:0). Both are in the
+  latched set: latched only at a pair boundary, last write wins, a change makes the first pair `invalid`; an identical rewrite is not a change.
+  The tag word is unchanged. Mode vectors keep boost 0 / trim 4. New vectors: `rst_default` (kind `reset`: the whole reset config, order 2,
+  N 4096, fs_div 1, sys+ota chop, boost 0, trim 4), `bt_b<0|1>_t<0..7>` (kind `boosttrim`, 16 vectors, N 64), sequence `seq_boosttrim`.
+- **`reset`**: reset values of the config set. **`fs_div_table`**: code -> clk divider and fs at clk = 48 MHz (0 = 4 MHz ... 4 = 0.25 MHz; 5-7 read as 1).
+- **Frame**: `boost`, `trim` (of the frame, from the active config), `words` (5 hex words = addr 0..4: acc1 hi, acc1 lo, acc2 hi, acc2 lo, tag; `wire` is their
+  concatenation), `status_word` (addr 5 as read right after the load: frame_ready 1, overrun 0, [12] boost, [11:9] trim, [7:0] frame_ctr; bit 13 cfg_pending is
+  host-timing dependent and held 0). `word_order` lists addr 0..5. `debug_bus` is the debug-mode signal list (uo_out[0..7], uio = status[7:0]) as reference data for the RTL tests.
+- **Sequences** gain `hold[t]`: `overrun` and `status_word` of the load of slot t, `rd` (0 if the frame is never read, i.e. in `dropped`) and `status_after_rd` (frame_ready and
+  overrun cleared, hold-register fields kept). `seq_drop`: slot 3 is not read, so the slot-4 load sets overrun (status 0xc..), the frame_ctr gap is 2 -> 4.
+- Mutants (all REJECT): boost latched mid-pair, trim reset != 100, word order swapped (addr 1 <-> 2), rd does not clear frame_ready, no overrun on load, boost/trim outside the invalid scope.

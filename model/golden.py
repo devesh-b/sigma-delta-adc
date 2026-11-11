@@ -1,4 +1,4 @@
-"""S6b golden-vector generator (v2) for the C9 decimator, frame and sequencer (tier 0, ideal-A).
+"""S6b golden-vector generator (v3, WO-33; v2 rows unchanged) for the C9 decimator, frame and sequencer (tier 0, ideal-A).
 
 Tier 0 = model/iadc.py with no noise, no leakage, no OTA non-idealities (Params defaults, xmax opened so nothing
 clips), at the v1 loop coefficients option B (c1 = 1/8, c2 = 1/2, k = 1/2, so k/c1 = 4).
@@ -30,8 +30,22 @@ C1, C2, K = 0.125, 0.5, 0.5
 KC1 = 4                      # k / c1, exact integer for option B
 CHOPS = ("off", "sys", "ota+sys", "ota")
 GRID = 2 ** 20
-LATCHED = ("order", "N", "fs_div", "sys_en", "ota_en", "short")
-RST_LEN = 2                  # reset window, fs cycles (D45 i)
+LATCHED = ("order", "N", "fs_div", "sys_en", "ota_en", "short", "boost", "trim")
+TRIM_RESET = 4               # binary 100 (D42)
+# v3 (G3): config reset values (SPEC 3.8a register map), fs_div code table at clk 48 MHz, word order, debug bus, status
+CLK_HZ = 48_000_000
+RESET = {"order": 2, "n_code": 3, "N": 4096, "fs_div": 1, "sys_en": 1, "ota_en": 1, "short": 0, "boost": 0,
+         "trim": TRIM_RESET}
+FS_DIV_TABLE = {str(i): {"div": d, "fs_hz": CLK_HZ // d} for i, d in enumerate((12, 24, 48, 96, 192))}
+FS_DIV_TABLE["reserved_5_7_as"] = 1
+WORD_ORDER = ["acc1_hi", "acc1_lo", "acc2_hi", "acc2_lo", "tag", "status"]       # addr 0..5; 6, 7 read 0
+DEBUG_BUS = {"uo_out": ["raw_y", "bit_valid", "valid_frame_ready", "fs_bit_clock", "rst_analog", "sys_swap",
+                        "ota_chop_phase", "invalid_hold"], "uio": "status[7:0] = frame_ctr",
+             "y_changes_on": "falling edge of the exported bit clock"}
+STATUS_LAYOUT = {"15": "frame_ready", "14": "overrun", "13": "cfg_pending (host-timing dependent: golden holds 0)",
+                 "12": "boost of hold-register frame", "11:9": "trim of hold-register frame", "8": "0",
+                 "7:0": "frame_ctr of hold-register frame"}
+RST_LEN = 2                 # reset window, fs cycles (D45 i)
 TRACE_FIELDS = ["rst_analog", "acc_clear", "sys_swap", "ota_chop_phase", "y_force", "bit_valid", "raw_pin",
                 "tag_chop", "cfg_latch"]
 _CACHE = {}
@@ -46,10 +60,33 @@ def params(order, N):
     return iadc.Params(order=order, N=N, c1=C1, c2=C2, k=K, xmax=1e6)
 
 
-def cfg(order, N, chop, short, fs_div=0):
-    return {"order": order, "N": N, "n_code": NCODE[N], "fs_div": fs_div,
-            "sys_en": int(chop in ("sys", "ota+sys")), "ota_en": int(chop in ("ota", "ota+sys")),
-            "short": int(bool(short)), "chop_mode": chop}
+def cfg_word(c):
+    """16-bit serial config register (SPEC 3.8a): order 12, n_code 11:10, fs_div 9:7, sys_en 6, ota_en 5, short 4,
+    boost 3, trim 2:0; order bit 1 = order 2."""
+    return ((int(c["order"] == 2) << 12) | (c["n_code"] << 10) | (c["fs_div"] << 7) | (c["sys_en"] << 6)
+            | (c["ota_en"] << 5) | (c["short"] << 4) | (c["boost"] << 3) | c["trim"])
+
+
+def cfg(order, N, chop, short, fs_div=0, boost=0, trim=TRIM_RESET):
+    c = {"order": order, "N": N, "n_code": NCODE[N], "fs_div": fs_div,
+         "sys_en": int(chop in ("sys", "ota+sys")), "ota_en": int(chop in ("ota", "ota+sys")),
+         "short": int(bool(short)), "chop_mode": chop, "boost": boost, "trim": trim}
+    c["cfg_word"] = cfg_word(c)
+    return c
+
+
+def status_word(ready, overrun, boost, trim, ctr):
+    """SPEC 3.8a status (addr 5). cfg_pending (bit 13) depends on host timing and is held 0 in the golden."""
+    return (ready << 15) | (overrun << 14) | (boost << 12) | (trim << 9) | (ctr & 255)
+
+
+def extras(c, f):
+    """G3 per-frame fields: boost/trim of the frame, the 5 readout words (addr 0..4), status word as read right
+    after the load with frame_ready 1, overrun 0 (sequences carry the real hold-register history in `hold`)."""
+    f["boost"], f["trim"] = c["boost"], c["trim"]
+    f["words"] = [f["wire"][4 * i:4 * i + 4] for i in range(5)]
+    f["status_word"] = "%04x" % status_word(1, 0, c["boost"], c["trim"], f["tags"]["frame_ctr"])
+    return f
 
 
 def changed(a, b):
@@ -138,7 +175,7 @@ def make_frame(c, u, off, t, tags):
     f = {"slot": t, "tags": tags, "tag_word": tag_word(tags)}
     f.update(model_frame(c, u, off, s))
     f["wire"] = "%08x%08x%04x" % (f["acc1"] & 0xFFFFFFFF, f["acc2"] & 0xFFFFFFFF, f["tag_word"])
-    return f
+    return extras(c, f)
 
 
 def pair_value(fa, fb):
@@ -149,8 +186,8 @@ def u_list(N, rng):
     return [-0.9, -0.5, -1.3 / N, 0.0, 1.3 / N, 0.5, 0.9] + [float(rng.uniform(-0.9, 0.9)) for _ in range(2)]
 
 
-def vector_mode(vid, kind, order, N, chop, short, u_req, off=0.0):
-    c = cfg(order, N, chop, short)
+def vector_mode(vid, kind, order, N, chop, short, u_req, off=0.0, boost=0, trim=TRIM_RESET, fs_div=0):
+    c = cfg(order, N, chop, short, fs_div, boost, trim)
     u = 0.0 if short else q(u_req)
     fr = [make_frame(a, u, off, t, tags) for t, (a, tags) in enumerate(sequencer(c, [{}, {}]))]
     return {"id": vid, "kind": kind, "config": c, "u_requested": q(u_req), "u": u, "off": 0.0 if short else off,
@@ -164,6 +201,7 @@ def stream_vector(sid, order, y, note):
     f = {"slot": 0, "tags": tags, "tag_word": tag_word(tags)}
     f.update(frame_core(c, y, s))
     f["wire"] = "%08x%08x%04x" % (f["acc1"] & 0xFFFFFFFF, f["acc2"] & 0xFFFFFFFF, f["tag_word"])
+    extras(c, f)
     return {"id": sid, "kind": "stream", "loop_valid": False, "note": note, "config": c, "frames": [f]}
 
 
@@ -181,7 +219,23 @@ def sequence(sid, config0, slots, us, dropped, note, kind="sequence"):
         pairs.append(d)
     return {"id": sid, "kind": kind, "note": note, "config0": config0,
             "slots": [{"writes": sl.get("writes", []), "u": us[i]} for i, sl in enumerate(slots)],
-            "dropped": sorted(dropped), "frames_sent": [f["slot"] for f in recv], "frames": frames, "pairs": pairs}
+            "dropped": sorted(dropped), "frames_sent": [f["slot"] for f in recv], "frames": frames, "pairs": pairs,
+            "hold": hold_history(frames, dropped)}
+
+
+def hold_history(frames, dropped):
+    """Hold-register / status history (SPEC 3.8a buffering). One load per slot (end of slot): frame_ready = 1; if the
+    previous frame was never rd-acked (it is in `dropped`) the load overwrites it and sets overrun. A `rd` edge
+    clears frame_ready and overrun (the hold register keeps the frame, so boost/trim/frame_ctr stay)."""
+    out, unread = [], False
+    for f in frames:
+        t, b, tr, ctr = f["slot"], f["boost"], f["trim"], f["tags"]["frame_ctr"]
+        h = {"slot": t, "overrun": int(unread), "status_word": "%04x" % status_word(1, int(unread), b, tr, ctr)}
+        h["rd"] = int(t not in dropped)
+        h["status_after_rd"] = "%04x" % status_word(0, 0, b, tr, ctr) if h["rd"] else None
+        unread = not h["rd"]
+        out.append(h)
+    return out
 
 
 def control_trace(seq):
@@ -283,7 +337,29 @@ def build():
                   "N 64, sys + ota chop, pairs 0 and 1, write (order 1) in slot 2 latching at slot 4, then pair 2. "
                   "Control trace per fs cycle, 66 cycles per slot.", kind="trace")
     tr["trace"] = control_trace(tr)
-    return {"format": 2, "seed": SEED, "grid": "u multiples of 2^-20",
+    # ---- G3 (v3) additions, appended so every v2 row is unchanged ----
+    vecs.append(vector_mode("rst_default", "reset", RESET["order"], RESET["N"], "ota+sys", 0, 0.3, 0.0,
+                            fs_div=RESET["fs_div"]))      # the whole reset config: boost 0, trim 100
+    for boost in (0, 1):
+        for trim in range(8):
+            vecs.append(vector_mode("bt_b%d_t%d" % (boost, trim), "boosttrim", 2, 64, "ota+sys", 0, 0.3, 0.0,
+                                    boost=boost, trim=trim))
+    cb = cfg(2, 64, "sys", 0, boost=1)
+    sl = [{} for _ in range(10)]
+    sl[0]["writes"] = [{"off": 10, "cfg": cb}]
+    sl[3]["writes"] = [{"off": 5, "cfg": cb}]
+    sl[4]["writes"] = [{"off": 3, "cfg": cfg(2, 64, "sys", 0, boost=1, trim=6)}]
+    sl[5]["writes"] = [{"off": 20, "cfg": cfg(2, 64, "sys", 0, boost=1, trim=2)}]
+    sl[6]["writes"] = [{"off": 65, "cfg": cfg(2, 64, "sys", 0, boost=0, trim=2)}]
+    seqs.append(sequence("seq_boosttrim", c0, sl, [q(0.3)] * 10, [3],
+                         "boost written in slot 0 latches at slot 2 (pair 1, invalid), never mid-pair (slot 1 still "
+                         "boost 0); the same value again in slot 3 is not a change; trim 6 then trim 2 written in "
+                         "slots 4, 5 (last wins) latch at slot 6 (pair 3, invalid); boost 0 written at the last cycle "
+                         "of slot 6 latches at slot 8 (pair 4, invalid). Slot 3 is not read: slot 4 loads with "
+                         "overrun, status [12:9] follows the hold-register frame."))
+    return {"format": 3, "seed": SEED, "grid": "u multiples of 2^-20", "reset": RESET, "clk_hz": CLK_HZ,
+            "fs_div_table": FS_DIV_TABLE, "word_order": WORD_ORDER, "debug_bus": DEBUG_BUS,
+            "status_layout": STATUS_LAYOUT,
             "model": {"c1": C1, "c2": C2, "k": K, "k_over_c1": KC1, "tier": 0}, "vectors": vecs, "streams": streams,
             "sequences": seqs, "traces": [tr]}
 
