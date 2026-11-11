@@ -51,6 +51,7 @@ WO-28 (D61): dual-path CMFB. Cc on ctl, Cr refreshed to (vocm, bli); gm-C follow
 m_it, C_INT to vdd); start-up clamps (rstb low) ctl, bli -> ivbl0 and outp, outn -> vocm. Tokens: int_off (broken copy:
 bli tied to ivbl0, the WO-26 passive loop), cm_open (now with a dummy m_plc pair on ctl), cc_div4, vbl0x2 (ivbl0 x2),
 cr_x2 (WO-30 info: Cr x 2). cr_x05 (WO-31: Cr / 2 = the pre-D64 0.025 pF, tb9 start-up broken copy).
+WO-36 (D68): clamp_stuck (output TG gates tied on), clamp_lv50 (output clamp to V_OCM + 50 mV), tb9 start-up broken copies.
 WO-32 (D65): output start-up clamp = transmission gate (OUT_RST n/p, gate rst from a local rstb inverter RST_INV), token
 clamp_weak = PMOS-only clamp at W / 4 (broken copy); mm3 = 3 sigma mismatch (Cc, Cr p/n; min1 gate offset, sizes_draft MM3);
 ibtp85 (ibtp x 0.85, the bkt copy), ibtp75 (ibtp x 0.75, the opac SR broken copy mtlo).
@@ -194,14 +195,20 @@ def build(name="ota1", cmfb="sc", fs=4e6, mut=None, sizes=None, boost=False):
     w([mos("mrst", "ctl", "rstb", "ivbl0", "vdd", c["dev"], c["W"], c["L"]),
        mos("mrsb", "bli", "rstb", "ivbl0", "vdd", c2["dev"], c2["W"], c2["L"])])
     on_, op_ = co["n"], co["p"]
+    # WO-36 (D68) broken copies of the start-up row: clamp_stuck = output TG gates tied on (ctl / bli clamps still follow
+    # rstb); clamp_lv50 = output clamp reference at V_OCM + 50 mV (wrong level)
+    vcl = "vcl" if "clamp_lv50" in mt else "vocm"
+    if vcl != "vocm":
+        w(["Vclx vcl vocm 0.05"])
+    gn_, gp_ = ("vdd", "vss") if "clamp_stuck" in mt else ("rst", "rstb")
     if "clamp_weak" in mt:   # WO-32 broken copy: PMOS-only output clamp at W / 4 (the pre-D65 clamp was PMOS-only, W 4)
         w([mos("mrsop", "outp", "rstb", "vocm", "vdd", op_["dev"], op_["W"] / 4, op_["L"]),
            mos("mrson", "outn", "rstb", "vocm", "vdd", op_["dev"], op_["W"] / 4, op_["L"])])
     else:   # D65 (WO-32): output clamp = transmission gate; n gate rst = NOT rstb (local 3.3 V inverter), p gate rstb
         w([mos("mrin", "rst", "rstb", "vss", "vss", ci["n"]["dev"], ci["n"]["W"], ci["n"]["L"]),
            mos("mrip", "rst", "rstb", "vdd", "vdd", ci["p"]["dev"], ci["p"]["W"], ci["p"]["L"])]
-          + [mos(f"mrso{s_}n", o_, "rst", "vocm", "vss", on_["dev"], on_["W"], on_["L"]) for s_, o_ in (("p", "outp"), ("n", "outn"))]
-          + [mos(f"mrso{s_}p", o_, "rstb", "vocm", "vdd", op_["dev"], op_["W"], op_["L"]) for s_, o_ in (("p", "outp"), ("n", "outn"))])
+          + [mos(f"mrso{s_}n", o_, gn_, vcl, "vss", on_["dev"], on_["W"], on_["L"]) for s_, o_ in (("p", "outp"), ("n", "outn"))]
+          + [mos(f"mrso{s_}p", o_, gp_, vcl, "vdd", op_["dev"], op_["W"], op_["L"]) for s_, o_ in (("p", "outp"), ("n", "outn"))])
     if "cm_open" in mt:   # DC: ctlg = ctl; AC: m_plc gates grounded. Dummy m_plc pair keeps the ctl gate load (gate ctl,
         # drain forced to V(sa)/V(sb) by B sources, so Cgs/Cgd on ctl see the same AC voltages as in the closed copy)
         pc = z["m_plc"]

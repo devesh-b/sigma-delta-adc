@@ -22,14 +22,15 @@ WO-30 rows (D63 basis; expected values from SPEC row 98 / D63 / CL-2 / CL-7 / SP
   * Diff step = the real worst per-cycle step, c1 (u_max + 1) VREF = 0.486 V diff (SPEC OTA1 GBW row; loop bound), as a
     10 ns charge pulse at the period start. The WO-27..29 0.8 V step overstated the per-cycle charge by 1.65x and was still
     slewing at +22.5 ns; at the sampling instants slewing has ended. TB9_DV_DIFF overrides (info runs).
+  * Start-up (gate, D68): ph2 instants within 10 mV of the steady state by 4 us AND |steady state - V_OCM| <= 10 mV.
   * Start-up (gate): outputs pre-charged to VDD / 0, integrator held in reset, start-up clamp (rstb low: ctl, bli -> V_BL0,
     outputs -> V_OCM) held 2 T (WO-31, D64: with Cr 0.05 pF the Cc charge mode decays fast enough; an 8 T copy, sulo8,
     runs as info); |V_cm - V_OCM| <= 10 mV over the last clock period before 4 us.
   Events start at 3.0 us (2.5 us after the 2 T clamp release of the ev copies; the Cc charge mode decays with
   tau = T Cc / Cr, ~1.1 us at the old Cr 0.025 pF, WO-30), run to 5.5 us.
 Broken copies (own deck, each must REJECT on the stated row): mcc4 = Cc / 4 (any row; the ph1 static row: the charge
-packet / 2 Cc grows 4x), masy = 1e-4 of the CM-step charge onto one island (CM-to-DM row), mio = int_off + vbl0x2 (start-up),
-mcr05 = Cr / 2 = the pre-D64 0.025 pF with the 2 T clamp (start-up; WO-30 measured 14-34 mV).
+packet / 2 Cc grows 4x), masy = 1e-4 of the CM-step charge onto one island (CM-to-DM row), mio = int_off + vbl0x2 (start-up abs term, D68), mcnr / mcst / mclv
+(clamp never released / output clamp stuck on / output clamp to V_OCM + 50 mV; start-up, WO-36).
 Setup per copy: OTA1 (cmfb="sc", boost, fs 4 MHz, ph1 / ph2 non-overlapping by g = 0.025/fs), Cint 4 pF out -> island
 (negative feedback, WO-29), Cs1 0.5 pF island -> ground, output routing C_RT; reset = island shunt to V_ICM (isl) + ideal
 output short (gen_tier1 style); chopper static.
@@ -72,20 +73,24 @@ NOM = [("ev", "ev", None), ("ev0", "ev0", None), ("suhi", "su_hi", None), ("sulo
 INFO = {"ev0", "sulo8", "masy0"}
 # WO-32: masy is the broken copy of the u-dependent CM-to-DM row: its island charge scales with the DM level (dvp: ASYM x qc,
 # dvz: none), so the twin difference changes with the signal. masyz (DM level 0) is its helper (no verdict). mclw = PMOS-only
-# output clamp at W / 4 (start-up row, su_lo: the PMOS is weakest pulling up from 0 V).
+# WO-36 (D68): mclw and mcr05 dropped (with the TG clamp they reach the band by 3 us; start-up is accepted as insensitive to
+# Cr and clamp strength). New start-up broken copies: mcnr = clamp never released (rstb held low, tb token rst_never),
+# mcst = output TG stuck on (ctl / bli clamps release), mclv = output clamp to V_OCM + 50 mV. mio must REJECT on the abs term.
 MUT = [("mcc4", "ev", "cc_div4"), ("masy", "ev", "cm_asym"), ("masy0", "ev0", None), ("masyz", "ev", "cm_asym+dvz"),
-       ("masyz0", "ev0", "dvz"), ("mio", "su_hi8", "int_off+vbl0x2"), ("mcr05", "su_lo", "cr_x05"), ("mclw", "su_lo", "clamp_weak")]
-EXPECT = {"mcc4": "", "masy": "CM-to-DM u-dep", "mio": "start-up", "mcr05": "start-up", "mclw": "start-up"}
+       ("masyz0", "ev0", "dvz"), ("mio", "su_hi8", "int_off+vbl0x2"), ("mcnr", "su_lo", "rst_never"), ("mcst", "su_lo", "clamp_stuck"),
+       ("mclv", "su_lo", "clamp_lv50")]
+EXPECT = {"mcc4": "", "masy": "CM-to-DM u-dep", "mio": "start-up abs", "mcnr": "start-up", "mcst": "start-up",
+          "mclv": "start-up"}
 HELPER = {"masyz"}
 TWIN = {"ev": "ev0", "masy": "masy0", "masyz": "masyz0", "mmp": "mmp0", "mmz": "mmz0", "mmn": "mmn0"}
 # WO-32 (D65 M2) 3 sigma mismatch deck (--mm): the same ev / ev0 twins at DM levels +, 0, - (diff step +0.486, none, -0.486 V)
 MM = [(f"mm{l}{s}", k, "mm3" + t) for l, t in (("p", ""), ("z", "+dvz"), ("n", "+dvn")) for s, k in (("", "ev"), ("0", "ev0"))]
 UDEP = {"mmp": ("mmp", "mmz", "mmn"), "masy": ("masy", "masyz", None)}   # row owner: (+ level, 0 level, - level)
-TBTOK = {"cm_asym", "dvz", "dvn"}    # testbench-only tokens (not passed to netlist.build)
+TBTOK = {"cm_asym", "dvz", "dvn", "rst_never"}    # testbench-only tokens (not passed to netlist.build)
 
 
 def copy(x, kind, sub, vd, mut=None):
-    rst = "rstb8" if kind.endswith("8") else "rstb"
+    rst = "0" if "rst_never" in NL.toks(mut) else "rstb8" if kind.endswith("8") else "rstb"   # WO-36: mcnr, rstb held low
     L = [f"X{x} vdd 0 inp_{x} inn_{x} outp_{x} outn_{x} vicm vocm ibtp_{x} ibn_{x} ibp_{x} ivbnc_{x} ivbpc_{x} ivbl0_{x} "
          f"vdd 0 lv 0 isl_{x} ph1 ph1b ph2 ph2b {rst} {sub}"]
     for p_, i_ in NL.bias_currents(True, mut).items():
@@ -253,9 +258,12 @@ def check_su(tm, cm):
     err = float(np.max(e2[j]))
     out = np.nonzero(e2 > TOL)[0]
     t_in = float(t2[out[-1] + 1]) if len(out) and out[-1] + 1 < len(t2) else (float(t2[0]) if not len(out) else float("nan"))
+    # WO-36 (D68): absolute term, |steady state - V_OCM| <= TOL (the relative-only row passed mio, 119 mV off V_OCM)
+    f_ = [] if err <= TOL else [f"start-up {err * 1e3:.2f} mV at ph2 instants (>= {(T_STOP - T) * 1e6:.2f} us)"]
+    if not abs(ss2 - S.V_OCM) <= TOL:
+        f_.append(f"start-up abs: steady state {(ss2 - S.V_OCM) * 1e3:.2f} mV off V_OCM")
     return (dict(err_ph2_mV=round(err * 1e3, 3), cm_ss_ph2_mV=round((ss2 - S.V_OCM) * 1e3, 3),
-                 t_enter_band_ph2_us=round(t_in * 1e6, 3), info_err_last_T_vs_VOCM_mV=round(err_old * 1e3, 3)),
-            [] if err <= TOL else [f"start-up {err * 1e3:.2f} mV at ph2 instants (>= {(T_STOP - T) * 1e6:.2f} us)"])
+                 t_enter_band_ph2_us=round(t_in * 1e6, 3), info_err_last_T_vs_VOCM_mV=round(err_old * 1e3, 3)), f_)
 
 
 def main():
