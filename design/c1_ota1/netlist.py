@@ -51,6 +51,9 @@ WO-28 (D61): dual-path CMFB. Cc on ctl, Cr refreshed to (vocm, bli); gm-C follow
 m_it, C_INT to vdd); start-up clamps (rstb low) ctl, bli -> ivbl0 and outp, outn -> vocm. Tokens: int_off (broken copy:
 bli tied to ivbl0, the WO-26 passive loop), cm_open (now with a dummy m_plc pair on ctl), cc_div4, vbl0x2 (ivbl0 x2),
 cr_x2 (WO-30 info: Cr x 2). cr_x05 (WO-31: Cr / 2 = the pre-D64 0.025 pF, tb9 start-up broken copy).
+WO-32 (D65): output start-up clamp = transmission gate (OUT_RST n/p, gate rst from a local rstb inverter RST_INV), token
+clamp_weak = PMOS-only clamp at W / 4 (broken copy); mm3 = 3 sigma mismatch (Cc, Cr p/n; min1 gate offset, sizes_draft MM3);
+ibtp85 (ibtp x 0.85, the bkt copy), ibtp75 (ibtp x 0.75, the opac SR broken copy mtlo).
 The WO-27 tokens cm_unity / cmbw4 and node cms are gone.
 mut is a '+'-joined token list: structural tokens nc_short, ref_composite (D58 4x4 composites, broken copy of the D59
 ratio rows), kp_fixed; bias-scaling tokens (bias_currents only) ibn105 (ibn x1.05), ibtp90 / ibtp112 (ibtp x0.90 /
@@ -162,7 +165,7 @@ def build(name="ota1", cmfb="sc", fs=4e6, mut=None, sizes=None, boost=False):
     w(sw("Sisl1", "inp", "vicm", "isl", "isl") + sw("Sisl2", "inn", "vicm", "isl", "isl"))
     # core
     w([dev("m_t", "mt", "tail", "ibtp", "vdd", "vdd", z),
-       dev("m_in", "min1", "da", "gp", "tail", "tail", z), dev("m_in", "min2", "db", "gm", "tail", "tail", z),
+       dev("m_in", "min1", "da", "gpm" if "mm3" in mt else "gp", "tail", "tail", z), dev("m_in", "min2", "db", "gm", "tail", "tail", z),
        dev("m_pp", "mpp1", "fa", "vss", "da", "da", z), dev("m_pp", "mpp2", "fb", "vss", "db", "db", z),
        dev("m_n", "mn1", "fa", "ibn", "vss", "vss", z), dev("m_n", "mn2", "fb", "ibn", "vss", "vss", z)])
     # fold chopper: fa/fb -> NMOS cascode sources xa/xb (chlp straight, chln crossed)
@@ -182,12 +185,23 @@ def build(name="ota1", cmfb="sc", fs=4e6, mut=None, sizes=None, boost=False):
     # cr_x05 = Cr / 2 = the old 0.025 pF (tb9 start-up broken copy)
     cc = S.C_CMFB_SENSE / (4.0 if "cc_div4" in mt else 1.0)
     cr = S.C_CMFB_REFRESH * (2.0 if "cr_x2" in mt else 0.5 if "cr_x05" in mt else 1.0)
-    w([f"Ccp outp ctl {cc:g}", f"Ccn outn ctl {cc:g}"])
-    c, c2, co = S.CTL_RST, S.BLI_RST, S.OUT_RST
+    # WO-32 mm3: 3 sigma mismatch copy (sizes_draft MM3): Cc and Cr p / n at +-1/2 of the 3 sigma dC/C, min1 gate offset dvt
+    mm = S.MM3 if "mm3" in mt else dict(cc=0.0, cr=0.0)
+    if "mm3" in mt:
+        w([f"Vmm gpm gp {S.MM3['dvt']:.6g}"])
+    w([f"Ccp outp ctl {cc * (1 + mm['cc'] / 2):g}", f"Ccn outn ctl {cc * (1 - mm['cc'] / 2):g}"])
+    c, c2, co, ci = S.CTL_RST, S.BLI_RST, S.OUT_RST, S.RST_INV
     w([mos("mrst", "ctl", "rstb", "ivbl0", "vdd", c["dev"], c["W"], c["L"]),
-       mos("mrsb", "bli", "rstb", "ivbl0", "vdd", c2["dev"], c2["W"], c2["L"]),
-       mos("mrsop", "outp", "rstb", "vocm", "vdd", co["dev"], co["W"], co["L"]),
-       mos("mrson", "outn", "rstb", "vocm", "vdd", co["dev"], co["W"], co["L"])])
+       mos("mrsb", "bli", "rstb", "ivbl0", "vdd", c2["dev"], c2["W"], c2["L"])])
+    on_, op_ = co["n"], co["p"]
+    if "clamp_weak" in mt:   # WO-32 broken copy: PMOS-only output clamp at W / 4 (the pre-D65 clamp was PMOS-only, W 4)
+        w([mos("mrsop", "outp", "rstb", "vocm", "vdd", op_["dev"], op_["W"] / 4, op_["L"]),
+           mos("mrson", "outn", "rstb", "vocm", "vdd", op_["dev"], op_["W"] / 4, op_["L"])])
+    else:   # D65 (WO-32): output clamp = transmission gate; n gate rst = NOT rstb (local 3.3 V inverter), p gate rstb
+        w([mos("mrin", "rst", "rstb", "vss", "vss", ci["n"]["dev"], ci["n"]["W"], ci["n"]["L"]),
+           mos("mrip", "rst", "rstb", "vdd", "vdd", ci["p"]["dev"], ci["p"]["W"], ci["p"]["L"])]
+          + [mos(f"mrso{s_}n", o_, "rst", "vocm", "vss", on_["dev"], on_["W"], on_["L"]) for s_, o_ in (("p", "outp"), ("n", "outn"))]
+          + [mos(f"mrso{s_}p", o_, "rstb", "vocm", "vdd", op_["dev"], op_["W"], op_["L"]) for s_, o_ in (("p", "outp"), ("n", "outn"))])
     if "cm_open" in mt:   # DC: ctlg = ctl; AC: m_plc gates grounded. Dummy m_plc pair keeps the ctl gate load (gate ctl,
         # drain forced to V(sa)/V(sb) by B sources, so Cgs/Cgd on ctl see the same AC voltages as in the closed copy)
         pc = z["m_plc"]
@@ -214,7 +228,7 @@ def build(name="ota1", cmfb="sc", fs=4e6, mut=None, sizes=None, boost=False):
                 return [mos(nm + "n", a, g, b, "vss", n["dev"], 0.42, n["L"]), mos(nm + "p", a, gb, b, "vdd", p["dev"], 0.42, p["L"])]
             return tg(nm, a, b, g, gb)
         for s_, o in (("p", "outp"), ("n", "outn")):
-            w([f"Cr{s_} ra{s_} rb{s_} {cr:g}"])
+            w([f"Cr{s_} ra{s_} rb{s_} {cr * (1 + (mm['cr'] if s_ == 'p' else -mm['cr']) / 2):g}"])
             w(cs(f"Sr1a{s_}", f"ra{s_}", "vocm", "ph1", "ph1b") + cs(f"Sr1b{s_}", f"rb{s_}", "bli", "ph1", "ph1b")
               + cs(f"Sr2a{s_}", f"ra{s_}", o, "ph2", "ph2b") + cs(f"Sr2b{s_}", f"rb{s_}", "ctl", "ph2", "ph2b"))
     elif cmfb == "dc":   # averaged Cr pair: i = (V_outcm - V_ctl - V_vocm + V_bli) / R into ctl and out of bli
@@ -238,7 +252,7 @@ def bias_currents(boost, mut=None):
     if "kp_fixed" in t:
         out["ivbpc"], out["ivbnc"] = m * S.I_NC * S.I_BPD_FRAC, m * S.I_NC * S.I_BND_FRAC
     for tok, port, f in (("ibn105", "ibn", 1.05), ("ibtp90", "ibtp", 0.90), ("ibtp112", "ibtp", 1.12), ("vbl0x4", "ivbl0", 4.0),
-                         ("ibtp95", "ibtp", 0.95), ("vbl0x2", "ivbl0", 2.0)):
+                         ("ibtp95", "ibtp", 0.95), ("vbl0x2", "ivbl0", 2.0), ("ibtp85", "ibtp", 0.85), ("ibtp75", "ibtp", 0.75)):
         if tok in t:
             out[port] *= f
     return out

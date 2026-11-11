@@ -215,5 +215,26 @@ SIZES["m_il"] = dict(dev="pfet_g5v0d10v5", WF=3.0, M=2, L=16.0, src="hand")    #
 SIZES["m_it"] = dict(SIZES["m_n"], M=INTEG["tail"], src="hand")                 # tail: m_n unit finger(s), gate ibn
 C_INT = 2.0e-12          # bli MIM to vdd (~1000 um2): f_z = gm_ia / (2 pi C_INT) ~0.4 MHz base / ~0.75 MHz boost (hand, <= f_cm / 10)
 BLI_RST = dict(CTL_RST)  # bli -> ivbl0 clamp while rstb low (start-up only, D57)
-OUT_RST = dict(dev="pfet_g5v0d10v5", W=4.0, L=0.5, src="hand")   # outp / outn -> vocm while rstb low (start-up only)
+# outp / outn -> vocm while rstb low (start-up only). D65 (WO-32): transmission gate instead of the PMOS-only clamp (W 4).
+# At V_OCM 1.5 V the 3.3 V PMOS (bulk vdd, |V_T| ~1.3 V with body effect) has Vsg - |V_T| ~0.2 V when the output starts at
+# 0 V; the NMOS (gate at vdd, terminals <= 1.5 V) carries that side with ~0.8 V overdrive. n W 2 / p W 4, L 0.5 each: Ron of a
+# few kOhm into ~1 pF, tau of a few ns against the 2 T (500 ns) clamp. 0 uA static (switch plus a local rstb inverter).
+OUT_RST = dict(n=dict(dev="nfet_g5v0d10v5", W=2.0, L=0.5), p=dict(dev="pfet_g5v0d10v5", W=4.0, L=0.5), src="hand")
+RST_INV = dict(n=dict(dev="nfet_g5v0d10v5", W=0.42, L=0.5), p=dict(dev="pfet_g5v0d10v5", W=0.84, L=0.5), src="hand")
 REPLICA_DV_MAX = 0.15    # WO-28 item 4: |V_rnd - V_fa| (sink replica drain vs m_n drain) [V]
+
+# WO-32 (D65 M2): 3 sigma mismatch copy of tb9 (token mm3; DESIGN.md 2.12). MIM: the sky130 PDK has no local MIM mismatch
+# model (only the global process parameter 'mim', libs.tech/ngspice/parameters/critical.spice), so a hand Pelgrom
+# coefficient is used: A_C = 1 %.um (conservative end of the ~0.3-1 %.um MIM range), density 2 fF/um2 (camimc 2.0e-15,
+# parameters/montecarlo.spice). sigma(dC/C) = A_C sqrt(1/A + 1/A) (same convention as sig_vt in c1b_opac). Input pair
+# pfet_01v8 at A_VT 12 mV.um, applied as a series gate source on min1 (hand delvto; the PDK MC is not used).
+MIM_AC, MIM_DENS = 0.01, 2.0e-15
+A_VT_PAIR = 12e-3
+
+
+def _mm_c(c):
+    return N_SIGMA * MIM_AC * (2.0 / (c / MIM_DENS * 1.0)) ** 0.5
+
+
+MM3 = dict(cs=_mm_c(0.5e-12), cint=_mm_c(4.0e-12), cc=_mm_c(C_CMFB_SENSE), cr=_mm_c(C_CMFB_REFRESH),
+           dvt=N_SIGMA * A_VT_PAIR * (2.0 / (SIZES["m_in"]["WF"] * SIZES["m_in"]["L"] * SIZES["m_in"]["M"])) ** 0.5)

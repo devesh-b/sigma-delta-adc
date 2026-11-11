@@ -589,3 +589,39 @@ Rev C deltas: pair 120/0.5 gives boost GBW 27.0–43.3 MHz (fs/125 worst) and β
 - **CL-4 number:** "β1 ≥ 0.83 (Cp_vg ≤ 0.32 pF per side); rev B design value 0.846 (Cp_vg 0.23 pF incl. 3.3 V chopper and island switches)." Reason: the gm-first pair (80/0.5) keeps Cgg at the rev A level, so β1 ≈ 0.80 is not needed.
 - **CL-5 (new, OTA1 devices row):** "vg-side chopper and island switches are 3.3 V devices on level-shifted VAPWR clocks; island and reset switches are closed by default while rst_n is low or the bias is invalid (bounds vg; replaces any tail clamp)." Reason: REVIEW-C1a M4/M5, SIM Ron of nfet_01v8 at 1.62 V > 60 MΩ.
 - **CL-6 (new, OTA1 slew row, wording only):** "C_L ≥ 1.4 pF is the tier-1 lump; the itemised real load is 0.78 pF (integrate) / 0.90 pF (hold), and the conservative sum is 1.30 pF (§2.1). SR is gated at 1.4 pF." Reason: review m1.
+
+## 2.12 WO-32 (D65): knee-based SR floor, C6 window, TG start-up clamp, CM-to-DM bound
+
+**SR floor (CL-9).** Row: SR − 3σ ≥ floor at 1.4 pF (σ = hand Pelgrom σ(I_tail), A_VT 12). Floor = knee: base 10.3 V/µs
+(O2 OTA1 knee 10.23–10.28, N 1024, 2 MHz, share 1.333 ppm, D44); boost 20.6 V/µs = 2 × base knee (tier-1 boost point scales
+gm, SR, fp2, t_half together; base share, so conservative against the 3.33 ppm boost share). The 1.4 pF basis is itself
+conservative (real integrate load ≈ 0.86 pF). 12.5 / 25 V/µs remain the design point. Gate B broken copies: sr95 (gross)
+and srknee (all six bias ports × 0.624, SR 16.5 V/µs at 1.4 pF = 0.8 × the boost floor). opac SR broken copy: ibtp75.
+
+**C6 reference window (info).** Per corner and mode: IREF_win_lo = floor / (SR − 3σ) − 1, IREF_win_hi = 1.08·I_TAIL /
+(I_tail + 3σ) − 1. The D47 trim (±20 %, step ≤ 6 %, residual ≤ ±3 %) centres the reference; the calibration picks the
+lowest code on the plateau, so the trimmed point sits on the low side of the window. bkt = ibtp × 0.85 (the window low edge,
+reached by the untrimmed reset code and the low calibration codes): K_P must still track there.
+
+**Start-up clamp (D65 m7).** outp / outn → vocm through a transmission gate (n W 2 / p W 4, L 0.5, 3.3 V devices; n gate =
+rst from a local rstb inverter n 0.42 / p 0.84). At V_OCM 1.5 V the PMOS alone has ≈ 0.2 V overdrive from a 0 V output
+(bulk at vdd), the NMOS ≈ 0.8 V. 0 µA static. Broken copy clamp_weak: PMOS only, W/4. tb9 start-up gate: CM at the ph2
+sampling instants within 10 mV of its steady state (mean of the last two ph2 ends, 5.5 µs) from 3.75 µs on.
+
+**CM-to-DM bound (D65 M2), from the S-model (model/iadc.py).** An error d_k [V diff] on x1 at the ph2 instant k (Cs2
+samples x1) enters the estimate as d_k / (c1·VREF), weighted by (N − k)/W (weights sum to 1 for an error that recurs every
+sample); INL is in ppm of FSR 2. Split d_k = a + b·x1,k + r_k(u):
+- a (constant: the CM-event charge × the CM-to-DM conversion ε0 of the mismatched circuit) → a constant offset
+  a / (c1·VREF) in û → removed by the endpoint line (and by system chop). **Does not count.**
+- b·x1,k (proportional to the integrator state) is a per-cycle leak of x1, the same form as the finite-gain leak
+  x1/(β·A). Its INL is the finite-gain INL of the CL-1b table gate (∝ N·b): flat 60 dB (b ≈ 1.2e-3) gives 1.47 ppm (WO-22),
+  so b ≲ 4e-4 keeps it under 0.5 ppm.
+- r(u), the nonlinear remainder: worst case (full signal dependence, every sample) INL = r / (2·c1·VREF); limit
+  0.1 × the 5 ppm boost share → |r| ≤ 0.256 µV.
+Gate (conservative, b and r together): max_k |d_±(t_k) − d_0(t_k)| ≤ 0.256 µV, with ev / ev0 twins at DM levels +0.486,
+0, −0.486 V (the real worst per-cycle step); the constant d_0 is reported, not gated. Mechanisms covered: (i) ε depending on
+the DM operating point (measured); (ii) Cc p/n mismatch δc turns the DM swing into CM at ctl (≤ δc·vd/2, vd ≤ 1.21 V),
+which ε0 converts to DM: hand row ε0·δc·1.21/2 ≤ 0.256 µV with ε0 = d_0 / 30 mV from the mismatch copy.
+3σ mismatch copy (token mm3, sizes_draft MM3), p side +½, n side −½: MIM A_C 1 %·µm (hand; the PDK has no local MIM
+mismatch model), 2 fF/µm²: Cs 0.27 %, Cint 0.095 %, Cc 0.60 %, Cr 0.85 %; input pair (pfet_01v8, W 120 L 0.5) ΔV_T
+3σ = 6.6 mV at A_VT 12 mV·µm as a series gate source on min1. masy (island charge ∝ DM level) stays the broken copy.

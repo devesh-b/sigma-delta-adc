@@ -25,6 +25,10 @@ C_OUT_EXT = 0.02e-12
 # REVIEW-C1b M2: the real integrate-phase load, not the 1.4 pF spec basis: Cint1 (1 - beta1) + Cc + output routing (~0.84-0.86 pF)
 C_INT_PHASE = P.CINT1 * (1.0 - S.BETA1) + S.C_CMFB_SENSE + C_OUT_EXT
 SR95_SCALE = 9.5e6 * C_INT_PHASE / (S.I_TAIL * S.BOOST)   # ~0.22: ALL six bias ports scale together (op point stays consistent)
+# WO-32 (D65 m5): near-knee copy srknee: ALL six ports scaled so that the boost SR at the SPEC basis (I_tail / 1.4 pF) is
+# 0.8 x the new boost floor (20.6 V/us, c1b_opac.SR_FLOOR) = 16.5 V/us; must REJECT, or the measured INL bounds the knee.
+SRKNEE_SCALE = 0.8 * 20.6e6 * 1.4e-12 / (S.I_TAIL * S.BOOST)
+SCALES = {"sr95": SR95_SCALE, "srknee": SRKNEE_SCALE}
 AUDIT_TYPES = {"X", "I"}   # the audit inventories behavioural parts only: allow exactly the netlisted-OTA element types
 AUDIT_TOKENS = (".lib", ".include", "subckt", "sky130", "nfet", "pfet")
 
@@ -119,8 +123,8 @@ def cfg(a):
     sub = os.path.join(a.out, "ota1_sc.spice")
     open(sub, "w").write(NL.build("ota1", cmfb="sc", fs=4e6, boost=True))
     bias = NL.bias_currents(True)
-    if a.copy == "sr95":
-        bias = {k: v * SR95_SCALE for k, v in bias.items()}   # M2: all six ports, not the tail alone
+    if a.copy in SCALES:
+        bias = {k: v * SCALES[a.copy] for k, v in bias.items()}   # M2: all six ports, not the tail alone
     u = TB.u_points(a.m, 0.9)
     if a.part:
         i, k = map(int, a.part.split("/"))
@@ -137,7 +141,7 @@ def main():
     ap.add_argument("--opt", default="O1")
     ap.add_argument("--n", type=int, default=1024)
     ap.add_argument("--m", type=int, default=21)
-    ap.add_argument("--copy", default="nom", choices=("nom", "sr95"))
+    ap.add_argument("--copy", default="nom", choices=("nom", "sr95", "srknee"))
     ap.add_argument("--corner", type=int, default=3)   # CORNERS9[3] = fs/125/3.0
     ap.add_argument("--part", default=None)
     ap.add_argument("--deck-timeout", type=int, default=7000)
@@ -147,12 +151,12 @@ def main():
         import glob
         fs = sorted(glob.glob(os.path.join(a.out, f"gb_{a.copy}_{a.opt}_N{a.n}_p*o{a.combine}.json")))
         try:
-            r = combine(fs, a.combine, broken=a.copy == "sr95")   # WO-29: broken copy: healthy parts > gate => REJECTED
+            r = combine(fs, a.combine, broken=a.copy in SCALES)   # WO-29: broken copy: healthy parts > gate => REJECTED
         except AssertionError as e:
             print(f"COMBINE INVALID: {e}")
             sys.exit(2)
         print(json.dumps(r))
-        if a.copy == "sr95":
+        if a.copy in SCALES:
             v = "REJECTED (good)" if r["healthy"] and r["inl_ep_ppm"] > GATE else ("PASSED (check is blind)" if r["healthy"] else "INVALID")
             print("broken copy", v)
             sys.exit(0 if v.startswith("REJ") else 1)
@@ -163,6 +167,8 @@ def main():
     TB.DECK_TIMEOUT_S = a.deck_timeout
     c, corner = cfg(a)
     tag = f"gb_{a.copy}_{a.opt}_N{a.n}" + (f"_p{a.part.replace('/', 'o')}" if a.part else "")
+    if a.copy == "srknee":
+        print(f"srknee copy: bias scale {SRKNEE_SCALE:.4f} on all six ports; boost SR {S.I_TAIL * S.BOOST * SRKNEE_SCALE / 1.4e-12 / 1e6:.2f} V/us at 1.4 pF")
     if a.copy == "sr95":
         print(f"sr95 copy: bias scale {SR95_SCALE:.4f} on all six ports; expected boost SR {S.I_TAIL * S.BOOST * SR95_SCALE / C_INT_PHASE / 1e6:.2f} "
               f"V/us at the integrate-phase load {C_INT_PHASE * 1e12:.3f} pF (nominal {S.I_TAIL * S.BOOST / C_INT_PHASE / 1e6:.1f}); "
@@ -187,7 +193,7 @@ def main():
     json.dump(row, open(os.path.join(a.out, tag + ".json"), "w"), indent=0, default=str)
     print(f"{tag} {corner}: INL ep {inl:.3f} ppm (gate {GATE}, share {GATE_SHARE:.2f}) runtime {r.get('runtime_s', 0):.0f}s "
           f"problems {r['problems'][:4]}")
-    if a.copy == "sr95":
+    if a.copy in SCALES:
         if healthy and inl > GATE:
             print("broken copy REJECTED (good)")
             sys.exit(0)

@@ -24,8 +24,10 @@ WO-26 (D59) rows replace the I_tail +-3 % row and the blind K_P row:
   I_tail <= I_TAIL_CEIL x I_TAIL (x BOOST); K_P tracking: copy "bkp" (ibn x1.05, I_NC ~+8 %) vs "blump", |dK_P/K_P| <= 2 %;
   |V_OCM error| <= 38 mV (SPEC row 98 / CL-2) at every copy. K_P +-10 % of target stays as a row.
   Broken copies (own deck, each must fail its TARGET row with a converged op): tt nc_short -> precision A0; tt
-  ref_composite -> ratio; tt kp_fixed+ibn105 vs kp_fixed (helper) -> K_P tracking; tt boost ibtp90 -> SR; tt boost
+  ref_composite -> ratio; tt kp_fixed+ibn105 vs kp_fixed (helper) -> K_P tracking; tt boost ibtp90 -> SR; WO-32: mtlo is ibtp75 (ibtp90 sits inside the knee-based window); tt boost
   ibtp112 -> I_tail ceiling; ff/125 boost vbl0x4 -> V_OCM.
+WO-32 (D65): SR floor 10.3 / 20.6 V/us (knee-based, SPEC CL-9), ceiling unchanged (power row), info row IREF_win_lo/hi_pct
+  (the I_REF_btp window the two rows allow per corner), bkt = ibtp x 0.85 (C6 window low edge, K_P tracking).
 
 Rows (expected values from SPEC / CL / RC-M1, not from this code):
   op converges, no NaN; core device margins Vds - Vdsat >= 50 mV (switches are triode by design, composite-reference
@@ -62,7 +64,11 @@ C_ROUTE = 0.035e-12      # vg routing estimate per side (CL-4; pair 12 fingers, 
 A0_MIN = 80.3
 K_TOL = 0.10
 RATIO_TOL, RATIO_SPREAD = 0.02, 0.02
-SR_FLOOR = {False: 12.5e6, True: 25e6}     # V/s at C_SR (SPEC row 95)
+# D65 (WO-32, SPEC CL-9): SR floor re-based on the knee: SR - 3 sigma >= floor at C_SR. Base 10.3 V/us = the O2 OTA1 knee
+# 10.23-10.28 (D44, r3, N 1024, 2 MHz, share 1.333 ppm); boost 20.6 V/us = 2 x that knee (the tier-1 boost point scales gm, SR,
+# fp2 and t_half together, SPEC OTA1 GBW row; taken at the base share 1.333, conservative against the boost share 3.33).
+# Gate B checks it with the srknee copy (0.8 x the boost floor, c1b_gateb). The old 12.5 / 25 V/us become the design point.
+SR_FLOOR = {False: 10.3e6, True: 20.6e6}   # V/s at C_SR (SPEC row 95, CL-9)
 C_SR = 1.4e-12
 I_TAIL_CEIL = 1.08                         # I_tail ceiling, x design (power / CL-8 budget; reviewer: +-4 % costs nothing)
 VOCM_MAX = 38e-3                           # SPEC row 98 / CL-2 (passive SC CMFB, before the CM amp: info since WO-27)
@@ -89,7 +95,7 @@ def sig_i(gm_i, a1, a2, avt=None):
 # (copy, mut tokens, target row or None = helper copy (no verdict), boost)
 MUTANTS = {("tt", 27): [("mutnc", "nc_short", "precision A0", False), ("mutrc", "ref_composite", "I_tail ceiling", False),
                         ("mkp0", "kp_fixed", None, False), ("mkp5", "kp_fixed+ibn105", "K_P tracking", False),
-                        ("mtlo", "ibtp90", "SR", True), ("mthi", "ibtp112", "I_tail ceiling", True)],
+                        ("mtlo", "ibtp75", "SR", True), ("mthi", "ibtp112", "I_tail ceiling", True)],
            ("ff", 125): [("mvo", "int_off", "V_OCM", False)]}   # WO-28: slow path off -> passive loop
 # WO-27: f_cm broken copy (Cc / 4, boost, integrate load) with its loop-break helper; appended to the tt mutant deck
 # WO-29 (D62): f_cm is info, so mcc4 is a helper here (no verdict); its broken-copy role is the tb9 event rows (c1b_tb9)
@@ -148,7 +154,9 @@ def copies_for(c, t):
         for ld in LOADS:
             OPEN[f"{m}{ld}"] = f"o{m}{ld}"
     # K_P tracking copies (ibn x1.05, ibtp x0.95) and the cm_open loop-break helpers (f_cm return ratio)
-    return cp + [("bkp", False, LOADS["lump"], "ibn105"), ("bkt", False, LOADS["lump"], "ibtp95")] + op
+    # WO-32 (D65): bkt = tail reference at the C6 window low edge (ibtp x 0.85: the untrimmed reset code and the low codes of
+    # the D47 calibration sweep reach it), judged on K_P tracking (the knee must stay the only effect of a low reference)
+    return cp + [("bkp", False, LOADS["lump"], "ibn105"), ("bkt", False, LOADS["lump"], "ibtp85")] + op
 
 
 def mutant_copies(c, t):
@@ -317,6 +325,9 @@ def analyse(vals, x, b, cl, mut, ac, k, vdd, hot):
     res["SR_m3sig_avt8_Vus"] = res["SR_Vus"] * (1 - S.N_SIGMA * res["sig_Itail_pct_avt8"] / 100)   # info
     res["SR_integ_m3sig_Vus"] = res["SR_m3sig_Vus"] * C_SR / LOADS["integ"]                       # info, real load
     res["I_tail_p3sig_uA"] = res["I_tail_uA"] * (1 + k3)
+    # WO-32 (D65 M1) info row: the C6 reference (I_REF_btp) window the SR floor and the ceiling allow at this corner [%]
+    res["IREF_win_lo_pct"] = (SR_FLOOR[b] / (res["SR_m3sig_Vus"] * 1e6) - 1) * 100
+    res["IREF_win_hi_pct"] = (I_TAIL_CEIL * it_t / (res["I_tail_p3sig_uA"] * 1e-6) - 1) * 100
     if not res["SR_m3sig_Vus"] * 1e6 >= SR_FLOOR[b]:
         fails.append(f"SR {res['SR_Vus']:.2f} V/us, -3sig {res['SR_m3sig_Vus']:.2f} < {SR_FLOOR[b] / 1e6:.1f} at {C_SR * 1e12:.1f} pF")
     if not res["I_tail_p3sig_uA"] * 1e-6 <= I_TAIL_CEIL * it_t:

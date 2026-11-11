@@ -70,9 +70,18 @@ DIAG_VEC = bool(DIAG) or bool(os.environ.get("TB9_VEC"))    # also log ctl / bli
 NOM = [("ev", "ev", None), ("ev0", "ev0", None), ("suhi", "su_hi", None), ("sulo", "su_lo", None),
        ("suvb", "su_lo", "vbl0x2"), ("sulo8", "su_lo8", None)]   # WO-31 (D64): Cr 0.05 pF default, 2 T clamp gates
 INFO = {"ev0", "sulo8", "masy0"}
-MUT = [("mcc4", "ev", "cc_div4"), ("masy", "ev", "cm_asym"), ("masy0", "ev0", None), ("mio", "su_hi8", "int_off+vbl0x2"), ("mcr05", "su_lo", "cr_x05")]
-EXPECT = {"mcc4": "", "masy": "CM-to-DM", "mio": "start-up", "mcr05": "start-up"}
-TWIN = {"ev": "ev0", "masy": "masy0"}
+# WO-32: masy is the broken copy of the u-dependent CM-to-DM row: its island charge scales with the DM level (dvp: ASYM x qc,
+# dvz: none), so the twin difference changes with the signal. masyz (DM level 0) is its helper (no verdict). mclw = PMOS-only
+# output clamp at W / 4 (start-up row, su_lo: the PMOS is weakest pulling up from 0 V).
+MUT = [("mcc4", "ev", "cc_div4"), ("masy", "ev", "cm_asym"), ("masy0", "ev0", None), ("masyz", "ev", "cm_asym+dvz"),
+       ("masyz0", "ev0", "dvz"), ("mio", "su_hi8", "int_off+vbl0x2"), ("mcr05", "su_lo", "cr_x05"), ("mclw", "su_lo", "clamp_weak")]
+EXPECT = {"mcc4": "", "masy": "CM-to-DM u-dep", "mio": "start-up", "mcr05": "start-up", "mclw": "start-up"}
+HELPER = {"masyz"}
+TWIN = {"ev": "ev0", "masy": "masy0", "masyz": "masyz0", "mmp": "mmp0", "mmz": "mmz0", "mmn": "mmn0"}
+# WO-32 (D65 M2) 3 sigma mismatch deck (--mm): the same ev / ev0 twins at DM levels +, 0, - (diff step +0.486, none, -0.486 V)
+MM = [(f"mm{l}{s}", k, "mm3" + t) for l, t in (("p", ""), ("z", "+dvz"), ("n", "+dvn")) for s, k in (("", "ev"), ("0", "ev0"))]
+UDEP = {"mmp": ("mmp", "mmz", "mmn"), "masy": ("masy", "masyz", None)}   # row owner: (+ level, 0 level, - level)
+TBTOK = {"cm_asym", "dvz", "dvn"}    # testbench-only tokens (not passed to netlist.build)
 
 
 def copy(x, kind, sub, vd, mut=None):
@@ -83,20 +92,24 @@ def copy(x, kind, sub, vd, mut=None):
         L.append(f"I{p_}_{x} {p_}_{x} 0 {i_:.6e}" if p_ in NL.SINK_PORTS else f"I{p_}_{x} vdd {p_}_{x} {i_:.6e}")
     # WO-29: Cint closes NEGATIVE feedback, outp -> inn and outn -> inp (gen_tier1). TB9_POL_OLD=1: old positive wiring.
     a_, b_ = ("inp", "inn") if os.environ.get("TB9_POL_OLD") else ("inn", "inp")
-    L += [f"Cip_{x} outp_{x} {a_}_{x} {CINT:g}", f"Cin_{x} outn_{x} {b_}_{x} {CINT:g}",
-          f"Csp_{x} inp_{x} 0 {CS1:g}", f"Csn_{x} inn_{x} 0 {CS1:g}",
+    tk_ = NL.toks(mut)
+    mm = S.MM3 if "mm3" in tk_ else dict(cint=0.0, cs=0.0)   # WO-32: p side +1/2, n side -1/2 of the 3 sigma dC/C
+    lev = 0 if "dvz" in tk_ else -1 if "dvn" in tk_ else 1   # WO-32: DM level of the diff step
+    L += [f"Cip_{x} outp_{x} {a_}_{x} {CINT * (1 + mm['cint'] / 2):g}", f"Cin_{x} outn_{x} {b_}_{x} {CINT * (1 - mm['cint'] / 2):g}",
+          f"Csp_{x} inp_{x} 0 {CS1 * (1 + mm['cs'] / 2):g}", f"Csn_{x} inn_{x} 0 {CS1 * (1 - mm['cs'] / 2):g}",
           f"Crp_{x} outp_{x} 0 {C_RT:g}", f"Crn_{x} outn_{x} 0 {C_RT:g}",
           f"Bcm_{x} cm_{x} 0 V = 0.5*(V(outp_{x})+V(outn_{x}))"]
     if kind in ("ev", "ev0"):
         L += [f"Bisl_{x} isl_{x} 0 V = {vd:g}*V(rsw)", f"Srs_{x} outp_{x} outn_{x} rsw 0 SWM"]
-        qd, qc = DV_DIFF / 2 * CINT, DV_CM * LOADS["integ"]
+        qd, qc = lev * DV_DIFF / 2 * CINT, DV_CM * LOADS["integ"]
         t1, t2 = EV[1][1], EV[2][1]
-        L += [f"Idp_{x} 0 inp_{x} PULSE(0 {qd / 10e-9:.6e} {t1:.6e} 0.1n 0.1n 9.9n 1)",
-              f"Idn_{x} inn_{x} 0 PULSE(0 {qd / 10e-9:.6e} {t1:.6e} 0.1n 0.1n 9.9n 1)"]
+        if lev:
+            L += [f"Idp_{x} 0 inp_{x} PULSE(0 {qd / 10e-9:.6e} {t1:.6e} 0.1n 0.1n 9.9n 1)",
+                  f"Idn_{x} inn_{x} 0 PULSE(0 {qd / 10e-9:.6e} {t1:.6e} 0.1n 0.1n 9.9n 1)"]
         if kind == "ev":
             L += [f"Icp_{x} 0 outp_{x} PULSE(0 {qc / 1e-9:.9e} {t2:.6e} 0.1n 0.1n 0.9n 1)",
                   f"Icn_{x} 0 outn_{x} PULSE(0 {qc / 1e-9:.9e} {t2:.6e} 0.1n 0.1n 0.9n 1)"]
-            if "cm_asym" in NL.toks(mut):
+            if "cm_asym" in NL.toks(mut) and lev:   # WO-32: the leak scales with the DM level (none at dvz)
                 # WO-30 run 1: an n/p imbalance of the OUTPUT charge left no DM at the sampling instants (masy PASSED,
                 # 0.01 uV): the DM output is set by the island charge, and output-side charge settles out. A CM event
                 # leaks to DM only as island charge, so the broken copy puts ASYM x the CM-step charge on one island
@@ -124,7 +137,7 @@ def deck(c, t, vd, tag, copies):
          ".model SWI sw vt=1.5 vh=0.1 ron=2k roff=1e14"]   # WO-29 diagnosis: ideal CMFB switches (sw_ideal*)
     subs = {}
     for x, kind, mut in copies:
-        tk = NL.toks(mut) - {"cm_asym"}
+        tk = NL.toks(mut) - TBTOK
         key = "+".join(sorted(tk)) or None
         if key not in subs:
             subs[key] = f"ota1_t9_{(key or 'nom').replace('+', '_')}"
@@ -161,7 +174,35 @@ def first_judged(te):
     return k0 * T + T / 2 - G - 0.5e-9
 
 
-def check_ev(tm, cm, dm=None, dm0=None):
+def udep(tm, col, xs):
+    """WO-32 (D65 M2, DESIGN.md 2.12): u-dependent CM-to-DM part. d_L(t_k) = V_dm,ev - V_dm,ev0 at level L (+, 0, -) at the
+    ph2 instants from the first judged one after the CM step to reset assert. A constant part (d_0) cancels in endpoint INL;
+    the gate is max_k |d_+/-(t_k) - d_0(t_k)| <= LIM_CMDM (the per-sample bound applied to the signal-dependent part only;
+    conservative: its linear-in-x1 share acts as an integrator leak, bounded much more loosely by the finite-gain INL)."""
+    ts, ph = instants(TSTOP_RUN)
+    s_ = (ph == 2) & (ts >= first_judged(EV[2][1]) - 1e-12) & (ts < EV[3][1])
+    d = {}
+    for lv, x in zip(("p", "z", "n"), xs):
+        if x:
+            d[lv] = np.interp(ts[s_], tm, col[x + "_dm"]) - np.interp(ts[s_], tm, col[TWIN[x] + "_dm"])
+    dev_ = max(float(np.max(np.abs(d[lv] - d["z"]))) for lv in d if lv != "z")
+    st = dict(udep_uV=round(dev_ * 1e6, 4), d0_const_uV=round(float(np.max(np.abs(d["z"]))) * 1e6, 4),
+              udep_limit_uV=round(LIM_CMDM * 1e6, 4))
+    if "n" in d:
+        st["lin_uV"] = round(float(np.max(np.abs(d["p"] - d["n"]))) / 2 * 1e6, 4)
+        st["curv_uV"] = round(float(np.max(np.abs(d["p"] + d["n"] - 2 * d["z"]))) / 2 * 1e6, 4)
+    # hand term (DESIGN.md 2.12): Cc p/n mismatch turns the DM swing into a CM signal (<= dc vd / 2, vd <= 1.21 V); that CM
+    # reaches DM through the same conversion eps0 = d_0 / DV_CM measured here
+    eps0 = st["d0_const_uV"] * 1e-6 / DV_CM
+    st["eps0"] = float(f"{eps0:.4g}")
+    st["hand_ccmis_uV"] = round(eps0 * S.MM3["cc"] * 1.21 / 2 * 1e6, 6)
+    fails = [f"CM-to-DM u-dep: {dev_ * 1e6:.4f} uV > {LIM_CMDM * 1e6:.3f} uV"] if not dev_ <= LIM_CMDM else []
+    if not st["hand_ccmis_uV"] <= LIM_CMDM * 1e6:
+        fails.append(f"CM-to-DM u-dep hand Cc term {st['hand_ccmis_uV']} uV > {LIM_CMDM * 1e6:.3f} uV")
+    return st, fails
+
+
+def check_ev(tm, cm, dm=None, dm0=None, total_gate=True):
     ts, ph = instants(TSTOP_RUN)
     v = np.interp(ts, tm, cm)
     ss = {p: float(np.mean(v[ph == p][-2:])) for p in (1, 2)}
@@ -191,30 +232,40 @@ def check_ev(tm, cm, dm=None, dm0=None):
         dmax, floor = float(np.max(np.abs(d[s_]))), float(np.max(np.abs(d[f_])))
         st.update(cmdm_uV=round(dmax * 1e6, 4), cmdm_floor_uV=round(floor * 1e6, 4), cmdm_limit_uV=round(LIM_CMDM * 1e6, 4),
                   cmdm_first_uV=round(float(d[s_][0]) * 1e6, 4))
-        if not dmax <= LIM_CMDM:
-            fails.append(f"CM-to-DM: {dmax * 1e6:.4f} uV > {LIM_CMDM * 1e6:.3f} uV")
+        if not dmax <= LIM_CMDM:   # WO-32: the total includes the constant part (cancels in endpoint INL): info on mm3 copies
+            (fails if total_gate else st.setdefault("info", [])).append(f"CM-to-DM: {dmax * 1e6:.4f} uV > {LIM_CMDM * 1e6:.3f} uV")
         if not floor <= LIM_CMDM / 10:
             fails.append(f"CM-to-DM floor {floor * 1e6:.4f} uV > limit/10 (row invalid)")
     return dict(events=rows, **st), fails
 
 
 def check_su(tm, cm):
+    """WO-32 (D65 m3): gate = CM at the ph2 sampling instants within TOL of its steady state (mean of the last two ph2 ends of
+    the run, 5.5 us) at every ph2 instant from the last period before T_STOP (4 us) on. The WO-30 metric (|V_cm - V_OCM| over
+    the whole last period before 4 us, which reads the steady ph1 / ph2 ripple) is kept as info."""
     w = (tm >= T_STOP - T) & (tm < T_STOP)
-    err = float(np.max(np.abs(cm[w] - S.V_OCM)))
-    out = np.nonzero(np.abs(cm - S.V_OCM) > TOL)[0]
-    t_in = float(tm[out[-1] + 1]) if len(out) and out[-1] + 1 < len(tm) else float("nan")
-    return (dict(err_last_T_mV=round(err * 1e3, 3), t_enter_band_us=round(t_in * 1e6, 3)),
-            [] if err <= TOL else [f"start-up {err * 1e3:.2f} mV"])
+    err_old = float(np.max(np.abs(cm[w] - S.V_OCM)))
+    ts, ph = instants(TSTOP_RUN)
+    v2, t2 = np.interp(ts[ph == 2], tm, cm), ts[ph == 2]
+    ss2 = float(np.mean(v2[-2:]))
+    e2 = np.abs(v2 - ss2)
+    j = t2 >= T_STOP - T
+    err = float(np.max(e2[j]))
+    out = np.nonzero(e2 > TOL)[0]
+    t_in = float(t2[out[-1] + 1]) if len(out) and out[-1] + 1 < len(t2) else (float(t2[0]) if not len(out) else float("nan"))
+    return (dict(err_ph2_mV=round(err * 1e3, 3), cm_ss_ph2_mV=round((ss2 - S.V_OCM) * 1e3, 3),
+                 t_enter_band_ph2_us=round(t_in * 1e6, 3), info_err_last_T_vs_VOCM_mV=round(err_old * 1e3, 3)),
+            [] if err <= TOL else [f"start-up {err * 1e3:.2f} mV at ph2 instants (>= {(T_STOP - T) * 1e6:.2f} us)"])
 
 
 def main():
-    out, idx, mut_deck = sys.argv[1], sys.argv[2], "--mut" in sys.argv
+    out, idx, mut_deck, mm_deck = sys.argv[1], sys.argv[2], "--mut" in sys.argv, "--mm" in sys.argv
     os.makedirs(out, exist_ok=True)
     nfail, rows = 0, []
     for ci in idx.split(","):
         c, t, vd = CORNERS9[int(ci)]
-        tag = f"tb9_{c}_{t}".replace("-", "m") + ("_mut" if mut_deck else "")
-        cps = list(MUT if mut_deck else NOM)
+        tag = f"tb9_{c}_{t}".replace("-", "m") + ("_mut" if mut_deck else "_mm" if mm_deck else "")
+        cps = list(MUT if mut_deck else MM if mm_deck else NOM)
         if DIAG:
             tag += "_diag"
             cps = [(s.split(":")[0], "ev", None if s.split(":")[1] == "-" else s.split(":")[1]) for s in DIAG.split(",")]
@@ -246,18 +297,28 @@ def main():
             print(json.dumps(dict(diag=tag, **d)), flush=True)
             json.dump(d, open(os.path.join(out, tag + "_diag.json"), "w"), indent=0)
             continue
+        ud = {}
+        for own, xs in UDEP.items():
+            if all(x_ is None or x_ + "_dm" in col for x_ in xs) and own + "_dm" in col:
+                ud[own] = udep(tm, col, xs)
         for x, kind, m in cps:
             cm = col[x + "_cm"]
             if kind == "ev0":
                 continue
             if kind == "ev":
                 tw = TWIN.get(x)
-                res, fails = check_ev(tm, cm, col.get(x + "_dm"), col.get(f"{tw}_dm") if tw else None)
+                res, fails = check_ev(tm, cm, col.get(x + "_dm"), col.get(f"{tw}_dm") if tw else None,
+                                      total_gate=not x.startswith("mm"))
+                if x in ud:
+                    res["udep"] = ud[x][0]
+                    fails = fails + ud[x][1]
             else:
                 res, fails = check_su(tm, cm)
             row = dict(corner=c, temp=t, vdd=vd, copy=x, mut=m, info=x in INFO, result=res,
                        fails=fails + ([f"lint {lint[:3]}"] if lint else []))
-            if mut_deck:
+            if mut_deck and x in HELPER:
+                row["mutant_verdict"] = "helper copy (DM level 0 of masy, no verdict)"
+            elif mut_deck:
                 ok = not lint and np.all(np.isfinite(cm))
                 hit = [f for f in fails if EXPECT[x] in f]
                 row["mutant_verdict"] = ("REJECTED (good)" if ok and hit else "PASSED (check is blind)" if ok
@@ -267,7 +328,7 @@ def main():
                 nfail += bool(row["fails"])
             rows.append(row)
             print(json.dumps(row), flush=True)
-    json.dump(rows, open(os.path.join(out, f"tb9_{idx.replace(',', '_')}{'_mut' if mut_deck else ''}.json"), "w"), indent=0)
+    json.dump(rows, open(os.path.join(out, f"tb9_{idx.replace(',', '_')}{'_mut' if mut_deck else '_mm' if mm_deck else ''}.json"), "w"), indent=0)
     print("VERDICT", "ACCEPT" if nfail == 0 else f"REJECT ({nfail})")
     sys.exit(1 if nfail else 0)
 
