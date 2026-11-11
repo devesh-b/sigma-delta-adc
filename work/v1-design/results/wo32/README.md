@@ -32,3 +32,10 @@ GB_DONE. Summary: `python design/c1_ota1/c1b_opac.py --summary out/opac`; tb9 VE
   judged against its own steady state cannot see; with the TG clamp, mcr05 (Cr / 2) and mclw are in band by 3.0 us.
 - **Gate B (running at 11:48):** fs/125 nominal, all 6 parts done: INL 1.69-2.17 ppm (combine pending). srknee (16.5 V/us at
   1.4 pF): parts 0/1 at 10.65 / 13.50 ppm > 5 (4 parts and the combine pending). Markers out/gb/*/combine.out, GB_DONE.
+
+## Gate B combines (read by WO-36, 12:14 IST; GB_DONE present)
+- **fs/125 nominal (TG clamp, Cr 0.05 pF): VERDICT ACCEPT, EXIT=0.** 6 parts, 21 points, healthy, no problems.
+  INL endpoint 2.171 ppm (union 2.171, best-fit union 2.075), endpoint spread 0.002 ppm; pass_gate and pass_share true.
+- **srknee (all six ports x 0.624, 16.5 V/us at 1.4 pF = 0.8 x boost floor): broken copy REJECTED (good), EXIT=0.**
+  INL endpoint 17.37 ppm (union 17.37, best-fit 14.80) > 5 ppm gate; healthy, endpoint spread 0.026 ppm.
+  The knee-based SR floor (CL-9, 20.6 V/us boost) therefore has a copy at 0.8 x the floor that fails gate B.
