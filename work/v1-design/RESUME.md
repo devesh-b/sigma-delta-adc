@@ -759,3 +759,12 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - D68 (user): start-up row adds an absolute term + new clamp broken copies. WO-36 (C1), WO-37 (C9 RTL), WO-38 (C9 TB) dispatched in parallel.
 - WO-37 done (37aee87, 25be205, 97b8a81, 550d241): C9 RTL in design/c9_digital/rtl (7 modules, top tt_um_sd_adc_c9). Verilator lint clean, yosys synth clean (1174 generic cells, 276 FF); iverilog smoke passes 1 golden frame. Ambiguities for after WO-38: comparator alignment (y[n] from the falling-edge sample in cycle n−1), rd rise 1 clk before a load is suppressed, release-to-slot latency, combinational final uo mux, extra analog ports on the wrapper. WO-38 (TB) still running.
 - WO-36 tb9: nominal ACCEPT at 4 corners; mio now REJECTED (abs term, 119 mV). **Clamp copies mcnr/mcst/mclv PASS (blind):** they run as su_lo start-up-only copies, and a clamp held at V_OCM is itself a CM source, so CM-only rows can't see them. mclv is released at 2 T, so the CMFB corrects it (possibly harmless by design). Gate B (WO-32): fs/125 TG 2.17 ppm ACCEPT, srknee 17.37 ppm REJECTED.
+- D69 (user): clamp copies mcnr/mcst go into the tb9 event deck and must fail the DM rows; mclv dropped as harmless by design. → next small C1 WO (WO-39).
+- WO-38 done (5c57793, 5a069be): C9 bench.
+  - Ref A vs golden v3.1: 0 mismatches; 19 broken Ref A copies all REJECT.
+  - Formal: 10 properties proven, not yet mutant-checked.
+  - cocotb: 13/16 on run c. The 3 failures were bench bugs (fixed); the rerun in WO-38-3267704-d is unread.
+  - No DUT bugs found.
+  - AMBs: AMB-18 (SPEC §3.8a debug sentence + golden debug_bus still say falling edge; D67 says rising: fix), AMB-17 (no HDL port names for the analog side), AMB-19 (comparator-cycle counting), AMB-20 (bus during rst_n), AMB-22 (frame-level status_word overrun always 0).
+  - Next: read the rerun, then mutation run M01–M59 + coverage (WO-40).
+- 2026-11-11 ~13:00: 1Password locked again (ssh + signing).
