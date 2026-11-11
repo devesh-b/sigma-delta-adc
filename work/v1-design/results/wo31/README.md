@@ -24,3 +24,17 @@ Markers: out/gb_status, out/gb/*/combine.out (EXIT=), GB_DONE.
   - Start-up err over the last period (limit 10 mV): suhi 7.5–9.3, sulo 6.9–9.6, suvb 7.5–9.3. 8 T sulo (info) 7.3–9.1.
   - Broken copy mcr05 (old Cr 0.025 pF): sulo 34.0 mV → REJECTED.
 - **Gate B launched** in WO-31-1cf257d: `gb.sh` (fs/125, ss/−40, ss/125, tt/27 + sr95 at fs/125 and sf/−40). Markers `out/gb_status`, `out/gb/*/combine.out`, `GB_DONE`.
+
+## Gate B (WO-31 netlist: D59–D64; boost, N 1024, m 21, O1, 6 parts, combine with the broken-copy rule)
+| config | INL ep [ppm] | verdict | endpoint spread [ppm] |
+|---|---|---|---|
+| fs/125 (c3) | **2.170** | ACCEPT (gate 5, share 3.33) | 0.0026 |
+| ss/−40 (c1) | 1.291 | ACCEPT | 0.021 (mixed 8-thread and 1-thread parts) |
+| ss/125 (c2) | 1.337 | ACCEPT | 0.0011 |
+| tt/27 (c0) | 0.452 | ACCEPT | 0.0008 |
+| sr95 fs/125 | 51 956 | broken copy REJECTED | 27 (info) |
+| sr95 sf/−40 | 50 231 | broken copy REJECTED | 2.4 (info) |
+
+- All four corners pass. fs/125 improved from 3.31 ppm (WO-26) to 2.17 ppm. That is below gate/2 (2.5), so no O2 run is needed.
+- Changing the thread count from 8 to 1 mid-run left the c1 endpoints within 0.021 ppm, so it is harmless.
+- Gate B started 00:54 and finished at about 04:20: waves of 3 at first, then 5 single-thread jobs from 02:02.

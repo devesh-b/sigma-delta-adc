@@ -1,0 +1,3 @@
+{"n_parts": 6, "n_points": 21, "endpoint_spread_ppm": 2.3550636155666993, "inl_ep_ppm": 50231.17950052408, "disagreement_info": ["u=0.9: u_hat disagrees by 2.3551 ppm > 0.05 across ['gb_sr95_O1_N1024_p0o6', 'gb_sr95_O1_N1024_p1o6', 'gb_sr95_O1_N1024_p2o6', 'gb_sr95_O1_N1024_p3o6', 'gb_sr95_O1_N1024_p4o6', 'gb_sr95_O1_N1024_p5o6']"], "inl_ep_union_ppm": 50230.440609493664, "inl_bf_union_ppm": 40339.03045238918, "problems": [], "healthy": true, "pass_gate": false, "pass_share": false}
+broken copy REJECTED (good)
+EXIT=0

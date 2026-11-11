@@ -1,0 +1,37 @@
+start Wednesday 11 November 2026 12:54:00 AM IST 36 jobs
+wave 1 done Wednesday 11 November 2026 01:18:39 AM IST
+wave 2 done Wednesday 11 November 2026 01:43:32 AM IST
+gb2 start Wednesday 11 November 2026 02:01:52 AM IST POOL=5
+launch c1_nom p3 02:01:52
+launch c1_nom p4 02:01:57
+launch c1_nom p5 02:10:33
+launch c2_nom p0 02:11:08
+launch c2_nom p1 02:14:43
+launch c2_nom p2 02:22:19
+launch c2_nom p3 02:22:54
+launch c2_nom p4 02:30:30
+launch c2_nom p5 02:32:35
+launch c0_nom p0 02:33:10
+launch c0_nom p1 02:39:46
+launch c0_nom p2 02:40:51
+launch c0_nom p3 02:47:27
+launch c0_nom p4 02:50:03
+launch c0_nom p5 02:54:08
+launch c3_sr95 p0 02:57:43
+launch c3_sr95 p1 02:58:48
+launch c3_sr95 p2 03:05:24
+launch c3_sr95 p3 03:07:59
+launch c3_sr95 p4 03:12:04
+launch c3_sr95 p5 03:15:39
+launch c8_sr95 p0 03:17:45
+launch c8_sr95 p1 03:22:20
+launch c8_sr95 p2 03:25:25
+launch c8_sr95 p3 03:29:30
+launch c8_sr95 p4 03:32:35
+launch c8_sr95 p5 03:38:11
+c3_nom VERDICT ACCEPT EXIT=0 
+c1_nom VERDICT ACCEPT EXIT=0 
+c2_nom VERDICT ACCEPT EXIT=0 
+c0_nom VERDICT ACCEPT EXIT=0 
+c3_sr95 broken copy REJECTED (good) EXIT=0 
+c8_sr95 broken copy REJECTED (good) EXIT=0 
