@@ -41,3 +41,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-32 C1b part 3a (D65: SPEC CL entries, SR floor re-base, TG clamp, CM-to-DM bound + mismatch copy, near-knee copy): dispatched 2026-11-11
 - WO-33 C9a golden v3 (G3 items 1-4, 6): dispatched 2026-11-11 (parallel to C1)
 - WO-34 C9b independent verification plan (rtl-verification-engineer): dispatched 2026-11-11
+- WO-35 C9c (D66 contract → SPEC CL + golden v3.1): dispatched 2026-11-11
