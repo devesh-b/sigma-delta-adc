@@ -1,0 +1,32 @@
+[tasks]
+bmc
+prove
+cover
+
+[options]
+bmc: mode bmc
+bmc: depth 60
+prove: mode prove
+cover: mode cover
+cover: depth 60
+multiclock off
+
+[engines]
+bmc: smtbmc yices
+prove: abc pdr
+cover: smtbmc yices
+
+[script]
+read_verilog -DFORMAL c9_cfg.v c9_core.v c9_dec.v c9_fsdiv.v c9_rdbus.v c9_seq.v tt_um_sd_adc_c9.v
+read_verilog -formal c9_props.sv
+prep -top c9_formal
+
+[files]
+c9_props.sv
+../../rtl/c9_cfg.v
+../../rtl/c9_core.v
+../../rtl/c9_dec.v
+../../rtl/c9_fsdiv.v
+../../rtl/c9_rdbus.v
+../../rtl/c9_seq.v
+../../rtl/tt_um_sd_adc_c9.v
