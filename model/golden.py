@@ -1,4 +1,4 @@
-"""S6b golden-vector generator (v3, WO-33; v2 rows unchanged) for the C9 decimator, frame and sequencer (tier 0, ideal-A).
+"""S6b golden-vector generator (v3.1, WO-35 / D66; v3 rows unchanged) for the C9 decimator, frame and sequencer (tier 0, ideal-A).
 
 Tier 0 = model/iadc.py with no noise, no leakage, no OTA non-idealities (Params defaults, xmax opened so nothing
 clips), at the v1 loop coefficients option B (c1 = 1/8, c2 = 1/2, k = 1/2, so k/c1 = 4).
@@ -42,7 +42,8 @@ WORD_ORDER = ["acc1_hi", "acc1_lo", "acc2_hi", "acc2_lo", "tag", "status"]      
 DEBUG_BUS = {"uo_out": ["raw_y", "bit_valid", "valid_frame_ready", "fs_bit_clock", "rst_analog", "sys_swap",
                         "ota_chop_phase", "invalid_hold"], "uio": "status[7:0] = frame_ctr",
              "y_changes_on": "falling edge of the exported bit clock"}
-STATUS_LAYOUT = {"15": "frame_ready", "14": "overrun", "13": "cfg_pending (host-timing dependent: golden holds 0)",
+STATUS_LAYOUT = {"15": "frame_ready", "14": "overrun",
+                 "13": "cfg_pending (v3.1: post-latch value after the load edge in hold[t].status_full; legacy status_word keeps 0)",
                  "12": "boost of hold-register frame", "11:9": "trim of hold-register frame", "8": "0",
                  "7:0": "frame_ctr of hold-register frame"}
 RST_LEN = 2                 # reset window, fs cycles (D45 i)
@@ -63,21 +64,31 @@ def params(order, N):
 def cfg_word(c):
     """16-bit serial config register (SPEC 3.8a): order 12, n_code 11:10, fs_div 9:7, sys_en 6, ota_en 5, short 4,
     boost 3, trim 2:0; order bit 1 = order 2."""
-    return ((int(c["order"] == 2) << 12) | (c["n_code"] << 10) | (c["fs_div"] << 7) | (c["sys_en"] << 6)
-            | (c["ota_en"] << 5) | (c["short"] << 4) | (c["boost"] << 3) | c["trim"])
+    return ((c.get("rsv", 0) << 13) | (int(c["order"] == 2) << 12) | (c["n_code"] << 10) | (c["fs_div"] << 7)
+            | (c["sys_en"] << 6) | (c["ota_en"] << 5) | (c["short"] << 4) | (c["boost"] << 3) | c["trim"])
 
 
-def cfg(order, N, chop, short, fs_div=0, boost=0, trim=TRIM_RESET):
-    c = {"order": order, "N": N, "n_code": NCODE[N], "fs_div": fs_div,
+def cfg(order, N, chop, short, fs_div=0, boost=0, trim=TRIM_RESET, rsv=0):
+    """`fs_div` is the code as written (0..7); `fs_div_eff` is the normalised value. `rsv` = reserved bits 15:13
+    (ignored by the design, D66 AMB-05); the key is present only when non-zero."""
+    c = {"order": order, "N": N, "n_code": NCODE[N], "fs_div": fs_div, "fs_div_eff": fs_eff(fs_div),
          "sys_en": int(chop in ("sys", "ota+sys")), "ota_en": int(chop in ("ota", "ota+sys")),
          "short": int(bool(short)), "chop_mode": chop, "boost": boost, "trim": trim}
+    if rsv:
+        c["rsv"] = rsv
     c["cfg_word"] = cfg_word(c)
     return c
 
 
-def status_word(ready, overrun, boost, trim, ctr):
-    """SPEC 3.8a status (addr 5). cfg_pending (bit 13) depends on host timing and is held 0 in the golden."""
-    return (ready << 15) | (overrun << 14) | (boost << 12) | (trim << 9) | (ctr & 255)
+def status_word(ready, overrun, boost, trim, ctr, pend=0):
+    """SPEC 3.8a status (addr 5). v3.1 (D66): bit 13 cfg_pending is the value just after the load edge, post-latch
+    on a coincident clk (`status_full` in hold[t]); the legacy `status_word` fields keep bit 13 = 0 (v3 rows)."""
+    return (ready << 15) | (overrun << 14) | (pend << 13) | (boost << 12) | (trim << 9) | (ctr & 255)
+
+
+def fs_eff(d):
+    """D66 AMB-05: fs_div codes 5-7 are normalised to 1 (SPEC 3.8a)."""
+    return d if d <= 4 else 1
 
 
 def extras(c, f):
@@ -90,7 +101,8 @@ def extras(c, f):
 
 
 def changed(a, b):
-    return any(a[k] != b[k] for k in LATCHED)
+    """Effective change of the latched set (fs_div compared normalised, reserved bits ignored; D66 AMB-05)."""
+    return any((fs_eff(a[k]) != fs_eff(b[k])) if k == "fs_div" else a[k] != b[k] for k in LATCHED)
 
 
 def hexbits(y):
@@ -205,7 +217,39 @@ def stream_vector(sid, order, y, note):
     return {"id": sid, "kind": "stream", "loop_valid": False, "note": note, "config": c, "frames": [f]}
 
 
-def sequence(sid, config0, slots, us, dropped, note, kind="sequence"):
+def pend_flags(config0, slots):
+    """cfg_pending (SPEC 3.8a bit 13) as seen just after the load edge at the end of slot t (D66). Writes of slot t
+    precede that edge. When slot t+1 is even the latch happens on the same clk, so the value is the post-latch one
+    (shadow == active -> 0); no mask."""
+    active, pending, out = config0, None, []
+    for t, sl in enumerate(slots):
+        if t % 2 == 0 and pending is not None:
+            active, pending = pending, None
+        for w in sorted(sl.get("writes", []), key=lambda w: w["off"]):
+            pending = w["cfg"]
+        out.append(0 if (t + 1) % 2 == 0 else int(pending is not None and changed(pending, active)))
+    return out
+
+
+def lost_frames(n, plan):
+    """Frames overwritten unread by the next load (host never sees them) under the rd plan (see hold_history)."""
+    ready, lost = 0, []
+    for t in range(n):
+        rel = plan.get(t)
+        if rel == "before":
+            ready = 0
+        if ready:
+            lost.append(t - 1)
+        ready = 1
+        if rel == "after":
+            ready = 0
+    return lost
+
+
+def sequence(sid, config0, slots, us, dropped, note, kind="sequence", rd=None):
+    if rd is None:
+        rd = {t: "after" for t in range(len(slots)) if t not in dropped}
+    assert sorted(dropped) == lost_frames(len(slots), rd), (sid, dropped)
     tg = sequencer(config0, slots)
     frames = [make_frame(a, us[t], 0.0, t, tags) for t, (a, tags) in enumerate(tg)]
     recv = [f for f in frames if f["slot"] not in dropped]
@@ -220,22 +264,65 @@ def sequence(sid, config0, slots, us, dropped, note, kind="sequence"):
     return {"id": sid, "kind": kind, "note": note, "config0": config0,
             "slots": [{"writes": sl.get("writes", []), "u": us[i]} for i, sl in enumerate(slots)],
             "dropped": sorted(dropped), "frames_sent": [f["slot"] for f in recv], "frames": frames, "pairs": pairs,
-            "hold": hold_history(frames, dropped)}
+            "hold": hold_history(frames, rd, pend_flags(config0, slots))}
 
 
-def hold_history(frames, dropped):
-    """Hold-register / status history (SPEC 3.8a buffering). One load per slot (end of slot): frame_ready = 1; if the
-    previous frame was never rd-acked (it is in `dropped`) the load overwrites it and sets overrun. A `rd` edge
-    clears frame_ready and overrun (the hold register keeps the frame, so boost/trim/frame_ctr stay)."""
-    out, unread = [], False
+def hold_history(frames, rd, pend):
+    """Hold-register / status history (SPEC 3.8a buffering, v3.1 rd rule, D66). One load per slot t at the end of the
+    slot (frame t). `rd[t]` is the position of the host rd edge (the synchronised rd rise) relative to that load clk:
+      "before": the edge is on an earlier clk than the load: clears frame_ready and overrun of the previous frame,
+                then the load sets frame_ready again (no overrun);
+      "on":     the edge is on the same clk as the load: the guard compares the post-load frame_ctr with the snapshot
+                taken at the edge, so the clear is suppressed and the new frame stays ready;
+      "after":  the edge is later than the load: clears frame_ready and overrun (the frame is acked);
+      None:     no rd edge near this load.
+    A load while frame_ready is 1 overwrites the hold register and sets overrun (the previous frame is lost)."""
+    out, ready, ov = [], 0, 0
     for f in frames:
         t, b, tr, ctr = f["slot"], f["boost"], f["trim"], f["tags"]["frame_ctr"]
-        h = {"slot": t, "overrun": int(unread), "status_word": "%04x" % status_word(1, int(unread), b, tr, ctr)}
-        h["rd"] = int(t not in dropped)
-        h["status_after_rd"] = "%04x" % status_word(0, 0, b, tr, ctr) if h["rd"] else None
-        unread = not h["rd"]
+        rel = rd.get(t)
+        if rel == "before":
+            ready = ov = 0
+        pre = ready
+        ov = int(ready)
+        ready = 1
+        h = {"slot": t, "overrun": ov, "status_word": "%04x" % status_word(1, ov, b, tr, ctr)}
+        h["rd"] = int(rel == "after")
+        h["status_after_rd"] = "%04x" % status_word(0, 0, b, tr, ctr) if rel == "after" else None
+        h["rd_rel"], h["ready_pre_load"], h["cfg_pending"] = rel, pre, pend[t]
+        h["status_full"] = "%04x" % status_word(1, ov, b, tr, ctr, pend[t])
+        if rel == "after":
+            ready = ov = 0
+        h["ready_end"], h["overrun_end"] = ready, ov
         out.append(h)
     return out
+
+
+def cfg_shift_model(ops):
+    """D66 AMB-07: 16-bit shift register, cleared by rst_n and after each cfg_ld; returns the word loaded at each ld."""
+    sr, out = 0, []
+    for op in ops:
+        if op.startswith("s:"):
+            for b in op[2:]:
+                sr = ((sr << 1) | int(b)) & 0xFFFF
+        elif op == "ld":
+            out.append("%04x" % sr)
+            sr = 0
+        elif op == "rst":
+            sr = 0
+    return out
+
+
+def cfg_shift_cases():
+    w = cfg(2, 64, "sys", 0, boost=1, trim=6)["cfg_word"]
+    full = format(w, "016b")
+    cases = [("short_short", ["s:10110", "ld", "s:111", "ld"], "short shifts: each ld loads only its own bits "
+              "(register cleared after the ld)"),
+             ("full16", ["s:" + full, "ld"], "16 clocks load the whole word"),
+             ("long20", ["s:1111" + full, "ld"], "more than 16 clocks: the last 16 bits are loaded"),
+             ("rst_clears", ["s:1111111111111111", "rst", "s:101", "ld"], "bits shifted before rst_n are gone"),
+             ("ld_ld", ["s:11", "ld", "ld"], "a second ld without shifting loads 0 (cleared after the first)")]
+    return [{"id": i, "ops": ops, "expect": cfg_shift_model(ops), "note": n} for i, ops, n in cases]
 
 
 def control_trace(seq):
@@ -357,7 +444,46 @@ def build():
                          "slots 4, 5 (last wins) latch at slot 6 (pair 3, invalid); boost 0 written at the last cycle "
                          "of slot 6 latches at slot 8 (pair 4, invalid). Slot 3 is not read: slot 4 loads with "
                          "overrun, status [12:9] follows the hold-register frame."))
-    return {"format": 3, "seed": SEED, "grid": "u multiples of 2^-20", "reset": RESET, "clk_hz": CLK_HZ,
+    # ---- v3.1 (WO-35, D66) additions, appended after every v3 row ----
+    cA, cB = cfg(2, 64, "sys", 0, boost=1), cfg(2, 64, "sys", 0, boost=1, trim=6)
+    cC = cfg(2, 64, "sys", 0, boost=0, trim=6)
+    sl = [{} for _ in range(10)]
+    sl[1]["writes"] = [{"off": 10, "cfg": cA}]
+    sl[2]["writes"] = [{"off": 5, "cfg": cB}]
+    sl[4]["writes"] = [{"off": 3, "cfg": cC}]
+    plan = {0: "after", 1: "before", 2: "on", 3: "before", 4: "on", 6: "after", 7: "after", 8: "after", 9: "after"}
+    seqs.append(sequence("seq_rd", c0, sl, [q(0.3)] * 10, lost_frames(10, plan),
+                         "rd edge before / on / after the load clk (D66 AMB-02/06/10); hold[t].rd_rel is the plan. "
+                         "Slot 0 after: acked. Slot 1 before: no-op, frame 1 stays ready. Slot 2 on: frame 1 is lost "
+                         "(overrun), the rd is suppressed, frame 2 stays ready + overrun. Slot 3 before: clears, then "
+                         "load: ready, no overrun. Slot 4 on: frame 3 lost, rd suppressed. Slot 5 no rd: frame 4 lost. "
+                         "Slot 6 after: frame 5 lost, then cleared. Slots 7-9 after. cfg_pending (post-latch, no mask) "
+                         "at the loads of slots 1..5 = 0, 1, 0, 1, 0: the loads of slots 1 and 3 coincide with a latch "
+                         "(shadow == active after it), so they show 0 although a write was pending before the edge.",
+                         rd=plan))
+    r5, r6, r7 = (cfg(2, 64, "sys", 0, fs_div=d) for d in (5, 6, 7))
+    rr = cfg(2, 64, "sys", 0, fs_div=1, rsv=7)
+    cf0, cf2 = cfg(2, 64, "sys", 0, fs_div=0), cfg(2, 64, "sys", 0, fs_div=2)
+    sl = [{} for _ in range(10)]
+    sl[0]["writes"] = [{"off": 5, "cfg": r5}]
+    sl[2]["writes"] = [{"off": 5, "cfg": rr}]
+    sl[4]["writes"] = [{"off": 5, "cfg": r6}]
+    sl[5]["writes"] = [{"off": 7, "cfg": cf0}]
+    sl[6]["writes"] = [{"off": 7, "cfg": cf2}]
+    sl[7]["writes"] = [{"off": 7, "cfg": r7}]
+    seqs.append(sequence("seq_reserved", cfg(2, 64, "sys", 0, fs_div=1), sl, [q(0.3)] * 10, [],
+                         "active fs_div 1. Writes of fs_div 5 (slot 0), reserved bits 15:13 = 111 (slot 2) and fs_div 6 "
+                         "(slot 4) are not changes: pairs 1 and 2 stay valid, cfg_pending 0. fs_div 0 written in slot 5 "
+                         "is a real change: latches at slot 6, pair 3 invalid. In slots 6 and 7 fs_div 2 and then "
+                         "fs_div 7 are written (last wins): 7 is 1, a change against the active 0, so cfg_pending is "
+                         "1 at the end of slot 6 and the pair 4 (slots 8, 9) is invalid."))
+    cs = cfg_shift_cases()
+    return {"format": 3, "rev": "3.1", "seed": SEED, "grid": "u multiples of 2^-20", "reset": RESET, "clk_hz": CLK_HZ,
+            "hold_reset": {"frame_ready": 0, "overrun": 0, "cfg_pending": 0, "acc1": 0, "acc2": 0,
+                           "tag_word": "%04x" % tag_word({"chop": 0, "order": 0, "n_code": 0, "sys_en": 0, "ota_en": 0,
+                                                          "short": 0, "invalid": 1, "frame_ctr": 0}),
+                           "status_word": "%04x" % status_word(0, 0, RESET["boost"], RESET["trim"], 0)},
+            "cfg_shift": cs,
             "fs_div_table": FS_DIV_TABLE, "word_order": WORD_ORDER, "debug_bus": DEBUG_BUS,
             "status_layout": STATUS_LAYOUT,
             "model": {"c1": C1, "c2": C2, "k": K, "k_over_c1": KC1, "tier": 0}, "vectors": vecs, "streams": streams,

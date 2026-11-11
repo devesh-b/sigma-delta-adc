@@ -97,3 +97,11 @@ chop sign in pair demodulation). Accumulators of 24 bit (acc2) and 14 bit (acc1)
 - **Sequences** gain `hold[t]`: `overrun` and `status_word` of the load of slot t, `rd` (0 if the frame is never read, i.e. in `dropped`) and `status_after_rd` (frame_ready and
   overrun cleared, hold-register fields kept). `seq_drop`: slot 3 is not read, so the slot-4 load sets overrun (status 0xc..), the frame_ctr gap is 2 -> 4.
 - Mutants (all REJECT): boost latched mid-pair, trim reset != 100, word order swapped (addr 1 <-> 2), rd does not clear frame_ready, no overrun on load, boost/trim outside the invalid scope.
+
+## Golden v3.1 additions (WO-35, D66; SPEC CL-12 to CL-26)
+`rev` = "3.1" (`format` stays 3). `s6_vectors_v3.json` (sha 27d9d2d3...) is the frozen v3 file; the test proves every v3 row is a subset of the v3.1 row with the same id (v3.1 only adds keys and rows, appended).
+- **`hold_reset`**: hold/status after rst_n (AMB-08): `tag_word` 0100 (invalid = 1), `status_word` 0800 (trim 100), nothing ready.
+- **Config**: `fs_div_eff` (codes 5-7 = 1) and, when non-zero, `rsv` (reserved bits 15:13, in `cfg_word`). A change is judged on the effective fields only (AMB-05): `seq_reserved` (fs_div 5, rsv 7, fs_div 6 are no change; fs_div 0 then 7 is).
+- **`hold[t]`** gains `rd_rel` ("before" / "on" / "after" / null: the rd edge relative to the load clk of slot t), `ready_pre_load`, `cfg_pending` (value just after the load edge, post-latch on a coincident clk, no mask), `status_full` (the status word with bit 13) and `ready_end`, `overrun_end`. Legacy `status_word` / `status_after_rd` keep bit 13 = 0. Rule: before clears the old frame, on is suppressed (new frame stays ready), after clears the new frame; a load with frame_ready 1 sets overrun and loses the old frame (`dropped` = lost frames, checked). Sequence `seq_rd` covers all three.
+- **`cfg_shift`**: 5 serial-write cases (`ops`: `s:<bits>`, `ld`, `rst`; `expect` = word loaded at each ld). The register is cleared by rst_n and after each ld (AMB-07).
+- Mutants (all REJECT): hold invalid 0 after reset, rd on the load clk clears, fs_div 5 counted as a change, shift register not cleared at ld, cfg_pending pre-latch, plus no-overrun and rd-does-not-clear.

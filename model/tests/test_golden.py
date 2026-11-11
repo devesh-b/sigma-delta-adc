@@ -17,7 +17,7 @@ from model import golden as G
 HERE = os.path.dirname(os.path.abspath(__file__))
 GOLD = os.path.join(HERE, "..", "..", "golden", "s6_vectors.json")
 # sha256 of the canonical serialisation of the seed-20261109 set (pinned; regenerate => same bytes)
-PINNED_SHA = "27d9d2d36efc6673f9268d059cd73eece157f8a43ebfa76e3b249d1975f2b88e"
+PINNED_SHA = "f4a2ece692f284432f9cb872a1f99229119952e7a2755f08ce9a4de31f289831"
 D = 1 << 20
 M32 = 0xFFFFFFFF
 LATCHED = ("order", "N", "fs_div", "sys_en", "ota_en", "short", "boost", "trim")
@@ -89,6 +89,17 @@ def pack_tag(chop, order2, n_code, sys_en, ota_en, short, invalid, ctr):
     return w
 
 
+def _fs_norm(d):
+    return d if d <= 4 else 1          # SPEC 3.8a (D66 AMB-05): codes 5-7 read as 1
+
+
+def _neq(a, b, k, mut=None):
+    """Effective difference of one latched field; fs_div compared normalised (mutant fs5chg: raw code)."""
+    if k == "fs_div" and mut != "fs5chg":
+        return _fs_norm(a[k]) != _fs_norm(b[k])
+    return a[k] != b[k]
+
+
 def ref_tags(config0, slots, mut=None):
     """Independent sequencer (D45 c, d, e). Latch at the even-slot reset-window edge; writes in earlier slots count,
     last wins; writes in the even slot itself are on or after the edge."""
@@ -105,7 +116,7 @@ def ref_tags(config0, slots, mut=None):
             if t % 2 == 0:
                 inv = t == 0 and mut != "noinvrst"
             if pending is not None:
-                inv = inv or any(pending[k] != active[k] for k in (LATCHED[:-2] if mut == "bt_noinv" else LATCHED))
+                inv = inv or any(_neq(pending, active, k, mut) for k in (LATCHED[:-2] if mut == "bt_noinv" else LATCHED))
                 active, pending = pending, None
                 if mut == "ctrreset":
                     ctr = 0
@@ -461,14 +472,14 @@ REF_WORDS = ["acc1_hi", "acc1_lo", "acc2_hi", "acc2_lo", "tag", "status"]
 
 def ref_cfg_word(c):
     w = 0
-    for val, wd in ((0, 3), (c["order"] == 2, 1), (c["n_code"], 2), (c["fs_div"], 3), (c["sys_en"], 1),
+    for val, wd in ((c.get("rsv", 0), 3), (c["order"] == 2, 1), (c["n_code"], 2), (c["fs_div"], 3), (c["sys_en"], 1),
                     (c["ota_en"], 1), (c["short"], 1), (c["boost"], 1), (c["trim"], 3)):
         w = (w << wd) | (int(val) & ((1 << wd) - 1))
     return w
 
 
-def ref_status(ready, ov, boost, trim, ctr):
-    return (ready << 15) | (ov << 14) | (boost << 12) | (trim << 9) | (ctr & 255)
+def ref_status(ready, ov, boost, trim, ctr, pend=0):
+    return (ready << 15) | (ov << 14) | (pend << 13) | (boost << 12) | (trim << 9) | (ctr & 255)
 
 
 def ref_words(f, mut=None):
@@ -480,18 +491,37 @@ def ref_words(f, mut=None):
 
 
 def ref_hold(sq, mut=None):
-    """Independent hold-register model: load per slot; overrun if the previous frame was never read; rd clears."""
-    out, ready = [], 0
+    """Independent hold-register model (SPEC 3.8a, D66). One load per slot. The rd position per slot is the stimulus
+    (hold[t].rd_rel: "before" / "on" / "after" / None relative to the load clk): before clears the old frame, on is
+    suppressed (post-load frame_ctr differs from the snapshot), after clears the new frame. Load with ready 1 sets
+    overrun. Returns (load state, end state, rd-acked, ready before the load, rel) per slot."""
+    out, ready, ov = [], 0, 0
     for f in sq["frames"]:
+        rel = sq["hold"][f["slot"]]["rd_rel"]
+        if rel == "before":
+            ready = ov = 0
+        pre = ready
         ov = 1 if (ready and mut != "nooverrun") else 0
         ready = 1
-        t = f["slot"]
-        rd = t not in sq["dropped"]
-        before = (ready, ov)
-        if rd:
+        load = (ready, ov)
+        if rel == "after" or (rel == "on" and mut == "rdon_clears"):
             ready = 1 if mut == "rdnoclear" else 0
             ov = 0
-        out.append((before, (ready, ov), rd))
+        out.append((load, (ready, ov), rel == "after", pre, rel))
+    return out
+
+
+def ref_pend(sq, mut=None):
+    """cfg_pending right after the load edge at the end of slot t: shadow differs from active (effective fields),
+    evaluated post-latch when slot t+1 is even (same clk, no mask). Mutant pendmask: pre-latch value."""
+    act, shadow, out = sq["config0"], None, []
+    for t, sl in enumerate(sq["slots"]):
+        if t % 2 == 0 and shadow is not None:
+            act, shadow = shadow, None
+        for w in sorted(sl["writes"], key=lambda w: w["off"]):
+            shadow = w["cfg"]
+        d = shadow is not None and any(_neq(shadow, act, k) for k in LATCHED)
+        out.append(int(d and ((t + 1) % 2 == 1 or mut == "pendmask")))
     return out
 
 
@@ -528,12 +558,53 @@ def check_g3(doc, mut=None):
         tg = ref_tags(sq["config0"], sq["slots"], mut)
         for (c, t), f in zip(tg, sq["frames"]):
             bad += _frame_g3(c, f, mut)
-        for (c, t), f, h, (before, after, rd) in zip(tg, sq["frames"], sq["hold"], ref_hold(sq, mut)):
-            bad += h["status_word"] != "%04x" % ref_status(before[0], before[1], c["boost"], c["trim"],
+        for (c, t), f, h, (load, end, rd, pre, rel) in zip(tg, sq["frames"], sq["hold"], ref_hold(sq, mut)):
+            bad += h["status_word"] != "%04x" % ref_status(load[0], load[1], c["boost"], c["trim"],
                                                            t["frame_ctr"])
             bad += h["rd"] != int(rd)
-            bad += h["status_after_rd"] != ("%04x" % ref_status(after[0], after[1], c["boost"], c["trim"],
+            bad += h["status_after_rd"] != ("%04x" % ref_status(0, 0, c["boost"], c["trim"],
                                                                 t["frame_ctr"]) if rd else None)
+    return bad
+
+
+def check_g31(doc, mut=None):
+    """v3.1 (D66): hold reset, cfg_pending, rd before/on/after, fs_div normalisation, reserved bits, shift register."""
+    bad = check_g3(doc, mut if mut in ("nooverrun", "rdnoclear") else None)
+    # AMB-08: hold tag invalid 1 after rst_n, status shows the reset trim 100, nothing ready
+    hr = doc["hold_reset"]
+    inv = 0 if mut == "holdinv0" else 1
+    bad += hr != {"frame_ready": 0, "overrun": 0, "cfg_pending": 0, "acc1": 0, "acc2": 0,
+                  "tag_word": "%04x" % (inv << 8), "status_word": "%04x" % ref_status(0, 0, 0, 4, 0)}
+    # AMB-05 reserved bits and fs_div codes: the write is not a change; cfg_word keeps the raw bits
+    for c in all_cfgs(doc):
+        bad += c["fs_div_eff"] != _fs_norm(c["fs_div"])
+    # AMB-02/06/10, cfg_pending
+    for sq in doc["sequences"]:
+        tg = ref_tags(sq["config0"], sq["slots"], mut)
+        pend = ref_pend(sq, mut)
+        rows = ref_hold(sq, mut)
+        lost = [t - 1 for t, r in enumerate(rows) if r[0][1]]
+        bad += sorted(sq["dropped"]) != lost
+        for (c, t), f, h, p, (load, end, rd, pre, rel) in zip(tg, sq["frames"], sq["hold"], pend, rows):
+            bad += (h["cfg_pending"], h["ready_pre_load"], h["overrun"]) != (p, pre, load[1])
+            bad += h["status_full"] != "%04x" % ref_status(load[0], load[1], c["boost"], c["trim"], t["frame_ctr"],
+                                                           p)
+            bad += (h["ready_end"], h["overrun_end"]) != end
+        for p in sq["pairs"]:
+            bad += tg[p["slots"][0]][1]["invalid"] == p["valid"]
+    # AMB-07: serial shift register cleared by rst_n and after each ld
+    for cs in doc["cfg_shift"]:
+        sr, out = 0, []
+        for op in cs["ops"]:
+            if op.startswith("s:"):
+                for b in op[2:]:
+                    sr = ((sr << 1) | int(b)) & 0xFFFF
+            elif op == "ld":
+                out.append("%04x" % sr)
+                sr = sr if mut == "noclear_ld" else 0
+            else:
+                sr = 0
+        bad += out != cs["expect"]
     return bad
 
 
@@ -599,3 +670,64 @@ def test_v2_rows_unchanged_in_v3(doc):
     bad = json.loads(json.dumps(doc))
     bad["vectors"][10]["frames"][0]["acc1"] += 1
     assert not subset(v2["vectors"][10], bad["vectors"][10])
+
+
+# ======================= golden v3.1 (WO-35, D66): contract rows =======================
+GOLD_V3 = os.path.join(HERE, "..", "..", "golden", "s6_vectors_v3.json")
+V3_SHA = "27d9d2d36efc6673f9268d059cd73eece157f8a43ebfa76e3b249d1975f2b88e"
+G31_MUT = ["holdinv0", "rdon_clears", "fs5chg", "noclear_ld", "pendmask", "nooverrun", "rdnoclear"]
+
+
+def test_g31_nominal(doc):
+    assert doc["rev"] == "3.1" and doc["format"] == 3
+    assert check_g31(doc) == 0
+
+
+@pytest.mark.parametrize("mut", G31_MUT)
+def test_g31_mutant_rejected(doc, mut):
+    assert check_g31(doc, mut) > 0
+
+
+def test_g31_semantics(doc):
+    rd = seq(doc, "seq_rd")
+    h = rd["hold"]
+    assert [x["rd_rel"] for x in h] == ["after", "before", "on", "before", "on", None, "after", "after", "after",
+                                        "after"]
+    assert rd["dropped"] == [1, 3, 4, 5]
+    assert [x["overrun"] for x in h] == [0, 0, 1, 0, 1, 1, 1, 0, 0, 0]
+    assert [x["ready_end"] for x in h] == [0, 1, 1, 1, 1, 1, 0, 0, 0, 0]
+    # on the load clk the rd is suppressed: the new frame stays ready (and keeps its overrun)
+    assert h[2]["ready_end"] == 1 and h[2]["overrun_end"] == 1 and h[4]["ready_pre_load"] == 1
+    assert h[3]["ready_pre_load"] == 0 and h[3]["overrun"] == 0          # before: old frame acked first
+    # cfg_pending is the post-latch value: slots 1 and 3 load on a latch clk and show 0
+    assert [x["cfg_pending"] for x in h][:6] == [0, 0, 1, 0, 1, 0]
+    assert int(h[2]["status_full"], 16) >> 13 & 1 == 1 and int(h[2]["status_word"], 16) >> 13 & 1 == 0
+    rs = seq(doc, "seq_reserved")
+    assert [f["tags"]["invalid"] for f in rs["frames"]] == [1, 1, 0, 0, 0, 0, 1, 1, 1, 1]
+    assert [x["cfg_pending"] for x in rs["hold"]][:8] == [0, 0, 0, 0, 0, 0, 1, 0]
+    assert [f["tags"]["n_code"] for f in rs["frames"]] == [0] * 10        # fs_div is not in the tag
+    hr = doc["hold_reset"]
+    assert hr["tag_word"] == "0100" and hr["status_word"] == "0800" and hr["frame_ready"] == 0
+    cs = {c["id"]: c["expect"] for c in doc["cfg_shift"]}
+    assert cs["short_short"] == ["0016", "0007"] and cs["ld_ld"] == ["0003", "0000"] and cs["rst_clears"] == ["0005"]
+
+
+def test_v3_rows_unchanged_in_v31(doc):
+    """Every v3 row is a subset of the v3.1 row with the same id (v3.1 only adds keys and rows); a broken v3.1 fails."""
+    with open(GOLD_V3) as f:
+        txt = f.read()
+    assert hashlib.sha256(txt.encode()).hexdigest() == V3_SHA
+    v3 = json.loads(txt)
+    assert v3["format"] == 3 and "rev" not in v3 and doc["rev"] == "3.1"
+    for key in ("vectors", "streams", "sequences", "traces"):
+        new = {r["id"]: r for r in doc[key]}
+        assert len(v3[key]) < len(new) or key in ("vectors", "streams", "traces")
+        for r in v3[key]:
+            assert subset(r, new[r["id"]]), (key, r["id"])
+        assert [r["id"] for r in doc[key]][:len(v3[key])] == [r["id"] for r in v3[key]]
+    assert [r["id"] for r in doc["sequences"]][-2:] == ["seq_rd", "seq_reserved"]
+    for k in ("reset", "fs_div_table", "word_order", "debug_bus", "model", "seed"):
+        assert doc[k] == v3[k]
+    bad = json.loads(json.dumps(doc))
+    bad["sequences"][0]["hold"][3]["status_word"] = "0000"
+    assert not subset(v3["sequences"][0], bad["sequences"][0])
