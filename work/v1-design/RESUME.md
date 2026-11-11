@@ -740,3 +740,13 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - New `gb2.sh`: single-threaded ngspice via `./.spiceinit num_threads=1` in the frozen copy, and a pool of 5 concurrent parts. It skips parts that are done or still running, then combines. The old driver (gb.sh) was stopped; its 3 running parts continue.
   - Same marker: GB_DONE.
   - Determinism note: thread count may change the last bits; the combine endpoint check (0.05 ppm) will show it.
+- **Gate B on the WO-31 netlist: all 4 corners ACCEPT** (fs/125 2.17, ss/−40 1.29, ss/125 1.34, tt 0.45 ppm). Both sr95 broken copies REJECTED. **C1b core closed at op/AC + tb9 + gate B.**
+- Next: sd-adc-design-reviewer pass on D59–D64 (WO-26..31). Then the remaining C1b items:
+  - tb12 / tb11 (boost toggle, CL-7/CL-8);
+  - tb8 / tb8b MC (with the HV-Vth caveat: hand Pelgrom cross-check);
+  - tb7 noise; tb6 / tb4;
+  - tb10 / tb13 stress and switches;
+  - full 45 PVT.
+- REVIEW-C1b-final: PROCEED, no Critical. M1 C6 ref accuracy vs SR floor; M2 CM-to-DM row blind. User Q1–Q4 pending. Next-WO order in the review.
+- D65 (user): SR floor re-based on the knee + D47 trim; CM-to-DM bound first, then mismatch copy; start-up at sampling instants + TG clamp. WO-32 written. **Blocked: 1Password locked (ssh + signing).** Uncommitted: gate B results (results/wo31/gateb, README), REVIEW-C1b-final, D65, WO-32, INDEX, RESUME.
+- 1Password unlocked: committed gate B results, REVIEW-C1b-final, D65/WO-32. WO-32 dispatched.
