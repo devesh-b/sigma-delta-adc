@@ -59,6 +59,34 @@ on → inv → inv → nb2 ┘ latch   → qlb → inv → inv → qb
 
 The rev-a MC plan double counted: the PDK `tt_mm` already gives the HV pair ≈ 9.3 mV·µm equivalent (toxe, WO-44 probe), and adding 12 RSS gave ≈ 15.2. **T3 now injects √(12² − 9.3²) ≈ 7.6 mV·µm** per device on top of `tt_mm` / `ss_mm` (differential σ_inj = √2·7.6/√10 ≈ 3.4 mV), so the pair totals 12.
 
+### 3.1b Offset limit from loop impact (D75, WO-51; replaces the fixed 20 mV 3σ)
+Script `offset_loop.py` (model/iadc.py, v1 loop: order 2, c1 0.125, c2 0.5, k 0.5, VREF 2.048 V; `comp_offset` adds to x2 at the decision; u over ±0.9 FS, 4001 points; OTAs ideal and A0 80 dB falling to 75 dB at 1.4 V diff). Results `work/v1-design/results/wo51/offset_loop.json`.
+
+**(a) x2 headroom.** The offset moves the x2 level at which the loop switches, so x2 swings around −Vos instead of 0.
+
+| Vos (mV) | 0 | ±15 | ±45 | 90 | 135 | 200 |
+|---|---|---|---|---|---|---|
+| peak \|x2\| diff, N 1024, ideal (V) | 1.237 | 1.408 | 1.408 | 1.408 | 1.435 | 1.664 |
+| same, A 80→75 dB | 1.219 | 1.405 | 1.405 | 1.404 | 1.431 | 1.659 |
+
+- The peak is flat at ≈ 1.41 V for every non-zero |Vos| ≤ 90 mV; 1.24 V at exactly 0 is a grid artefact of the tie-break (dec ≥ 0 ⇒ +1), which any offset or noise removes. It starts to grow between 90 and 135 mV (+27 mV at 135, +256 mV at 200).
+- **Limit (a): |μ| + 3σ ≤ 60 mV** = 2/3 of the last verified-flat point (90 mV); the 90–135 mV interval is not resolved, hence the margin.
+- **Finding for C2 (not a C3 limit):** the realistic x2 peak is ≈ 1.41 V diff, not 1.21 V. That is at the edge of the 1.4 V A ≥ 75 dB range (OTA DC-gain row), independent of the comparator offset. OTA2 swing is to be rechecked against 1.41 V.
+
+**(b) Chop residue.** The constant part cancels in the system-chop pair; what is left is the change in the quantisation pattern.
+
+| | N 1024 | N 4096 |
+|---|---|---|
+| unchopped mean shift at 45 mV (removed by chop) | 1.32 µV (1.53 with A 80→75) | 0.09 µV (0.13) |
+| chopped mean shift, any Vos ≤ 200 mV | 0 (≤ 0.001 µV) | 0 |
+| max smoothed residue (101-point window), Vos 15–200 mV, ideal | 0.89–1.39 µV (≤ 0.34 ppm FS) | 0.04–0.11 µV (≤ 0.027 ppm) |
+| same, A 80→75 dB | 1.39–3.02 µV (≤ 0.74 ppm, at 45 mV) | 0.08–0.22 µV (≤ 0.055 ppm) |
+
+- The residue does not grow with Vos (15 mV gives the same order as 200 mV). It is the floor of the metric: two ±1-LSB sawtooth patterns (55–62 µV p-p at N 1024) that differ only in phase, averaged over a finite window. So it is an upper bound, not an offset effect. On silicon, thermal noise dithers the pattern.
+- **Limit (b):** residue ≤ 1 ppm FS, the INL share of this row. It holds at any Vos up to 200 mV (worst 0.74 ppm at N 1024, 0.055 ppm at N 4096), so (a) sets the limit.
+
+**New row 105 (offset): |μ| + 3σ ≤ 60 mV and every MC sample ≤ 60 mV, at tt/27 (≥ 200) and ss/−40 (≥ 50)**, plausibility σ within [0.5, 2]× the sensitivity estimate (§3.1c). Broken copy: HV-pair A_VT ×6 (72 mV·µm total) ⇒ REJECT. ×3 (≈ 62 mV in WO-48) sits at the limit, so it is kept as an info copy only. Re-judged WO-48 MC against 60 mV: tt σ 14.4 mV, |μ| + 3σ 44.8 mV ⇒ ACCEPT (ss/−40: 45.0 ⇒ ACCEPT). Max |x| was clipped at the ±40 mV bisection range, which is why the range is now ±200 mV at 0.1 mV.
+
 ### 3.2 Noise (row 105: ≤ 5 mV rms) — T4 is report-only (REVIEW-C3a 6)
 Input-pair integration noise: σ_n² ≈ 2·(4kTγ/g_m)·1/(2 t_int); g_m ≈ 1 mS per side, t_int ≈ C_d·V_th,n/(I_tail/2) ≈ 0.1–0.3 ns ⇒ **σ_n ≈ 0.3–0.6 mV rms, ≈ 10× under the row**; latch noise divides by A_n; in-loop it divides by the integrator gains. `.noise` on a frozen linearisation is a poor proxy for a regenerative comparator, so no sim gate.
 
@@ -67,6 +95,12 @@ t_dec ≈ t_int + τ_reg·ln((V_DD/2)/(A_n·Δ)) + t_buf+SR+outbuf. Set A spot (
 
 ### 3.4 Kickback (row 108)
 CM kick per fire edge ≈ 45 mV (WO-44, set A pair; A′ keeps the pair, so unchanged); differential ≤ 1.9 mV (reset edge). Recovery through R ≈ 1/(β2·g_m2) ≈ 20 kΩ with 0.7 pF (τ ≈ 14 ns; 46 kΩ at 2 MHz). No isolation element; row-108 broken copy = C_X2/10. **Asymmetric x2 (REVIEW-C3a 5):** ±10 % R/C per side converts part of the CM kick to differential; T5 runs it and reports CM recovery. The 45 mV CM kick causes no state error in order 2; open C2 items: OTA2 output headroom (45 mV) and comparator input CM range at the fire instant (T1 covers CM 1.2 / 1.8 V).
+
+### 3.4b Asymmetric kickback (WO-51 item 3)
+**Mechanism.** The fire edge pulls both pair sources (tl) down; Cgs of the 20 µm HV pair kicks both x2 sides by the same charge Q. The CM kick is ≈ 41–45 mV. With per-side C_X2 = (1 ± δc)·C, the differential kick is ≈ 2δc·V_cm,kick; ±10 % gives 0.2 × 41 mV ≈ 8.2 mV, as measured (7.7 / 8.2 mV). Recovery: τ_p ≠ τ_n when R differs, so at 0.5·t_half (≈ 4τ) the two CM tails no longer cancel: 41 mV × (e^{−56/16.9} − e^{−56/11.3}) ≈ 1.2 mV, as measured (1.18 / 1.10 mV). The symmetric case shows 0.001 mV. It is CM-to-DM conversion through the x2 node impedance, not a comparator asymmetry.
+**Is ±10 % realistic?** No. Per side, x2 is the OTA2 output in closed loop. Its C is the MIM Cint2/load plus routing: MIM matching is ≲ 0.5 % and routing is symmetric by layout, so take ±1 %. Its R ≈ 1/(β2·gm) per side, where the gm mismatch of the OTA2 input/output devices is a few % 3σ, so take ±5 %. The gate deck uses R ±5 %, C ±1 %; ±10 % stays as an info copy. Expected under that gate: diff peak ≈ 2.7 mV (symmetric reset-edge diff) + 0.02 × 41 ≈ 0.8 mV, recovery ≈ 0.1 × 4 × 41 × e^{−4} ≈ 0.3 mV.
+**Gain-only?** The kick charge is the same each cycle (CM, set by tl and the pair), and OTA2 is in hold, so x2 recovers to the held value: no state change once recovered (the recovery row checks this). What does not recover by 0.5·t_half is a constant per-cycle error at the decision instant: a fixed comparator-offset-like term, which the chop removes (§3.1b).
+**Fix options (not applied, cost stated):** (1) halve the HV pair (5/0.5 ×2): CM kick ≈ ½, so the ±10 % diff ≈ 4 mV; pair offset term √2× larger (5.4 → 7.6 mV σ hand), allowed by the 60 mV row; ≈ 0 area/current cost. (2) A neutralisation pair (cross-coupled dummy HV devices, drains on the opposite tl node) cancels the CM kick to first order: 2 HV devices per side, ≈ +20 µm² and some extra Cgs on x2. (3) A static preamp isolates fully: 10–30 µA against the 189/200 µA budget (D46c); rejected. A cascode does not help: the kick is through Cgs, not Cgd.
 
 ### 3.5 Metastability, Δ ≈ 0, P(DAC ≠ decimator)
 Unresolved at t if |Δ| < Δ_crit = (V_DD/2/A_n)·exp(−(t − t_int)/τ_reg). Available time ≈ 75 ns (§2) at 4 MHz. Even with τ_reg 1 ns (13× pessimistic), P per decision ≈ 2e-17 at p(0) = 800 V⁻¹. One FF drives DAC and decimator, so they disagree only if that FF goes metastable; q never moves within T/2 of the capture edge. Cycle 0 (x2 = 0) is overridden by the forced y[0]. T10nz runs ±1 µV cycles and checks valid, complementary q/qb at capture (Δ = 0 exactly is solver noise, LEARNINGS-pthomas).
@@ -92,11 +126,11 @@ VDPWR 1.62–1.98 V; strobe from C4's 1.8 V side; q/qb straight into C9 (no shif
 | T1 polarity | `cyc`: 8 full fs cycles on the 48 MHz grid, x2 steps at φI start through R_X2/C_X2, sequence +0.3 V, −0.5 mV, +1 mV, −0.3 V, +0.5 mV, −1 mV, ±1 µV; 9 PVT at 4 MHz CM 1.5; ss/−40 CM 1.2, 1.8 and 2 MHz | q = 1 ⇔ x2 > 0 at capture (rails 0.9/0.1·VDD) | `qswap` |
 | T2 decision time (requirement) | `cyc`, every non-zero cycle | 0 < t_dec < 0.3·t_half | strobe level 0.6 V (weak strobe, physical) |
 | T2band | `one`: single fire at 1 mV, ss/−40/1.62, 4 MHz (WO-44 spot conditions) | t_dec ∈ [0.5, 3]× 1.12 ns | `starve` (tail 1/4, 64× less W/L) |
-| T3 offset MC | `mc`: 25 instances per deck, bisection in ngspice (9 steps, ±40 mV, 0.16 mV), own rndseed; 200 at tt_mm/27/1.8, 50 at ss_mm/−40/1.62; + injected 7.6 mV·µm per HV device | \|μ\| + 3σ ≤ 20 mV, every sample ≤ 20 mV, no clipped sample, σ within [0.5, 2]× 5.9 mV (§11.7) | pair A_VT ×3 (36 total) |
+| T3 offset MC | `mc`: 25 instances per deck, bisection in ngspice (12 steps, ±200 mV, 0.1 mV), own rndseed; 200 at tt_mm/27/1.8, 50 at ss_mm/−40/1.62; + injected 7.6 mV·µm per HV device. `sens` (per-device dVT sensitivity, tt) + `pdk` (σ(Vgs) per device type, tt_mm, 60 each) give σ_est (§3.1c) | \|μ\| + 3σ ≤ 60 mV (D75, §3.1b), every sample ≤ 60 mV, no clipped sample, σ within [0.5, 2]× σ_est (§11.7) | pair A_VT ×6 (72 total); ×3 info |
 | T4 noise | hand calc §3.2 | report only (REVIEW-C3a 6) | — |
-| T5 kickback | `one`: constant x2, fire + reset edges, 9 PVT at 4 MHz, ss/−40 at 2 MHz, ss/−40 ±10 % R/C asymmetric | diff peak ≤ 5 mV, ≤ 0.5 mV at 0.5·t_half after each edge; CM peak and recovery reported (C2) | C_X2/10 |
+| T5 kickback | `one`: constant x2, fire + reset edges, 9 PVT at 4 MHz, ss/−40 at 2 MHz, ss/−40 asymmetric R ±5 % / C ±1 % (§3.4b; ±10 % R/C info) | diff peak ≤ 5 mV, ≤ 0.5 mV at 0.5·t_half after each edge; CM peak and recovery reported (C2) | C_X2/10 |
 | T7 memory | `cyc` cycles −0.5 mV after +0.3 V and +0.5 mV after −0.3 V | correct sign at capture | `nobuf` (latch gates on op/on) |
-| T8 device stress | `st`: VDPWR 1.98 V, order a (x2 to 3.6 V before VDPWR) and b (VDPWR first), then overload both ways, x2 −0.5 V; tt/27 and ff/−40 | every terminal pair: 1.8 V devices ≤ 1.98 V, HV ≤ 5.5 V | `in18` |
+| T8 device stress | `st`: VDPWR 1.98 V, order a (x2 to 3.6 V before VDPWR) and b (VDPWR first), then overload both ways, x2 −0.5 V, back to CM; tt/27 and ff/−40. **Gate stimulus (WO-51, §4b):** x2 at the OTA2 slew (27 V/µs per side) through R_X2/C_X2, moving only in φI, strobe on the 4 MHz phase plan. Info: `fast` (WO-48: 4.1 V in 20 ns through 10 Ω, free-running strobe), `async` (OTA2 slew, x2 also moves while the strobe is high) | every terminal pair: 1.8 V devices ≤ 1.98 V, HV ≤ 5.5 V | `in18` |
 | T9 current | `cyc` | report (from VDPWR) | — |
 | T10 capture window | `cyc`, capture = next fs_tick (clk edge) | §2 window + glitch | strobe in φI (`phase`) |
 | T10nz near-zero | `cyc` ±1 µV cycles | q/qb valid, complementary, never both high in the capture window | `nolatch` |

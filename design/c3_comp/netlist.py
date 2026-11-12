@@ -63,9 +63,15 @@ def devices(sizes=SIZES, mut=""):
     return D
 
 
-def comp_subckt(sizes=SIZES, mut="", name="c3_comp"):
+def comp_subckt(sizes=SIZES, mut="", name="c3_comp", dvt=None):
+    """dvt: {device name: volts} -> an ideal source in series with that gate, V(gate) = V(net) - dv, i.e. the
+    device's VT raised by dv (WO-51 per-device offset sensitivity; labelled probe, not part of the design)."""
     L = [f".subckt {name} " + " ".join(PORTS)]
     for (n, model, d, g, s_, b, p) in devices(sizes, mut):
+        if dvt and n in dvt:
+            gx = f"gx_{n.lower()}"
+            L.append(f"VDVT{n} {g} {gx} {dvt[n]:.6e}")
+            g = gx
         L.append(f"X{n} {d} {g} {s_} {b} {model} W={p['W']} L={p['L']} nf=1 m={p['m']}")
     L.append(f".ends {name}")
     return "\n".join(L) + "\n"
