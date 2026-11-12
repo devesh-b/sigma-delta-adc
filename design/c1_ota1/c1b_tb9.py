@@ -22,6 +22,9 @@ WO-30 rows (D63 basis; expected values from SPEC row 98 / D63 / CL-2 / CL-7 / SP
   * Diff step = the real worst per-cycle step, c1 (u_max + 1) VREF = 0.486 V diff (SPEC OTA1 GBW row; loop bound), as a
     10 ns charge pulse at the period start. The WO-27..29 0.8 V step overstated the per-cycle charge by 1.65x and was still
     slewing at +22.5 ns; at the sampling instants slewing has ended. TB9_DV_DIFF overrides (info runs).
+  * DM diff step (gate, WO-39 D69): at the ph2 instants from the first judged one after the diff step to the CM step,
+    | |V_dm(t) - V_dm(pre)| - |lev| DV_DIFF | <= 10 mV (pre = last ph2 instant before the step; the charge pulse is
+    lev DV_DIFF / 2 Cint per island). Catches a held output clamp (DM collapse) and slow DM settling.
   * Start-up (gate, D68): ph2 instants within 10 mV of the steady state by 4 us AND |steady state - V_OCM| <= 10 mV.
   * Start-up (gate): outputs pre-charged to VDD / 0, integrator held in reset, start-up clamp (rstb low: ctl, bli -> V_BL0,
     outputs -> V_OCM) held 2 T (WO-31, D64: with Cr 0.05 pF the Cc charge mode decays fast enough; an 8 T copy, sulo8,
@@ -29,8 +32,9 @@ WO-30 rows (D63 basis; expected values from SPEC row 98 / D63 / CL-2 / CL-7 / SP
   Events start at 3.0 us (2.5 us after the 2 T clamp release of the ev copies; the Cc charge mode decays with
   tau = T Cc / Cr, ~1.1 us at the old Cr 0.025 pF, WO-30), run to 5.5 us.
 Broken copies (own deck, each must REJECT on the stated row): mcc4 = Cc / 4 (any row; the ph1 static row: the charge
-packet / 2 Cc grows 4x), masy = 1e-4 of the CM-step charge onto one island (CM-to-DM row), mio = int_off + vbl0x2 (start-up abs term, D68), mcnr / mcst / mclv
-(clamp never released / output clamp stuck on / output clamp to V_OCM + 50 mV; start-up, WO-36).
+packet / 2 Cc grows 4x), masy = 1e-4 of the CM-step charge onto one island (CM-to-DM row), mio = int_off + vbl0x2 (start-up abs term, D68), mcnr / mcst
+(clamp never released / output clamp stuck on; ev kind, DM diff-step row, WO-39 D69). mclv dropped (D69: released at 2 T,
+then CMFB-corrected; WO-36 measured steady state -1.5 mV off V_OCM, in band from 1.99 us).
 Setup per copy: OTA1 (cmfb="sc", boost, fs 4 MHz, ph1 / ph2 non-overlapping by g = 0.025/fs), Cint 4 pF out -> island
 (negative feedback, WO-29), Cs1 0.5 pF island -> ground, output routing C_RT; reset = island shunt to V_ICM (isl) + ideal
 output short (gen_tier1 style); chopper static.
@@ -77,10 +81,10 @@ INFO = {"ev0", "sulo8", "masy0"}
 # Cr and clamp strength). New start-up broken copies: mcnr = clamp never released (rstb held low, tb token rst_never),
 # mcst = output TG stuck on (ctl / bli clamps release), mclv = output clamp to V_OCM + 50 mV. mio must REJECT on the abs term.
 MUT = [("mcc4", "ev", "cc_div4"), ("masy", "ev", "cm_asym"), ("masy0", "ev0", None), ("masyz", "ev", "cm_asym+dvz"),
-       ("masyz0", "ev0", "dvz"), ("mio", "su_hi8", "int_off+vbl0x2"), ("mcnr", "su_lo", "rst_never"), ("mcst", "su_lo", "clamp_stuck"),
-       ("mclv", "su_lo", "clamp_lv50")]
-EXPECT = {"mcc4": "", "masy": "CM-to-DM u-dep", "mio": "start-up abs", "mcnr": "start-up", "mcst": "start-up",
-          "mclv": "start-up"}
+       ("masyz0", "ev0", "dvz"), ("mio", "su_hi8", "int_off+vbl0x2"), ("mcnr", "ev", "rst_never"), ("mcst", "ev", "clamp_stuck")]
+# WO-39 (D69): mcnr / mcst run as event-deck copies (a clamp held at V_OCM is a CM source, invisible to CM-only rows); they
+# must REJECT on the DM diff-step row. mclv dropped (harmless by design, evidence in DESIGN.md 2.12 and results/wo39).
+EXPECT = {"mcc4": "", "masy": "CM-to-DM u-dep", "mio": "start-up abs", "mcnr": "DM diff step", "mcst": "DM diff step"}
 HELPER = {"masyz"}
 TWIN = {"ev": "ev0", "masy": "masy0", "masyz": "masyz0", "mmp": "mmp0", "mmz": "mmz0", "mmn": "mmn0"}
 # WO-32 (D65 M2) 3 sigma mismatch deck (--mm): the same ev / ev0 twins at DM levels +, 0, - (diff step +0.486, none, -0.486 V)
@@ -207,7 +211,7 @@ def udep(tm, col, xs):
     return st, fails
 
 
-def check_ev(tm, cm, dm=None, dm0=None, total_gate=True):
+def check_ev(tm, cm, dm=None, dm0=None, total_gate=True, lev=1):
     ts, ph = instants(TSTOP_RUN)
     v = np.interp(ts, tm, cm)
     ss = {p: float(np.mean(v[ph == p][-2:])) for p in (1, 2)}
@@ -230,6 +234,14 @@ def check_ev(tm, cm, dm=None, dm0=None, total_gate=True):
         fails.append(f"static ph2: {st['cm_ss_ph2_mV']} mV > {TOL * 1e3:.0f} mV")
     if not abs(ss[1] - S.V_OCM) <= TOL_PH1:
         fails.append(f"static ph1: {st['cm_ss_ph1_mV']} mV > {TOL_PH1 * 1e3:.0f} mV")
+    if dm is not None:   # WO-39 (D69): DM diff-step row (DM collapse / settling)
+        s2 = (ph == 2) & (ts >= first_judged(EV[1][1]) - 1e-12) & (ts < EV[2][1])
+        pre = float(np.interp(ts[(ph == 2) & (ts < EV[1][1])][-1], tm, dm))
+        dv = np.interp(ts[s2], tm, dm) - pre
+        derr = float(np.max(np.abs(np.abs(dv) - abs(lev) * DV_DIFF)))
+        st.update(dm_step_mV=[round(float(q) * 1e3, 3) for q in dv], dm_step_err_mV=round(derr * 1e3, 3))
+        if not derr <= TOL:
+            fails.append(f"DM diff step: {derr * 1e3:.2f} mV > {TOL * 1e3:.0f} mV from {abs(lev) * DV_DIFF * 1e3:.0f} mV")
     if dm is not None and dm0 is not None:
         d = np.interp(ts, tm, dm) - np.interp(ts, tm, dm0)
         s_ = (ph == 2) & (ts >= first_judged(EV[2][1]) - 1e-12) & (ts < EV[3][1])
@@ -316,7 +328,8 @@ def main():
             if kind == "ev":
                 tw = TWIN.get(x)
                 res, fails = check_ev(tm, cm, col.get(x + "_dm"), col.get(f"{tw}_dm") if tw else None,
-                                      total_gate=not x.startswith("mm"))
+                                      total_gate=not x.startswith("mm"),
+                                      lev=0 if "dvz" in NL.toks(m) else -1 if "dvn" in NL.toks(m) else 1)
                 if x in ud:
                     res["udep"] = ud[x][0]
                     fails = fails + ud[x][1]
