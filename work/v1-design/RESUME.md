@@ -769,3 +769,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - Next: read the rerun, then mutation run M01–M59 + coverage (WO-40).
 - 2026-11-11 ~13:00: 1Password locked again (ssh + signing).
 - WO-38 rerun: 15/16 (a_rst01_async_mid: reset latency, spec gap). D70 (user): latency = 2-FF sync + div clk; AMB-18 fix. WO-39 (C1 clamp copies) and WO-40 (C9 mutation + coverage) dispatched.
+- User 2026-11-12: parallelise by server load. New `scripts/lpool.sh` (load-adaptive pool, single-thread jobs, POOL_DONE marker); smoke-tested on the sandbox. Use it in all WOs from now; it replaces the fixed ≤5 cap.
