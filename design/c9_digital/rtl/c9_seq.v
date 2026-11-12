@@ -4,7 +4,6 @@ module c9_seq (
     input  wire        clk,
     input  wire        rst_n,
     input  wire        fs_tick,
-    input  wire        s_tick,       // bit-clock falling edge
     input  wire        comp_in,
     input  wire [1:0]  n_code,       // active config
     input  wire        sys_en_n,
@@ -24,7 +23,6 @@ module c9_seq (
     output reg         y_dac         // the retimed DAC flop = decimator input = raw bit
 );
     reg [12:0] c;
-    reg        comp_s;
     wire [12:0] c_last = (13'd64 << {n_code, 1'b0}) + 13'd1;   // N + 1
     wire       slot_start = boot | (c == c_last);
     wire [12:0] c_n    = slot_start ? 13'd0 : c + 13'd1;
@@ -36,9 +34,8 @@ module c9_seq (
         if (!rst_n) begin
             c <= 13'd0; boot <= 1'b1; inv_pair <= 1'b1; slot_ctr <= 8'd0;
             rst_analog <= 1'b1; sys_swap <= 1'b0; ota_chop <= 1'b0; y_force <= 1'b0;
-            bit_valid <= 1'b0; acc_clear <= 1'b0; y_dac <= 1'b0; comp_s <= 1'b0;
+            bit_valid <= 1'b0; acc_clear <= 1'b0; y_dac <= 1'b0;
         end else begin
-            if (s_tick) comp_s <= comp_in;                      // falling edge of bit clock (CL-23)
             if (fs_tick) begin
                 boot       <= 1'b0;
                 c          <= c_n;
@@ -48,7 +45,7 @@ module c9_seq (
                 bit_valid  <= ~rst_n_nx;
                 acc_clear  <= (c == 13'd0) & ~slot_start;
                 y_force    <= (c == 13'd1);
-                y_dac      <= (c == 13'd1) ? 1'b1 : comp_s;     // forced y[0] = +1 (3.7a a)
+                y_dac      <= (c == 13'd1) ? 1'b1 : comp_in;    // D74: capture comp_in on fs_tick; forced y[0] = +1 (3.7a a)
                 ota_chop   <= ota_en_n & ~rst_n_nx & c_n[0];    // n mod 2 = c mod 2, 0 in reset
                 if (slot_start) sys_swap <= sys_en_n & ctr_n[0];
             end

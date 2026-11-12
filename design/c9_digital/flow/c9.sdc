@@ -1,4 +1,4 @@
-# WO-47 draft SDC for the C9 digital macro (tt_um_sd_adc_c9), clk = 48 MHz (SPEC 3.8a).
+# WO-47 draft SDC for the C9 digital macro (sd_adc_c9), clk = 48 MHz (SPEC 3.8a).
 # DRAFT: input/output budgets below are first estimates; the C4 / C3 numbers come from their PEX runs.
 # No false paths, no multicycle paths, no case analysis: every endpoint is timed (pd-expert rule 4).
 

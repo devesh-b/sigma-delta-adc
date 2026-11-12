@@ -2,9 +2,8 @@
   "//": "WO-47 DRAFT LibreLane (Classic flow) config for the C9 digital macro. Not a signoff config. DIE_AREA is a placeholder until the WO-47 synthesis probe area is in (see HARDENING.md 3). Paths are relative to this file.",
   "meta": { "version": 2, "flow": "Classic" },
 
-  "DESIGN_NAME": "tt_um_sd_adc_c9",
+  "DESIGN_NAME": "sd_adc_c9",
   "VERILOG_FILES": [
-    "dir::../rtl/tt_um_sd_adc_c9.v",
     "dir::../rtl/c9_core.v",
     "dir::../rtl/c9_fsdiv.v",
     "dir::../rtl/c9_cfg.v",

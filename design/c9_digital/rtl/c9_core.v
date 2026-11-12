@@ -1,9 +1,10 @@
-// C9 digital core (one clock domain, clk = 48 MHz). Wrapper-free: the TT top is tt_um_sd_adc_c9.
-module c9_core (
+// C9 digital macro core (one clock domain, clk = 48 MHz). Macro top (D72): no tt_um_ prefix; tt_um_sd_adc_c9 is a sim-only wrapper.
+/* verilator lint_off DECLFILENAME */  // file keeps its c9_core.v name (tb/ file lists); module is sd_adc_c9
+module sd_adc_c9 (
     input  wire       clk,
     input  wire       rst_n,
     input  wire [7:0] ui_in,
-    input  wire       comp_in,       // comparator output, sampled on the bit-clock falling edge
+    input  wire       comp_in,       // comparator output, captured into the DAC flop on fs_tick (D74)
     output wire [7:0] uo_out,
     output wire [7:0] uio_out,
     // analog control, all active high
@@ -38,7 +39,7 @@ module c9_core (
     end
     wire rd_rise = srd[1] & ~rd_p;
 
-    wire        fs_tick, s_tick, latch, load, boot, inv_pair, acc_clear;
+    wire        fs_tick, latch, load, boot, inv_pair, acc_clear;
     wire        cfg_change, sys_en_n, ota_en_n, cfg_pending;
     wire [12:0] act;
     wire [7:0]  slot_ctr;
@@ -48,13 +49,13 @@ module c9_core (
     wire        hold_boost, frame_ready, overrun;
     wire [2:0]  hold_trim;
 
-    c9_fsdiv u_div (.clk(clk), .rst_n(rs), .div_code(act[9:7]), .fs_tick(fs_tick), .s_tick(s_tick), .bit_clk(fs_clk));
+    c9_fsdiv u_div (.clk(clk), .rst_n(rs), .div_code(act[9:7]), .fs_tick(fs_tick), .bit_clk(fs_clk));
 
     c9_cfg u_cfg (.clk(clk), .rst_n(rs), .cfg_clk_s(sck[1]), .cfg_dat_s(sdat[1]), .cfg_ld_s(sld[1]),
                   .latch(latch), .act(act), .change(cfg_change), .sys_en_n(sys_en_n), .ota_en_n(ota_en_n),
                   .cfg_pending(cfg_pending));
 
-    c9_seq u_seq (.clk(clk), .rst_n(rs), .fs_tick(fs_tick), .s_tick(s_tick), .comp_in(comp_in),
+    c9_seq u_seq (.clk(clk), .rst_n(rs), .fs_tick(fs_tick), .comp_in(comp_in),
                   .n_code(act[11:10]), .sys_en_n(sys_en_n), .ota_en_n(ota_en_n), .cfg_change(cfg_change),
                   .latch(latch), .load(load), .boot(boot), .inv_pair(inv_pair), .slot_ctr(slot_ctr),
                   .rst_analog(rst_analog), .sys_swap(sys_swap), .ota_chop(ota_chop_phase), .y_force(y_force),
@@ -81,6 +82,6 @@ module c9_core (
     assign order_o = act[12];
     assign boost_o = act[3];
     assign trim_o  = act[2:0];
-    // boot / acc_clear / s_tick used internally only
+    // boot / acc_clear used internally only
     wire _unused = &{1'b0, boot};
 endmodule
