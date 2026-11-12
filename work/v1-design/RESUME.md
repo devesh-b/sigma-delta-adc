@@ -790,3 +790,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - C9: WO-42 agent waiting on its runs. Then WO-49 (RTL: D72 widths + rename + D74 capture on fs_tick, dropping comp_s), bench rerun, and the PnR run (pd-expert).
   - Pending SPEC CL entries: D72 (acc widths), D73 (trim ±19 %, calibration +2), D74 (strobe/capture, replacing CL-23).
   - Fix the 2 pre-existing test_c1_netlist failures (dualpath_structure, device_count).
+- WO-48 (37ca242, c7f1a82): C3 rev b, netlist.py, c3_tb.py (cyc/one/st/mc, every row has a broken copy). Full run: 47 decks in WO-48-37ca242 (run/pool_logs/POOL_DONE; collect: python c3_comp/c3_tb.py collect run), 6–9 h at load 6.6. Smoke: T8 stress REJECT at tt (dp 2.36 V > 1.98 V), probably a stimulus artefact (x2 slewed at 200 V/µs through 10 Ω) → reviewer decides the stimulus vs a dp/dn clamp; gate not changed.
