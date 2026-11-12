@@ -47,3 +47,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-38 C9e cocotb TB + Ref A + formal (rtl-verification-engineer, independent of RTL): dispatched 2026-11-11
 - WO-39 C1 clamp copies in the tb9 event deck (D69): dispatched 2026-11-12
 - WO-40 C9f D70 alignment + RTL mutation + coverage (rtl-verification-engineer): dispatched 2026-11-12
+- WO-41 C1 noise (tb7: thermal, 1/f, chopper residue, tier-0 feed): dispatched 2026-11-12

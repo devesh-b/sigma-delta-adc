@@ -770,3 +770,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - 2026-11-11 ~13:00: 1Password locked again (ssh + signing).
 - WO-38 rerun: 15/16 (a_rst01_async_mid: reset latency, spec gap). D70 (user): latency = 2-FF sync + div clk; AMB-18 fix. WO-39 (C1 clamp copies) and WO-40 (C9 mutation + coverage) dispatched.
 - User 2026-11-12: parallelise by server load. New `scripts/lpool.sh` (load-adaptive pool, single-thread jobs, POOL_DONE marker); smoke-tested on the sandbox. Use it in all WOs from now; it replaces the fixed ≤5 cap.
+- WO-39 done (993677c, 7865218, ed47a0e): new 'DM diff step' row; mcnr/mcst REJECT (DM 84.7 mV vs 486); mclv dropped with evidence; nominal ACCEPT at 4 corners. Ran via lpool (5 jobs, 9 min). Agent slip: a stray local 'python3 -' (no code ran). WO-41 (noise) dispatched.
