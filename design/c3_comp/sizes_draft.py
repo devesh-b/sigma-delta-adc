@@ -16,6 +16,7 @@ HVN, NF, PF = PRE + "nfet_g5v0d10v5", PRE + "nfet_01v8", PRE + "pfet_01v8"
 # W, L in um; m = parallel instances. HV devices use 5 um unit fingers (width bins, as ttsky-sigma-delta).
 SIZES = dict(
     IN=dict(W=5.0, L=0.5, m=4),    # HV input pair, per side: 10 um^2 (offset, DESIGN.md 3.1)
+    CAS=dict(W=5.0, L=0.5, m=4),   # HV cascode per side, gate = vdd (WO-51, T8 fix; same unit as the pair)
     TAIL=dict(W=4.0, L=0.5, m=2),  # 1.8 V clocked tail (D74), gate = strobe
     LN=dict(W=4.0, L=0.5, m=1),    # 1.8 V cross-coupled NMOS (sources on dp/dn), set B
     LP=dict(W=4.0, L=0.5, m=1),    # 1.8 V cross-coupled PMOS, set B
@@ -45,7 +46,8 @@ TDEC_SPOT_SS40 = 1.120e-9          # WO-44 spot t_dec at 1 mV, ss/-40/1.62 V (T2
 #   nobuf  : SR latch gates directly on op/on (buffers removed)      -> T7 hysteresis/memory REJECT
 #   nolatch: SR latch removed, q/qb = buffered on/op (transparent)   -> T10 near-zero / capture REJECT
 #   in18   : input pair as nfet_01v8                                -> T8 device stress REJECT
-MUTS = ("starve", "qswap", "nobuf", "nolatch", "in18")
+#   nocas  : no HV cascode (rev b)                                    -> T8 info: shows the fix
+MUTS = ("starve", "qswap", "nobuf", "nolatch", "in18", "nocas")
 
 
 def comp_subckt(mut=""):

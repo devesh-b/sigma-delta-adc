@@ -374,6 +374,7 @@ def deck_list():
         D[f"st_tt27_{o}"] = (st_deck, ("tt", 27, o), {}, {"T8": "pass"})
         D[f"st_ff-40_{o}"] = (st_deck, ("ff", -40, o), {}, {"T8": "pass"})
     D["st_brk_in18"] = (st_deck, ("tt", 27, "a"), {"mut": "in18"}, {"T8": "reject"})
+    D["st_nocas_tt27_a"] = (st_deck, ("tt", 27, "a"), {"mut": "nocas"}, {"T8": "info"})   # rev b, gate stimulus
     for c, t, o in (("tt", 27, "a"), ("ff", -40, "b")):    # info copies
         D[f"st_fast_{c}{t}_{o}"] = (st_deck, (c, t, o), {"stim": "fast"}, {"T8": "info"})
         D[f"st_async_{c}{t}_{o}"] = (st_deck, (c, t, o), {"stim": "async"}, {"T8": "info"})

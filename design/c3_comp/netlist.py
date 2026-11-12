@@ -27,9 +27,20 @@ def devices(sizes=SIZES, mut=""):
     if "starve" in mut:
         s["TAIL"] = dict(W=1.0, L=4.0, m=1)
     pair = NF if "in18" in mut else HVN
-    D = [("T", NF, "tl", "clk", "vss", "vss", s["TAIL"]),
-         ("M1", pair, "dp", "inp", "tl", "vss", s["IN"]),
-         ("M2", pair, "dn", "inn", "tl", "vss", s["IN"]),
+    # WO-51 (T8): HV cascode (gate = vdd) between each pair drain (ap/an) and dp/dn. When x2 moves while the strobe
+    # is high and the pair device is off, its Cgd kick lands on ap/an (HV), not on the floating 1.8 V node dp/dn
+    # (WO-48/51: dp reached 2.35-2.44 V, clamped only by the precharge PMOS drain-body diode). "nocas" = rev b.
+    if "nocas" in mut:
+        D = [("T", NF, "tl", "clk", "vss", "vss", s["TAIL"]),
+             ("M1", pair, "dp", "inp", "tl", "vss", s["IN"]),
+             ("M2", pair, "dn", "inn", "tl", "vss", s["IN"])]
+    else:
+        D = [("T", NF, "tl", "clk", "vss", "vss", s["TAIL"]),
+             ("M1", pair, "ap", "inp", "tl", "vss", s["IN"]),
+             ("M2", pair, "an", "inn", "tl", "vss", s["IN"]),
+             ("K1", HVN, "dp", "vdd", "ap", "vss", s["CAS"]),
+             ("K2", HVN, "dn", "vdd", "an", "vss", s["CAS"])]
+    D += [
          ("M3", NF, "op", "on", "dp", "vss", s["LN"]),
          ("M4", NF, "on", "op", "dn", "vss", s["LN"]),
          ("M5", PF, "op", "on", "vdd", "vdd", s["LP"]),
