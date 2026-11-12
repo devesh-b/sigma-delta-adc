@@ -54,7 +54,12 @@ CINT1, CS1 = 4.0e-12, 0.5e-12
 C_ROUTE, C_RT = 0.035e-12, 0.02e-12     # vg and output routing per side (c1b_opac)
 BETA_DES = 0.846
 LUMP = 1.4e-12
-TH_MAX, TH_TGT, FC_MAX, M8_TOL, GAMMA = 250e-6, 200e-6, 631e3, 0.30, 2.0 / 3.0
+# WO-52 (D75): TH_MAX is derived from the 1.2 uV tier-0 direct-path share (DESIGN.md 2.7a: 1.2 x 182.0 / 0.559 = 391 uV,
+# rounded down); 250 uV is the pre-D75 SPEC value, kept as an info column. The D71 200 uV target is dropped.
+TH_MAX, TH_INFO, FC_MAX, M8_TOL, GAMMA = 390e-6, 250e-6, 631e3, 0.30, 2.0 / 3.0
+M8_GROUPS = ("input pair", "sinks m_n", "loads m_pl/m_plc")   # the devices in the hand formula G (WO-52 like for like)
+R_DC = 1e9          # WO-52: noiseless DC-bias resistor for the vg nodes (replaces the 1 MH inductors)
+OP_MATCH = 1e-3     # WO-52: noise-analysis op vs the converged `op` (relative, gm of every DEVS device)
 R_MUT = 65e3
 F_GAM = 1e8
 DEVS = {"min1": "m_in", "mn1": "m_n", "mpl1": "m_pl", "mplc1": "m_plc", "mnc1": "m_nc", "mpc1": "m_pc"}
@@ -81,7 +86,9 @@ def sizes_for(mut):
     return z
 
 
-def deck(c, t, v, x, b, kind, mut, nodesets=None):
+def deck(c, t, v, x, b, kind, mut, nodesets=None, part="op"):
+    """part 'op': op + every print (the gated op, its lint); part 'noise': .noise only, then the totals and the DEVS gm
+    (WO-52: the noise analysis repeats the op from a fresh start; it is checked against the 'op' part, see run())."""
     sub = f"ota1_{x}"
     z = sizes_for(mut)
     L = [f"* WO-43 c1b_tb7 {x} {kind}", f".lib {LIB} {c}", f".temp {t}", ".option gmin=1e-12 reltol=1e-6 itl1=500",
@@ -101,7 +108,10 @@ def deck(c, t, v, x, b, kind, mut, nodesets=None):
               "Bbpp bpp 0 V = V(icm) + 0.5*V(d)", "Bbpn bpn 0 V = V(icm) - 0.5*V(d)",
               f"Cip {vp} outn {CINT1:g}", f"Cin {vn} outp {CINT1:g}", f"Cpp {vp} 0 {C_ROUTE:g}", f"Cpn {vn} 0 {C_ROUTE:g}",
               f"Bdp dp 0 V = V(icm) - 0.5*max(min(V(s)/1000, 0.3), -0.3)", f"Bdn dn 0 V = V(icm) + 0.5*max(min(V(s)/1000, 0.3), -0.3)",
-              f"Ldcp dp {vp} 1e6", f"Ldcn dn {vn} 1e6", "Bs 0 s I = 1e-3*(V(outp) - V(outn))", "Rdcs s 0 1e12", "Csrv s 0 1e9",
+              # WO-52: noiseless 1 GOhm instead of the 1 MH inductors (Newton failed with the inductors even with the ol
+              # nodeset). Pole with Cs1 + Cint1 + Cp_vg (~4.6 pF) ~35 Hz, below the 1 kHz band; 0.35 % at the 10 kHz check.
+              f"Rdcp dp {vp} {R_DC:g} noisy=0", f"Rdcn dn {vn} {R_DC:g} noisy=0",
+              "Bs 0 s I = 1e-3*(V(outp) - V(outn))", "Rdcs s 0 1e12", "Csrv s 0 1e9",
               f"Cop outp 0 {cext:g}", f"Con outn 0 {cext:g}"]
         if nodesets:   # WO-43: the open-loop op of the same mode (D71)
             L += [".nodeset " + " ".join(f"v({k})={z_:.6g}" for k, z_ in nodesets.items())]
@@ -114,16 +124,20 @@ def deck(c, t, v, x, b, kind, mut, nodesets=None):
               "Bs 0 s I = 1e-3*(V(outp) - V(outn))", "Rdcs s 0 1e12", "Csrv s 0 1e9",
               f"Cop outp 0 {cext:g}", f"Con outn 0 {cext:g}",
               f".nodeset v(s)=0 v(outp)={S.V_OCM} v(outn)={S.V_OCM}"]
-    L += [".control", "set wr_singlescale", "set wr_vecnames", "op",
-          "print i(vdd) v(outp) v(outn) v(gip) v(gin)"]
-    if kind == "ol":
-        L += ["print all"]
-    L += [f"print {par(x, i, z[k]['dev'], q)}" for i, k in DEVS.items() for q in DQ]
-    L += [f"print {par(x, i, 'nfet_g5v0d10v5', q)}" for i in SWQ for q in ("cgg", "cdd", "vth")]
-    L += [f"print v(x{x}.{n})" for n in ("fa", "xa", "sa")]
-    fmax = "1e10" if kind != "ol" else "1e9"
-    L += [f"noise v(outp,outn) vd dec 20 1e3 {fmax} 1", "print all", "setplot noise1",
-          f"wrdata {x}_{kind}_n1.csv onoise_spectrum inoise_spectrum", "quit", ".endc", ".end"]
+    L += [".control", "set wr_singlescale", "set wr_vecnames"]
+    if part == "op":
+        L += ["op", "print i(vdd) v(outp) v(outn) v(gip) v(gin)"]
+        if kind == "ol":
+            L += ["print all"]
+        L += [f"print {par(x, i, z[k]['dev'], q)}" for i, k in DEVS.items() for q in DQ]
+        L += [f"print {par(x, i, 'nfet_g5v0d10v5', q)}" for i in SWQ for q in ("cgg", "cdd", "vth")]
+        L += [f"print v(x{x}.{n})" for n in ("fa", "xa", "sa")]
+    else:
+        fmax = "1e10" if kind != "ol" else "1e9"
+        L += [f"noise v(outp,outn) vd dec 20 1e3 {fmax} 1", "print all"]
+        L += [f"print {par(x, i, z[k]['dev'], 'gm')}" for i, k in DEVS.items()]
+        L += ["setplot noise1", f"wrdata {x}_{kind}_n1.csv onoise_spectrum inoise_spectrum"]
+    L += ["quit", ".endc", ".end"]
     return "\n".join(L) + "\n"
 
 
@@ -144,11 +158,22 @@ LINT = r"(error|unknown|singular|no convergence|timestep too small|could not fin
 
 def run(out, c, t, v, x, b, kind, mut, nodesets=None):
     tag = f"{x}_{kind}"
-    fn = os.path.join(out, tag + ".sp")
-    open(fn, "w").write(deck(c, t, v, x, b, kind, mut, nodesets))
-    r = subprocess.run(["ngspice", "-b", fn], cwd=out, capture_output=True, text=True, timeout=1500)
-    vals = parse(r.stdout)
-    lint = [l.strip() for l in (r.stdout + r.stderr).splitlines() if re.search(LINT, l, re.I)]
+    out_ = {}
+    for part in ("op", "noise"):   # WO-52: two runs, so each analysis starts fresh and its lint is its own
+        fn = os.path.join(out, f"{tag}_{part}.sp")
+        open(fn, "w").write(deck(c, t, v, x, b, kind, mut, nodesets, part))
+        r = subprocess.run(["ngspice", "-b", fn], cwd=out, capture_output=True, text=True, timeout=1500)
+        out_[part] = (parse(r.stdout), [l.strip() for l in (r.stdout + r.stderr).splitlines() if re.search(LINT, l, re.I)])
+    vals, lint = out_["op"]
+    nvals, nlint = out_["noise"]
+    # the gated op is the 'op' run (no fallback allowed). The .noise run may fall back to transient op (seen at fs/125 with
+    # the op converging directly in the 'op' run); it is accepted only if it lands on the same op: gm of every DEVS device
+    # within OP_MATCH. Any other noise-run lint fails.
+    gmk = [par(x, i, z_["dev"], "gm").lower() for i, z_ in ((i, sizes_for(mut)[k]) for i, k in DEVS.items())]
+    match = op_match({k: vals.get(k, float("nan")) for k in gmk}, {k: nvals.get(k, float("nan")) for k in gmk})
+    nfb = any(re.search("transient op", l, re.I) for l in nlint)
+    lint = lint + [l for l in nlint if not re.search("transient op", l, re.I)] + ([] if match else ["noise op != op"])
+    vals.update({k: z_ for k, z_ in nvals.items() if k.startswith(("onoise", "inoise"))})
     csv = os.path.join(out, tag + "_n1.csv")
     spec = None
     if os.path.exists(csv):
@@ -166,7 +191,14 @@ def run(out, c, t, v, x, b, kind, mut, nodesets=None):
             if n.startswith(f"x{x}.") or n in TOPN:
                 nodes[n] = z_
     res = analyse(vals, lint, spec, x, b, kind, mut)
+    res.update(noise_op_fallback=nfb, noise_op_match=match)
     return res, nodes, vals
+
+
+def op_match(a, b):
+    """WO-52: True if every value of b is within OP_MATCH (relative) of a (same keys, all finite)."""
+    return bool(a) and all(math.isfinite(a[k]) and math.isfinite(b.get(k, float("nan"))) and a[k] != 0
+                           and abs(b[k] / a[k] - 1) <= OP_MATCH for k in a)
 
 
 def gamma(out, c, t, v, b, mut, ol_vals, x_ol):
@@ -274,8 +306,10 @@ def analyse(vals, lint, spec, x, b, kind, mut):
             res["H1k"] = h1k
             res["loop_ok"] = abs(h1k / (CS1 / CINT1) - 1) <= 0.05
         res["thermal_ok"] = bool(ok) and res["thermal_vg_uV"] <= TH_MAX * 1e6
-        res["thermal_tgt_ok"] = bool(ok) and res["thermal_vg_uV"] <= TH_TGT * 1e6
-        res["m8_ok"] = abs(res["thermal_vg_uV"] / res["thermal_hand_uV"] - 1) <= M8_TOL
+        res["thermal_info250"] = res["thermal_vg_uV"] <= TH_INFO * 1e6   # info only (pre-D75 SPEC value)
+        # WO-52: like for like, the hand G covers the pair, the sinks and the loads only
+        res["thermal_m8_uV"] = res["thermal_vg_uV"] * math.sqrt(sum(res["contrib_pct"].get(k, 0.0) for k in M8_GROUPS) / 100)
+        res["m8_ok"] = abs(res["thermal_m8_uV"] / res["thermal_hand_uV"] - 1) <= M8_TOL
     else:
         if spec is not None and spec.ndim == 2:
             f, en = spec[:, 0], spec[:, 2]
@@ -397,12 +431,13 @@ def summary(out):
             m = "f" if b else "b"
             pick = lambda k: next((r for r in nom if r["corner"] == cn and r["copy"] == m + k), None)
             ri, rl, ro = pick("int"), pick("lump"), pick("ol")
-            okr = ri["thermal_ok"] and ri["thermal_tgt_ok"] and ri["op_ok"] and ri.get("loop_ok") and ri["m8_ok"] \
+            okr = ri["thermal_ok"] and ri["op_ok"] and ri.get("loop_ok") and ri["m8_ok"] \
                 and ro["op_ok"] and ro["m8_ok"] and (rl is None or rl["op_ok"])
             if not okr:
                 fails.append(f"{cn} {m}")
             gm_ = ri.get("gam", {})
-            print(f"{cn} | {m} | {ri['thermal_vg_uV']:.1f} ({ri['thermal_hand_uV']:.1f}) | "
+            print(f"{cn} | {m} | {ri['thermal_vg_uV']:.1f} [{ri['thermal_m8_uV']:.1f} vs hand {ri['thermal_hand_uV']:.1f}]"
+                  f"{'' if ri['thermal_info250'] else ' >250(info)'} nfb {ri['noise_op_fallback']}/{ro['noise_op_fallback']} | "
                   f"{(rl['thermal_vg_uV'] if rl else float('nan')):.1f} | {ri['flicker_vg_uV']:.1f} | "
                   f"{ro['en_white_nV']:.2f} ({ro['en_hand_nV']:.2f}) | {ro['fc_kHz']:.1f} | {ri['beta1']:.4f} | "
                   f"{gm_.get('min1', float('nan')):.2f}/{gm_.get('mn1', float('nan')):.2f}/{gm_.get('mpl1', float('nan')):.2f} | "
@@ -439,9 +474,21 @@ def summary(out):
     mr = {r["copy"]: r for r in mut}
     if mr:
         rg, rs = mr["mrgint"], mr["msinkint"]
-        rg_rej = rg["op_ok"] and not rg["thermal_ok"] and not rg["m8_ok"]
-        rs_rej = rs["op_ok"] and not (rs["thermal_ok"] and rs["thermal_tgt_ok"])
+        # WO-52 (D75): mrg must REJECT the 390 uV row, the tier-0 direct-path row and the ol M8 row (series R adds en; the
+        # int M8 row is like for like and does not see R by construction). msink cannot cross 390 uV (sink share ~1/3):
+        # sensitivity row, the rise over nominal must be >= half the hand-predicted sqrt(1 + share) - 1.
+        mrg_mod = model_rows(mr["mrgol"]["en_white_nV"], mr["mrgol"]["fc_kHz"] * 1e3, rg["thermal_vg_uV"] * 1e-6)
+        rg_rej = rg["op_ok"] and not rg["thermal_ok"] and not mrg_mod["th_direct_ok"] and not mr["mrgol"]["m8_ok"]
         nomw = next((r for r in nom if r["copy"] == "bint" and r["corner"] == rs["corner"]), None)
+        rise_hand = math.sqrt(1 + nomw["contrib_pct"].get("sinks m_n", 0) / 100) - 1 if nomw else float("nan")
+        rise = rs["thermal_vg_uV"] / nomw["thermal_vg_uV"] - 1 if nomw else float("nan")
+        rs_rej = rs["op_ok"] and rise >= 0.5 * rise_hand
+        print(f"broken mrg: tier-0 direct {mrg_mod['th_direct_uV']:.2f} uV (<= 1.2 ok={mrg_mod['th_direct_ok']}); "
+              f"msink rise {100 * rise:.1f} % vs hand {100 * rise_hand:.1f} %")
+        # op-match check broken copy: a 1 % shifted op must not match
+        k0 = {"g": 1.0e-4}
+        if op_match(k0, {"g": 1.01e-4}) or not op_match(k0, {"g": 1.0e-4}):
+            fails.append("op_match broken copy not rejected")
         print(f"broken mrg: thermal {rg['thermal_vg_uV']:.1f} uV (hand {rg['thermal_hand_uV']:.1f}) en "
               f"{mr['mrgol'].get('en_white_nV', float('nan')):.2f} nV -> {'REJECTED' if rg_rej else 'NOT REJECTED'}")
         print(f"broken msink ({rs['corner']} base, sink W x4, gm_n {rs['gm_n_uS']:.1f} uS vs nominal "
@@ -451,7 +498,7 @@ def summary(out):
         if not rg_rej:
             fails.append("mrg not rejected")
         if not rs_rej:
-            fails.append("msink not rejected")
+            fails.append("msink not rejected (sink noise not seen)")
     else:
         print("broken copies: not run (sweep)")
     json.dump(dict(rows=rows, chopper=ch, chopper_broken=chb, model=mod, fails=fails),

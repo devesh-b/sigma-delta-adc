@@ -109,7 +109,8 @@ SIZES = dict(
     m_t=dict(dev="pfet_g5v0d10v5",  WF=3.75, M=32, L=6.0, src="hand"),  # tail W 120 L 6, 32 unit fingers. WO-28 (D61):
     # unit finger x3 in W and L (was 1.25/2: same W/L, same current density, 9x area) -> m_t 720 um2, m_tr 90 um2,
     # sigma(I_tail) / 2.9 for the SR - 3 sigma / ceiling + 3 sigma rows
-    m_n=dict(dev="nfet_g5v0d10v5",  WF=2.25, M=32, L=4.0, src="op"),  # fold sinks W 72 L 4 (M1), 32 unit fingers
+    m_n=dict(dev="nfet_g5v0d10v5",  WF=2.25, M=32, L=8.0, src="op"),  # fold sinks W 72 L 8 (D75, WO-43 c1; was L 4), 32
+    # unit fingers. The reference m_nr, replica m_rn and integrator tail m_it derive from this unit finger (K_N tracking).
     m_nc=dict(dev="nfet_g5v0d10v5", WF=5,   M=4,  L=2.0, src="op"),   # NMOS cascodes W 20 L 2
     m_pc=dict(dev="pfet_g5v0d10v5", WF=5,   M=16, L=2.0, src="op"),   # PMOS cascodes W 80 L 2 (rev C, was 40/2)
     m_pl=dict(dev="pfet_g5v0d10v5", WF=2.5, M=32, L=4.0, src="op"),  # PMOS load, fixed half (75 %), W 80 L 4, 32 unit fingers

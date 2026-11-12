@@ -71,7 +71,10 @@ def dualpath_ok(text):
             and f(r"^Ccp outp ctl ") and f(r"^Ccn outn ctl ") and f(r"^XSr1apn rap ph1 vocm ") and f(r"^XSr1bpn rbp ph1 bli ")
             and f(r"^XSr2apn rap ph2 outp ") and f(r"^XSr2bpn rbp ph2 ctl ") and f(r"^Xmplc1 sa ctl vdd vdd ")
             and f(r"^Xmrst ctl rstb ivbl0 vdd ") and f(r"^Xmrsb bli rstb ivbl0 vdd ")
-            and f(r"^Xmrsop outp rstb vocm vdd ") and f(r"^Xmrson outn rstb vocm vdd ") and not f(r"cms"))
+            # WO-52: D65 (WO-32) output clamp = transmission gate, n gate rst from the local inverter (mrin / mrip)
+            and f(r"^Xmrsopn outp rst vocm vss ") and f(r"^Xmrsonn outn rst vocm vss ")
+            and f(r"^Xmrsopp outp rstb vocm vdd ") and f(r"^Xmrsonp outn rstb vocm vdd ")
+            and f(r"^Xmrin rst rstb vss vss ") and f(r"^Xmrip rst rstb vdd vdd ") and not f(r"cms"))
 
 
 def test_dualpath_structure():
@@ -83,7 +86,9 @@ def test_dualpath_fails_on_broken_copy():
     assert not dualpath_ok(NL.build(mut="cm_open"))                                     # loop break left in
     assert not dualpath_ok(NL.build().replace("Xmia2 bli bli cit", "Xmia2 bli ctl cit"))  # follower feedback lost
     assert not dualpath_ok(NL.build().replace("XSr1bpn rbp ph1 bli", "XSr1bpn rbp ph1 ivbl0"))  # WO-26 refresh level
-    assert not dualpath_ok(NL.build().replace("Xmrsop outp rstb vocm", "Xmrsop outp rstb outp"))  # no output clamp
+    assert not dualpath_ok(NL.build().replace("Xmrsopp outp rstb vocm", "Xmrsopp outp rstb outp"))  # no output clamp
+    assert not dualpath_ok(NL.build(mut="clamp_weak"))                                  # WO-52: pre-D65 PMOS-only clamp
+    assert not dualpath_ok(NL.build(mut="clamp_stuck"))                                 # WO-52: TG gates tied on
 
 
 def test_dc_cmfb_averages_onto_ctl_and_bli():
@@ -123,15 +128,26 @@ def test_replica_sizes_fail_on_hand_typed_copy():
     assert not replica_sizes_ok(z)
 
 
+def count_ok(c):
+    """Device count per type. WO-52: D65 (WO-32) output clamp = TG (n 2 + p 2) plus the local rstb inverter (n 1 + p 1)."""
+    return (c.get("pfet_01v8") == 2 and c.get("nfet_01v8") == 4
+            # m_n 2, m_nc 2, refs m_nr 1, m_bnd 1, replica m_rn + cascode m_rnc 2, input chopper 4, island 2, CMFB TG n 8,
+            # bank TG n 1, rcb diode m_rcb 1, integrator pair/tail 3, output clamp TG n 2, rst inverter n 1
+            and c.get("nfet_g5v0d10v5") == 2 + 2 + 1 + 1 + 2 + 4 + 2 + 8 + 1 + 1 + 3 + 2 + 1
+            # m_t 1, m_pp 2, m_pc 2, m_pl 2, m_plc 2, refs m_tr/m_plr/mbl0 3, mbpd/mbpds 2, mbpx/mbpxs 2, m_rt 1, bank TG p 1,
+            # pull-up mbku 1, CMFB TG p 8, ctl reset 1, m_rcp 1, integrator loads 2, bli clamp 1, output clamp TG p 2,
+            # rst inverter p 1
+            and c.get("pfet_g5v0d10v5") == 1 + 2 + 2 + 2 + 2 + 3 + 2 + 2 + 1 + 1 + 1 + 8 + 1 + 1 + 2 + 1 + 2 + 1)
+
+
 def test_device_count():
-    c = NL.count(NL.build(cmfb="sc"))
-    assert c.get("pfet_01v8") == 2
-    assert c.get("nfet_01v8") == 4
-    # m_n 2, m_nc 2, refs m_nr 1, m_bnd 1, replica m_rn + cascode m_rnc 2, input chopper 4, island 2, CMFB TG n 8, bank TG n 1
-    assert c.get("nfet_g5v0d10v5") == 2 + 2 + 1 + 1 + 2 + 4 + 2 + 8 + 1 + 1 + 3   # + rcb diode m_rcb, + integrator pair/tail
-    # m_t 1, m_pp 2, m_pc 2, m_pl 2, m_plc 2, refs m_tr/m_plr/mbl0 3, mbpd/mbpds 2, mbpx/mbpxs 2, m_rt 1, bank TG p 1,
-    # pull-up mbku 1, CMFB TG p 8, ctl reset 1
-    assert c.get("pfet_g5v0d10v5") == 1 + 2 + 2 + 2 + 2 + 3 + 2 + 2 + 1 + 1 + 1 + 8 + 1 + 1 + 2 + 1 + 2   # + m_rcp, integrator loads, bli clamp, output clamps
+    assert count_ok(NL.count(NL.build(cmfb="sc")))
+
+
+def test_device_count_fails_on_broken_copy():
+    assert not count_ok(NL.count(NL.build(cmfb="sc", mut="clamp_weak")))   # pre-D65 PMOS-only clamp, no inverter
+    t = NL.build(cmfb="sc")
+    assert not count_ok(NL.count("\n".join(l for l in t.splitlines() if not l.startswith("Xmrin "))))   # inverter n lost
 
 
 def test_geometry_on_every_device():

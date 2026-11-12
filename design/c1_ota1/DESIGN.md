@@ -374,6 +374,46 @@ Not re-simulated (WO-23). HAND:
 - That gives ≈ 100 µV rms at tt, plus ≈ 5 % from the 3.3 V chopper Ron (§1.4). SPEC ≤ 250 µV ✓.
 - 1/f: the pair W·L is unchanged; the loads (not chopped) have larger W·L. Expected ≤ rev A's 50–100 kHz corner.
 
+#### 2.7a WO-52 (D75): sink L 8 and the noise row re-based on the system share
+
+**Sizing.** m_n unit finger L 4 → 8 (W 72 kept, 32 fingers). m_nr, m_rn and m_it derive from that finger, so the 1:8 reference,
+the replica (K_N tracking) and the integrator tail current are unchanged. 0 µA. WO-43 sweep (c1): worst thermal 241.8 µV
+(fs/125 boost), m_n margin ≥ 0.10 V (row ≥ 0.05), boost span 1.43 V (row 1.40). The 200 µV design target (D71) is dropped.
+
+**Derivation of the v_vg limit.** The tier-0 direct path (D71) puts the sampled OTA1 noise at the virtual ground into the
+kT/C term of the model. At sampling, the integrator charge error from vg is C_s1·v_vg against the switch kT/C noise of both
+sides, 2kT/C_s1 per side, i.e. 4kT/C_s1 differential. So the model's excess factor is
+
+  exc = 1 + v_vg² / (4kT/C_s1),  √(4kT/C_s1) = √(4 · 1.381e-23 · 300 / 0.5e-12) = 182.0 µV  (c1b_tb7.model_rows, T 300 K).
+
+The model's kT/C output noise power scales with exc, so the OTA1 share at the output (contrib_noise: √(n² − n_ktc²)) is
+
+  th_direct = n_ktc · √(exc − 1) = n_ktc · v_vg / 182.0 µV,  n_ktc = 0.556 µV @15 SPS, N 4096 (WO-41 model rows).
+
+Check against the WO-41 rows (Monte Carlo): th_direct² / (exc − 1) = 0.27–0.31 µV², i.e. an effective n_ktc of
+0.52–0.56 µV; the worst (largest) 0.559 µV is used. The 1.2 µV share then gives
+
+  v_vg ≤ 1.2 µV · 182.0 µV / 0.559 µV = 391 µV rms diff  →  **row limit 390 µV** (rounded down).
+
+**Rows (tb7).** Gate: thermal_vg ≤ 390 µV at every corner and mode, and the tier-0 direct path itself ≤ 1.2 µV thermal
+(joint ≤ 2.5 µV, 1/f ≤ 1.0 µV) at every corner. The 250 µV value is kept as an info column (the pre-D75 SPEC number, not a
+gate). The conventional noise-gain path stays info (D71). The derivation holds only while the direct-path model holds;
+V9 (tier 0 with PEX) is the check.
+
+**M8 row (WO-52).** The hand formula covers the input pair, the sinks and the loads only. The int-copy row compares it with
+the simulated thermal of those groups (contrib_pct), like for like; cascodes and switches (~30 % of the power) were the WO-43
+gap. The ol-copy row (en_white vs 8kT·G/gm_in) stays on the total.
+
+**Broken copies.** mrg (65 kΩ series R, tt base, ≈ 540 µV in WO-41) must REJECT the 390 µV row, the direct-path row
+(0.556 · 540 / 182 ≈ 1.6 µV) and the ol M8 row. msink (sink W ×4 at fs/125) changes the total by only ≈ +15 % (sink share
+≈ 1/3), so it cannot cross 390 µV; it is now a sensitivity check: it must raise thermal_vg by ≥ half of the hand-predicted
+rise √(1 + share) − 1, or the copy is REJECTED as "sink noise not seen".
+
+**tb7 op fix (WO-52).** WO-43's ol-op nodeset reached the int copy (30 nodes, names verified) but the int copy still fell
+back. Spot runs (fs/125 c1 deck): with the 1 MH DC inductors Newton fails even with the nodeset; with a noiseless resistor
+(1 GΩ, `noisy=0`) the `op` converges directly, but the `.noise` analysis repeats the op from a fresh start and that one fell
+back. See `work/v1-design/results/wo52/README.md` for the final deck structure.
+
 ### 2.8 Device stress (D40a) and the vg bound (M4)
 
 **Rule (M4):**
