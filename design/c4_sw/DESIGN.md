@@ -210,7 +210,16 @@ Spot limits used in `spot.py` (proposals for the C4b gate; the reviewer may tigh
 
 ## 9. Spot-sim results
 
-See `work/v1-design/results/wo46/README.md` (filled from `summary.md` of the frozen run).
+Full tables: `work/v1-design/results/wo46/README.md` (frozen run WO-46-03e28fe, 22/22 jobs, all 9 broken copies
+REJECT). Consequences for the sizes in §2/§3:
+- Input TG #1: **12/36** (Ron_max 1247 Ω at ss/−40/3.0; 10/30 gives 1490 Ω, only 0.7 % margin; 8/24 fails at 1784 Ω).
+- DAC TG #2/#10 and #6/#7/#11: 4/12 reads 3.6 kΩ at ss/−40 → **≈ 6/18** for the 3 kΩ target.
+- Top-plate shorts #3/#8: 2/4 (9.8 kΩ peak, τ 2.5 ns) confirmed; injection rule of §4 holds.
+- vg switches #4/#9: NMOS 8/0.5 reads 1.23 kΩ at ss/125 in the vg band → **≈ 10–12/0.5**, leakage to be gated (an
+  8/16 TG junction leaks 1.08 nA at ff/125/3.6, so no PMOS and no large junctions on vg).
+- Generator: dead time 1.82 ns (thresholds, ff/−40) to 5.50 ns (50 %, ss/125), t_half ≥ 118.1 ns, early ≥ 0.70 ns;
+  phase edge 1.22 ns at ss/125 fails the 1 ns spot limit → inv_8 final drivers in C4b.
+- LS: delay 0.27–1.83 ns, edge ≤ 0.25 ns, duty error ≤ 0.48 %.
 
 ## 10. Questions for the reviewer
 
