@@ -54,3 +54,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-45 C6a bias/trim/start-up design note + spot sims: dispatched 2026-11-12 (parallel)
 - WO-46 C4a switches + phase gen (+C7 level shifters) design note + spot sims: dispatched 2026-11-12 (parallel)
 - WO-47 C9h hardening plan + synth probe (pd-expert): dispatched 2026-11-12 (parallel)
+- WO-48 C3b revise per D74 + netlist + full tb (9 PVT + MC): dispatched 2026-11-12
