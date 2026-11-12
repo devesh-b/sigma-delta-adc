@@ -41,7 +41,11 @@ TEMPS = (-40, 27, 125)
 DCT = [("tt", 3.3), ("ss", 3.0), ("ff", 3.6), ("fs", 3.0), ("sf", 3.0)]
 TRAN = [("tt", 27, 3.3), ("ss", -40, 3.0), ("ff", 125, 3.0)]   # SPEC row 104: 0 -> 3.0 V at ss/-40 and ff/125
 TRS = (1e-6, 1e-2)
-LIM_TC, LIM_STEP, COVER = 0.03, 0.06, 1.4126   # COVER = (G0+7)/G0 needed for +-20 % at +-3 % residual
+LIM_TC, LIM_STEP = 0.03, 0.06
+# trim must correct the PROCESS part of the reference error, R +-15 % + VBG +-4 % = +-19 % (bias_bgr_area.md; the
+# +-3 % TC part is not trimmable at a room-temperature calibration), at +-3 % residual: I7/I0 >= (1.19/0.81)(0.97/1.03)
+EPS_TRIM, RESID = 0.19, 0.03
+COVER = (1 + EPS_TRIM) / (1 - EPS_TRIM) * (1 - RESID) / (1 + RESID)
 
 
 def x(name, d, g, s, b, dev, w, l, m=1):
@@ -152,9 +156,12 @@ def trim_eval(d, mut):
         itgt = u * GT
         steps = [I[k + 1] - I[k] for k in range(7)]
         res.append(dict(T=t, I=I, step_min_u=min(steps) / u, step_max_pct=100 * max(steps) / itgt,
-                        cover=I[7] / I[0], lo_pct=100 * (I[0] / I[CODE_RESET] - 1),
+                        cover=I[7] / I[0], eps_lo_pct=100 * (itgt * (1 - RESID) / I[7] - 1),
+                        eps_hi_pct=100 * (itgt * (1 + RESID) / I[0] - 1),
+                        adj_max=max(I[k + 1] / I[k] for k in range(7)), lo_pct=100 * (I[0] / I[CODE_RESET] - 1),
                         hi_pct=100 * (I[7] / I[CODE_RESET] - 1)))
-    ok = all(r["step_min_u"] >= 0.5 and r["step_max_pct"] <= 100 * LIM_STEP and r["cover"] >= COVER for r in res)
+    ok = all(r["step_min_u"] >= 0.5 and r["step_max_pct"] <= 100 * LIM_STEP and r["cover"] >= COVER
+             and r["adj_max"] <= (1 + RESID) / (1 - RESID) for r in res)
     return res, ok
 
 
@@ -273,7 +280,7 @@ def summary(out):
                  f"own {r.get('own_uA_27', 0):.2f} uA trim_ok {r.get('trim_ok')} ")
             for q in r.get("trim", []):
                 s += (f"| T{q['T']:g}: stepmin {q['step_min_u']:.2f}u stepmax {q['step_max_pct']:.2f}% "
-                      f"cover {q['cover']:.4f} c0 {q['lo_pct']:+.1f}% c7 {q['hi_pct']:+.1f}% ")
+                      f"cover {q['cover']:.4f} eps {q['eps_lo_pct']:+.1f}/{q['eps_hi_pct']:+.1f}% c0 {q['lo_pct']:+.1f}% c7 {q['hi_pct']:+.1f}% ")
         elif r["kind"] == "dcv":
             s = (f"I 3.0/3.3/3.6 {r.get('i30_uA', 0):.4f}/{r.get('i33_uA', 0):.4f}/{r.get('i36_uA', 0):.4f} uA "
                  f"dI/I {r.get('dIrel_per_V_pct', 0):.2f} %/V PSRR {r.get('psrr_dB', 0):.1f} dB")
