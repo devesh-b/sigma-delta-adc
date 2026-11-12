@@ -791,3 +791,20 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - Pending SPEC CL entries: D72 (acc widths), D73 (trim ±19 %, calibration +2), D74 (strobe/capture, replacing CL-23).
   - Fix the 2 pre-existing test_c1_netlist failures (dualpath_structure, device_count).
 - WO-48 (37ca242, c7f1a82): C3 rev b, netlist.py, c3_tb.py (cyc/one/st/mc, every row has a broken copy). Full run: 47 decks in WO-48-37ca242 (run/pool_logs/POOL_DONE; collect: python c3_comp/c3_tb.py collect run), 6–9 h at load 6.6. Smoke: T8 stress REJECT at tt (dp 2.36 V > 1.98 V), probably a stimulus artefact (x2 slewed at 200 V/µs through 10 Ω) → reviewer decides the stimulus vs a dp/dn clamp; gate not changed.
+- 2026-11-13 results (coordinator):
+  - **C1 sink sweep** (results/wo43/sweep_summary.txt): **no candidate reaches ≤ 200 µV.**
+    - Worst-corner thermal: c0 257 µV (the baseline on the new tb, above the 250 gate), c1 L 8: 242, c2: 240, c3 RS 2.5k: 221, c4: 224.
+    - c2–c4 (m_bnd 0.95) cut boost span to 1.265–1.29 V, under the 1.40 V row; c1 keeps span 1.43.
+    - The int-copy op still falls back to transient op (the nodeset fix did not take).
+    - Switches are now 15–17 % of thermal noise.
+    - → user decision.
+  - **C6 spot** (results/wo45/spot_summary.txt): DC, trim, TC (−2.4/+0.25 %) and PSRR (69–73 dB) OK; nosu, ptat and trim_open REJECT as expected.
+    - **Start-up FAILS:** the transient settles at 13–48 % of the DC current (a second stable state). sf/27 DC also lands in a low state (0.106 µA).
+    - → a design fix in C6, not a user decision.
+  - **C3 full run** (results/wo48/summary.txt):
+    - Functional rows T1/T2/T7/T10/T10nz/T5 ACCEPT at 9 PVT; every broken copy REJECTs.
+    - **Fails:**
+      - T3 offset MC: σ 14.4 mV at tt, 3σ 44.8 mV against 20 (hand estimate 17.7);
+      - T8 stress: dp 2.36–2.44 V against 1.98 V at tt and ff/−40, both power-up orders;
+      - T5 asymmetric kick 7.7–8.2 mV against 5.
+    - → user decision on offset; stress/asym are design or stimulus fixes.

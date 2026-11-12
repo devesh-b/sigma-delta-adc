@@ -1,0 +1,40 @@
+cyc_brk_nobuf      T7=REJECT(r) sanity=ok info={'tdec_ns': [0.731, 500.744, 250.744, 0.744, None, None], 'i_uA': 0.7025334454552404} why={'T7': ['c1:pol', 'c4:pol']}
+cyc_brk_nolatch    T10nz=REJECT(r) sanity=ok info={'tdec_ns': [251.898, 1.898, 2.312, 0.596, 2.143, 1.773], 'i_uA': 1.7633743597584284} why={'T10nz': ['c6:bh=1.62', 'c7:bh=1.62']}
+cyc_brk_phase      T10=REJECT(r) sanity=ok info={'tdec_ns': [1.421, 259.385, 9.385, 502.113, 252.113, 2.113], 'i_uA': 1.0414203807048392} why={'T10': ['c1:win', 'c2:win', 'c4:win']}
+cyc_brk_qswap      T1=REJECT(r) sanity=ok info={'tdec_ns': [252.119, 2.119, 6.702, 0.794, 9.593, 1.993], 'i_uA': 1.3032031190275974} why={'T1': ['c0:pol', 'c2:pol', 'c3:pol']}
+cyc_brk_weak       T2=REJECT(r) sanity=ok info={'tdec_ns': [None, None, None, None, None, None], 'i_uA': 0.14162449354024922} why={'T2': ['c0:tdec=None', 'c1:tdec=None', 'c2:tdec=None']}
+cyc_ff+125_198     T1=ACCEPT(p) T2=ACCEPT(p) T7=ACCEPT(p) T10=ACCEPT(p) T10nz=ACCEPT(p) sanity=ok info={'tdec_ns': [0.367, 0.881, 0.422, 0.402, 0.423, 0.813], 'i_uA': 4.109736258695818}
+cyc_ff-40_198      T1=ACCEPT(p) T2=ACCEPT(p) T7=ACCEPT(p) T10=ACCEPT(p) T10nz=ACCEPT(p) sanity=ok info={'tdec_ns': [0.298, 0.876, 0.354, 0.313, 0.353, 0.793], 'i_uA': 1.6878755446831284}
+cyc_fs+125_198     T1=ACCEPT(p) T2=ACCEPT(p) T7=ACCEPT(p) T10=ACCEPT(p) T10nz=ACCEPT(p) sanity=ok info={'tdec_ns': [0.461, 1.09, 0.498, 0.502, 0.503, 1.013], 'i_uA': 7.407507071324822}
+cyc_fs-40_162      T1=ACCEPT(p) T2=ACCEPT(p) T7=ACCEPT(p) T10=ACCEPT(p) T10nz=ACCEPT(p) sanity=ok info={'tdec_ns': [0.507, 5.867, 0.661, 0.534, 0.663, 4.363], 'i_uA': 1.2943184771806437}
+cyc_sf+125_198     T1=ACCEPT(p) T2=ACCEPT(p) T7=ACCEPT(p) T10=ACCEPT(p) T10nz=ACCEPT(p) sanity=ok info={'tdec_ns': [0.488, 0.995, 0.639, 0.499, 0.643, 0.913], 'i_uA': 1.9234492775781669}
+cyc_sf-40_162      T1=ACCEPT(p) T2=ACCEPT(p) T7=ACCEPT(p) T10=ACCEPT(p) T10nz=ACCEPT(p) sanity=ok info={'tdec_ns': [0.686, 8.135, 1.778, 0.622, 1.883, 1.773], 'i_uA': 1.554307774634967}
+cyc_ss+125_162     T1=ACCEPT(p) T2=ACCEPT(p) T7=ACCEPT(p) T10=ACCEPT(p) T10nz=ACCEPT(p) sanity=ok info={'tdec_ns': [0.804, 2.401, 0.95, 0.827, 0.953, 2.183], 'i_uA': 1.4475086002599191}
+cyc_ss-40_162      T1=ACCEPT(p) T2=ACCEPT(p) T7=ACCEPT(p) T10=ACCEPT(p) T10nz=ACCEPT(p) sanity=ok info={'tdec_ns': [0.797, 9.591, 1.992, 0.754, 2.123, 6.703], 'i_uA': 1.392031190275973}
+cyc_ss40_2MHz      T1=ACCEPT(p) T2=ACCEPT(p) T7=ACCEPT(p) T10=ACCEPT(p) T10nz=ACCEPT(p) sanity=ok info={'tdec_ns': [0.797, 10.754, 1.993, 0.753, 2.153, 6.703], 'i_uA': 0.6990951903034048}
+cyc_ss40_cm12      T1=ACCEPT(p) T2=ACCEPT(p) T7=ACCEPT(p) T10=ACCEPT(p) T10nz=ACCEPT(p) sanity=ok info={'tdec_ns': [0.836, 2.077, 1.844, 0.792, 2.083, 1.823], 'i_uA': 1.5810901307239509}
+cyc_ss40_cm18      T1=ACCEPT(p) T2=ACCEPT(p) T7=ACCEPT(p) T10=ACCEPT(p) T10nz=ACCEPT(p) sanity=ok info={'tdec_ns': [0.815, 13.282, 2.11, 0.772, 2.173, 9.923], 'i_uA': 1.3686476569069643}
+cyc_tt+27_180      T1=ACCEPT(p) T2=ACCEPT(p) T7=ACCEPT(p) T10=ACCEPT(p) T10nz=ACCEPT(p) sanity=ok info={'tdec_ns': [0.471, 1.503, 0.566, 0.485, 0.563, 1.353], 'i_uA': 1.522681752159621}
+one_brk_cl10       T5=REJECT(r) sanity=ok info={'tdec_ns': 2.017, 'kick_mV': [2.203, 16.33, 0.0, 0.0], 'cm_peak_mV': 263.09, 'cm_rec_mV': [0.0, 0.199]} why={'T5': []}
+one_brk_starve     T2band=REJECT(r) sanity=ok info={'tdec_ns': 5.644, 'kick_mV': [0.229, 2.799, 0.002, 0.001], 'cm_peak_mV': 33.58, 'cm_rec_mV': [1.186, 1.039]} why={'T2band': ['tdec=5.643899999999999e-09']}
+one_ff+125_198     T5=ACCEPT(p) sanity=ok info={'tdec_ns': 0.424, 'kick_mV': [1.285, 2.435, 0.001, 0.001], 'cm_peak_mV': 48.01, 'cm_rec_mV': [1.087, 1.221]}
+one_ff-40_198      T5=ACCEPT(p) sanity=ok info={'tdec_ns': 0.357, 'kick_mV': [0.821, 3.226, 0.001, 0.001], 'cm_peak_mV': 43.39, 'cm_rec_mV': [0.956, 1.052]}
+one_fs+125_198     T5=ACCEPT(p) sanity=ok info={'tdec_ns': 0.503, 'kick_mV': [2.106, 2.995, 0.001, 0.001], 'cm_peak_mV': 49.34, 'cm_rec_mV': [1.152, 1.303]}
+one_fs-40_162      T5=ACCEPT(p) sanity=ok info={'tdec_ns': 0.666, 'kick_mV': [0.571, 2.554, 0.001, 0.001], 'cm_peak_mV': 40.74, 'cm_rec_mV': [0.921, 1.029]}
+one_sf+125_198     T5=ACCEPT(p) sanity=ok info={'tdec_ns': 0.641, 'kick_mV': [0.908, 2.467, 0.001, 0.001], 'cm_peak_mV': 47.98, 'cm_rec_mV': [1.075, 1.211]}
+one_sf-40_162      T5=ACCEPT(p) sanity=ok info={'tdec_ns': 1.787, 'kick_mV': [0.193, 2.054, 0.001, 0.001], 'cm_peak_mV': 40.67, 'cm_rec_mV': [0.891, 1.006]}
+one_ss+125_162     T5=ACCEPT(p) sanity=ok info={'tdec_ns': 0.956, 'kick_mV': [0.723, 1.75, 0.001, 0.001], 'cm_peak_mV': 46.59, 'cm_rec_mV': [1.067, 1.239]}
+one_ss-40_162      T5=ACCEPT(p) T2band=ACCEPT(p) sanity=ok info={'tdec_ns': 2.0, 'kick_mV': [0.342, 2.73, 0.001, 0.001], 'cm_peak_mV': 40.79, 'cm_rec_mV': [0.918, 1.037]}
+one_ss40_2MHz      T5=ACCEPT(p) sanity=ok info={'tdec_ns': 1.999, 'kick_mV': [0.347, 2.739, 0.001, 0.001], 'cm_peak_mV': 41.15, 'cm_rec_mV': [1.502, 1.579]}
+one_ss40_asym      T5=REJECT(p) sanity=ok info={'tdec_ns': 1.523, 'kick_mV': [7.671, 8.175, 1.178, 1.102], 'cm_peak_mV': 41.13, 'cm_rec_mV': [1.014, 1.122]} why={'T5': []}
+one_tt+27_180      T5=ACCEPT(p) sanity=ok info={'tdec_ns': 0.57, 'kick_mV': [0.738, 2.669, 0.001, 0.001], 'cm_peak_mV': 45.03, 'cm_rec_mV': [1.008, 1.129]}
+st_brk_in18        T8=REJECT(r) sanity=ok info={'max18': (3.69018, 'st_m1_gs'), 'maxhv': (0.0, '')} why={'T8': ['n=181/181']}
+st_ff-40_a         T8=REJECT(p) sanity=ok info={'max18': (2.3626, 'st_m3_sb'), 'maxhv': (3.69096, 'st_m1_gs')} why={'T8': ['n=181/181']}
+st_ff-40_b         T8=REJECT(p) sanity=ok info={'max18': (2.43632, 'st_m3_sb'), 'maxhv': (3.69085, 'st_m1_gs')} why={'T8': ['n=181/181']}
+st_tt27_a          T8=REJECT(p) sanity=ok info={'max18': (2.36257, 'st_m3_sb'), 'maxhv': (3.72234, 'st_m1_gs')} why={'T8': ['n=181/181']}
+st_tt27_b          T8=REJECT(p) sanity=ok info={'max18': (2.41009, 'st_m3_sb'), 'maxhv': (3.72234, 'st_m1_gs')} why={'T8': ['n=181/181']}
+mc_brk_x3          T3=REJECT(r) tt_mm/27/1.8 n=50 mu=-0.412mV sigma=20.629mV |mu|+3s=62.30mV max|x|=39.92mV clip=3 inj_rms=17.952mV (A_inj 34.78) fail=['clip', 'mu3s', 'every', 'plaus']
+mc_ss40            T3=REJECT(p) ss_mm/-40/1.62 n=50 mu=-4.275mV sigma=13.569mV |mu|+3s=44.98mV max|x|=33.52mV clip=0 inj_rms=3.480mV (A_inj 7.58) fail=['mu3s', 'every', 'plaus']
+mc_tt              T3=REJECT(p) tt_mm/27/1.8 n=200 mu=1.669mV sigma=14.366mV |mu|+3s=44.77mV max|x|=39.92mV clip=1 inj_rms=3.614mV (A_inj 7.58) fail=['clip', 'mu3s', 'every', 'plaus']
+T4 noise (report only, REVIEW-C3a 6): hand sigma_n ~0.3-0.6 mV rms (gm 1 mS/side, t_int 0.1-0.3 ns) vs 5 mV rms: ~10x margin; .noise is a poor proxy for a regenerative comparator.
+SUMMARY REJECT (7 deck rows off expectation)
