@@ -50,3 +50,7 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-41 C1 noise (tb7: thermal, 1/f, chopper residue, tier-0 feed): dispatched 2026-11-12
 - WO-42 C9g verification closure (F01, functional bins, 200 seeds, soak, X-init, full golden, CDC note): dispatched 2026-11-12
 - WO-43 C1 sink-noise reduction (D71) + tb7 fixes + reruns: dispatched 2026-11-12
+- WO-44 C3a comparator design note + spot sims: dispatched 2026-11-12 (parallel)
+- WO-45 C6a bias/trim/start-up design note + spot sims: dispatched 2026-11-12 (parallel)
+- WO-46 C4a switches + phase gen (+C7 level shifters) design note + spot sims: dispatched 2026-11-12 (parallel)
+- WO-47 C9h hardening plan + synth probe (pd-expert): dispatched 2026-11-12 (parallel)
