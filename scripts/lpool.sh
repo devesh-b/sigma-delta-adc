@@ -19,7 +19,7 @@
 
 JOBFILE=${1:?usage: lpool.sh JOBFILE [LOGDIR]}
 LOGDIR=${2:-$(dirname "$JOBFILE")/pool_logs}
-NPROC=$(nproc)
+NPROC=$(env -u OMP_NUM_THREADS nproc)   # GNU nproc honours OMP_NUM_THREADS; ignore it here
 MAXJOBS=${MAXJOBS:-$NPROC}
 MARGIN=${MARGIN:-0.5}
 POLL=${POLL:-20}
@@ -30,24 +30,40 @@ export OMP_NUM_THREADS=1
 mapfile -t JOBS < <(grep -v '^[[:space:]]*\(#\|$\)' "$JOBFILE")
 echo "lpool start $(date +%T) jobs=${#JOBS[@]} nproc=$NPROC max=$MAXJOBS" >> "$LOGDIR/pool.status"
 
-running() { jobs -rp | wc -l; }
-slots() {
-  local load1 free s
+# Our running jobs are tracked as an explicit PID list checked with kill -0, in the main shell.
+# (The old `jobs -rp` inside $(...) ran in a subshell and miscounted, so the pool over-launched;
+# found 2026-11-13.)
+PIDS=()
+NRUN=0
+count_running() {
+  local alive=() p
+  for p in "${PIDS[@]}"; do kill -0 "$p" 2>/dev/null && alive+=("$p"); done
+  PIDS=("${alive[@]}")
+  NRUN=${#PIDS[@]}
+}
+NSLOT=1
+compute_slots() {
+  local load1 free
   load1=$(cut -d' ' -f1 /proc/loadavg)
   free=$(awk -v n="$NPROC" -v l="$load1" -v m="$MARGIN" 'BEGIN{f=n-l-m; print (f<0)?0:int(f)}')
-  s=$(( $(running) + free ))
-  [ "$s" -lt 1 ] && s=1
-  [ "$s" -gt "$MAXJOBS" ] && s=$MAXJOBS
-  echo "$s"
+  NSLOT=$(( NRUN + free ))
+  [ "$NSLOT" -lt 1 ] && NSLOT=1
+  [ "$NSLOT" -gt "$MAXJOBS" ] && NSLOT=$MAXJOBS
 }
 
 i=0
 for j in "${JOBS[@]}"; do
   i=$((i+1))
-  while [ "$(running)" -ge "$(slots)" ]; do sleep "$POLL"; done
+  while :; do
+    count_running; compute_slots
+    [ "$NRUN" -lt "$NSLOT" ] && break
+    sleep "$POLL"
+  done
   ( nice -n 10 bash -c "$j" > "$LOGDIR/job_$i.log" 2>&1; echo "EXIT=$?" >> "$LOGDIR/job_$i.log" ) &
-  echo "launch $i $(date +%T) running=$(running) load=$(cut -d' ' -f1 /proc/loadavg) :: $j" >> "$LOGDIR/pool.status"
-  sleep 5
+  PIDS+=("$!")
+  count_running
+  echo "launch $i $(date +%T) running=$NRUN slots=$NSLOT load=$(cut -d' ' -f1 /proc/loadavg) :: $j" >> "$LOGDIR/pool.status"
+  sleep 30   # let load1 catch up before the next decision
 done
 wait
 echo "lpool done $(date +%T)" >> "$LOGDIR/pool.status"
