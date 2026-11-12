@@ -768,3 +768,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - AMBs: AMB-18 (SPEC §3.8a debug sentence + golden debug_bus still say falling edge; D67 says rising: fix), AMB-17 (no HDL port names for the analog side), AMB-19 (comparator-cycle counting), AMB-20 (bus during rst_n), AMB-22 (frame-level status_word overrun always 0).
   - Next: read the rerun, then mutation run M01–M59 + coverage (WO-40).
 - 2026-11-11 ~13:00: 1Password locked again (ssh + signing).
+- WO-38 rerun: 15/16 (a_rst01_async_mid: reset latency, spec gap). D70 (user): latency = 2-FF sync + div clk; AMB-18 fix. WO-39 (C1 clamp copies) and WO-40 (C9 mutation + coverage) dispatched.
