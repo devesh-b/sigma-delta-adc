@@ -55,3 +55,7 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-46 C4a switches + phase gen (+C7 level shifters) design note + spot sims: dispatched 2026-11-12 (parallel)
 - WO-47 C9h hardening plan + synth probe (pd-expert): dispatched 2026-11-12 (parallel)
 - WO-48 C3b revise per D74 + netlist + full tb (9 PVT + MC): dispatched 2026-11-12
+- WO-49 C9i RTL D72+D74 (Sonnet) then bench + WO-42 leftovers (verif): dispatched 2026-11-13
+- WO-50 C6b bandgap start-up fix: dispatched 2026-11-13
+- WO-51 C3c offset re-base (D75), stress stimulus, asym kick: dispatched 2026-11-13
+- WO-52 C1 L8 + noise row re-base (D75) + tb7 op fix + test fixes + reruns: dispatched 2026-11-13
