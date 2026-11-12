@@ -1,0 +1,33 @@
+{
+  "//": "WO-47 DRAFT LibreLane (Classic flow) config for the C9 digital macro. Not a signoff config. DIE_AREA is a placeholder until the WO-47 synthesis probe area is in (see HARDENING.md 3). Paths are relative to this file.",
+  "meta": { "version": 2, "flow": "Classic" },
+
+  "DESIGN_NAME": "tt_um_sd_adc_c9",
+  "VERILOG_FILES": [
+    "dir::../rtl/tt_um_sd_adc_c9.v",
+    "dir::../rtl/c9_core.v",
+    "dir::../rtl/c9_fsdiv.v",
+    "dir::../rtl/c9_cfg.v",
+    "dir::../rtl/c9_seq.v",
+    "dir::../rtl/c9_dec.v",
+    "dir::../rtl/c9_rdbus.v"
+  ],
+
+  "CLOCK_PORT": "clk",
+  "CLOCK_PERIOD": 20.833,
+  "PNR_SDC_FILE": "dir::c9.sdc",
+  "SIGNOFF_SDC_FILE": "dir::c9.sdc",
+
+  "FP_SIZING": "absolute",
+  "DIE_AREA": [0, 0, 150, 80],
+  "PL_TARGET_DENSITY_PCT": 60,
+  "IO_PIN_ORDER_CFG": "dir::pin_order.cfg",
+
+  "FP_PDN_MULTILAYER": false,
+  "RT_MAX_LAYER": "met4",
+
+  "RUN_HEURISTIC_DIODE_INSERTION": true,
+  "DIODE_ON_PORTS": "in",
+
+  "RUN_LINTER": true
+}
