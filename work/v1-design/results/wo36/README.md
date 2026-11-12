@@ -14,5 +14,12 @@ Markers: out/status_{1..3} (EXIT=), out/DONE_{1..3}; VERDICT lines in out/tb9/{n
   may read in band on a CM-only row; mclv is released at 2 T and the CMFB should pull it back by 4 us. Any of the three
   passing means the CM row cannot see that defect, which is reported as such (not argued away).
 
-## Results
-(pending)
+## Results (pulled 2026-11-12, WO-39)
+- nominal tt+fs125 (0,2) and ss125+sf125 (3,4): VERDICT ACCEPT, EXIT=0.
+- --mut: VERDICT REJECT (3), EXIT=1. mcc4 REJECTED (reset release 13.2 mV, reset assert 26.4 mV, static ph1 −42.9 mV);
+  masy REJECTED (CM-to-DM u-dep 0.548 µV > 0.256); mio REJECTED (start-up abs: 119.2 mV off V_OCM).
+- mcnr PASSED (blind): cm_ss_ph2 +1.09 mV, err_ph2 0.0 mV. mcst PASSED (blind): −4.32 mV, 0.14 mV. A clamp held at V_OCM is a
+  CM source; the CM-only start-up row cannot see it. Followed up in WO-39 (D69): event-deck copies, DM diff-step row.
+- mclv PASSED: cm_ss_ph2 −1.49 mV, in band from 1.99 µs, err_ph2 0.04 mV. The 50 mV-off clamp is released at 2 T and the
+  CMFB corrects the CM well before 4 µs: harmless by design, copy dropped (D69). This is recorded as a property of the
+  design (the clamp level does not set the steady CM), not as a pass of the row.

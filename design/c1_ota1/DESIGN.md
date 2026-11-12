@@ -607,6 +607,13 @@ reached by the untrimmed reset code and the low calibration codes): K_P must sti
 rst from a local rstb inverter n 0.42 / p 0.84). At V_OCM 1.5 V the PMOS alone has ≈ 0.2 V overdrive from a 0 V output
 (bulk at vdd), the NMOS ≈ 0.8 V. 0 µA static. Broken copy clamp_weak: PMOS only, W/4. tb9 start-up gate: CM at the ph2
 sampling instants within 10 mV of its steady state (mean of the last two ph2 ends, 5.5 µs) from 3.75 µs on.
+**Clamp broken copies (D69, WO-39).** A TG clamp held at V_OCM is itself a CM source, so "clamp never released" (mcnr)
+and "clamp stuck on" (mcst) passed the CM-only start-up row (WO-36: 1.1 and −4.3 mV off V_OCM). They now run in the tb9
+event deck and are judged on a DM diff-step row: at the ph2 instants after the 0.486 V diff step (until the CM step),
+\| \|ΔV_dm\| − \|lev\|·0.486 V \| ≤ 10 mV; a held output clamp collapses the DM response. "Clamp to the wrong level"
+(mclv, clamp_lv50, V_OCM + 50 mV) is dropped as harmless by design: the clamp is released at 2 T and the CMFB then sets
+the CM. WO-36 evidence (tt, su_lo): steady state −1.49 mV off V_OCM, in the 10 mV band from 1.99 µs, 0.04 mV at the ph2
+instants from 3.75 µs. The netlist token stays for diagnosis.
 
 **CM-to-DM bound (D65 M2), from the S-model (model/iadc.py).** An error d_k [V diff] on x1 at the ph2 instant k (Cs2
 samples x1) enters the estimate as d_k / (c1·VREF), weighted by (N − k)/W (weights sum to 1 for an error that recurs every
