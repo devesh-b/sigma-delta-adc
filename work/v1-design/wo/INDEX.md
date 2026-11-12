@@ -48,3 +48,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-39 C1 clamp copies in the tb9 event deck (D69): dispatched 2026-11-12
 - WO-40 C9f D70 alignment + RTL mutation + coverage (rtl-verification-engineer): dispatched 2026-11-12
 - WO-41 C1 noise (tb7: thermal, 1/f, chopper residue, tier-0 feed): dispatched 2026-11-12
+- WO-42 C9g verification closure (F01, functional bins, 200 seeds, soak, X-init, full golden, CDC note): dispatched 2026-11-12
