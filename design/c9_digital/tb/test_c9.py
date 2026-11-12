@@ -1164,6 +1164,8 @@ async def c07_addr(dut):
     """CV-ADDR: every addr x dbg held stable and as a 1-clk glitch; bus == Ref A outside the 3-clk settle."""
     tb = await mk(dut, host=False)
     await tb.reset()
+    tb.set_ui(0x87, 7)                       # start away from 0 so a0_d0 also gets a glitch run
+    await tb.clks(5)
     for v in [a | (d << 7) for d in (0, 1) for a in range(8)]:
         tb.set_ui(0x87, v)
         await tb.clks(1)
