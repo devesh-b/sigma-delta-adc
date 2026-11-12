@@ -48,8 +48,8 @@ TGS = {"in4": (4.0, 8.0), "in8": (8.0, 16.0), "in8p3": (8.0, 24.0), "ref2": (2.0
 INPUT_TGS = ("in4", "in8", "in8p3")
 
 # generator knobs
-K_G, C_G = 4, 30e-15              # gap chain: inverters (even), cap per node
-K_E, C_E = 2, 10e-15              # early->late chain
+K_G, C_G = 4, 70e-15              # gap chain: inverters (even), cap per node (smoke tt: 30 fF gave g50 1.85 ns, g 1.0 ns)
+K_E, C_E = 2, 40e-15              # early->late chain (smoke tt: 10 fF gave 0.44 ns)
 CLOAD = 200e-15                   # per phase output (true and complement)
 
 LIM = dict(ron_max=1500.0, g_min=1.0e-9, g50_max=0.025 / FS, early_min=0.5e-9, t_half_min=0.45 / FS,
