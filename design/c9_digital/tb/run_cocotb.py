@@ -3,6 +3,7 @@ C9_SEED, C9_FULL, C9_COMP, C9_OUT, C9_BUILD_ARGS (extra build flags, e.g. --cove
 import glob
 import os
 import sys
+from pathlib import Path
 
 from cocotb_tools.runner import get_results, get_runner
 
@@ -33,6 +34,6 @@ r.test(hdl_toplevel=top, test_module="test_c9", test_dir=os.environ.get("C9_RUND
 if not os.path.exists(xml):
     print("RESULT FAIL: no results file")
     sys.exit(1)
-n, nf = get_results(xml)
+n, nf = get_results(Path(xml))   # cocotb 2.1 wants a Path
 print(f"RESULT {'PASS' if (n and not nf) else 'FAIL'}: {n} tests, {nf} failed ({xml})")
 sys.exit(0 if (n and not nf) else 1)

@@ -3,7 +3,7 @@
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd); MID=$1
 D=$HERE/../mut/$MID; mkdir -p "$D"
-[ -d "$D/rtl" ] || python3 "$HERE/mutants.py" make "$MID" "$D" > /dev/null || exit 2
+[ "$MID" = base ] || [ -d "$D/rtl" ] || python3 "$HERE/mutants.py" make "$MID" "$D" > /dev/null || exit 2
 [ "$MID" = base ] && { rm -rf "$D/rtl"; cp -a "$HERE/../rtl" "$D/rtl"; }
 for P in F01 F02 F03 F05 F06 F08 F09 F10 F16 F17; do
   F=$D/f_$P; rm -rf "$F"; mkdir -p "$F"

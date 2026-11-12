@@ -132,9 +132,12 @@ M = {
     "M58": ([(DIV, "default: begin div_m1 = 8'd23;", "default: begin div_m1 = 8'd24;")],
             ["s01_reset_idle", "d_fs01_div_codes"]),
     "M59": ([(CORE, "1'b0, hold_tag[7:0]};", "1'b0, slot_ctr};")], ["d_dec01_golden_vectors", "d_frm04_overrun"]),
+    # WO-40 additions: give F17 and F10 a mutant (no plan mutant breaks them)
+    "M60": ([(SEQ, "rst_analog <= 1'b1; sys_swap <= 1'b0;", "rst_analog <= 1'b0; sys_swap <= 1'b0;")], ["s01_reset_idle"]),
+    "M61": ([(SEQ, "bit_valid  <= ~rst_n_nx;", "bit_valid  <= ~rst_n_nx & ~(c == 13'd5);")], ["a_seq01_trace_ctl"]),
 }
 FORMAL = ["M07", "M07b", "M19", "M20", "M21", "M22", "M24", "M30", "M31", "M35", "M36", "M37", "M45",
-          "M03", "M10", "M15", "M16", "M53", "M58"]
+          "M03", "M10", "M15", "M16", "M53", "M58", "M60", "M61"]
 
 
 def make(mid, dest):
