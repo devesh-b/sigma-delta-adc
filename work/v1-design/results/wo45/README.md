@@ -11,4 +11,10 @@ Frozen copy on the sandbox: `/home/mempool/regr/tt/WO-45-0fb6db0` (`.spiceinit` 
 I(27) 1.005 µA (master, code 100); TC −2.77 / +0.52 % (slope +1.97 %); own current 3.58 µA; trim: steps 0.996–0.998 u, step 5.04 % of target, I7/I0 1.4103–1.4112 (≥ 1.4126 for the literal ±20 % fails by 0.1 %: the DESIGN.md §3 finding; the check now uses the process range ±19 %, I7/I0 ≥ 1.3836).
 
 ## Results
-PENDING (see status below).
+PENDING. Status at 23:18 (sandbox time): stage 1 tune running (≈ 86 s per grid point under load 6.8 on 6 cores, the dct sweep needs true-gmin stepping; ≈ 19 min for the grid), stage 2 not started; expect ≈ 30–40 min more.
+
+## Pickup (no wait loops)
+1. `ssh sandbox 'ls /home/mempool/regr/tt/WO-45-0fb6db0/out/pool/POOL_DONE && cat /home/mempool/regr/tt/WO-45-0fb6db0/out/summary.txt'`
+2. If absent: `cat .../out/tune.log` (stage 1 output appears only when it ends) and `tail .../out/pool_run/pool.status`.
+3. Expected verdicts: every `none` row ACCEPT, `ptat` / `trim_open` / `nosu` rows REJECT (`summary` prints MISMATCH otherwise and exits 1). A `nosu` ACCEPT means the start-up check is blind (DESIGN.md §6) and needs a harder condition.
+4. Copy the table into this README, fill DESIGN.md §8 own-current line and §6 t90 − t_ok, then run the reviewer on DESIGN.md.
