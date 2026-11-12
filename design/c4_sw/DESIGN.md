@@ -19,13 +19,14 @@ input switching), D22 (Cs 0.5 pF). Topology reference: `design/tier1/gen_tier1.p
 | φI (φIe early, φIl late) | integrate half: Cs1 → Cint1, Cs2/Ck2 → Cint2, DAC on, OTA1 integrate | `ph1` (CMFB refresh) | `phi2` | high |
 | φS (φSe early, φSl late) | sample half: Cs1 samples VIN, Cs2 samples x1 (OTA1 hold), D12 top-plate short | `ph2` (CMFB share) | `phi1` / `phi1e` | low |
 
-**Reading of CL-23 used here (Q1 below):** the bit-clock rising edge (fs-cycle start) starts φI; the falling edge
-(end of C1 `ph1` = end of φI) is the instant the comparator samples x2, because x2 is final at the end of OTA2's
-integrate half. The comparator strobe is generated in C4 from the φIl falling edge (not from the raw fs edge), so it
-fires after x2 is complete. C9's DAC flop takes the latched decision at the next rising edge, and C4 applies it in
-that cycle's φI. Loop delay therefore equals the tier-1 deck (latch at T − g + 2 ns, DAC in the next `phi2`); only
-the cycle boundary moves by half a period (tier 1 starts with `phi1`). Every C9 control changes on the rising edge,
-so it changes inside the S→I dead time, which is where rule 13 wants the OTA-chop edge.
+**Comparator timing (user D74, supersedes the earlier CL-23 reading):** the bit-clock rising edge (fs-cycle start,
+C9 `fs_tick`) starts φI. x2 is final at the end of φI and **held through φS** (OTA2 in hold). The comparator strobe
+φC fires **inside φS**: C4 derives it from the φSe rising edge (after the I→S gap, so x2 is complete), not from the
+raw fs edge. C9 captures `comp_in` straight into the DAC flop on the next `fs_tick` (rising edge), and C4 applies y
+in that cycle's φI. Budget at 4 MHz: strobe ≈ g + 1 ns after the falling edge, decision < 34 ns (SPEC comparator
+row), next fs_tick ≈ t_half + g later, so the output is stable ≈ t_half − 34 ns ≈ 75 ns before capture (≈ 190 ns at
+2 MHz), every corner. Loop delay equals the tier-1 deck (one decision per cycle, DAC in the next integrate half).
+Every C9 control changes on the rising edge, i.e. inside the S→I dead time, where rule 13 wants the OTA-chop edge.
 
 ## 2. Switch list (per side; ×2 for the differential pair unless noted)
 
@@ -46,7 +47,8 @@ V_ICM + Vin_cm − Vref_cm = 0.18–2.22 V over Vin_cm 0…VREF (review F2 input
 | 9 | vg2 connect (Sg2) | tp2 → vg2 | φIe | 1.07–1.33 V | 3.3 V NMOS only | C4 |
 | 10 | Ck2 DAC (Skh, Skl) | bk → VREF+ / VREF− | φIl · y / φIl · ¬y | as #2 | 3.3 V TG ≈ 4/12 | C4 |
 | 11 | Ck2 rest (Sk0) | bk → cm (tier 1); **proposal: bkp ↔ bkn short** | φS | as #2 | 3.3 V TG ≈ 4/12 | C4 (Q3) |
-| 12 | Int2 islands / reset / order-1 hold | — | rst2 | — | C2 | C2 (C4 drives) |
+| 12 | Int2 islands / reset; **order-1 per-cycle reset (D74)** | Cint2 / vg2 | rst2 (slot reset) **or** rst2_o1 (order 1, every cycle, late φS after the strobe decision) | — | C2 | C2 (C4 drives) |
+| 13 | Comparator input | x2 only (**no mux**, D74) | strobe φC in φS | — | — | C3 |
 
 Notes.
 - **#1 merged (Q2):** the sys-chop swap (rule 8: on the pin side, ahead of sampling) and the internal short are done by
@@ -57,6 +59,12 @@ Notes.
 - **#11 (Q3):** with D12 and CL-2 only the differential charge matters, so Ck2's rest phase can short bkp ↔ bkn as
   CL-2 does for Cs2, with no CM bus.
 - The comparator strobe φC (C3) and the CMFB `ph1/ph2` come from the same generator.
+- **Order 1 (D74):** the comparator always reads x2; there is no input mux. Integrator 2 runs as a follower: Cint2 is
+  reset every cycle and Cs2 transfers x1 in φI, so x2 = k·x1 each cycle; the Ck2 DAC (#10/#11) is held in its rest
+  state (`order` = 0). Timing constraint: the per-cycle reset must not overlap the strobe, because x2 must stay held
+  from the end of φI until the comparator has decided. So rst2_o1 is placed late in φS (after strobe + decision
+  time, ≥ 40 ns at 4 MHz) and ends before the S→I gap; at 4 MHz that leaves ≈ 70 ns of reset, against the reset
+  settling of Cint2 (≈ 1 kΩ × 1 pF, 15 τ ≈ 15 ns). The C2 reset switch must meet that; check in C4b (Q7).
 
 ## 3. TG vs NMOS-only, sizing (Ron, settling)
 
@@ -194,6 +202,11 @@ Spot limits used in `spot.py` (proposals for the C4b gate; the reviewer may tigh
 7. Reset residue with real switches (D46a, r ≤ 1e-4 in 2 cycles at 4 MHz boost and 0.25 MHz). Copy: 1-cycle window.
 8. Power-up ramps in both orders (§7). Copy: detector removed → isl not closed while VDPWR is low.
 9. vg leakage at ff/125/3.6 and ff/100/3.6 (≤ 90 / 20 pA per node), PEX in C4c.
+10. Comparator strobe placement (D74): φC rises inside φS, after φIl is off (x2 final) and with ≥ t_half − t_dec margin
+    to the next fs_tick, at every corner and fs. Copy: **strobe on the wrong phase** (φC from φIe, i.e. during x2
+    integration) ⇒ REJECT.
+11. Order-1 follower (D74): rst2_o1 never overlaps φC + decision time; x2 = k·x1 per cycle within settling. Copy:
+    rst2_o1 placed in early φS (overlapping the strobe) ⇒ REJECT.
 
 ## 9. Spot-sim results
 
@@ -201,7 +214,8 @@ See `work/v1-design/results/wo46/README.md` (filled from `summary.md` of the fro
 
 ## 10. Questions for the reviewer
 
-- **Q1** CL-23 reading in §1 (bit clock high = φI = C1 `ph1`; comparator strobe from the φIl fall).
+- **Q1** phase mapping in §1 (bit clock high = φI = C1 `ph1`); strobe in φS per D74.
+- **Q7** order-1 per-cycle int2 reset placed late in φS (§2 notes): enough time at 4 MHz?
 - **Q2** merged input / sys-swap / short switch (#1) instead of a series swap switch.
 - **Q3** Ck2 rest phase as a p ↔ n short (#11), no CM bus.
 - **Q4** input TG size from §9 (gate load per phase grows ×1.5 from 8/24 to 12/36).
