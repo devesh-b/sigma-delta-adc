@@ -15,10 +15,10 @@ One ngspice run per copy (one .noise each, so the plots are noise1 / noise2). Co
   lump  int + extra output cap so that the effective load is the SPEC 1.4 pF lump (info).
   ol    open loop, the c1b_opac servo input (DC servo, frozen at AC): inoise = en(f), differential, at the OTA input.
 Quantities:
-  thermal_vg = beta1 x (output rms of every non-flicker generator, 1 Hz .. 10 GHz). beta1 = Cint/(Cint + Cs1 + Cp_vg) from
+  thermal_vg = beta1 x (output rms of every non-flicker generator, 1 kHz .. 10 GHz). beta1 = Cint/(Cint + Cs1 + Cp_vg) from
   the op (same Cp_vg formula as c1b_opac). Input referral of the sampled OTA noise is ~1: the charge Cs1 x v_vg left on Cint
   when Cs1 opens gives dx = c1 v_vg, i.e. du = v_vg (Cp_vg stays connected and gives no persistent charge).
-  en_white, fc: weighted LSQ fit en^2 = a + b/f over 100 Hz .. 2 MHz, en_white = sqrt(a), fc = b/a (the model's definition:
+  en_white, fc: weighted LSQ fit en^2 = a + b/f over 1 kHz .. 2 MHz, en_white = sqrt(a), fc = b/a (the model's definition:
   PSD_1/f = en_white^2 fc / f).
 Rows (limits from SPEC rows 92-93, DESIGN.md 2.7 and section 4 row 7, not from this code):
   thermal_vg <= 250 uV rms diff at every corner and mode (gate); fc <= 631 kHz (info);
@@ -100,7 +100,8 @@ def deck(c, t, v, x, b, kind, mut):
     L += [f"print {par(x, i, S.SIZES[k]['dev'], q)}" for i, k in DEVS.items() for q in ("gm", "id", "cgg", "cdd")]
     L += [f"print {par(x, i, 'nfet_g5v0d10v5', q)}" for i in SWQ for q in ("cgg", "cdd", "vth")]
     fmax = "1e10" if kind != "ol" else "1e9"
-    L += [f"noise v(outp,outn) vd dec 20 1 {fmax} 1", "print all", "setplot noise1",
+    # from 1 kHz: below the L-C corner (~80 Hz) the DC-bias inductors steal the Cint feedback (beta_eff ~ (f/80 Hz)^2)
+    L += [f"noise v(outp,outn) vd dec 20 1e3 {fmax} 1", "print all", "setplot noise1",
           f"wrdata {x}_{kind}_n1.csv onoise_spectrum inoise_spectrum", "quit", ".endc", ".end"]
     return "\n".join(L) + "\n"
 
@@ -164,8 +165,10 @@ def analyse(vals, lint, spec, x, b, kind, mut):
     res["en_hand_nV"] = math.sqrt(8 * KB * T * GAMMA * (1 + alpha) / d["min1"]["gm"]) * 1e9
     lv = leaves(vals)
     tot = g("onoise_total")
-    ssum = math.sqrt(sum(z * z for z in lv.values()))
+    ssum = math.sqrt(sum(z * z for z in lv.values() if math.isfinite(z)))
     res["gen_sum_ok"] = bool(lv) and abs(ssum - tot) <= 0.02 * tot
+    res["nan_gens"] = [k for k, z in lv.items() if not math.isfinite(z)][:5]
+    lv = {k: z for k, z in lv.items() if math.isfinite(z)}
     use = {k: z for k, z in lv.items() if "rdc" not in k}
     fl = {k: z for k, z in use.items() if k.endswith("1overf") or "flicker" in k}
     th = {k: z for k, z in use.items() if k not in fl}
@@ -192,7 +195,7 @@ def analyse(vals, lint, spec, x, b, kind, mut):
     else:
         if spec is not None and spec.ndim == 2:
             f, en = spec[:, 0], spec[:, 2]
-            m = (f >= 100) & (f <= 2e6)
+            m = (f >= 1e3) & (f <= 2e6)
             A = np.vstack([np.ones(m.sum()), 1.0 / f[m]]).T / (en[m] ** 2)[:, None]
             a, bb = np.linalg.lstsq(A, np.ones(m.sum()), rcond=None)[0]
             res.update(en_white_nV=math.sqrt(a) * 1e9, fc_kHz=bb / a / 1e3,
