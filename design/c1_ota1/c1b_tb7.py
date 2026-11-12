@@ -172,40 +172,26 @@ def run(out, c, t, v, x, b, kind, mut, nodesets=None):
 def gamma(out, c, t, v, b, mut, ol_vals, x_ol):
     """PDK gamma per device class at the ol op (WO-43, D71)."""
     z = sizes_for(mut)
-    fn = os.path.join(out, f"{'f' if b else 'b'}{mut or ''}_gam.sp")
-    L = [f"* WO-43 c1b_tb7 gamma deck", f".lib {LIB} {c}", f".temp {t}", ".option gmin=1e-12 reltol=1e-6"]
-    ctl = [".control", "op"]
-    for i, (inst, key) in enumerate(GAMDEV.items()):
+    T = 273.15 + t
+    gam = {}
+    for i, (inst, key) in enumerate(GAMDEV.items()):   # one deck per device (one .noise per run, plots noise1 / noise2)
         p = z[key]
         g_ = lambda q: ol_vals.get(par(x_ol, inst, p["dev"], q).lower(), float("nan"))
-        vgs, vds = g_("vgs"), g_("vds")
-        L += [f"Vg{i} g{i} 0 dc {vgs:.6g} ac 1", f"Vd{i} d{i} 0 dc {vds:.6g}", f"H{i} o{i} 0 Vd{i} 1",
-              NL.mos(f"g{i}", f"d{i}", f"g{i}", "0", "0", p["dev"], p["WF"], p["L"], p["M"])]
-        ctl += [f"print @m.xg{i}.msky130_fd_pr__{p['dev']}[gm]"]
-    for i in range(len(GAMDEV)):
-        ctl += [f"noise v(o{i}) vg{i} lin 1 {F_GAM:g} {F_GAM:g}", f"setplot noise{2 * i + 1}", f"echo GAMMARK{i}",
-                "print onoise_spectrum"]
-    L += ctl + ["quit", ".endc", ".end"]
-    open(fn, "w").write("\n".join(L) + "\n")
-    r = subprocess.run(["ngspice", "-b", fn], cwd=out, capture_output=True, text=True, timeout=600)
-    vals = parse(r.stdout)
-    T = 273.15 + t
-    res, cur = {}, None
-    for ln in r.stdout.splitlines():
-        m = re.match(r"\s*GAMMARK(\d)", ln)
-        if m:
-            cur = int(m.group(1))
-            continue
-        if cur is not None and "onoise_spectrum" in ln and "=" in ln:
-            try:
-                res[cur] = float(ln.split("=")[1].split()[0])
-            except (ValueError, IndexError):
-                pass
-            cur = None
-    gam = {}
-    for i, (inst, key) in enumerate(GAMDEV.items()):
-        gm = vals.get(f"@m.xg{i}.msky130_fd_pr__{z[key]['dev']}[gm]", float("nan"))
-        gam[inst] = res.get(i, float("nan")) ** 2 / (4 * KB * T * gm) if gm == gm and gm > 0 else float("nan")
+        sg = -1.0 if p["dev"].startswith("pfet") else 1.0   # BSIM prints |vgs|, |vds| for PMOS; source = bulk = 0 here
+        vgs, vds = sg * abs(g_("vgs")), sg * abs(g_("vds"))
+        fn = os.path.join(out, f"{'f' if b else 'b'}{mut or ''}_gam{i}.sp")
+        L = ["* WO-43 c1b_tb7 gamma deck", f".lib {LIB} {c}", f".temp {t}", ".option gmin=1e-12 reltol=1e-6",
+             f"Vg g 0 dc {vgs:.6g} ac 1", f"Vd d 0 dc {vds:.6g}", "H1 o 0 Vd 1",
+             NL.mos("g", "d", "g", "0", "0", p["dev"], p["WF"], p["L"], p["M"]),
+             ".control", "op", f"print @m.xg.msky130_fd_pr__{p['dev']}[gm]", f"print @m.xg.msky130_fd_pr__{p['dev']}[id]",
+             f"noise v(o) vg lin 1 {F_GAM:g} {F_GAM:g}", "setplot noise1", "print onoise_spectrum", "quit", ".endc", ".end"]
+        open(fn, "w").write("\n".join(L) + "\n")
+        r = subprocess.run(["ngspice", "-b", fn], cwd=out, capture_output=True, text=True, timeout=600)
+        vals = parse(r.stdout)
+        gm = vals.get(f"@m.xg.msky130_fd_pr__{p['dev']}[gm]", float("nan"))
+        sp = vals.get("onoise_spectrum", float("nan"))
+        gam[inst] = sp ** 2 / (4 * KB * T * gm) if gm == gm and gm > 0 else float("nan")
+        gam[inst + "_id_uA"] = abs(vals.get(f"@m.xg.msky130_fd_pr__{p['dev']}[id]", float("nan"))) * 1e6
     return gam
 
 
