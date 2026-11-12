@@ -594,3 +594,25 @@ Verilator `--coverage` (line, toggle, branch) merged across the regression.
 - **The analog side:** level shifters, phase non-overlap and comparator timing margins. These belong to C7/C8/V-rows; at C9 only the digital contract is covered.
 - **Substrate/digital noise coupling** into the first integrator (§3.9, V9).
 - **Firmware:** the host discard rule is checked against a model host only.
+
+## 11. WO-42 additions (verification, 2026-11-12)
+
+### 11.1 Static CDC review of the async inputs (RTL structure, read-only; no tool)
+| Input | Crossing in RTL (c9_core / c9_rdbus) | Verdict |
+|---|---|---|
+| rst_n | `r1`, `rs`: async clear, 2-FF synchronous release; every block's reset is `rs` | OK: async assert, sync release (CL-19, D70) |
+| cfg_clk, cfg_dat, cfg_ld, rd | 2-FF (`sck`, `sdat`, `sld`, `srd`), reset by `rs`; edges detected after the second flop | OK, 1 b each. cfg_dat is sampled on the synchronised cfg_clk edge, so the 3.8a rule "cfg_dat stable >= 2 clk around the cfg_clk edge" is a requirement on the host |
+| addr[2:0], dbg | 2-FF per bit (`a1`/`a2`, `d1`/`d2`), then the registered word | A multi-bit crossing without Gray coding or a handshake. During an addr change, a2 can hold a mixed code for 1 clk, so the bus can show a wrong word for 1 clk. That is inside the CL-21 3-clk settle; it is not a bug if the host waits 3 clk |
+| comp_in | one flop `comp_s`, enabled on s_tick (falling edge of the bit clock, CL-23) | No synchroniser, by design: the comparator is clocked from the same clk domain. The analog contract must state that the comparator output is resolved before s_tick. Analog item (C7/C8), not C9 |
+| uio_in, ena | unused (`_unused`) | OK (CL-20) |
+
+Metastability itself is not simulated (waiver kept). M39 (rd without a sync) is covered by this review.
+
+### 11.2 Functional bins as implemented (tb/fcov.py), with reductions to 7.1
+- CV-WRITE-PHASE uses 15 phases × 4 kinds (60 bins) plus 8 field bins plus pending-at-rst_n. The phases are e−3..e+3 around the even latch edge (at the synchronised update), then even c0/c1/c2/mid/N+1 and odd c0/mid/N+1 outside that window. The 3-way phase × kind × field cross is split into phase × kind and field.
+  - Unreachable: multi and write-back at e+0..e+3. They need a second synchronised update ≤ 3 clk after the latch edge, but cfg_ld pulses are ≥ 4 clk apart: cfg_ld uses the cfg_clk pin rate, and SPEC does not state a cfg_ld width (SPEC-AMB-24).
+- CV-RD is split into the rise offset −8..+8 (17 bins) and the state {status read} × {frame_ready} × {overrun}.
+  - Unreachable: frame_ready 0 with overrun 1.
+- CV-RST: the release-phase bins are dropped. Under D70 the divider restarts at release, and the reset config is always fs_div 1.
+- Directed coverage tests: c01_mode_sweep, c02_fs_sweep, c03_write_phase, c04_rd_bins, c05_ctr_wrap, c06_rst_pos, c07_addr. R-01 was rewritten to follow §4.7: edge, odd-last and mid write weighting, equal and multi writes, and rd aimed at load ±4.
+- F-01 is strengthened: a sys_swap change is allowed only on the edge where rst_analog rises (cycle 0) and fs_clk rises. It must fail on M07, M07b and M19.

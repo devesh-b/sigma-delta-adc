@@ -25,7 +25,7 @@ module c9_formal (input wire clk, input wire rst_n, input wire ena, input wire [
     assert (!(rst_analog && bit_valid));                                       // F03 SEQ-01
     assert (!y_force || bit_valid);                                            // F05 y_force only at n = 0
     assert (!rst_analog || !ota_chop_phase);                                   // F09 3.7a i
-    if (stable && sys_swap != p_sys_swap) assert (rst_analog && fs_clk && !p_fs_clk); // F01 swap only on an fs start edge in reset
+    if (stable && sys_swap != p_sys_swap) assert (rst_analog && !p_rst_analog && fs_clk && !p_fs_clk); // F01 WO-42: swap only on the cycle-0 edge (rst_analog rise = fs start edge)
     if (stable && cfg != p_cfg) assert (rst_analog && fs_clk && !p_fs_clk);  // F02 cfg outs only on a start edge in reset (CL-23)
     if (stable && bit_valid && !p_bit_valid) assert (y_force && p_rst_analog);// F08 n = 0 follows reset window
     if (stable && y_force) assert (y_dac);                                     // F06 forced y[0] = +1

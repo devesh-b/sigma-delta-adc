@@ -15,3 +15,10 @@ mux of flops by a flop select; debug y is the DAC flop (D67).
 Run (sandbox, IIC-OSIC-TOOLS): `verilator --lint-only -Wall --top-module tt_um_sd_adc_c9 rtl/*.v`;
 `yosys -p "read_verilog rtl/*.v; synth -top tt_um_sd_adc_c9 -flatten; check -assert; stat"`;
 `python3 smoke/gen_vec.py ../../golden/s6_vectors.json smoke/vec.vh; iverilog -g2005 -Ismoke -o s.vvp smoke/smoke_tb.v rtl/*.v; vvp s.vvp`.
+
+## Firmware-visible facts (WO-42, verification; not SPEC changes)
+- **acc LSBs are always 0 for even N.** acc1 = sum of N values of +-1, so it is even. acc2 = sum of the partial sums S_0..S_{N-1}
+  (exclusive); S_k has the parity of k, so there are N/2 odd terms, and N/2 is even for N >= 4, so acc2 is even too. Bit 0 of word 1 (acc1[15:0]) and of word 3
+  (acc2[15:0]) reads 0 in every frame (N 64/256/1024/4096 are all even). Verilator toggle coverage confirms
+  this: hold_acc1[0] and hold_acc2[0] never toggle (WO-40). Firmware must not treat a stuck LSB as a fault.
+- **status[8] is tied to 0** (SPEC 3.8a status word: [8] = 0). Do not use it as a flag.

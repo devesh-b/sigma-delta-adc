@@ -13,8 +13,10 @@ Always-on checkers (every test, every clk):
   * host-read frames == Ref A frame, and == golden where a vector exists; empty compares fail.
 Seeds: C9_SEED (default 1).  Long items: C9_FULL=1.
 """
+import copy
 import os
 import random
+import sys
 from collections import deque
 
 import cocotb
@@ -23,6 +25,7 @@ from cocotb.handle import Force
 from cocotb.triggers import Event, FallingEdge, Timer
 
 import golden_harness as gh
+from fcov import FCov
 from ref_a import DIV, N_OF, RESET_CFG, RefA, eff, fields
 
 FULL = os.environ.get("C9_FULL", "0") == "1"
@@ -85,6 +88,8 @@ class TB:
         self.edges = 0
         self.first_rst_seen = False
         self.ctl_strict = True
+        self.cov = FCov()
+        self.place_n = self.place_miss = 0
 
     def _find(self, forced, cands):
         names = [forced] if forced else cands
@@ -162,7 +167,9 @@ class TB:
             if self.a_rst_n and not r.started and not start_now and r.rel_cnt > 192 + 6:
                 self.fail("no fs bit clock rise after rst_n release")
                 start_now = True
+            self.cov.pre(self)
             r.step(self.a_rst_n, self.a_ui, self.comp, start_now=start_now)
+            self.cov.post(self)
             # ---- control ports, clk-exact
             if not self.missing:
                 k = r.ctl()
@@ -320,6 +327,9 @@ class TB:
             self.fail(f"PORT-CONTRACT: no HDL port found for {self.missing} (set C9_PORTMAP)")
         self.dut._log.info(f"checks {self.nchk}; loads {self.loads_seen}; host reads {len(self.reads)}; "
                            f"bus lag {self.bus_lag}; release latency {self.lat_hist}; seed {SEED}")
+        if self.place_n:
+            self.dut._log.info(f"placed writes/rd {self.place_n}, off-target {self.place_miss} (TB aim; bins record actual)")
+        self.cov.dump(sys._getframe(1).f_code.co_name, SEED)
         for e in self.err:
             self.dut._log.error(e)
         assert self.nerr == 0, f"{self.nerr} failures (first: {self.err[:1]})"
@@ -475,6 +485,11 @@ async def d_dec01_golden_vectors(dut):
             and (FULL or v["config"]["N"] <= 64 or v["kind"] == "boosttrim")]
     if not FULL:
         vecs = vecs[:40]
+    sh = os.environ.get("C9_VSHARD")              # "i/n": every n-th vector from i (parallel FULL runs)
+    if sh:
+        i, n = (int(x) for x in sh.split("/"))
+        vecs = vecs[i::n]
+    tb.dut._log.info(f"vectors in this run: {len(vecs)} (shard {sh})")
     await replay_vectors(tb, vecs, g)
     tb.dut._log.info(f"vectors replayed: {len(vecs)}")
     tb.report(need=("golden", "host_frame", "bus"))
@@ -821,22 +836,342 @@ async def d_bus02_latency(dut):
     tb.report(need=("lat",))
 
 
-@cocotb.test(timeout_time=20, timeout_unit="sec")
+# ====================================================================== WO-42: placement helpers
+K_SYNC = 3      # a pin level set by a driver in loop iteration i is acted on by Ref A at edge i + 3 (2-FF + edge)
+
+
+def predict(tb, pred, lo, hi):
+    """Absolute edge E (now+lo .. now+hi) whose Ref A post-state satisfies pred; a Ref A copy is stepped with
+    the current pins (no ld).  Position only depends on the active config, so pending shifts/reads don't matter."""
+    fr = tb.ref.frames
+    tb.ref.frames = []
+    rc = copy.deepcopy(tb.ref)
+    tb.ref.frames = fr
+    ui = tb.ui & ~0x48
+    for k in range(1, hi + 1):
+        rc.step(1, ui, 0)
+        if k >= lo and pred(rc):
+            return tb.edges + k
+    return None
+
+
+def g_place(tb, words, E):
+    """Shift words[0], then len(words) cfg_ld pulses (2 clk high, 2 low: >= 4 clk apart) so the last synchronised
+    shadow update is at edge E.  Later lds load the cleared shift register (0, CL-18)."""
+    first = E - 4 * (len(words) - 1)
+    start = first - K_SYNC - 72
+    while tb.edges < start:
+        yield
+    yield from tb.g_cfg_write(words[0], ld=False)
+    while tb.edges < first - K_SYNC:
+        yield
+    for _ in words:
+        tb.set_ui(0x40, 0x40); yield; yield
+        tb.set_ui(0x40, 0); yield; yield
+    while tb.edges < E:
+        yield
+    tb.place_n += 1
+    if "ld" not in tb.ref.events:
+        tb.place_miss += 1
+
+
+def g_rd_at(tb, P, width=2):
+    """rd pin so its synchronised rise acts at edge P + 1 (pre-state = post-state of P)."""
+    while tb.edges < P - 2:
+        yield
+    tb.set_ui(0x08, 0x08)
+    for _ in range(width):
+        yield
+    tb.set_ui(0x08, 0)
+    yield
+    tb.place_n += 1
+
+
+def p_wphase(ph):
+    """Post-state predicate for a write phase (fcov.PHASES) at any config."""
+    if ph.startswith("e"):
+        d = int(ph[1:])
+        if d < 0:
+            return lambda rc: rc.slot % 2 == 1 and rc.c == rc.N + 1 and rc.cnt == rc.div + d
+        return lambda rc: rc.slot % 2 == 0 and rc.c == 0 and rc.cnt == d
+    par = 0 if ph.startswith("even") else 1
+    pos = ph.split("_")[1]
+    cnt = {"c0": 6}.get(pos, 5)
+    cf = {"c0": lambda rc: 0, "c1": lambda rc: 1, "c2": lambda rc: 2, "mid": lambda rc: rc.N // 2,
+          "N1": lambda rc: rc.N + 1}[pos]
+    if ph == "odd_N1":
+        cnt = 2
+    return lambda rc: rc.slot % 2 == par and rc.c == cf(rc) and rc.cnt == cnt
+
+
+def p_load(d):
+    """Post-state P such that the next edge's pre-state is d clk from the load edge (d 0 = the load edge)."""
+    if d <= 0:
+        return lambda rc: rc.c == rc.N + 1 and rc.cnt - (rc.div - 1) == d
+    return lambda rc: rc.c == 0 and rc.slot > 0 and rc.cnt + 1 == d
+
+
+async def settle_cfg(tb, word):
+    for _ in range(3):
+        await set_cfg(tb, word)
+        if tb.ref.active == eff(word):
+            return
+    tb.fail(f"could not settle config {word:04x}")
+
+
+R01_SLOTS = int(os.environ.get("C9_R01_SLOTS", "64"))
+
+
+@cocotb.test(timeout_time=float(os.environ.get("C9_R01_TO", "20")), timeout_unit="sec")
 async def r01_random(dut):
-    """R-01: random configs (biased to N 64 / fast fs), random write phases incl. edge, random host policy."""
+    """R-01 (plan 4.7): >= C9_R01_SLOTS slots; N 64 (70 %) / 256; writes aimed at the latch edge +-3 (40 %), the
+    last cycle of an odd slot (20 %), anywhere (40 %); equal and multi writes; host acks randomly; extra rd edges
+    aimed at load +-4.  Ref A compares every clk.  SOAK-01 = this test with large C9_R01_SLOTS on Verilator."""
     tb = await mk(dut)
     rng = random.Random(SEED)
-    tb.dut._log.info(f"R-01 seed {SEED}")
+    tb.dut._log.info(f"R-01 seed {SEED} slots {R01_SLOTS}")
     await tb.reset()
     await set_cfg(tb, 0x0000)
-    for i in range(12 if not FULL else 60):
-        w = rng.choice([0x0000, 0x1000, 0x0060, 0x0040, 0x0020, 0x0010, 0x0008, 0x0007, 0x0400, 0x0280, 0xE000,
-                        rng.getrandbits(16) & 0xE3FF])
-        tb.host_ack = rng.random() > 0.2
-        tb.tasks.append(tb.g_cfg_write(w))
-        await tb.clks(rng.randrange(80, 2000))
+    r = tb.ref
+    l0 = tb.loads_seen
+    while tb.loads_seen - l0 < R01_SLOTS:
+        n = 0 if rng.random() < 0.7 else 1
+        fd = rng.choice([0, 0, 0, 0, 1, 2, 5, 7])
+        w = (rng.getrandbits(1) << 12) | (n << 10) | (fd << 7) | rng.getrandbits(7)
         if rng.random() < 0.1:
+            w |= rng.getrandbits(3) << 13                # reserved bits: not a change (CL-16)
+        if rng.random() < 0.15:
+            w = r.active
+        words = [w, 0] if rng.random() < 0.15 else [w]
+        p = rng.random()
+        if p < 0.4:
+            pred = p_wphase(f"e{rng.randint(-3, 3):+d}")
+        elif p < 0.6:
+            k = rng.randrange(192)
+            pred = (lambda k: lambda rc: rc.slot % 2 == 1 and rc.c == rc.N + 1 and rc.cnt == k % rc.div)(k)
+        else:
+            par, cc, k = rng.getrandbits(1), rng.randrange(260), rng.randrange(192)
+            pred = (lambda par, cc, k: lambda rc: rc.slot % 2 == par and rc.c == cc % (rc.N + 2)
+                    and rc.cnt == k % rc.div)(par, cc, k)
+        E = predict(tb, pred, 80 + 4 * len(words), 3 * 258 * 48)
+        if E is None:
+            await tb.clks(100)
+            continue
+        tb.tasks.append(g_place(tb, words, E))
+        tb.host_ack = rng.random() > 0.2
+        if rng.random() < 0.3:
+            P = predict(tb, p_load(rng.randint(-4, 4)), 10, 3 * 258 * 48)
+            if P is not None:
+                tb.tasks.append(g_rd_at(tb, P, width=rng.choice([1, 2, 3, 4])))
+        await tb.until(lambda: tb.edges >= E + 1, 4 * 258 * 192, "placed write")
+        await tb.clks(rng.randrange(1, 300))
+        if rng.random() < 0.03:
             await tb.reset(n=rng.randrange(1, 20))
+            await set_cfg(tb, 0x0000)
     tb.host_ack = True
     await tb.clks(2000)
     tb.report(need=("bus", "host_frame", "rst_analog"))
+
+
+# ====================================================================== WO-42 directed coverage tests (7.1 bins)
+@cocotb.test(timeout_time=20, timeout_unit="sec")
+async def c01_mode_sweep(dut):
+    """CV-MODE (64), CV-BT, CV-DATA: every order x N x chop x short at fs/12, boost/trim cycled, comparator
+    patterns all +1 / all -1 / (+--+) / random; host reads and checks every frame."""
+    tb = await mk(dut)
+    await tb.reset()
+    r = tb.ref
+    await set_cfg(tb, 0x0000)
+    BT = [(0, 0), (0, 4), (0, 7), (1, 0), (1, 4), (1, 7)]
+    k = 0
+    for n in range(4):
+        for o in (0, 1):
+            for (sy, ot) in ((0, 0), (1, 0), (1, 1), (0, 1)):
+                for s in (0, 1):
+                    b, t = BT[k % 6]
+                    w = (o << 12) | (n << 10) | (sy << 6) | (ot << 5) | (s << 4) | (b << 3) | t
+                    N = N_OF[n]
+                    nxt = r.slot + 2 if r.slot % 2 == 0 else r.slot + 1
+                    pat = k % 4
+                    for sl in (nxt, nxt + 1):
+                        if pat == 0:
+                            tb.yb[sl] = [1] * N
+                        elif pat == 1:
+                            tb.yb[sl] = [1] + [0] * (N - 1)
+                        elif pat == 2:
+                            tb.yb[sl] = [(1, 0, 0, 1)[i % 4] for i in range(N)]
+                    await set_cfg(tb, w)
+                    k += 1
+    await tb.to_slot(r.slot + 2, 2)
+    await tb.clks(60)
+    tb.report(need=("host_frame", "bus"))
+
+
+@cocotb.test(timeout_time=20, timeout_unit="sec")
+async def c02_fs_sweep(dut):
+    """CV-FS: fs_div 0..7 x N 64 / 4096 and transitions 0>4, 4>0, 1>0, any>reserved."""
+    tb = await mk(dut)
+    await tb.reset()
+    for n, codes in ((0, (0, 4, 0, 1, 0, 5, 2, 6, 3, 7)), (3, (0, 1, 2, 3, 4, 5, 6, 7))):
+        for code in codes:
+            await set_cfg(tb, (n << 10) | (code << 7))
+            tb.chk("fsdiv")
+    tb.report(need=("fsdiv", "fs_clk"))
+
+
+@cocotb.test(timeout_time=20, timeout_unit="sec")
+async def c03_write_phase(dut):
+    """CV-WRITE-PHASE: every phase x {single, equal, multi, write-back}, each field changed (single writes cycle
+    the 8 fields).  Writes are placed clk-exact through the pins; the collector records the actual phase."""
+    from fcov import PHASES
+    tb = await mk(dut)
+    await tb.reset()
+    r = tb.ref
+    fbits = (12, 10, 7, 6, 5, 4, 3, 0)
+    i = 0
+    for kind in ("single", "equal", "multi", "writeback"):
+        base = 0x0010 if kind == "multi" else 0x0000
+        for ph in PHASES:
+            if kind in ("multi", "writeback") and ph in ("e+0", "e+1", "e+2", "e+3"):
+                continue
+            await settle_cfg(tb, base)
+            words = {"single": [base ^ (1 << fbits[i % 8])], "equal": [base], "multi": [0x0001],
+                     "writeback": [0x0010]}[kind]
+            if kind in ("multi", "writeback"):
+                words = words + [0]
+            i += kind == "single"
+            E = predict(tb, p_wphase(ph), 80 + 4 * len(words), 6 * 66 * 12)
+            if E is None:
+                tb.fail(f"no target for {ph}")
+                continue
+            tb.tasks.append(g_place(tb, words, E))
+            await tb.until(lambda: tb.edges >= E + 1, 7 * 66 * 12, f"place {ph} {kind}")
+            tb.chk("wphase")
+    tb.report(need=("wphase",))
+
+
+@cocotb.test(timeout_time=20, timeout_unit="sec")
+async def c04_rd_bins(dut):
+    """CV-RD / CV-OVR: rd rise at load -8..+8, state {status read} x {frame_ready, overrun}, widths 1..4 and
+    held, 1/2/3/>=10 unread loads.  Host off; Ref A checks frame_ready/overrun through the bus every clk."""
+    tb = await mk(dut, host=False)
+    await tb.reset()
+    r = tb.ref
+    await set_cfg(tb, 0x0000)
+    for d in range(-8, 9):
+        P = predict(tb, p_load(d), 10, 3 * 66 * 12)
+        tb.tasks.append(g_rd_at(tb, P, width=1 + (d & 3)))
+        await tb.until(lambda: tb.edges >= P + 10, 4 * 66 * 12, "rd ofs")
+        await tb.clks(30)
+    for sr in (0, 1):
+        for st in ("fr0", "fr1_ov0", "fr1_ov1"):
+            await tb.to_slot(r.slot + 1, 3)                  # just after a load
+            if st == "fr1_ov1":
+                await tb.to_slot(r.slot + 1, 3)              # second unread load
+            if st != "fr1_ov1":
+                tb.tasks.append(tb.g_rd(width=2))            # clear: frame_ready 0, overrun 0
+                await tb.clks(12)
+            if st == "fr1_ov0":
+                await tb.to_slot(r.slot + 1, 3)
+            if sr:
+                tb.set_ui(0x87, 5)
+                await tb.clks(8)
+                tb.set_ui(0x87, 0)
+            await tb.clks(4)
+            tb.tasks.append(tb.g_rd(width=2))
+            await tb.clks(20)
+            tb.chk("rd_state")
+    tb.set_ui(0x08, 0x08)                                    # held across a load
+    await tb.to_slot(r.slot + 2, 2)
+    tb.set_ui(0x08, 0)
+    await tb.clks(10)
+    await tb.to_slot(r.slot + 11, 2)                         # >= 10 unread loads
+    tb.report(need=("rd_state", "bus"))
+
+
+@cocotb.test(timeout_time=20, timeout_unit="sec")
+async def c05_ctr_wrap(dut):
+    """CV-CTR / CV-OVR: frame_ctr 254, 255 -> 0 with overrun set across the wrap, a config change latched at
+    frame_ctr 0 (slot 256).  Host off until after the wrap."""
+    tb = await mk(dut, host=False)
+    await tb.reset()
+    r = tb.ref
+    await set_cfg(tb, 0x0000)
+    await tb.to_slot(255, 2)
+    await set_cfg(tb, 0x0010)                     # written in slot 255, latches at slot 256 (frame_ctr 0)
+    await tb.to_slot(258, 2)
+    tb.tasks.append(tb._host_read(r.frames[-1]))
+    await tb.clks(80)
+    tb.chk("wrap")
+    tb.report(need=("wrap", "host_frame"))
+
+
+@cocotb.test(timeout_time=20, timeout_unit="sec")
+async def c06_rst_pos(dut):
+    """CV-RST: rst_n asserted at c 0, c 1, n 0, mid, n N-1, load -1/0/+1, before slot 0, during a cfg shift,
+    with rd high, with dbg 1, and with a write pending.  Reset config (N 4096, fs/24): no rewrite needed."""
+    tb = await mk(dut)
+    await tb.reset()
+    r = tb.ref
+    cases = [("c0", lambda rc: rc.c == 0 and rc.cnt == 5), ("c1", lambda rc: rc.c == 1 and rc.cnt == 3),
+             ("n0", lambda rc: rc.c == 2 and rc.cnt == 3), ("mid", lambda rc: rc.c == 100),
+             ("nNm1", lambda rc: rc.c == rc.N + 1 and rc.cnt == 5),
+             ("load-1", p_load(-1)), ("load0", p_load(0)), ("load+1", p_load(1))]
+    for name, pred in cases:
+        P = predict(tb, pred, 5, 2 * 4098 * 24 + 100)
+        if P is None:
+            tb.fail(f"no target {name}")
+            continue
+
+        def g(P=P):
+            while tb.edges < P:
+                yield
+            tb.rst_n = 0
+        tb.tasks.append(g())
+        await tb.until(lambda: tb.rst_n == 0, 2 * 4098 * 24 + 200, name)
+        await tb.clks(4)
+        await tb.reset(n=3)
+        tb.chk("rst_pos")
+    # before slot 0 (release window), during a shift, rd high, dbg 1, pending write
+    tb.rst_n = 0
+    await tb.clks(3)
+    tb.rst_n = 1
+    await tb.clks(8)
+    await tb.reset(n=3)
+    for setup in ("shift", "rd", "dbg", "pending"):
+        if setup == "shift":
+            tb.tasks.append(tb.g_cfg_write(0x0001, ld=False))
+            await tb.clks(30)
+        elif setup == "rd":
+            tb.set_ui(0x08, 0x08)
+            await tb.clks(5)
+        elif setup == "dbg":
+            tb.set_ui(0x80, 0x80)
+            await tb.clks(8)
+        else:
+            tb.tasks.append(tb.g_cfg_write(0x0001))
+            await tb.clks(100)
+        tb.rst_n = 0
+        await tb.clks(4)
+        await tb.reset(n=3)
+        tb.chk("rst_pos")
+    await tb.clks(200)
+    tb.report(need=("rst_pos", "rst_lat"))
+
+
+@cocotb.test()
+async def c07_addr(dut):
+    """CV-ADDR: every addr x dbg held stable and as a 1-clk glitch; bus == Ref A outside the 3-clk settle."""
+    tb = await mk(dut, host=False)
+    await tb.reset()
+    for v in [a | (d << 7) for d in (0, 1) for a in range(8)]:
+        tb.set_ui(0x87, v)
+        await tb.clks(1)
+        tb.set_ui(0x87, v ^ 1)
+        await tb.clks(5)
+        tb.set_ui(0x87, v)
+        await tb.clks(6)
+        tb.chk("addr")
+    tb.set_ui(0x87, 0)
+    await tb.clks(10)
+    tb.report(need=("addr", "bus"))

@@ -28,9 +28,14 @@ if os.path.exists(xml):
     os.remove(xml)
 env = {k: v for k, v in os.environ.items() if k.startswith("C9_")}
 env["PYTHONPATH"] = here + os.pathsep + os.environ.get("PYTHONPATH", "")
+pa = os.environ.get("C9_PLUSARGS", "").split()   # e.g. +verilator+rand+reset+2 (X-01)
+if pa:
+    env_pa = dict(plusargs=pa)
+else:
+    env_pa = {}
 tf = os.environ.get("TESTS")
 r.test(hdl_toplevel=top, test_module="test_c9", test_dir=os.environ.get("C9_RUNDIR", here), build_dir=bd, results_xml=xml,
-       extra_env=env, test_filter=tf if tf else None)
+       extra_env=env, test_filter=tf if tf else None, **env_pa)
 if not os.path.exists(xml):
     print("RESULT FAIL: no results file")
     sys.exit(1)
