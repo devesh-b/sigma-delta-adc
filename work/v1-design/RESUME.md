@@ -814,3 +814,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - Input TG → 12/36; DAC TG ~6/18; vg NMOS 10–12 µm; top-plate short ≤ 2/4.
   - Phase edge 1.22 ns at ss/125 against 1.0 (fix: inv_8 drivers).
   - Reviewer next.
+- WO-49A done (953624e): RTL D72 + D74 + rename sd_adc_c9; CL-28 (D74 capture), CL-29 (D72 widths + rename); lint/synth clean, 936 cells / 225 FF (was 1111/276). WO-49B (bench rerun + width mutants + WO-42 leftovers) dispatched.
