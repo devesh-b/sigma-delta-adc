@@ -85,6 +85,9 @@ def mos(name, d, g, s, b, dev, wf, l, m=1):
 
 def dev(key, name, d, g, s, b, sizes):
     p = sizes[key]
+    if p.get("RS") and key in S.SINK_FAMILY:   # WO-43: source degeneration, RS x M_n / M (same I.R drop per finger)
+        r = p["RS"] * sizes["m_n"]["M"] / p["M"]
+        return [mos(name, d, g, name + "_s", b, p["dev"], p["WF"], p["L"], p["M"]), f"R{name} {name}_s {s} {r:.6g}"]
     return mos(name, d, g, s, b, p["dev"], p["WF"], p["L"], p["M"])
 
 
@@ -103,6 +106,8 @@ def toks(mut):
 def ref(key, name, node, rail, bulk, sizes, mut):
     """D59: parallel-only unit-finger diode (m = M_ref). Broken copy ref_composite: D58 P x S composite of the same W/L."""
     p = sizes[key]
+    if p.get("RS") and key in S.SINK_FAMILY:
+        return dev(key, name, node, node, rail, bulk, sizes)
     if "ref_composite" in toks(mut):
         return composite(name, node, node, rail, bulk, p, S.REF_COMPOSITE["P"] * p["M"], S.REF_COMPOSITE["S"])
     return [mos(name, node, node, rail, bulk, p["dev"], p["WF"], p["L"], p["M"])]
@@ -245,6 +250,7 @@ def build(name="ota1", cmfb="sc", fs=4e6, mut=None, sizes=None, boost=False):
     else:
         raise ValueError(cmfb)
     L.append(f".ends {name}")
+    L = [y for x in L for y in (x if isinstance(x, list) else [x])]   # WO-43: dev() with RS returns [mos, R]
     return "\n".join(L) + "\n"
 
 

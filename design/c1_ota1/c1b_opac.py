@@ -110,6 +110,9 @@ BIASQ = {"mbpd": "m_bpd", "mbpds": "m_bpd", "mbnd": "m_bnd"}
 INTQ = {"mia1": "m_ia", "mia2": "m_ia", "mit": "m_it", "mil1": "m_il", "mil2": "m_il"}   # WO-28 slow-path integrator
 REPQ = {"mrn": "m_rn", "mrnc": "m_rnc", "mrcb": "m_rcb"}                                  # WO-28 item 4 replica margins
 NODES = ("tail", "da", "fa", "xa", "sa", "ctl", "rnd", "rcb", "bli", "cid", "cit")   # subckt-internal only (ports: top level)
+if S.SIZES["m_n"].get("RS"):   # WO-43 source degeneration: sink source nodes
+    NODES = NODES + ("mn1_s", "mrn_s")
+RS_ON = bool(S.SIZES["m_n"].get("RS"))
 BRK_MAX = 1e-3          # WO-28 run 2: cm_open loop break must be DC-transparent, |V(ctlg) - V(ctl)| <= 1 mV
 HELPER_DCTL, HELPER_DOCM = 1e-3, 0.1e-3   # helper op vs closed-loop op: |dV_ctl| <= 1 mV, |dV_OCM| <= 0.1 mV
 FZ_RATIO = 10.0          # WO-28: slow-path PI zero f_z <= f_cm / 10
@@ -221,7 +224,7 @@ def analyse(vals, x, b, cl, mut, ac, k, vdd, hot):
     v = lambda n: g(f"v(x{x}.{n})")
     d = {i: {q: g(par(x, i, S.SIZES[kk]["dev"], q)) for q in DEVQ} for i, kk in CORE.items()}
     on, op_ = g(f"v(outn_{x})"), g(f"v(outp_{x})")
-    vds = {"mt": vdd - v("tail"), "min1": v("tail") - v("da"), "mpp1": v("da") - v("fa"), "mn1": v("fa"),
+    vds = {"mt": vdd - v("tail"), "min1": v("tail") - v("da"), "mpp1": v("da") - v("fa"), "mn1": v("fa") - (v("mn1_s") if RS_ON else 0.0),
            "mnc1": on - v("xa"), "mpc1": v("sa") - on, "mpl1": vdd - v("sa"), "mplc1": vdd - v("sa")}
     res, fails = {"margins": {}}, []
     for i in CORE:
@@ -302,7 +305,7 @@ def analyse(vals, x, b, cl, mut, ac, k, vdd, hot):
         res["V_rnd_minus_V_fa_mV"] = (v("rnd") - v("fa")) * 1e3
         if not abs(v("rnd") - v("fa")) <= S.REPLICA_DV_MAX:
             fails.append(f"replica drain |V_rnd - V_fa| {abs(v('rnd') - v('fa')) * 1e3:.0f} mV > {S.REPLICA_DV_MAX * 1e3:.0f}")
-        for i_, vv in {"mrn": v("rnd"), "mrnc": g(f"v(ivbpc_{x})") - v("rnd"), "mrcb": v("rcb")}.items():
+        for i_, vv in {"mrn": v("rnd") - (v("mrn_s") if RS_ON else 0.0), "mrnc": g(f"v(ivbpc_{x})") - v("rnd"), "mrcb": v("rcb")}.items():
             res["margins"][i_] = vv - abs(rq[i_]["vdsat"])
             if not res["margins"][i_] >= 0.05:
                 fails.append(f"{i_} margin {res['margins'][i_]:.3f}")

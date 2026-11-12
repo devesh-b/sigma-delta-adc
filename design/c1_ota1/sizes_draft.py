@@ -238,3 +238,27 @@ def _mm_c(c):
 
 MM3 = dict(cs=_mm_c(0.5e-12), cint=_mm_c(4.0e-12), cc=_mm_c(C_CMFB_SENSE), cr=_mm_c(C_CMFB_REFRESH),
            dvt=N_SIGMA * A_VT_PAIR * (2.0 / (SIZES["m_in"]["WF"] * SIZES["m_in"]["L"] * SIZES["m_in"]["M"])) ** 0.5)
+
+# WO-43 (D71): sink family. m_n and everything derived from its unit finger (reference m_nr, replica m_rn, integrator
+# tail m_it) change together, so the 1:8 reference ratio, the replica (K_N tracking) and the integrator tail current stay.
+# Optional source degeneration RS [Ohm] is given for the full 32-finger m_n; each derived device gets RS x M_n / M.
+SINK_FAMILY = ("m_n", "m_nr", "m_rn", "m_it")
+
+
+def sink_variant(z, L=None, WF=None, RS=None, wmult=None, bnd_wf=None):
+    """Copy of a SIZES dict with the sink family re-sized (sweep candidates and the msink broken copy).
+    wmult scales WF of the whole family (same currents, gm up: msink = wmult 4). bnd_wf sets the vbnc diode m_bnd width
+    (K_N = 8 x 1.25 / bnd_wf), which moves the fold node."""
+    z = {k: dict(v) for k, v in z.items()}
+    for k in SINK_FAMILY:
+        if L is not None:
+            z[k]["L"] = L
+        if WF is not None:
+            z[k]["WF"] = WF
+        if wmult is not None:
+            z[k]["WF"] = z[k]["WF"] * wmult
+        if RS is not None:
+            z[k]["RS"] = RS
+    if bnd_wf is not None:
+        z["m_bnd"]["WF"] = bnd_wf
+    return z
