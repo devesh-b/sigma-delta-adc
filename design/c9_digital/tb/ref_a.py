@@ -9,8 +9,8 @@ Interpretation choices (where the SPEC leaves a free parameter; each is a bench 
     on at edge j+2 (CL-14 "2-3 clk after the pin edge").
   * addr and dbg: 2-FF sync, then the registered bus: word visible after edge j+2 (CL-21 "<= 3 clk").
   * fs divider: cnt 0..div-1, fs-cycle start edge = cnt wraps to 0 = bit clock rising (CL-23); bit clock
-    high for cnt < div/2; comparator sampled on the edge where cnt becomes div/2 (bit clock falling, CL-23);
-    the DAC flop (y) updates on the next start edge (D67: debug y = DAC flop).
+    high for cnt < div/2; comparator captured straight into the DAC flop on the start edge itself (CL-28, D74,
+    replaces the CL-23 falling-edge sample; D67: debug y = DAC flop).
   * The decision sampled in fs cycle c is y for cycle c+1 (n = c-1).  Decisions of c = 0, 1, N+1 are ignored
     (3.7a a: n = 0 forced to +1).
   * Release (CL-19, CL-27 / D70): rst_n is synchronised by 2 FF (edges e0, e1, e0 = first edge sampling
@@ -215,8 +215,8 @@ class RefA:
             self._rd(rd_rise, load=False)
             return
         tick = self.cnt == self.div - 1
-        if self.cnt == self.div // 2 - 1:
-            self.comp_q = comp & 1                  # bit-clock falling edge: comparator sample (CL-23)
+        if tick:
+            self.comp_q = comp & 1                  # fs-cycle start edge: comp_in straight into the DAC flop (CL-28, D74)
         if not tick:
             self.cnt += 1
             self._rd(rd_rise, load=False)

@@ -5,6 +5,8 @@
 #   soak SEED SLOTS    SOAK-01: r01 with SLOTS slots on Verilator
 #   x01 SEED           X-01: Verilator --x-initial unique + rand reset, init seed SEED
 #   full I/N | other   C9_FULL: d_dec01 vector shard I/N, or the other FULL items
+#   test NAME SEED [TO]  one cocotb test (icarus), fcov collector in ../wo42/test_NAME_sSEED/fcov (WO-49B)
+#   suite STEP     run.sh STEP (agree|lint|formal|cocotb|all), out ../wo42/suite_STEP (WO-49B)
 #   fml MID            per-property PDR (mut_formal.sh); MID base|M07|M07b|M19|...
 #   merge              fcov merge of every ../wo42/**/fcov
 set -u
@@ -19,6 +21,8 @@ case $K in
   x01)   echo "X01 s$1 $(run "$R/x01_s$1" SIM=verilator C9_SEED=1 C9_BUILD_ARGS="--x-assign unique --x-initial unique $VB" C9_PLUSARGS="+verilator+rand+reset+2 +verilator+seed+$1" TESTS='(s01_reset_idle|s02_reset_pair_golden|a_seq01_trace_ctl|a_rst01_async_mid|d_bus03_debug|d_inv02_each_field|c07_addr)$' timeout 3600)";;
   full)  if [ "$1" = other ]; then T='(d_dec03_streams|d_cfg05_sequences|d_cfg02_shift|d_frm04_overrun)$'; V=; else T='d_dec01_golden_vectors$'; V=$1; fi
          echo "FULL $1 $(run "$R/full_${1//\//of}" C9_FULL=1 C9_VSHARD=$V TESTS="$T" timeout 14400)";;
+  test)  echo "TEST $1 s$2 $(run "$R/test_$1_s$2" C9_SEED=$2 TESTS="$1\$" timeout ${3:-7200})";;
+  suite) mkdir -p "$R/suite_$1"; env C9_OUT="$R/suite_$1" ./run.sh "$1" > "$R/suite_$1/run.log" 2>&1; echo "SUITE $1 $(grep -E "^== |RUN RESULT" "$R/suite_$1/run.log" | tr "\n" " ")";;
   fml)   "$HERE/mut_formal.sh" "$1";;
   merge) python3 "$HERE/fcov.py" merge "$R";;
   *)     echo "unknown job $K"; exit 2;;

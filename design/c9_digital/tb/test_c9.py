@@ -206,7 +206,7 @@ class TB:
                 self.loads_seen += 1
                 if self.host_auto and self.rst_n:      # WO-42 TB-7: no host read queued once a reset is requested
                     self.tasks.append(self._host_read(r.frames[-1]))
-            # ---- comparator BFM for the next edge (from Ref A's position, contract CL-23)
+            # ---- comparator BFM for the next edge (from Ref A's position, contract CL-28)
             self.comp = self._comp_next()
             self._drive_comp(self.comp)
             # ---- drivers (generators, one step per clk)
@@ -233,13 +233,13 @@ class TB:
             good = bits[n] if (bits is not None and n < len(bits)) else self.rng.getrandbits(1)
             if bits is None:
                 self.yb.setdefault(("rand", r.slot), {})[n] = good
-        samp = div // 2 - 1                      # Ref A samples at the edge after pre-state cnt == samp
-        nxt_cnt = cnt + 1 if cnt < div - 1 else 0
+        samp = div - 1                           # CL-28: Ref A captures on the start edge (pre-state cnt == div-1)
+        win = int(os.environ.get("C9_COMP_WIN", "0"))   # extra clk of valid data before the capture edge
         if good is None:
             return (self.edges & 1) if self.comp_mode != "plain" else 0   # reset window / c = N+1: junk
         if self.comp_mode == "plain":
             return good
-        return good if abs(nxt_cnt - samp) <= 1 else (1 - good)          # correct only at fall edge +-1 clk
+        return good if (samp - cnt) % div <= win else (1 - good)          # correct only on the capture edge (hostile)
 
     # ------------------------------------------------------------------ utilities
     async def clks(self, n):
