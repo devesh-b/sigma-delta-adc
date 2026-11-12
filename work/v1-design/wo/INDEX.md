@@ -59,3 +59,5 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-50 C6b bandgap start-up fix: dispatched 2026-11-13
 - WO-51 C3c offset re-base (D75), stress stimulus, asym kick: dispatched 2026-11-13
 - WO-52 C1 L8 + noise row re-base (D75) + tb7 op fix + test fixes + reruns: dispatched 2026-11-13
+- WO-53 S-model order-1 delay study (D76): dispatched 2026-11-13
+- WO-54 C4b revise + netlist + tb (REVIEW-C4a, D76): dispatched 2026-11-13
