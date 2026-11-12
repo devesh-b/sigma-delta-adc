@@ -1,0 +1,14 @@
+tt27_p1        ACCEPT exp=pass   tdec=0.345ns kpk=0.644mV/1.861mV krec=0.001mV/0.001mV kcm=45.094mV q=1.8 qb=9.52807e-07 tqz=0.345ns tqbz=NA Iavg=0.6991120000000001 fail=[] miss=[]
+tt27_m1        ACCEPT exp=pass   tdec=0.345ns kpk=0.644mV/1.861mV krec=0.001mV/0.001mV kcm=45.094mV q=9.52807e-07 qb=1.8 tqz=NA tqbz=0.345ns Iavg=0.6991120000000001 fail=[] miss=[]
+tt27_z         ACCEPT exp=info   tdec=NA kpk=0.661mV/1.876mV krec=0.000mV/0.000mV kcm=45.096mV q=9.53322e-07 qb=1.8 tqz=0.354ns tqbz=NA Iavg=0.755288 fail=[] miss=[]
+ss40_p1        ACCEPT exp=pass   tdec=1.120ns kpk=0.298mV/1.564mV krec=0.001mV/0.000mV kcm=40.880mV q=1.62 qb=8.6737e-08 tqz=1.120ns tqbz=NA Iavg=0.581308 fail=[] miss=[]
+ss40_m1        ACCEPT exp=pass   tdec=1.120ns kpk=0.298mV/1.564mV krec=0.001mV/0.000mV kcm=40.880mV q=8.6737e-08 qb=1.62 tqz=NA tqbz=1.120ns Iavg=0.581308 fail=[] miss=[]
+ss40_z         ACCEPT exp=info   tdec=NA kpk=0.301mV/1.587mV krec=0.000mV/0.000mV kcm=40.884mV q=1.62 qb=1.01418e-07 tqz=2.118ns tqbz=NA Iavg=0.6307 fail=[] miss=[]
+ss40_p1_cm12   ACCEPT exp=pass   tdec=0.902ns kpk=0.730mV/1.614mV krec=0.001mV/0.000mV kcm=32.425mV q=1.62 qb=8.672e-08 tqz=0.902ns tqbz=NA Iavg=0.503576 fail=[] miss=[]
+ss40_m1_cm18   ACCEPT exp=pass   tdec=1.391ns kpk=0.198mV/0.693mV krec=0.001mV/0.000mV kcm=49.297mV q=8.59499e-08 qb=1.62 tqz=NA tqbz=1.391ns Iavg=0.657724 fail=[] miss=[]
+brk_starve     ACCEPT exp=reject tdec=6.422ns kpk=0.572mV/1.496mV krec=0.002mV/0.000mV kcm=33.751mV q=1.62 qb=9.08653e-08 tqz=6.422ns tqbz=NA Iavg=0.7021520000000001 fail=[] miss=[]
+brk_qswap      REJECT exp=reject tdec=NA kpk=0.298mV/1.564mV krec=0.001mV/0.000mV kcm=40.880mV q=4.85899e-09 qb=1.62 tqz=NA tqbz=NA Iavg=0.516408 fail=['polarity', 't_dec'] miss=[]
+brk_cl10       REJECT exp=reject tdec=1.144ns kpk=2.525mV/7.250mV krec=0.000mV/0.000mV kcm=267.573mV q=1.62 qb=8.6769e-08 tqz=1.144ns tqbz=NA Iavg=0.5786720000000001 fail=['kick_peak'] miss=[]
+mm_tt          ACCEPT exp=pass   hn:sig=5.872mV,Avt=9.29 hp:sig=3.085mV,Avt=4.88 ln:sig=5.518mV,Avt=5.52 lp:sig=5.420mV,Avt=5.42
+brk_mm_off     REJECT exp=reject hn:sig=0.000mV,Avt=0.00 hp:sig=0.000mV,Avt=0.00 ln:sig=0.000mV,Avt=0.00 lp:sig=0.000mV,Avt=0.00
+SUMMARY REJECT (1 rows off expectation)

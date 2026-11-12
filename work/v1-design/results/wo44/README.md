@@ -27,3 +27,17 @@ It writes `spot/spot.json` and prints one ACCEPT/REJECT row per point plus `SUMM
 ## PDK mismatch (item 3, from the model files)
 - `nfet_01v8` / `pfet_01v8`: vth0 mismatch present (`MC_MM_SWITCH·AGAUSS·slope/sqrt(l·w·mult)`, nfet 3.356 / 7.356 mV·µm, pfet 4.356–7.356 mV·µm), active in the `*_mm` lib sections.
 - **`nfet_g5v0d10v5`: `vth0_slope = 0.000` for all devices; only toxe mismatch (0.8e-2; pfet_g5v0d10v5 1.2–2.3e-2).** A `tt_mm` MC therefore under-reports any HV input pair offset. The `mm_tt` / `brk_mm_off` decks measure σ(Vgs) of 60 instances per type (pending, same pool).
+
+## Spot results (coordinator, after POOL_DONE; 13/13 EXIT=0; `spot_summary.txt`)
+- **Nominal (tt27, ss40, CM 1.2/1.8):** all ACCEPT.
+  - Decision time 0.35 ns (tt) to 1.39 ns (ss/−40), against 33.75 ns.
+  - Differential kickback ≤ 0.73 / 1.86 mV, against 5 mV.
+  - CM kick 32–49 mV (info, a C2 item).
+  - Current 0.50–0.76 µA.
+- **mm_tt (single-device mismatch probe):**
+  - HV nfet σ 5.87 mV, A_VT 9.29 eq. This comes from toxe, not vth0.
+  - hp 3.09; ln/lp about 5.5 mV.
+- **Broken copies:**
+  - brk_qswap REJECT (polarity), brk_cl10 REJECT (kick 7.25 mV), brk_mm_off REJECT.
+  - **brk_starve PASSES:** decision 6.4 ns, still ≪ 33.75 ns. The decision-time row cannot catch a 5× slower comparator, so the row or the copy needs tightening (a reviewer item).
+- SUMMARY REJECT (1 row off expectation: brk_starve).
