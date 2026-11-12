@@ -1,0 +1,8 @@
+N64_nodelay    x1pk 0.237 (0.243 V/side) raw max_err 2.925e-02 bits 5.10 INL 12812.5 ppm | oracle max_err 1.11e-16 | affine-resid 1.558e-02
+N64_delay      x1pk 0.475 (0.486 V/side) raw max_err 5.600e-02 bits 4.16 INL 16145.8 ppm | oracle max_err 1.11e-16 | affine-resid 3.369e-02
+N256_nodelay   x1pk 0.237 (0.243 V/side) raw max_err 7.313e-03 bits 7.10 INL 2897.1 ppm | oracle max_err 1.11e-16 | affine-resid 3.908e-03
+N256_delay     x1pk 0.475 (0.486 V/side) raw max_err 1.363e-02 bits 6.20 INL 4804.7 ppm | oracle max_err 1.11e-16 | affine-resid 7.804e-03
+N1024_nodelay  x1pk 0.237 (0.243 V/side) raw max_err 1.797e-03 bits 9.12 INL 813.8 ppm | oracle max_err 1.11e-16 | affine-resid 9.780e-04
+N1024_delay    x1pk 0.475 (0.486 V/side) raw max_err 3.438e-03 bits 8.18 INL 976.6 ppm | oracle max_err 1.11e-16 | affine-resid 2.034e-03
+N4096_nodelay  x1pk 0.237 (0.243 V/side) raw max_err 4.453e-04 bits 11.13 INL 174.2 ppm | oracle max_err 1.11e-16 | affine-resid 2.451e-04
+N4096_delay    x1pk 0.475 (0.486 V/side) raw max_err 8.594e-04 bits 10.18 INL 307.6 ppm | oracle max_err 1.11e-16 | affine-resid 4.999e-04

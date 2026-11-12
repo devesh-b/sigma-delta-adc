@@ -1,4 +1,4 @@
-"""S6b golden-vector generator (v3.1, WO-35 / D66; v3 rows unchanged) for the C9 decimator, frame and sequencer (tier 0, ideal-A).
+"""S6b golden-vector generator (v3.2, WO-53 / D76 adds o1d_vectors; v3.1 rows unchanged) for the C9 decimator, frame and sequencer (tier 0, ideal-A).
 
 Tier 0 = model/iadc.py with no noise, no leakage, no OTA non-idealities (Params defaults, xmax opened so nothing
 clips), at the v1 loop coefficients option B (c1 = 1/8, c2 = 1/2, k = 1/2, so k/c1 = 4).
@@ -57,8 +57,11 @@ def q(u):
     return round(float(u) * GRID) / GRID
 
 
+_DELAY = False   # v3.2 (WO-53 / D76): True while building the o1d rows (order 1 with the extra loop delay y[n+1] = sign(x1[n]))
+
+
 def params(order, N):
-    return iadc.Params(order=order, N=N, c1=C1, c2=C2, k=K, xmax=1e6)
+    return iadc.Params(order=order, N=N, c1=C1, c2=C2, k=K, xmax=1e6, order1_delay=bool(_DELAY and order == 1))
 
 
 def cfg_word(c):
@@ -141,7 +144,7 @@ def model_frame(c, u, off, s):
     if c["short"]:
         u, off = 0.0, 0.0
     uf = u + s * off                       # input-frame value; the model applies s itself (sys_sign)
-    key = (c["order"], c["N"], uf, s)
+    key = (c["order"], c["N"], uf, s, _DELAY)
     if key not in _CACHE:
         p = params(c["order"], c["N"])
         uh, st = iadc.convert(p, np.array([uf]), sys_sign=np.array([float(s)]), return_state=True)
@@ -478,7 +481,19 @@ def build():
                          "fs_div 7 are written (last wins): 7 is 1, a change against the active 0, so cfg_pending is "
                          "1 at the end of slot 6 and the pair 4 (slots 8, 9) is invalid."))
     cs = cfg_shift_cases()
-    return {"format": 3, "rev": "3.1", "seed": SEED, "grid": "u multiples of 2^-20", "reset": RESET, "clk_hz": CLK_HZ,
+    # ---- v3.2 (WO-53, D76): order-1 rows with the C4 loop delay, in a NEW top-level key so every v3.1 row and key is unchanged ----
+    global _DELAY
+    _DELAY = True
+    rng2 = np.random.default_rng(SEED + 1)
+    o1d = []
+    for chop in ("sys", "ota+sys"):
+        for N in N_SET:
+            for i, u in enumerate(u_list(N, rng2)):
+                v = vector_mode("o1d_%s_N%d_u%d" % (chop.replace("+", "p"), N, i), "mode", 1, N, chop, 0, u)
+                v["o1_delay"] = 1
+                o1d.append(v)
+    _DELAY = False
+    return {"format": 3, "rev": "3.2", "o1d_vectors": o1d, "seed": SEED, "grid": "u multiples of 2^-20", "reset": RESET, "clk_hz": CLK_HZ,
             "hold_reset": {"frame_ready": 0, "overrun": 0, "cfg_pending": 0, "acc1": 0, "acc2": 0,
                            "tag_word": "%04x" % tag_word({"chop": 0, "order": 0, "n_code": 0, "sys_en": 0, "ota_en": 0,
                                                           "short": 0, "invalid": 1, "frame_ctr": 0}),

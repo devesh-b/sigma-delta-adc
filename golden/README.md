@@ -7,7 +7,9 @@
 Loop: option B, c1 = 1/8, c2 = 1/2, k = 1/2, so k/c1 = 4 (integer). Every u is a multiple of 2^-20, so the
 float model and an integer implementation agree bit for bit.
 
-Top level: `format` (3), `seed`, `model`, `reset`, `clk_hz`, `fs_div_table`, `word_order`, `debug_bus`, `status_layout`, `vectors`, `streams`, `sequences`, `traces`. D70 (2026-11-12): `debug_bus.y_changes_on` now says **rising** edge of the exported bit clock (D67, SPEC CL-27); no other byte changed, sha re-pinned, `test_v3_rows_unchanged_in_v31` checks that this is the only debug_bus difference from v3.
+Top level: `format` (3), `rev` ("3.2"), `o1d_vectors`, `seed`, `model`, `reset`, `clk_hz`, `fs_div_table`, `word_order`, `debug_bus`, `status_layout`, `vectors`, `streams`, `sequences`, `traces`. D70 (2026-11-12): `debug_bus.y_changes_on` now says **rising** edge of the exported bit clock (D67, SPEC CL-27); no other byte changed, sha re-pinned, `test_v3_rows_unchanged_in_v31` checks that this is the only debug_bus difference from v3.
+
+**v3.2 (WO-53 / D76, 2026-11-13):** new top-level key `o1d_vectors` (72 order-1 mode vectors, `o1_delay: 1`, chop sys and ota+sys, N 64..4096) holding the order-1 loop **with the extra loop delay of the C4 netlist**, y[n+1] = sign(x1[n]), y[0] = +1 forced. Every v3.1 row and key is unchanged (the legacy order-1 rows in `vectors` are the no-delay ideal loop and stay for the subset proofs); the RTL takes ybits from the comparator pin, so the C9 RTL is unaffected. Checked by `model/tests/test_golden_o1d.py` (independent integer loop). sha re-pinned to 6ae28d76...
 
 `s6_vectors_v2.json` is the frozen v2 file (sha f08faffe...), kept only so a test proves every v2 row is a subset of the v3 row (v3 only adds keys and rows).
 

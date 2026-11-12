@@ -17,7 +17,7 @@ from model import golden as G
 HERE = os.path.dirname(os.path.abspath(__file__))
 GOLD = os.path.join(HERE, "..", "..", "golden", "s6_vectors.json")
 # sha256 of the canonical serialisation of the seed-20261109 set (pinned; regenerate => same bytes)
-PINNED_SHA = "04bcce89b48975fe1e8c3597b637b0bc4d0e577399cad6498c6d199c4f1ba0c0"   # D70: debug y edge -> rising
+PINNED_SHA = "6ae28d76598c354500caa89835d0b44d026fd5eb5f4b98397ef75b4852aa7b6d"   # v3.2 (WO-53): + o1d_vectors; was 04bcce89... (v3.1)
 D = 1 << 20
 M32 = 0xFFFFFFFF
 LATCHED = ("order", "N", "fs_div", "sys_en", "ota_en", "short", "boost", "trim")
@@ -437,7 +437,7 @@ def test_order1_acc2_defined(doc):
 
 
 def test_size_and_readme():
-    assert os.path.getsize(GOLD) < 1_000_000
+    assert os.path.getsize(GOLD) < 1_300_000   # v3.2: o1d rows
     with open(os.path.join(HERE, "..", "..", "golden", "README.md")) as f:
         txt = f.read()
     assert "RTL-observable" in txt and "Reference-only" in txt and "comp_raw0" in txt
@@ -679,7 +679,7 @@ G31_MUT = ["holdinv0", "rdon_clears", "fs5chg", "noclear_ld", "pendmask", "noove
 
 
 def test_g31_nominal(doc):
-    assert doc["rev"] == "3.1" and doc["format"] == 3
+    assert doc["rev"] == "3.2" and doc["format"] == 3
     assert check_g31(doc) == 0
 
 
@@ -718,7 +718,7 @@ def test_v3_rows_unchanged_in_v31(doc):
         txt = f.read()
     assert hashlib.sha256(txt.encode()).hexdigest() == V3_SHA
     v3 = json.loads(txt)
-    assert v3["format"] == 3 and "rev" not in v3 and doc["rev"] == "3.1"
+    assert v3["format"] == 3 and "rev" not in v3 and doc["rev"] == "3.2"
     for key in ("vectors", "streams", "sequences", "traces"):
         new = {r["id"]: r for r in doc[key]}
         assert len(v3[key]) < len(new) or key in ("vectors", "streams", "traces")

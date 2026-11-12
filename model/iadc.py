@@ -110,6 +110,9 @@ class Params:
                                  # (OTA1 output-referred offset). Same effect as
                                  # vos2 on u_hat: 2*e2/(c1(N-1)) input-referred.
 
+    order1_delay: bool = False   # WO-53 / D76: order 1 with the extra loop delay of the C4 netlist (comparator reads x2 = c2*x1 of the
+                                 # previous phase): y[n+1] = sign(x1[n]); y[0] = +1 (x1[-1] = 0). Default off => bit-identical legacy.
+
     comp_offset: float = 0.0     # comparator offset (units of vref)
     comp_noise: float = 0.0      # comparator rms noise (units of vref)
 
@@ -271,12 +274,13 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False, x
     S = np.zeros(B)
     sumS = np.zeros(B)
     xm1 = xm2 = 0.0
-    ys = []                      # S6: per-cycle quantiser decisions (+/-1), exposed via return_state
+    x1d = x1.copy()              # order1_delay: x1 of the previous cycle (x1[-1] = x1[0])
+    ys = []                     # S6: per-cycle quantiser decisions (+/-1), exposed via return_state
     xsw = p.vlin_diff / p.vref if p.vlin_diff > 0 else p.xswing
     e2_off = (p.vos2 + p.x1_offset) / p.vref      # 0.0 => skipped (bit-identical)
 
     for n in range(N):
-        q = x2 if p.order == 2 else x1
+        q = x2 if p.order == 2 else (x1d if p.order1_delay else x1)
         dec = q + p.comp_offset
         if p.comp_noise:
             dec = dec + p.comp_noise * rng.standard_normal(B)
@@ -324,6 +328,7 @@ def convert(p, u, rng=None, ota_noise=None, sys_sign=None, return_state=False, x
         if dyn2:
             p2, g2 = _leaky(a0_2, cs2, x2, drop2, xsw, p.av_table2, p.vref, p.cp_hold2)
         x1_old = x1
+        x1d = x1_old                 # order1_delay: the decision of the next cycle reads this state
         x1 = np.clip(p1 * x1 + g1 * p.c1 * (u_s - y * r + e), -p.xmax, p.xmax)
         xm1 = max(xm1, float(np.max(np.abs(x1))))
         if p.order == 2:
