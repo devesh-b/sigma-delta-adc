@@ -782,3 +782,11 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - WO-45 partial (249cca9, 0fb6db0, 59bdc91, e0e603e): C6 design note (Banba BGR, 3-bit trim, start-up + bias_ok, boost via one switched master-leg half). Smoke: 1.005 µA master, own 3.58 µA, TC −2.77/+0.52 %, step 5.04 %. Spot pool in WO-45-0fb6db0 (out/pool/POOL_DONE, out/summary.txt). User decisions: trim conflict (G0 17 / 4th bit / ±3.03 %), calibration code (+2 / +1 / supply current). Open: ivbl0 clamp current, bias_ok-to-rstb hold, PSRR definition.
 - D73 (user): trim ±19 % process-only (G0 17); calibration = lowest passing code + 2. Waiting: C6 spot pool, C3 spot pool, C1 sink sweep, C4 (WO-46) runs, C9 WO-42. Then reviewer passes on the C3/C6/C4 design notes.
 - REVIEW-C3a: REVISE. D74 (user): strobe in φS + capture on fs_tick (drop comp_s; CL-23 change), A_VT 12 total, set A′, HV pair + 1.8 V tail, order 1 via int2 as follower/reset. Queue: C3 revision WO (rows T2 band / T10 wrong phase / T5 asym / T4 report-only) + C9 RTL WO-48 (D72 widths + rename + D74 capture) after WO-42; C4 told.
+- 2026-11-13: **usage limit reached.** State at stop, with pickup steps:
+  - C1 sink sweep: WO-43-2b6fa35-s, `out/sweep_logs/POOL_DONE`. Then `python design/c1_ota1/c1b_tb7.py --summary out/sweep/c0..c4`, pick a candidate, and do WO-43 items 3–4 (reruns).
+  - C6 spot: WO-45-0fb6db0, `out/pool/POOL_DONE`, then `out/summary.txt`. Then the reviewer on design/c6_bias/DESIGN.md. Add SPEC CL entries for D73.
+  - C4: WO-46 agent waiting on its runs (also told D74). When done, reviewer on design/c4_sw/DESIGN.md.
+  - C3: WO-48 agent waiting on its runs (revision + netlist + tb).
+  - C9: WO-42 agent waiting on its runs. Then WO-49 (RTL: D72 widths + rename + D74 capture on fs_tick, dropping comp_s), bench rerun, and the PnR run (pd-expert).
+  - Pending SPEC CL entries: D72 (acc widths), D73 (trim ±19 %, calibration +2), D74 (strobe/capture, replacing CL-23).
+  - Fix the 2 pre-existing test_c1_netlist failures (dualpath_structure, device_count).
