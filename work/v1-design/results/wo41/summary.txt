@@ -1,0 +1,38 @@
+     10 EXIT=0
+corner | mode | thermal_vg uV (hand) | lump uV | flick_vg uV | en_w nV (hand) | fc kHz | beta | ok
+ff/125/3.6 | b | 230.0 (170.7) | 157.0 | 18.4 | 33.12 (27.32) | 18.6 | 0.8452 | REJECT opFalse/True loopTrue m8 False/True
+ff/125/3.6 | f | 219.9 (155.7) | 148.7 | 17.2 | 22.55 (18.18) | 32.6 | 0.8420 | REJECT opFalse/True loopTrue m8 False/True
+ff/-40/3.6 | b | 170.0 (127.1) | 116.2 | 15.2 | 19.75 (16.96) | 32.7 | 0.8383 | REJECT opFalse/True loopTrue m8 False/True
+ff/-40/3.6 | f | 160.0 (114.2) | 108.4 | 13.7 | 12.58 (10.97) | 60.7 | 0.8348 | REJECT opFalse/True loopTrue m8 False/True
+fs/125/3.0 | b | 241.5 (173.4) | 164.3 | 20.5 | 35.70 (28.48) | 19.7 | 0.8463 | REJECT opTrue/True loopTrue m8 False/True
+fs/125/3.0 | f | 237.2 (156.5) | 158.7 | 18.9 | 24.44 (18.57) | 32.4 | 0.8430 | REJECT opTrue/True loopTrue m8 False/False
+fs/-40/3.0 | b | 177.5 (126.0) | 120.5 | 16.1 | 21.01 (16.89) | 32.1 | 0.8387 | REJECT opFalse/False loopTrue m8 False/True
+fs/-40/3.0 | f | 173.2 (112.9) | 115.7 | 14.6 | 14.23 (10.86) | 51.5 | 0.8351 | REJECT opFalse/True loopTrue m8 False/False
+sf/125/3.0 | b | 228.8 (162.2) | 155.4 | 17.0 | 31.26 (25.13) | 17.2 | 0.8417 | REJECT opFalse/True loopTrue m8 False/True
+sf/125/3.0 | f | 223.9 (149.3) | 150.7 | 16.3 | 22.00 (17.03) | 29.5 | 0.8388 | REJECT opFalse/True loopTrue m8 False/True
+sf/-40/3.0 | b | 172.1 (124.9) | 117.4 | 15.2 | 20.59 (16.99) | 30.0 | 0.8358 | REJECT opTrue/True loopTrue m8 False/True
+sf/-40/3.0 | f | 165.5 (132.1) | 111.6 | 14.0 | 13.85 (11.10) | 50.9 | 0.8346 | REJECT opFalse/True loopTrue m8 True/True
+ss/125/3.0 | b | 234.9 (164.0) | 159.7 | 18.9 | 33.17 (26.13) | 19.1 | 0.8425 | REJECT opTrue/True loopTrue m8 False/True
+ss/125/3.0 | f | 233.0 (149.1) | 155.9 | 17.8 | 23.17 (17.32) | 31.4 | 0.8392 | REJECT opTrue/True loopTrue m8 False/False
+ss/-40/3.0 | b | 173.9 (122.5) | 118.0 | 15.3 | 19.98 (15.93) | 31.2 | 0.8351 | REJECT opFalse/True loopTrue m8 False/True
+ss/-40/3.0 | f | 171.3 (109.1) | 114.5 | 14.1 | 13.79 (10.42) | 50.1 | 0.8316 | REJECT opFalse/True loopTrue m8 False/False
+tt/27/3.3 | b | 200.1 (146.0) | 136.7 | 17.5 | 26.58 (21.72) | 25.3 | 0.8411 | REJECT opFalse/True loopTrue m8 False/True
+tt/27/3.3 | f | 190.7 (131.6) | 128.8 | 16.0 | 17.78 (14.10) | 43.1 | 0.8377 | REJECT opFalse/True loopTrue m8 False/True
+contributors tt base (thermal power %): {"sinks m_n": 53.8, "loads m_pl/m_plc": 14.5, "input pair": 14.5, "NMOS cascodes": 8.6, "PMOS cascodes": 5.1, "switches (chopper/island)": 3.4, "prot. cascode": 0.2, "CMFB integrator/clamps": 0.0, "bias/other": 0.0, "tail": 0.0}
+worst thermal: fs/125/3.0 bint 241.5 uV; contributors {"sinks m_n": 52.2, "loads m_pl/m_plc": 15.6, "input pair": 13.7, "NMOS cascodes": 7.0, "switches (chopper/island)": 6.2, "PMOS cascodes": 5.1, "prot. cascode": 0.2, "CMFB integrator/clamps": 0.0, "bias/other": 0.0, "tail": 0.0}
+chopper hand bound (tt base): {"Qch_fC": 4.3669, "vov": 1.0382, "delta": 0.0459, "const_mV": 0.2002, "sig_uV": 0.2458, "const_ok": true, "sig_ok": true}
+chopper broken: one-sided (delta 1) const 4.367 mV ok=False; A0 41.3 dB sig 21.909 uV ok=False
+model ff/125/3.6 {"ktc_uV": 0.556, "th_conv_uV": 2.435, "th_direct_uV": 0.699, "exc_direct": 2.597, "fl_lf1_uV": 0.106, "fl_lf93_uV": 0.163, "joint_conv_uV": 2.482, "joint_direct_uV": 0.888, "th_conv_ok": false, "th_direct_ok": true, "fl_ok": true, "joint_ok": true}
+model ff/-40/3.6 {"ktc_uV": 0.556, "th_conv_uV": 1.449, "th_direct_uV": 0.523, "exc_direct": 1.873, "fl_lf1_uV": 0.119, "fl_lf93_uV": 0.125, "joint_conv_uV": 1.536, "joint_direct_uV": 0.749, "th_conv_ok": false, "th_direct_ok": true, "fl_ok": true, "joint_ok": true}
+model fs/125/3.0 {"ktc_uV": 0.556, "th_conv_uV": 2.653, "th_direct_uV": 0.713, "exc_direct": 2.76, "fl_lf1_uV": 0.104, "fl_lf93_uV": 0.149, "joint_conv_uV": 2.7, "joint_direct_uV": 0.916, "th_conv_ok": false, "th_direct_ok": true, "fl_ok": true, "joint_ok": false}
+model fs/-40/3.0 {"ktc_uV": 0.556, "th_conv_uV": 1.544, "th_direct_uV": 0.537, "exc_direct": 1.951, "fl_lf1_uV": 0.115, "fl_lf93_uV": 0.13, "joint_conv_uV": 1.643, "joint_direct_uV": 0.768, "th_conv_ok": false, "th_direct_ok": true, "fl_ok": true, "joint_ok": true}
+model sf/125/3.0 {"ktc_uV": 0.556, "th_conv_uV": 2.3, "th_direct_uV": 0.699, "exc_direct": 2.579, "fl_lf1_uV": 0.112, "fl_lf93_uV": 0.131, "joint_conv_uV": 2.37, "joint_direct_uV": 0.89, "th_conv_ok": false, "th_direct_ok": true, "fl_ok": true, "joint_ok": true}
+model sf/-40/3.0 {"ktc_uV": 0.556, "th_conv_uV": 1.53, "th_direct_uV": 0.518, "exc_direct": 1.894, "fl_lf1_uV": 0.118, "fl_lf93_uV": 0.126, "joint_conv_uV": 1.618, "joint_direct_uV": 0.764, "th_conv_ok": false, "th_direct_ok": true, "fl_ok": true, "joint_ok": true}
+model ss/125/3.0 {"ktc_uV": 0.556, "th_conv_uV": 2.452, "th_direct_uV": 0.702, "exc_direct": 2.665, "fl_lf1_uV": 0.106, "fl_lf93_uV": 0.149, "joint_conv_uV": 2.495, "joint_direct_uV": 0.902, "th_conv_ok": false, "th_direct_ok": true, "fl_ok": true, "joint_ok": true}
+model ss/-40/3.0 {"ktc_uV": 0.556, "th_conv_uV": 1.477, "th_direct_uV": 0.542, "exc_direct": 1.913, "fl_lf1_uV": 0.117, "fl_lf93_uV": 0.128, "joint_conv_uV": 1.568, "joint_direct_uV": 0.773, "th_conv_ok": false, "th_direct_ok": true, "fl_ok": true, "joint_ok": true}
+model tt/27/3.3 {"ktc_uV": 0.556, "th_conv_uV": 1.955, "th_direct_uV": 0.585, "exc_direct": 2.209, "fl_lf1_uV": 0.109, "fl_lf93_uV": 0.14, "joint_conv_uV": 2.04, "joint_direct_uV": 0.833, "th_conv_ok": false, "th_direct_ok": true, "fl_ok": true, "joint_ok": true}
+broken mrg: thermal 542.5 uV (hand 146.1) en 53.78 nV -> REJECTED
+broken mhalf: thermal 210.2 uV en 27.24 nV fc 30.1 kHz; model {"ktc_uV": 0.556, "th_conv_uV": 2.013, "th_direct_uV": 0.666, "exc_direct": 2.334, "fl_lf1_uV": 0.106, "fl_lf93_uV": 0.133, "joint_conv_uV": 2.115, "joint_direct_uV": 0.844, "th_conv_ok": false, "th_direct_ok": true, "fl_ok": true, "joint_ok": true} -> NOT REJECTED
+VERDICT REJECT ff/125/3.6 b; ff/125/3.6 f; ff/-40/3.6 b; ff/-40/3.6 f; fs/125/3.0 b; fs/125/3.0 f; fs/-40/3.0 b; fs/-40/3.0 f; sf/125/3.0 b; sf/125/3.0 f; sf/-40/3.0 b; sf/-40/3.0 f; ss/125/3.0 b; ss/125/3.0 f; ss/-40/3.0 b; ss/-40/3.0 f; tt/27/3.3 b; tt/27/3.3 f; mhalf not rejected
+
+[exited with code 0]
