@@ -17,7 +17,7 @@ from model import golden as G
 HERE = os.path.dirname(os.path.abspath(__file__))
 GOLD = os.path.join(HERE, "..", "..", "golden", "s6_vectors.json")
 # sha256 of the canonical serialisation of the seed-20261109 set (pinned; regenerate => same bytes)
-PINNED_SHA = "f4a2ece692f284432f9cb872a1f99229119952e7a2755f08ce9a4de31f289831"
+PINNED_SHA = "04bcce89b48975fe1e8c3597b637b0bc4d0e577399cad6498c6d199c4f1ba0c0"   # D70: debug y edge -> rising
 D = 1 << 20
 M32 = 0xFFFFFFFF
 LATCHED = ("order", "N", "fs_div", "sys_en", "ota_en", "short", "boost", "trim")
@@ -726,8 +726,13 @@ def test_v3_rows_unchanged_in_v31(doc):
             assert subset(r, new[r["id"]]), (key, r["id"])
         assert [r["id"] for r in doc[key]][:len(v3[key])] == [r["id"] for r in v3[key]]
     assert [r["id"] for r in doc["sequences"]][-2:] == ["seq_rd", "seq_reserved"]
-    for k in ("reset", "fs_div_table", "word_order", "debug_bus", "model", "seed"):
+    for k in ("reset", "fs_div_table", "word_order", "model", "seed"):
         assert doc[k] == v3[k]
+    # D70 / AMB-18: the only debug_bus change since v3 is the y edge (falling -> rising, per D67)
+    dv3 = {k: v for k, v in v3["debug_bus"].items() if k != "y_changes_on"}
+    assert {k: v for k, v in doc["debug_bus"].items() if k != "y_changes_on"} == dv3
+    assert v3["debug_bus"]["y_changes_on"].startswith("falling")
+    assert doc["debug_bus"]["y_changes_on"].startswith("rising")
     bad = json.loads(json.dumps(doc))
     bad["sequences"][0]["hold"][3]["status_word"] = "0000"
     assert not subset(v3["sequences"][0], bad["sequences"][0])

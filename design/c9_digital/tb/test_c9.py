@@ -65,7 +65,7 @@ class TB:
             if h is not None:
                 self.ports[name] = h
         self.missing = [n for n in list(CTL) + ["comp"] if n not in self.ports]
-        self.ref = RefA(rst_lat=None, rd_lag=int(os.environ.get("C9_RD_LAG", "1")))
+        self.ref = RefA(rst_lat="d70", rd_lag=int(os.environ.get("C9_RD_LAG", "1")))
         self.ui, self.rst_n, self.comp = 0, 0, 0
         self.a_ui, self.a_rst_n = 0, 0       # values actually on the DUT pins at the next rising edge
         self.yb = {}                 # absolute slot -> golden bits for the comparator BFM
@@ -149,16 +149,17 @@ class TB:
                 self.chk("x")
                 if oe != 0xFF:
                     self.fail(f"uio_oe = {oe}")
-            # release alignment: DUT fs bit clock first rises after release = slot 0 start (CL-19)
+            # release latency (CL-19, CL-27 / D70): Ref A starts slot 0 itself at e(1 + div); the DUT fs bit
+            # clock must first rise on exactly that edge (no bench alignment)
             start_now = False
             if self.a_rst_n and not r.started and out.get("fs_clk") == 1:
-                start_now = True
                 lat = (r.rel_cnt + 1) if not r.in_rst else 0
                 self.lat_hist.append(lat)
-                if lat > 24 + 4 or lat != self.lat_hist[0]:
-                    self.fail(f"release-to-slot latency {lat} (history {self.lat_hist}; bound div+4, deterministic)")
+                if lat != r.lat():
+                    self.fail(f"release-to-slot latency {lat} != {r.lat()} (D70; history {self.lat_hist})")
+                    start_now = True
                 self.chk("rst_lat")
-            if self.a_rst_n and not r.started and not start_now and r.rel_cnt > 24 + 6:
+            if self.a_rst_n and not r.started and not start_now and r.rel_cnt > 192 + 6:
                 self.fail("no fs bit clock rise after rst_n release")
                 start_now = True
             r.step(self.a_rst_n, self.a_ui, self.comp, start_now=start_now)
@@ -740,6 +741,7 @@ async def a_rst01_async_mid(dut):
         await tb.clks(rng.randrange(1, 700))
         await Timer(3, unit="ns")                # mid clk-low phase: no clk edge until the next rise
         dut.rst_n.value = 0
+        tb.a_rst_n = 0                           # the pin is low at the next rising edge (async assert)
         await Timer(2, unit="ns")
         if lv(tb.ports["rst_analog"]) != 1 if "rst_analog" in tb.ports else False:
             tb.fail("rst_analog not asserted asynchronously")

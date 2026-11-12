@@ -67,7 +67,7 @@ class Run:
         r = self.ref
         if not r.started:
             nxt = 0 if r.in_rst else r.rel_cnt + 1
-            return (0, 0) if (r.rst_lat is not None and nxt >= r.rst_lat) else None
+            return (0, 0) if (r.rst_lat is not None and nxt >= r.lat()) else None
         if r.cnt != r.div - 1:
             return None
         if r.c + 1 >= r.N + 2:

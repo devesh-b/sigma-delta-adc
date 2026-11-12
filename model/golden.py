@@ -41,7 +41,7 @@ FS_DIV_TABLE["reserved_5_7_as"] = 1
 WORD_ORDER = ["acc1_hi", "acc1_lo", "acc2_hi", "acc2_lo", "tag", "status"]       # addr 0..5; 6, 7 read 0
 DEBUG_BUS = {"uo_out": ["raw_y", "bit_valid", "valid_frame_ready", "fs_bit_clock", "rst_analog", "sys_swap",
                         "ota_chop_phase", "invalid_hold"], "uio": "status[7:0] = frame_ctr",
-             "y_changes_on": "falling edge of the exported bit clock"}
+             "y_changes_on": "rising edge of the exported bit clock (fs-cycle start; sample on the falling edge, D67/D70)"}
 STATUS_LAYOUT = {"15": "frame_ready", "14": "overrun",
                  "13": "cfg_pending (v3.1: post-latch value after the load edge in hold[t].status_full; legacy status_word keeps 0)",
                  "12": "boost of hold-register frame", "11:9": "trim of hold-register frame", "8": "0",

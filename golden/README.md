@@ -7,7 +7,9 @@
 Loop: option B, c1 = 1/8, c2 = 1/2, k = 1/2, so k/c1 = 4 (integer). Every u is a multiple of 2^-20, so the
 float model and an integer implementation agree bit for bit.
 
-Top level: `format` (3), `seed`, `model`, `reset`, `clk_hz`, `fs_div_table`, `word_order`, `debug_bus`, `status_layout`, `vectors`, `streams`, `sequences`, `traces`. `s6_vectors_v2.json` is the frozen v2 file (sha f08faffe...), kept only so a test proves every v2 row is a subset of the v3 row (v3 only adds keys and rows).
+Top level: `format` (3), `seed`, `model`, `reset`, `clk_hz`, `fs_div_table`, `word_order`, `debug_bus`, `status_layout`, `vectors`, `streams`, `sequences`, `traces`. D70 (2026-11-12): `debug_bus.y_changes_on` now says **rising** edge of the exported bit clock (D67, SPEC CL-27); no other byte changed, sha re-pinned, `test_v3_rows_unchanged_in_v31` checks that this is the only debug_bus difference from v3.
+
+`s6_vectors_v2.json` is the frozen v2 file (sha f08faffe...), kept only so a test proves every v2 row is a subset of the v3 row (v3 only adds keys and rows).
 
 ## RTL-observable fields (what an RTL testbench must reproduce)
 | Field | Meaning |

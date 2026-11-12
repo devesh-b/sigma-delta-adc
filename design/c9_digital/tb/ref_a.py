@@ -13,8 +13,10 @@ Interpretation choices (where the SPEC leaves a free parameter; each is a bench 
     the DAC flop (y) updates on the next start edge (D67: debug y = DAC flop).
   * The decision sampled in fs cycle c is y for cycle c+1 (n = c-1).  Decisions of c = 0, 1, N+1 are ignored
     (3.7a a: n = 0 forced to +1).
-  * Release: the slot-0 start edge is aligned to the DUT by the bench (one free, bounded, determinism-checked
-    latency, CL-19).  Ref A's own default is `rst_lat` edges after the first edge that samples rst_n = 1.
+  * Release (CL-19, CL-27 / D70): rst_n is synchronised by 2 FF (edges e0, e1, e0 = first edge sampling
+    rst_n = 1); the divider restarts at the synchronised release and the first fs_tick (slot 0, c = 0, bit clock
+    rising) is exactly `div` clk later, i.e. edge e(1 + div).  rst_lat="d70" (default) = that edge; an integer
+    rst_lat is an explicit override (golden agreement, fs-granular); None = bench-aligned (start_now).
 """
 
 DIV = {0: 12, 1: 24, 2: 48, 3: 96, 4: 192}
@@ -62,7 +64,7 @@ class Sync:
 
 
 class RefA:
-    def __init__(self, mut=None, rst_lat=2, cfg0=None, rd_lag=0):
+    def __init__(self, mut=None, rst_lat="d70", cfg0=None, rd_lag=0):
         self.rd_lag = rd_lag      # clk from the synchronised rd rise to the clear (CL-12 allows a later clear)
         assert mut is None or mut in MUTANTS, mut
         self.mut = mut
@@ -106,6 +108,10 @@ class RefA:
         self.frames = []                   # every hold load, in order
         self.in_rst = True
         self.rd_pend = False
+
+    def lat(self):
+        """Release latency in edges after e0 (rel_cnt units)."""
+        return 1 + self.div if self.rst_lat == "d70" else self.rst_lat
 
     # ------------------------------------------------------------------ derived combinational values
     @property
@@ -204,7 +210,7 @@ class RefA:
 
         # ---- fs divider / sequencer
         if not self.started:
-            if start_now or (self.rst_lat is not None and self.rel_cnt >= self.rst_lat):
+            if start_now or (self.rst_lat is not None and self.rel_cnt >= self.lat()):
                 self._start_edge(first=True, pre_shadow=pre_shadow)
             self._rd(rd_rise, load=False)
             return
