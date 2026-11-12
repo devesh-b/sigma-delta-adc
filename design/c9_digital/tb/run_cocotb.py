@@ -1,5 +1,5 @@
 """cocotb 2.x runner for the C9 bench.  Env: SIM (icarus|verilator), C9_TOP, C9_RTL, TESTS (regex),
-C9_SEED, C9_FULL, C9_COMP, C9_OUT.  Exit 1 on any failure, on zero tests, or on a missing results file."""
+C9_SEED, C9_FULL, C9_COMP, C9_OUT, C9_BUILD_ARGS (extra build flags, e.g. --coverage), C9_RUNDIR (sim cwd).  Exit 1 on any failure, on zero tests, or on a missing results file."""
 import glob
 import os
 import sys
@@ -18,6 +18,9 @@ if not srcs:
 bd = os.path.join(out, f"build_{sim}")
 r = get_runner(sim)
 kw = dict(timescale=("1ns", "1ps")) if sim == "icarus" else {}
+ba = os.environ.get("C9_BUILD_ARGS", "").split()
+if ba:
+    kw["build_args"] = ba
 r.build(sources=srcs, hdl_toplevel=top, build_dir=bd, always=True, **kw)
 xml = os.path.join(out, f"results_{sim}_{os.environ.get('C9_SEED', '1')}.xml")
 if os.path.exists(xml):
@@ -25,7 +28,7 @@ if os.path.exists(xml):
 env = {k: v for k, v in os.environ.items() if k.startswith("C9_")}
 env["PYTHONPATH"] = here + os.pathsep + os.environ.get("PYTHONPATH", "")
 tf = os.environ.get("TESTS")
-r.test(hdl_toplevel=top, test_module="test_c9", test_dir=here, build_dir=bd, results_xml=xml,
+r.test(hdl_toplevel=top, test_module="test_c9", test_dir=os.environ.get("C9_RUNDIR", here), build_dir=bd, results_xml=xml,
        extra_env=env, test_filter=tf if tf else None)
 if not os.path.exists(xml):
     print("RESULT FAIL: no results file")
