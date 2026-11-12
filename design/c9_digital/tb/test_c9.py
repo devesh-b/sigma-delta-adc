@@ -90,6 +90,7 @@ class TB:
         self.ctl_strict = True
         self.cov = FCov()
         self.place_n = self.place_miss = 0
+        self.last_ld = -1
 
     def _find(self, forced, cands):
         names = [forced] if forced else cands
@@ -170,6 +171,8 @@ class TB:
             self.cov.pre(self)
             r.step(self.a_rst_n, self.a_ui, self.comp, start_now=start_now)
             self.cov.post(self)
+            if "ld" in r.events:
+                self.last_ld = self.edges
             # ---- control ports, clk-exact
             if not self.missing:
                 k = r.ctl()
@@ -871,7 +874,7 @@ def g_place(tb, words, E):
     while tb.edges < E:
         yield
     tb.place_n += 1
-    if "ld" not in tb.ref.events:
+    if tb.last_ld != E:
         tb.place_miss += 1
 
 
@@ -889,7 +892,7 @@ def g_rd_at(tb, P, width=2):
 
 def p_wphase(ph):
     """Post-state predicate for a write phase (fcov.PHASES) at any config."""
-    if ph.startswith("e"):
+    if ph[1] in "+-":
         d = int(ph[1:])
         if d < 0:
             return lambda rc: rc.slot % 2 == 1 and rc.c == rc.N + 1 and rc.cnt == rc.div + d
