@@ -808,3 +808,9 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
       - T8 stress: dp 2.36–2.44 V against 1.98 V at tt and ff/−40, both power-up orders;
       - T5 asymmetric kick 7.7–8.2 mV against 5.
     - → user decision on offset; stress/asym are design or stimulus fixes.
+- D75 (user): C1 sink L 8 + thermal row re-based on the system share; C3 offset row re-based on loop impact.
+- WO-42 done (8f4db5b, f5b26f6, 36b3642, a429510): F01 closed (fails on M07/M07b/M19); bins 230/250 (CV-WRITE-PHASE 32/52 left, c03 rerun); R-01 200 seeds pass; C9_FULL pass; X-01 pass; SOAK s1 rerun pending; CDC note in plan §11.1; new AMB-24 (cfg_ld / rd minimum width).
+- WO-46 done (dbdcc80…3a837e7): C4 note + spot sims 22/22, every broken copy REJECTs.
+  - Input TG → 12/36; DAC TG ~6/18; vg NMOS 10–12 µm; top-plate short ≤ 2/4.
+  - Phase edge 1.22 ns at ss/125 against 1.0 (fix: inv_8 drivers).
+  - Reviewer next.
