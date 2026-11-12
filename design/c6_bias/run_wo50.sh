@@ -9,7 +9,7 @@ export PATH=$HOME/.nix-profile/bin:$PATH PDK_ROOT=/home/mempool/.ciel PDK=sky130
 mkdir -p out golden
 cp /home/mempool/regr/tt/WO-45-0fb6db0/golden/tune.json out/tune.json
 python design/c6_bias/c6_spot.py jobs out out/jobs.txt
-/home/mempool/tt-sd/scripts/lpool.sh out/jobs.txt out/pool_run
+env -u OMP_NUM_THREADS /home/mempool/tt-sd/scripts/lpool.sh out/jobs.txt out/pool_run  # nproc honours OMP_NUM_THREADS (WO-45/50 first pool ran with nproc=1)
 python design/c6_bias/c6_spot.py summary out > out/summary.txt 2>&1
 cp out/summary.txt out/tune.json golden/ 2>/dev/null
 mkdir -p out/pool && date > out/pool/POOL_DONE

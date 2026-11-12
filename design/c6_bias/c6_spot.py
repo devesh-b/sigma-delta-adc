@@ -12,7 +12,7 @@ C6 netlist; the netlist + full tb come after the review). Runs on the sandbox on
              dci  = DC initial-state test: one-point .dc from .nodeset all nodes = 0 and = VDD
              tran = VAPWR PWL 0 -> VDD over TR seconds, uic (no .op), start-up
              loop = loop broken at the M5 gate (o1 -> o1x), .dc Vx: equilibria + core differential vs current (INFO)
-        MUT  none | nosu (start-up removed: Ms and Mpo) | early (start-up released early: Mk/Mkh x16)
+        MUT  none | nosu (start-up removed: Mpo) | early (start-up released early: Mk/Mkh x16)
              | su45 (the WO-45 start-up, proportional Ms on tsu) | ptat (both R2 open) | trim_open (LSB leg open)
   python c6_spot.py summary OUT                    # verdict table -> stdout
 
@@ -23,10 +23,11 @@ mirror load, Cc on o1; stage 2 = NMOS M5 into PMOS diode M6 (8 units) on VG; Cvg
 Start-up (WO-50, DESIGN.md 6): leaker (8 x PMOS L 20 in series, gate 0) pulls tsu up; Mk (gate VN, 0.21 x the
 master diode) pulls tsu down, so tsu falls once I_master > I_lk / 0.21 (release threshold); Mkh (0.105 x, switched
 in by ok) adds hysteresis once released. ok = NOT tsu (bias_ok), sua = NOT ok (start-up active, rail-to-rail).
-While sua is high: Ms pulls VG down and Mpo pulls the amp output o1 up (M5 on), so the current is pushed above the
-operating point and the loop settles from above, never through the low-current region where the core differential
-V_B - V_A is ~0 (both pnps off, both branches are just R2; WO-50 finding). After release Ms and Mpo are off (gates
-at the rails): nothing is injected into the core.
+While ok is low, Mpo (one unit PMOS, ~1 uA) pulls the amp output o1 up (M5 on); no device forces VG (WO-50 smoke:
+a hard VG pull-down Ms drove I to 20x, the amp slammed o1 to 0 on release and the start-up relaxed 41 times). The amp
+overpowers Mpo once the core is in its normal region, so the current stays bounded and the loop settles from above, never through the low-current region where the core differential
+V_B - V_A is ~0 (both pnps off, both branches are just R2; WO-50 finding). After release Mpo is off (gate
+at VDD): nothing is injected into the core.
 """
 import json
 import math
@@ -57,7 +58,7 @@ NLK = 8                        # leaker: NLK x unit PMOS in series, gate 0
 MN_W, MN_L = 2.0, 4.0          # master NMOS diode
 MK_W, MK_L = 0.42, 4.0         # Mk: 0.21 x master diode -> release at I_lk / 0.21
 MKH_W, MKH_L = 0.42, 8.0       # Mkh: +0.105 x when ok is high (hysteresis 1.5 : 1)
-MPO_W, MPO_L = 0.42, 4.0       # o1 pull-up while sua is high
+MPO_W, MPO_L = 0.42, 20.0      # o1 pull-up while sua is high: one unit PMOS, ~1 uA, the amp can overpower it
 R_K = (MK_W / MK_L) / (MN_W / MN_L)
 R_KH = (MKH_W / MKH_L) / (MN_W / MN_L)
 # gates (WO-50 exit + DESIGN.md 6)
@@ -107,7 +108,7 @@ def deck(kind, corner, temp, vdd, mut="none", tr=1e-6, ratio=4.6, out="o.csv", i
               x("mhs", "hk", "ok", "0", "0", N5, 1, 1),
               x("mip2", "sua", "ok", "vdd", "vdd", P5, 1, 1), x("min2", "sua", "ok", "0", "0", N5, 1, 1)]
         if mut != "nosu":
-            L += [x("ms", "vg", "sua", "0", "0", N5, 1, 1), x("mpo", "o1", "ok", "vdd", "vdd", P5, MPO_W, MPO_L)]
+            L += [x("mpo", "o1", "ok", "vdd", "vdd", P5, MPO_W, MPO_L)]
     # master leg (code 100) into the NMOS diode VN
     L += [x("mm", "mo", "vg", "vdd", "vdd", P5, UW, UL, G0 + CODE_RESET), "Vsm mo vn 0",
           x("mn", "vn", "vn", "0", "0", N5, MN_W, MN_L)]
