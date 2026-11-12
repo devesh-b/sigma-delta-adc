@@ -815,3 +815,7 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - Phase edge 1.22 ns at ss/125 against 1.0 (fix: inv_8 drivers).
   - Reviewer next.
 - WO-49A done (953624e): RTL D72 + D74 + rename sd_adc_c9; CL-28 (D74 capture), CL-29 (D72 widths + rename); lint/synth clean, 936 cells / 225 FF (was 1111/276). WO-49B (bench rerun + width mutants + WO-42 leftovers) dispatched.
+- REVIEW-C4a saved. D76 (user): model order-1 delay first; derive edge_max; small Sg + leak sweep; detector + isolation LS for power-up. Next: C4b WO (revise note + netlist + tb) and the order-1 model study.
+- WO-52 code done (bf4a565, 3a7ae1a): L 8, noise row v_vg ≤ 390 µV (CL-31 after renumbering a clash), tb7 op split (the noise-deck fallback is accepted only if gm matches the op deck within 0.1 %), test fixes (20 pass). Runs in WO-52-bf4a565 (out/logs/POOL_DONE; pickup in results/wo52/README).
+- WO-51 code done (81c5fe3, c88268b, 739949c): offset limit 60 mV (x2 headroom); HV cascode for T8; T5 gate at R ±5 % / C ±1 %. Runs in WO-51-c88268b (run/pool_logs/POOL_DONE; collect: python c3_comp/c3_tb.py collect run). Finding: realistic x2 peak ~1.41 V diff, at the edge of OTA2's range (C2 item).
+- SPEC CL-30 clash fixed: C3 offset = CL-30, C1 noise = CL-31.
