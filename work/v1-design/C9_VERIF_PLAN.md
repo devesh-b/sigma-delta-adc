@@ -500,7 +500,9 @@ Mutants are throwaway copies under `verif/mutants/` (never committed back). Each
 | M54 | rst_n does not clear the hold or frame_ready | A-RST-01 |
 | M55 | short not in the latched set | `seq_short`, D-INV-02 |
 | M56 | cfg_pending inverted, or compared against the hold config | D-CFG-04, A-CFG-02 |
-| M57 | y updated on the bit-clock rising edge | D-Y-03 |
+| M57 | (WO-49B, CL-28) comparator captured one fs cycle late (extra flop on fs_tick, the CL-23 loop delay) | GOLD |
+| M57b | (WO-49B, CL-28) comparator captured 1 clk before fs_tick (strobe on the wrong phase) | A-SEQ-01, GOLD (strict BFM) |
+| W1 / W2 | (WO-49B, CL-29) acc1 13 b / acc2 24 b internal width | D-DEC-03, GOLD |
 | M58 | bit clock period = div + 1 | D-FS-01, BUS-04 |
 | M59 | status frame_ctr = live counter instead of the hold frame_ctr | D-FRM-03, A-FRM-01 |
 
@@ -616,3 +618,10 @@ Metastability itself is not simulated (waiver kept). M39 (rd without a sync) is 
 - CV-RST: the release-phase bins are dropped. Under D70 the divider restarts at release, and the reset config is always fs_div 1.
 - Directed coverage tests: c01_mode_sweep, c02_fs_sweep, c03_write_phase, c04_rd_bins, c05_ctr_wrap, c06_rst_pos, c07_addr. R-01 was rewritten to follow §4.7: edge, odd-last and mid write weighting, equal and multi writes, and rd aimed at load ±4.
 - F-01 is strengthened: a sys_swap change is allowed only on the edge where rst_analog rises (cycle 0) and fs_clk rises. It must fail on M07, M07b and M19.
+
+## 12. WO-49B changes (D72 / D74, 2026-11-13)
+
+- **Capture edge (CL-28).** Ref A captures `comp` on the fs-cycle start edge (pre-state cnt = div−1) straight into the DAC flop; the CL-23 falling-edge sample is gone. The decision captured at the end of cycle c is still y[n] with n = c − 1, so the golden (fs-cycle granular) expectations do not change.
+- **Comparator BFM (hostile, default).** `comp_in` carries the correct bit only on the clk whose rising edge is the capture edge; it carries the inverted bit on every other clk of the conversion window. `C9_COMP_WIN=k` widens the valid window to k clk before the edge (default 0). A DUT that captures one clk early or late fails clk-exact on `dac_y` and fails the golden.
+- **Widths (CL-29).** The bench sees only the 32-bit frame words, so the narrow accumulators are checked through the golden and the N 4096 full-scale streams (D-DEC-03). W1 (acc1 13 b) and W2 (acc2 24 b) are the width mutants. Arithmetic note: with N ≤ 4096, the exclusive acc2 stays within ±N(N−1)/2 = ±8 386 560 < 2^23. A 24-bit signed acc2 therefore holds every legal value, so W2 cannot be killed by legal stimulus (see the WO-49B report).
+- **Job kinds** in `wo42_job.sh`: `test NAME SEED` (one test, with the collector) and `suite STEP`. The job file is `wo49b_jobs.txt`.
