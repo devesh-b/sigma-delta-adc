@@ -204,7 +204,7 @@ class TB:
             self.last = dict(out, bus=bus)
             if "load" in r.events:
                 self.loads_seen += 1
-                if self.host_auto:
+                if self.host_auto and self.rst_n:      # WO-42 TB-7: no host read queued once a reset is requested
                     self.tasks.append(self._host_read(r.frames[-1]))
             # ---- comparator BFM for the next edge (from Ref A's position, contract CL-23)
             self.comp = self._comp_next()
