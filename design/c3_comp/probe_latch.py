@@ -27,7 +27,7 @@ def main(out, corner, temp, order, mut=""):
     devs = devices(mut=mut)
     nodes = sorted({n for dv in devs for n in dv[2:6]} - PORTS)
     lat = [dv for dv in devs if dv[0][0] == "S" and dv[1].endswith("nfet_01v8")]   # Sq3 Sq4 Sb3 Sb4
-    sig = ["vdd", "clk", "x2p", "x2n"] + [f"xc.{n}" for n in nodes]
+    sig = ["vdd", "clk", "x2p", "x2n", "q", "qb"] + [f"xc.{n}" for n in nodes]
     add = []
     for n in nodes:
         add += [f"let mx_{n} = vecmax(v(xc.{n}))", f"let mn_{n} = vecmin(v(xc.{n}))",
@@ -54,7 +54,8 @@ def main(out, corner, temp, order, mut=""):
     os.remove(w)
     t = a[:, 0]
     col = {s: a[:, 1 + i] for i, s in enumerate(sig)}
-    v = lambda n: col["vdd"] * 0 if n == "vss" else col["vdd"] if n == "vdd" else col[f"xc.{n}"]
+    top = {"vdd": "vdd", "q": "q", "qb": "qb", "clk": "clk", "inp": "x2p", "inn": "x2n"}
+    v = lambda n: col["vdd"] * 0 if n == "vss" else col[top[n]] if n in top else col[f"xc.{n}"]
     dt_ = np.diff(t, append=t[-1])
     print(f"1.8 V devices with max|Vds| > {V18_MAX} V (max, time above limit):")
     for (nm, model, dn, gn, sn, _, _) in devs:
