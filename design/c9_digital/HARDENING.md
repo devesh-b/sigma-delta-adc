@@ -118,3 +118,8 @@ macro (uio_oe = 0xFF via tie cells); `ena`, `uio_in` unused.
 - RUN_HEURISTIC_DIODE_INSERTION false (LibreLane default, classic.py:166); antenna repair and port diodes kept. CheckAntennas 0/0.
 - Fanout violations 46 -> 10 (clock leaves only), slew 256 -> 43 pins (4 drivers, ss_1v40 only), cap 3 -> 0, diodes 342 -> 13.
 - Setup ss_1v40 +2.70 ns; all 12 corners met; DRC/LVS/XOR 0. Details: work/v1-design/results/wo69/README.md.
+
+## WO-71: CTS sink clustering size 8
+- `CTS_SINK_CLUSTERING_SIZE: 8` (LibreLane 3.1.0.dev3 steps/openroad.py:2495 -> cts.tcl:67 `-sink_clustering_size`). Auto clustering had chosen
+  10, but leaves ended at 12-13 sinks. Result: max fanout 10 -> 0 at all 12 corners; setup/hold met; DRC/LVS/XOR/antenna 0; power +3 %
+  (37 clock buffers, 17 dummy loads). Slew at ss_1v40 unchanged (43 pins, buf_1 fanout nets). Details: work/v1-design/results/wo71/README.md.
