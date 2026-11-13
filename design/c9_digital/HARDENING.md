@@ -113,3 +113,8 @@ macro (uio_oe = 0xFF via tie cells); `ena`, `uio_in` unused.
   +2.58 -> +0.17 ns, slew 256 -> 108, cap 3 -> 0, fanout 46 -> 51. Do not ban buf_1 without a buffer-list control.
 - 36 of 46 fanout violations are heuristic antenna diodes on sinks (GRT antenna check had 0 violations before insertion).
   Details: work/v1-design/results/wo67/README.md.
+
+## WO-69 (2026-11-13): heuristic diode insertion off
+- RUN_HEURISTIC_DIODE_INSERTION false (LibreLane default, classic.py:166); antenna repair and port diodes kept. CheckAntennas 0/0.
+- Fanout violations 46 -> 10 (clock leaves only), slew 256 -> 43 pins (4 drivers, ss_1v40 only), cap 3 -> 0, diodes 342 -> 13.
+- Setup ss_1v40 +2.70 ns; all 12 corners met; DRC/LVS/XOR 0. Details: work/v1-design/results/wo69/README.md.
