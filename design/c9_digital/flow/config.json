@@ -42,5 +42,8 @@
   "RUN_HEURISTIC_DIODE_INSERTION": true,
   "DIODE_ON_PORTS": "in",
 
-  "RUN_LINTER": true
+  "RUN_LINTER": true,
+
+  "// WO-60A": "D79: EXTRA_EXCLUDED_CELLS (LibreLane 3.1.0.dev3 config/flow.py; old names RSZ_DONT_USE_CELLS/DONT_USE_CELLS) is added to PNR_EXCLUDED_CELL_FILE and applied via set_dont_use in every OpenROAD step (scripts/openroad/common/io.tcl) and to synthesis. In WO-58B pnr1 the resizer used 65 clkdlybuf4s25_1 as fanout buffers (~5 ns of the ss_100C_1v40 critical path). Clock-delay and metal-delay cells are banned; dlygate4sd* stays allowed (only used as hold buffers, 179x in pnr1). Synthesis already excludes these via no_synth.cells, so the synth netlist should not change.",
+  "EXTRA_EXCLUDED_CELLS": ["sky130_fd_sc_hd__clkdlybuf4s*", "sky130_fd_sc_hd__dlymetal6s*"]
 }

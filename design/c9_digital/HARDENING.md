@@ -54,6 +54,11 @@ place around MIM arrays and guard rings under our matching rules.
   at `PL_TARGET_DENSITY_PCT` 60, then shrink. Power straps: set pitch/offset so one VDPWR and one VGND strap pair lines up with
   the tile stripes, which C7 extends full height through a met4-free lane.
 - Antenna: `RUN_HEURISTIC_DIODE_INSERTION`, `DIODE_ON_PORTS in`; keep LibreLane's antenna check on.
+- Don't-use (WO-60A, D79): `EXTRA_EXCLUDED_CELLS` = `clkdlybuf4s*`, `dlymetal6s*`. Source: LibreLane 3.1.0.dev3
+  `librelane/config/flow.py` ("Wildcards matching additional cells to exclude from both synthesis and PnR", old names
+  `RSZ_DONT_USE_CELLS`/`DONT_USE_CELLS`); merged with the PDK `PNR_EXCLUDED_CELL_FILE` (`steps/openroad.py`) and applied by
+  `set_dont_use` (`scripts/openroad/common/io.tcl`). Reason: WO-58B pnr1 used 65 `clkdlybuf4s25_1` as resizer fanout
+  buffers (~5 ns of the failing ss_100C_1v40 path). `dlygate4sd*` stays allowed: in pnr1 all 179 are `hold*` buffers.
 - Macro name: the RTL top is `tt_um_sd_adc_c9`. The shuttle merges all GDS, so the macro cell must not be the project's
   top_module name and should carry the project prefix; renaming is an RTL change (decision 9.3).
 
