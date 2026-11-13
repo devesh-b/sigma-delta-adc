@@ -8,6 +8,8 @@ Gate: INL(endpoint) <= 5 ppm at 4 MHz boost; also reported against 3.33 ppm (5/1
 CL-1b, not from this code. Broken copy --copy sr95: tail reference scaled so the boost SR is 9.5 V/us at 1.4 pF
 (scale from the REAL integrate-phase load, see sr95_scale; all six bias ports scaled together) -> must REJECT. Chopper static (chp/chlp high). --part i/k runs the i-th of k slices of the u grid
 (endpoints kept in every slice so each slice has its own endpoint line; combine with combine()).
+WO-63: --mode prec = precision gate B (SPEC row 94): base bias, fs 2 MHz, OTA2 13.5 V/us / 10 MHz, gate 1.333 ppm,
+tags gbp_*; broken copy --copy srknee (base SR 8.24 V/us = 0.8 x 10.3 floor) must REJECT. --mode boost (default) unchanged.
 """
 import argparse, ast, json, math, os, re, sys
 
@@ -29,6 +31,15 @@ SR95_SCALE = 9.5e6 * C_INT_PHASE / (S.I_TAIL * S.BOOST)   # ~0.22: ALL six bias 
 # 0.8 x the new boost floor (20.6 V/us, c1b_opac.SR_FLOOR) = 16.5 V/us; must REJECT, or the measured INL bounds the knee.
 SRKNEE_SCALE = 0.8 * 20.6e6 * 1.4e-12 / (S.I_TAIL * S.BOOST)
 SCALES = {"sr95": SR95_SCALE, "srknee": SRKNEE_SCALE}
+# WO-63 (SPEC row 94, D48(1)): precision mode = base bias (boost 0), fs 2 MHz, gate 1.333 ppm; OTA2 at its precision
+# macromodel point (13.5 V/us, GBW 10 MHz, fp2_mult 3, beta2 0.497 from the default cp_vg). Broken copy srknee in prec:
+# ALL six ports scaled so the base SR at the SPEC basis (I_tail / 1.4 pF) is 0.8 x the 10.3 V/us base floor = 8.24 V/us.
+GATE_PREC = 1.333
+SRKNEE_PREC_SCALE = 0.8 * 10.3e6 * 1.4e-12 / S.I_TAIL
+MODES = {   # mode: (fs, boost, gate, tag prefix, OTA2 / OTA1-behavioural macromodel point, broken-copy scales)
+    "boost": (4e6, True, GATE, "gb", dict(gbw=27e6, gbw2=22.5e6, sr2=27e6, fp2_mult2=3.0), SCALES),
+    "prec": (2e6, False, GATE_PREC, "gbp", dict(gbw=10e6, gbw2=10e6, sr2=13.5e6, fp2_mult2=3.0), {"srknee": SRKNEE_PREC_SCALE}),
+}
 AUDIT_TYPES = {"X", "I"}   # the audit inventories behavioural parts only: allow exactly the netlisted-OTA element types
 AUDIT_TOKENS = (".lib", ".include", "subckt", "sky130", "nfet", "pfet")
 
@@ -77,7 +88,7 @@ def cm_at_release(out, tag):
 EP_TOL_PPM = 0.05   # endpoint agreement between parts [ppm of FSR 2]; WO-24 nom parts agree to ~0.008 ppm
 
 
-def combine(paths, k=None, tol_ppm=EP_TOL_PPM, broken=False):
+def combine(paths, k=None, tol_ppm=EP_TOL_PPM, broken=False, gate=GATE):
     """Combine --part slices (REVIEW-C1b m6). Asserts that every part has the same endpoints (u_in) and that their u_hat
     agree within tol_ppm (the endpoint conversions are the same codes / residues in each part; a part that drifted or a
     stale json fails here). Also checks the part set is complete (0..k-1, no duplicates) and that shared interior
@@ -115,23 +126,24 @@ def combine(paths, k=None, tol_ppm=EP_TOL_PPM, broken=False):
     healthy = not probs and all(math.isfinite(r["inl_ep_ppm"]) for r in rows)
     return dict(n_parts=k, n_points=len(uu), endpoint_spread_ppm=spread, inl_ep_ppm=inl, disagreement_info=disagree[:6],
                 inl_ep_union_ppm=union["inl_ep_ppm"], inl_bf_union_ppm=union["inl_bf_ppm"], problems=probs,
-                healthy=healthy, pass_gate=healthy and inl <= GATE, pass_share=healthy and inl <= GATE_SHARE)
+                healthy=healthy, gate_ppm=gate, pass_gate=healthy and inl <= gate, pass_share=healthy and inl <= gate / 1.5)
 
 
 def cfg(a):
     c, t, v = CORNERS9[a.corner]
+    fs, bst, _, _, pt, scales = MODES[a.mode]
     sub = os.path.join(a.out, "ota1_sc.spice")
-    open(sub, "w").write(NL.build("ota1", cmfb="sc", fs=4e6, boost=True))
-    bias = NL.bias_currents(True)
-    if a.copy in SCALES:
-        bias = {k: v * SCALES[a.copy] for k, v in bias.items()}   # M2: all six ports, not the tail alone
+    open(sub, "w").write(NL.build("ota1", cmfb="sc", fs=fs, boost=bst))
+    bias = NL.bias_currents(bst)
+    if a.copy != "nom":
+        bias = {k: v * scales[a.copy] for k, v in bias.items()}   # M2: all six ports, not the tail alone
     u = TB.u_points(a.m, 0.9)
     if a.part:
         i, k = map(int, a.part.split("/"))
         u = tuple(sorted(set((u[0], u[-1]) + u[1 + i:-1:k])))
-    xt = dict(subckt=sub, lib=LIB, corner=c, temp=t, vdd=v, boost=True, bias=bias, sink_ports=NL.SINK_PORTS,
+    xt = dict(subckt=sub, lib=LIB, corner=c, temp=t, vdd=v, boost=bst, bias=bias, sink_ports=NL.SINK_PORTS,
               vicm=S.V_ICM, vocm=S.V_OCM, cp_vg_ext=0.035e-12, c_out_ext=C_OUT_EXT)
-    return TB.v2_cfg(dict(fs=4e6, gbw=27e6, gbw2=22.5e6, sr2=27e6, fp2_mult2=3.0, bst1=1.0, bst2=1.0, ota1_xtor=xt),
+    return TB.v2_cfg(dict(fs=fs, bst1=1.0, bst2=1.0, ota1_xtor=xt) | pt,
                      n=a.n, m=a.m) | dict(u_list=u), (c, t, v)
 
 
@@ -146,18 +158,22 @@ def main():
     ap.add_argument("--part", default=None)
     ap.add_argument("--deck-timeout", type=int, default=7000)
     ap.add_argument("--combine", type=int, default=0, help="combine K part jsons of this copy/opt/n in OUT, then exit")
+    ap.add_argument("--mode", default="boost", choices=tuple(MODES), help="boost: 4 MHz, 5 ppm; prec: base bias, 2 MHz, 1.333 ppm (WO-63)")
     a = ap.parse_args()
+    _, _, gate, pfx, _, scales = MODES[a.mode]
+    if a.copy != "nom" and a.copy not in scales:
+        ap.error(f"copy {a.copy} not defined in mode {a.mode}")
     if a.combine:
         import glob
-        fs = sorted(glob.glob(os.path.join(a.out, f"gb_{a.copy}_{a.opt}_N{a.n}_p*o{a.combine}.json")))
+        fs = sorted(glob.glob(os.path.join(a.out, f"{pfx}_{a.copy}_{a.opt}_N{a.n}_p*o{a.combine}.json")))
         try:
-            r = combine(fs, a.combine, broken=a.copy in SCALES)   # WO-29: broken copy: healthy parts > gate => REJECTED
+            r = combine(fs, a.combine, broken=a.copy != "nom", gate=gate)   # WO-29: broken copy: healthy parts > gate => REJECTED
         except AssertionError as e:
             print(f"COMBINE INVALID: {e}")
             sys.exit(2)
         print(json.dumps(r))
-        if a.copy in SCALES:
-            v = "REJECTED (good)" if r["healthy"] and r["inl_ep_ppm"] > GATE else ("PASSED (check is blind)" if r["healthy"] else "INVALID")
+        if a.copy != "nom":
+            v = "REJECTED (good)" if r["healthy"] and r["inl_ep_ppm"] > gate else ("PASSED (check is blind)" if r["healthy"] else "INVALID")
             print("broken copy", v)
             sys.exit(0 if v.startswith("REJ") else 1)
         print("VERDICT", "ACCEPT" if r["pass_gate"] else "REJECT")
@@ -166,8 +182,11 @@ def main():
     P.SPICE_OPTIONS_TIER1.update(P.option_ladder(a.opt))
     TB.DECK_TIMEOUT_S = a.deck_timeout
     c, corner = cfg(a)
-    tag = f"gb_{a.copy}_{a.opt}_N{a.n}" + (f"_p{a.part.replace('/', 'o')}" if a.part else "")
-    if a.copy == "srknee":
+    tag = f"{pfx}_{a.copy}_{a.opt}_N{a.n}" + (f"_p{a.part.replace('/', 'o')}" if a.part else "")
+    if a.mode == "prec":
+        print(f"prec mode: base bias, fs 2 MHz, OTA2 13.5 V/us / 10 MHz, gate {gate} ppm; base SR "
+              f"{S.I_TAIL * (scales.get(a.copy, 1.0)) / 1.4e-12 / 1e6:.2f} V/us at 1.4 pF (copy {a.copy})")
+    elif a.copy == "srknee":
         print(f"srknee copy: bias scale {SRKNEE_SCALE:.4f} on all six ports; boost SR {S.I_TAIL * S.BOOST * SRKNEE_SCALE / 1.4e-12 / 1e6:.2f} V/us at 1.4 pF")
     if a.copy == "sr95":
         print(f"sr95 copy: bias scale {SR95_SCALE:.4f} on all six ports; expected boost SR {S.I_TAIL * S.BOOST * SR95_SCALE / C_INT_PHASE / 1e6:.2f} "
@@ -186,15 +205,15 @@ def main():
         os.remove(csv)   # WO rule: no raw csv
     inl = r.get("inl_ep_ppm", float("nan"))
     healthy = not r["problems"] and math.isfinite(inl)
-    ok = healthy and inl <= GATE
-    row = dict(TB.strip(r), corner=corner, copy=a.copy, opt=a.opt, n=a.n, m=a.m, part=a.part, gate_ppm=GATE,
-               share_gate_ppm=GATE_SHARE, inl_ep_ppm=inl, pass_gate=ok, pass_share=healthy and inl <= GATE_SHARE)
+    ok = healthy and inl <= gate
+    row = dict(TB.strip(r), corner=corner, copy=a.copy, opt=a.opt, n=a.n, m=a.m, part=a.part, mode=a.mode, gate_ppm=gate,
+               share_gate_ppm=gate / 1.5, inl_ep_ppm=inl, pass_gate=ok, pass_share=healthy and inl <= gate / 1.5)
     row.pop("meta", None)
     json.dump(row, open(os.path.join(a.out, tag + ".json"), "w"), indent=0, default=str)
-    print(f"{tag} {corner}: INL ep {inl:.3f} ppm (gate {GATE}, share {GATE_SHARE:.2f}) runtime {r.get('runtime_s', 0):.0f}s "
+    print(f"{tag} {corner}: INL ep {inl:.3f} ppm (gate {gate}, share {gate / 1.5:.2f}) runtime {r.get('runtime_s', 0):.0f}s "
           f"problems {r['problems'][:4]}")
-    if a.copy in SCALES:
-        if healthy and inl > GATE:
+    if a.copy != "nom":
+        if healthy and inl > gate:
             print("broken copy REJECTED (good)")
             sys.exit(0)
         if healthy:
