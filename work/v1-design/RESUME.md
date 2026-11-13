@@ -845,3 +845,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - Smoke: single equilibrium; sf/27 initial-state test OK.
   - The 1 µs ramp misses ±1 % at +10 µs (26–40 µs).
   - Pool in WO-55-2662364. User decision on the 10 µs gate.
+- D78 (user): C4 logic isolation; Sg re-split with the C1 share; C6 ~40 µs settle covered by the C9 hold (row → settled before rstb release; single bias_ok rise).
