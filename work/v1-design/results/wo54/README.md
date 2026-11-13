@@ -29,4 +29,11 @@ Design note: `design/c4_sw/DESIGN.md` rev b.
 
 ## Pickup
 
-See the report from the WO-54 agent for the exact pool command and directory.
+- Full gate pool (89 jobs) launched 2026-11-13 10:39 IST from the frozen copy `/home/mempool/regr/tt/WO-54-e6022d3`
+  (scripts in `c4_sw/`, outputs in `run/`, pool log `run/pool/`, `.spiceinit` single-thread in `run/`).
+- Smoke pool `/home/mempool/regr/tt/WO-54-smoke2` (tim tt 4 MHz, rampa tt, settle ss/−40, injdm tt, rampa nodet)
+  launched 10:38 with the clkiso fix; check it first, it validates the metrics.
+- When `run/pool/POOL_DONE` exists:
+  `ssh sandbox '. /home/mempool/tt-sd/.venv-sbx/bin/activate; cd /home/mempool/regr/tt/WO-54-e6022d3/run; python ../c4_sw/c4_tb.py report .'`
+  (exit 2 = missing / errored job or a broken copy that does not REJECT), then pull `summary.md` into this folder.
+- If the smoke shows a metric bug: fix `c4_tb.py`, commit, new frozen copy, rerun (raw csv is deleted per job).
