@@ -846,3 +846,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - The 1 µs ramp misses ±1 % at +10 µs (26–40 µs).
   - Pool in WO-55-2662364. User decision on the 10 µs gate.
 - D78 (user): C4 logic isolation; Sg re-split with the C1 share; C6 ~40 µs settle covered by the C9 hold (row → settled before rstb release; single bias_ok rise).
+- WO-57 done (346995c): acc2 24 b, CL-32, 929 cells / 223 FF. WO-58A (re-verify) + WO-58B (PnR) dispatched as fresh agents. Note: the IIC container cannot mount /home/mempool/regr.
