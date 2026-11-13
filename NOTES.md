@@ -44,7 +44,7 @@ Survey date: 2026-11-07. Source: https://index.tinytapeout.com (29 shuttles, ~4,
 ## 2. Making specs better: the levers
 - SQNR (ideal, L = loop order, N = quantizer bits, OSR = oversampling ratio): `SQNR ≈ 6.02N + 1.76 − 10log10(π^(2L)/(2L+1)) + (2L+1)·10log10(OSR)`
   - Each OSR doubling gains 3(2L+1) dB: 1st order +9 dB (1.5 bit), **2nd order +15 dB (2.5 bit)**, 3rd order +21 dB.
-  - Example: 2nd order, 1-bit, OSR 128 → ~85 dB SQNR → in practice limited by thermal noise, kT/C, and op-amp gain.
+  - Example: 2nd order, 1-bit, OSR 128 → ≈100 dB ideal SQNR (lower in practice) → limited by thermal noise, kT/C, and op-amp gain.
 - In practice on sky130, the limits are kT/C (larger Cs → more area; tile is only ~334x225 µm for 2x2), OTA gain and swing, comparator metastability, clock jitter (critical for CT designs), and the pad/analog-switch path (<500 Ω, <5 pF, through tt_asw_3v3).
 - A 2nd-order **CIFF or CIFB SC** modulator is the classic, robust next step (Boser-Wooley / Schreier toolbox). Tools: python-deltasigma (port of Schreier's DSToolbox) for NTF synthesis, then a behavioral sim, then xschem/ngspice.
 - On-chip CIC (sinc³ for 2nd order: CIC order ≥ L+1) is cheap in digital tiles and makes the ADC complete.

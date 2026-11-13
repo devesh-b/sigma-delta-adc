@@ -116,7 +116,7 @@ All repos are Apache-2.0 shallow clones (`--depth 1`).
 - **Referral of slow errors:**
   - **Offset and 1/f refer to the input with gain ≈ 1** in a bottom-plate SC integrator.
   - The wideband noise gain (1 + Cf/Cs + Cp/Cs ≈ 5.3) applies only to white noise. *I got this wrong at first; see §8.*
-- **Effective resolution** = log2(FSR/rms) with FSR = 4.096 V. For reference: 1.5 µV ≈ 19.6 b, 5 µV ≈ 17.9 b, 50 µV ≈ 14.5 b.
+- **Effective resolution** = log2(FSR/(√12·v_rms)) = (SNR − 1.76)/6.02 with FSR = 4.096 V. For reference: 1.5 µV ≈ 19.6 b, 5 µV ≈ 17.9 b, 50 µV ≈ 14.5 b.
 
 ### Linearity and gain
 - **Constant finite OTA gain** gives **gain error ≈ 1/A0**, which can be calibrated out. It does not give INL.

@@ -64,7 +64,7 @@ Notes.
   CL-2 does for Cs2, with no CM bus.
 - The comparator strobe φC (C3) and the CMFB `ph1/ph2` come from the same generator.
 - **Order 1 (D74):** the comparator always reads x2; there is no input mux. Integrator 2 runs as a follower: Cint2 is
-  reset every cycle and Cs2 transfers x1 in φI, so x2 = k·x1 each cycle; the Ck2 DAC (#10/#11) is held in its rest
+  reset every cycle and Cs2 transfers x1 in φI, so x2 = (Cs2/Cint2)·x1 = c2·x1 each cycle; the Ck2 DAC (#10/#11) is held in its rest
   state (`order` = 0). Timing constraint: the per-cycle reset must not overlap the strobe, because x2 must stay held
   from the end of φI until the comparator has decided. So rst2_o1 is placed late in φS (after strobe + decision
   time, ≥ 40 ns at 4 MHz) and ends before the S→I gap; at 4 MHz that leaves ≈ 70 ns of reset, against the reset
@@ -248,7 +248,7 @@ Spot limits used in `spot.py` (proposals for the C4b gate; the reviewer may tigh
 10. Comparator strobe placement (D74): φC rises inside φS, after φIl is off (x2 final) and with ≥ t_half − t_dec margin
     to the next fs_tick, at every corner and fs. Copy: **strobe on the wrong phase** (φC from φIe, i.e. during x2
     integration) ⇒ REJECT.
-11. Order-1 follower (D74): rst2_o1 never overlaps φC + decision time; x2 = k·x1 per cycle within settling. Copy:
+11. Order-1 follower (D74): rst2_o1 never overlaps φC + decision time; x2 = (Cs2/Cint2)·x1 = c2·x1 per cycle within settling. Copy:
     rst2_o1 placed in early φS (overlapping the strobe) ⇒ REJECT.
 
 ## 9. Spot-sim results
