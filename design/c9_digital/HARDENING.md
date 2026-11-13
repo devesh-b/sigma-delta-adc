@@ -4,6 +4,9 @@ Status: **plan + synthesis/floorplan probe only. No PnR, no GDS.**
 **WO-58B update (2026-11-13):** first full PnR launched from flow 3e1e9ea (config: PDN_MULTILAYER, 190 x 150 um, ss_100C_1v40
 corner added, timing checks on all corners; SDC/pin order cleaned of non-macro ports). Results and state:
 `work/v1-design/results/wo58b/README.md`. Section 4 config notes below are superseded by `flow/config.json`.
+**WO-66 update (2026-11-13):** retimed RTL (WO-60B, uncommitted) + flow e450ae2: setup met at all 12 corners (ss_100C_1v40 +2.58 ns,
+Fmax 54.8 MHz), hold met, tt reg-to-reg 6.66 ns < P/2. DRC/LVS/antenna/XOR clean. DRV still open: 46 fanout, 256 slew (ss_1v40),
+3 max-cap (ss_1v60). Results, netlist/SDF paths: `work/v1-design/results/wo66/README.md`.
 Probe evidence: `work/v1-design/results/wo47/README.md`
 (run `/home/mempool/regr/tt/WO-47-7742be2/c9_digital/flow/runs/probe`, LibreLane v3.1.0.dev3 in IIC-OSIC-TOOLS 2026.10,
 TT-pinned sky130A open_pdks d56f8a8e). Measured / inferred / assumed are marked M / I / A.
