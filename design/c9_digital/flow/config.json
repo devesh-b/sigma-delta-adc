@@ -46,6 +46,9 @@
   "// WO-71": "CTS_SINK_CLUSTERING_SIZE set to 8 (LibreLane 3.1.0.dev3 steps/openroad.py:2495, Optional[int], no default; passed as clock_tree_synthesis -sink_clustering_size by scripts/openroad/cts.tcl:67). Unset, TritonCTS searched and chose size 10 / diameter 50 (WO-69 35-openroad-cts log, CTS-0206), but 10 clkbuf_leaf drivers still ended at 12-13 sinks against set_max_fanout 10 (cluster overflow plus 11 dummy loads, CTS-0207). 8 leaves margin for both; explicit 10 would repeat the auto choice.",
   "CTS_SINK_CLUSTERING_SIZE": 8,
 
+  "// WO-72": "RUN_POST_GRT_DESIGN_REPAIR set to true (LibreLane 3.1.0.dev3 flows/classic.py:139, bool, default False, marked experimental; gates OpenROAD.RepairDesignPostGRT via classic.py:271). The step (steps/openroad.py:2687, scripts/openroad/repair_design_postgrt.tcl) re-runs GRT, estimate_parasitics -global_routing, then repair_design with routed-load estimates, then DPL + GRT. WO-71 left 43/11 max-slew pins at ss_1v40 (worst 1.72 ns vs 1.5 ns) on buf_1 fanout-buffer nets sized by post-GPL repair against placement-only parasitics. Related vars kept at defaults: GRT_DESIGN_REPAIR_RUN_GRT true, GRT_DESIGN_REPAIR_MAX_WIRE_LENGTH 0, GRT_DESIGN_REPAIR_MAX_SLEW_PCT 10, GRT_DESIGN_REPAIR_MAX_CAP_PCT 10 (openroad.py:2697-2724).",
+  "RUN_POST_GRT_DESIGN_REPAIR": true,
+
   "RUN_LINTER": true,
 
   "// WO-60A": "D79: EXTRA_EXCLUDED_CELLS (LibreLane 3.1.0.dev3 config/flow.py; old names RSZ_DONT_USE_CELLS/DONT_USE_CELLS) is added to PNR_EXCLUDED_CELL_FILE and applied via set_dont_use in every OpenROAD step (scripts/openroad/common/io.tcl) and to synthesis. In WO-58B pnr1 the resizer used 65 clkdlybuf4s25_1 as fanout buffers (~5 ns of the ss_100C_1v40 critical path). Clock-delay and metal-delay cells are banned; dlygate4sd* stays allowed (only used as hold buffers, 179x in pnr1). Synthesis already excludes these via no_synth.cells, so the synth netlist should not change.",
