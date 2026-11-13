@@ -37,7 +37,9 @@ def devices(sizes=SIZES, mut=""):
     # "revc" = WO-51 netlist (cascode, 1.8 V tail, no ap/an precharge), "nocas" = rev b; both info copies.
     tail = NF if ("nocas" in mut or "revc" in mut) else HVN
     tsz = s["TAIL"] if tail == HVN else s["TAIL18"]
-    if "nocas" in mut:
+    # WO-65 (T5 broken copies on rev d): "nohvc" = rev d with the HV cascode K1/K2 and the ap/an precharge removed,
+    # pair drains straight on dp/dn (HV tail kept); "nopa" = rev d with only the ap/an precharge P1/P2 removed.
+    if "nocas" in mut or "nohvc" in mut:
         D = [("T", tail, "tl", "clk", "vss", "vss", tsz),
              ("M1", pair, "dp", "inp", "tl", "vss", s["IN"]),
              ("M2", pair, "dn", "inn", "tl", "vss", s["IN"])]
@@ -47,7 +49,7 @@ def devices(sizes=SIZES, mut=""):
              ("M2", pair, "an", "inn", "tl", "vss", s["IN"]),
              ("K1", HVN, "dp", "vdd", "ap", "vss", s["CAS"]),
              ("K2", HVN, "dn", "vdd", "an", "vss", s["CAS"])]
-        if "revc" not in mut:
+        if "revc" not in mut and "nopa" not in mut:
             D += [("P1", HVP, "ap", "clk", "vdd", "vdd", s["PA"]),
                   ("P2", HVP, "an", "clk", "vdd", "vdd", s["PA"])]
     D += [

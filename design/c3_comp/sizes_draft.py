@@ -51,7 +51,9 @@ TDEC_SPOT_SS40 = 1.120e-9          # WO-44 spot t_dec at 1 mV, ss/-40/1.62 V (T2
 #   in18   : input pair as nfet_01v8                                -> T8 device stress REJECT
 #   nocas  : no HV cascode (rev b)                                    -> T8 info: shows the fix
 #   revc   : WO-51 netlist (cascode, 1.8 V tail, ap/an not precharged) -> info: T7/T2 memory and T8 tail (diagnosis)
-MUTS = ("starve", "qswap", "nobuf", "nolatch", "in18", "nocas", "revc")
+#   nohvc  : rev d without HV cascode + ap/an precharge (pair drains on dp/dn) -> T5 kickback REJECT (WO-65)
+#   nopa   : rev d without the ap/an precharge P1/P2                -> T5 info (WO-65)
+MUTS = ("starve", "qswap", "nobuf", "nolatch", "in18", "nocas", "revc", "nohvc", "nopa")
 
 
 def comp_subckt(mut=""):

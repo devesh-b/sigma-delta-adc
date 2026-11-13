@@ -13,8 +13,12 @@ Deck families (each row ACCEPT/REJECT; every row has a broken copy that must REJ
          nolatch (T10nz), nobuf (T7).
   one  : single fire from reset at constant x2 (WO-44 spot conditions). Rows T5 kickback (diff peak / recovery at
          both edges, CM reported), T2band (ss/-40/1.62, 4 MHz: t_dec(1 mV) within [0.5, 3] x the WO-44 spot value).
-         Variant asym (+-10 % R/C per side). Broken: starve (T2band), cl10 (T5).
-  st   : T8 device stress, both power-up orders, x2 0..3.6 V and -0.5 V. Broken: in18 (input pair 1.8 V).
+         Variant asym (+-10 % R/C per side). Broken: starve (T2band), nohvc (T5, WO-65: HV cascode and ap/an
+         precharge removed, pair drains on dp/dn). Info: nopa (ap/an precharge removed), cl10 (C_x2 / 10; blind on
+         rev d, WO-56).
+  st   : T8 device stress, both power-up orders, x2 0..3.6 V and -0.5 V (D80 split: 1.8 V oxide pairs + Vds vs
+         1.98 V, 1.8 V junctions Vsb/Vdb vs VJ18_MAX, HV every pair vs 5.5 V). Broken: in18 (input pair 1.8 V,
+         oxide); chk_jn20 (checker copy: same deck as st_tt27_a judged at a 2.0 V junction limit, must REJECT).
   mc   : T3 offset MC at the D74 basis (tt_mm / ss_mm + injected HV-pair dVT 7.6 mV*um so the HV pair totals 12),
          25 instances per deck, bisection inside ngspice. Broken: pair mismatch x3 (A_VT 36 total).
 Numerical rules: gear, reltol 1e-5, tmax 1 ps on every decision deck (stress: 5 ps), 10 ohm on ideal sources,
@@ -39,7 +43,14 @@ RX2 = {4e6: 20e3, 2e6: 46e3}      # OTA2 closed-loop output resistance (DESIGN.m
 C_X2 = 0.7e-12
 OS_MAX = 60e-3                    # SPEC row 105 after D75 (WO-51): |mu| + 3 sigma <= 60 mV, loop-derived (DESIGN.md 3.1b)
 KICK_MAX, KICK_REC = 5e-3, 0.5e-3 # SPEC row 108
-V18_MAX, VHV_MAX = 1.98, 5.5      # D40 / HV gate oxide (never loosened)
+V18_MAX, VHV_MAX = 1.98, 5.5      # D40 / HV gate oxide (never loosened); V18_MAX: 1.8 V Vgs, Vgd, Vgb, Vds (D80)
+# D80 (WO-65): 1.8 V device junctions (Vsb, Vdb) are judged against the PDK junction rating, not 1.98 V.
+# The nfet_01v8 S/D junction is the N+/P-well diode sky130_fd_pr__diode_pw2nd_05v5, the pfet_01v8 one the P+/N-well
+# diode sky130_fd_pr__diode_pd2nw_05v5: rated 5.5 V by the PDK device-name suffix (_05v5), model breakdown
+# bv = 11.7 V / 12.69 V (libs.ref/sky130_fd_pr/spice/*diode_pw2nd_05v5.model.spice, *pd2nw_05v5*, line 38), and the
+# BSIM4 cards of nfet_01v8 carry bvs = 11.7 V (sky130_fd_pr__nfet_01v8__tt*.pm3.spice). Limit = 5.5 V rating - 10 %.
+VJ18_MAX = 4.95
+JN_PAIRS = ("sb", "db")
 SR_X2 = 27e6                      # V/s, OTA2 boost slew (SPEC OTA2 row), applied per side (conservative: diff SR)
 # T5 asymmetry (WO-51 item 3): gate = per-side R +-5 % (OTA2 closed-loop gm mismatch), C +-1 % (MIM + routing);
 # the +-10 % R/C of WO-48 stays as an info copy.
@@ -209,7 +220,7 @@ def _slew_follow(events, tstop, fs, locked, dt=1e-9):
     return keep
 
 
-def st_deck(corner, temp, order, mut="", stim="slew"):
+def st_deck(corner, temp, order, mut="", stim="slew", jlim=VJ18_MAX):
     """stim: 'slew' (gate) x2 at the OTA2 slew rate through R_X2/C_X2, moving only in phiI, strobe on the 4 MHz
     phase plan (phiS); 'async' (info) same slew but x2 also moves while the strobe is high; 'fast' (info) the WO-48
     stimulus (4.1 V in 20 ns through 10 ohm, free-running 100 ns strobe)."""
@@ -266,7 +277,8 @@ def st_deck(corner, temp, order, mut="", stim="slew"):
             names.append(v)
     L += ["meas tran tempr find v(tmp) at=1n", "let tend = vecmax(time)"]
     L += _echo(names + ["tempr", "tend"]) + [".endc", ".end"]
-    meta = dict(fam="st", corner=corner, temp=temp, vdd=vd, order=order, mut=mut, stim=stim, devs=devs, tstop=tstop)
+    meta = dict(fam="st", corner=corner, temp=temp, vdd=vd, order=order, mut=mut, stim=stim, devs=devs, tstop=tstop,
+                jlim=jlim)
     return "\n".join(L) + "\n", meta
 
 
@@ -374,11 +386,14 @@ def deck_list():
     D["one_ss40_asym"] = (one_deck, (*SS40, 1.5, 4e6), {"asym": "real"}, {"T5": "pass"})
     D["one_ss40_asym10"] = (one_deck, (*SS40, 1.5, 4e6), {"asym": "x10"}, {"T5": "info"})
     D["one_brk_starve"] = (one_deck, (*SS40, 1.5, 4e6), {"mut": "starve"}, {"T2band": "reject"})
-    D["one_brk_cl10"] = (one_deck, (*SS40, 1.5, 4e6), {"mut": "cl10"}, {"T5": "reject"})
+    D["one_info_cl10"] = (one_deck, (*SS40, 1.5, 4e6), {"mut": "cl10"}, {"T5": "info"})   # blind on rev d (WO-56)
+    D["one_brk_nohvc"] = (one_deck, (*SS40, 1.5, 4e6), {"mut": "nohvc"}, {"T5": "reject"})  # WO-65 item 2
+    D["one_info_nopa"] = (one_deck, (*SS40, 1.5, 4e6), {"mut": "nopa"}, {"T5": "info"})
     for o in ("a", "b"):                                   # st: T8 (gate: OTA2 slew, phase plan)
         D[f"st_tt27_{o}"] = (st_deck, ("tt", 27, o), {}, {"T8": "pass"})
         D[f"st_ff-40_{o}"] = (st_deck, ("ff", -40, o), {}, {"T8": "pass"})
     D["st_brk_in18"] = (st_deck, ("tt", 27, "a"), {"mut": "in18"}, {"T8": "reject"})
+    D["st_chk_jn20"] = (st_deck, ("tt", 27, "a"), {"jlim": 2.0}, {"T8": "reject"})   # D80 junction limb is live
     D["st_nocas_tt27_a"] = (st_deck, ("tt", 27, "a"), {"mut": "nocas"}, {"T8": "info"})   # rev b, gate stimulus
     D["st_revc_tt27_a"] = (st_deck, ("tt", 27, "a"), {"mut": "revc"}, {"T8": "info"})     # rev c (WO-51)
     for c, t, v in (SS40, ("tt", 27, 1.80)):              # rev c function, with the ap/an probe (WO-56 diagnosis)
@@ -505,20 +520,26 @@ def eval_one(r, m):
 
 
 def eval_st(r, m):
-    worst = {"18": (0.0, ""), "hv": (0.0, "")}
+    # D80: "18" = 1.8 V oxide pairs (gs, dg, gb) + ds vs V18_MAX; "jn" = 1.8 V junctions (sb, db) vs jlim;
+    # "hv" = every pair of the HV devices vs VHV_MAX (unchanged)
+    worst = {"18": (0.0, ""), "jn": (0.0, ""), "hv": (0.0, "")}
     miss = 0
     for n, model in m["devs"].items():
-        cls = "hv" if "g5v0" in model else "18"
         for k, v in r.items():
             if k.startswith(f"st_{n.lower()}_"):
+                cls = "hv" if "g5v0" in model else ("jn" if k.rsplit("_", 1)[1] in JN_PAIRS else "18")
                 if v is None:
                     miss += 1
                 elif v > worst[cls][0]:
                     worst[cls] = (v, k)
+    jlim = m.get("jlim", VJ18_MAX)
     n_exp = sum(1 for x in open(m["deck"]) if x.startswith("let st_")) if "deck" in m else None
     n_got = sum(1 for k in r if k.startswith("st_") and r[k] is not None)
-    ok = miss == 0 and n_got == n_exp and n_got > 0 and worst["18"][0] <= V18_MAX and worst["hv"][0] <= VHV_MAX
-    return {"T8": [ok, [f"n={n_got}/{n_exp}"]]}, dict(max18=worst["18"], maxhv=worst["hv"])
+    lim = {"18": V18_MAX, "jn": jlim, "hv": VHV_MAX}
+    over = [c for c in lim if worst[c][0] > lim[c]]
+    ok = miss == 0 and n_got == n_exp and n_got > 0 and not over
+    return {"T8": [ok, [f"n={n_got}/{n_exp}"] + [f"over:{c}" for c in over]]}, dict(
+        max18ox=worst["18"], max18jn=worst["jn"], jlim=jlim, maxhv=worst["hv"])
 
 
 def collect(out):
