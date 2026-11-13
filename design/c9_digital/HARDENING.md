@@ -107,3 +107,9 @@ macro (uio_oe = 0xFF via tie cells); `ena`, `uio_in` unused.
 2. Corners: accept ss_100C_1v40 as the 125 C proxy and 125 C / 1.98 V as unmodelled.
 3. Macro cell name: rename the RTL wrapper (prefixed, not the top_module) before PnR.
 4. Approve the next run: full LibreLane PnR of the macro at 190 x 150 um (one run, sandbox).
+
+## WO-67 (2026-11-13): buf_1 ban tried, rejected
+- Banning sky130_fd_sc_hd__buf_1 made repair_design use dlygate4sd3_1 (delay cell) for all 70 fanout buffers: ss_1v40 setup
+  +2.58 -> +0.17 ns, slew 256 -> 108, cap 3 -> 0, fanout 46 -> 51. Do not ban buf_1 without a buffer-list control.
+- 36 of 46 fanout violations are heuristic antenna diodes on sinks (GRT antenna check had 0 violations before insertion).
+  Details: work/v1-design/results/wo67/README.md.
