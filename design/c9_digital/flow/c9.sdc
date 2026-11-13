@@ -15,12 +15,11 @@ set_input_delay -clock clk -max [expr 0.30 * $clk_period] $tt_in
 set_input_delay -clock clk -min 0.0 $tt_in
 set_input_transition 0.5 $tt_in
 
-# Unused TT inputs (ena, uio_in) have no load inside the macro; constrain them so they are not reported as
-# unconstrained, they time nothing.
-set_input_delay -clock clk 0.0 [get_ports {ena uio_in[*]}]
+# ena, uio_in and uio_oe are not macro ports (the tt_um wrapper ties uio_oe and drops ena/uio_in), so they are
+# not constrained here (WO-58B: the earlier lines matched nothing, STA-0366).
 
-# Comparator output (from C3 via C4). Captured with the s_tick enable on the clk edge that makes the bit clock
-# fall (CL-23). The comparator is triggered by that same edge through C4, so comp_in changes AFTER the capture
+# Comparator output (from C3 via C4). Captured straight into the DAC flop with the fs_tick enable (D74; was
+# s_tick / CL-23). The comparator is triggered by that same edge through C4, so comp_in changes AFTER the capture
 # edge (min delay = clk -> fs_clk flop -> C4 phase gen -> comparator latch, several ns) and is stable for the
 # rest of the fs period. Max delay is a full fs period minus margin; we budget it as one clk period (tightest
 # reading, so the macro does not depend on the enable for setup). Min = 1.0 ns is the hold-side assumption that
@@ -30,7 +29,7 @@ set_input_delay -clock clk -min 1.0 [get_ports comp_in]
 set_input_transition 0.3 [get_ports comp_in]
 
 # TT outputs: registered read bus (CL-21) and debug bus. Board budget 30 % of the period.
-set tt_out [get_ports {uo_out[*] uio_out[*] uio_oe[*]}]
+set tt_out [get_ports {uo_out[*] uio_out[*]}]
 set_output_delay -clock clk -max [expr 0.30 * $clk_period] $tt_out
 set_output_delay -clock clk -min 0.0 $tt_out
 set_load 0.05 $tt_out
