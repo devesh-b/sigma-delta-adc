@@ -12,12 +12,15 @@ Set A' (D74): set A input pair (5/0.5 x4 per side, CM kick ~45 mV as spotted) + 
 
 PRE = "sky130_fd_pr__"
 HVN, NF, PF = PRE + "nfet_g5v0d10v5", PRE + "nfet_01v8", PRE + "pfet_01v8"
+HVP = PRE + "pfet_g5v0d10v5"
 
 # W, L in um; m = parallel instances. HV devices use 5 um unit fingers (width bins, as ttsky-sigma-delta).
 SIZES = dict(
     IN=dict(W=5.0, L=0.5, m=4),    # HV input pair, per side: 10 um^2 (offset, DESIGN.md 3.1)
     CAS=dict(W=5.0, L=0.5, m=4),   # HV cascode per side, gate = vdd (WO-51, T8 fix; same unit as the pair)
-    TAIL=dict(W=4.0, L=0.5, m=2),  # 1.8 V clocked tail (D74), gate = strobe
+    TAIL=dict(W=5.0, L=0.5, m=4),  # HV clocked tail (WO-56 rev d), gate = strobe; W/L 40 vs 16 of the 1.8 V tail
+    TAIL18=dict(W=4.0, L=0.5, m=2),  # 1.8 V tail of rev b/c (D74), info copies nocas / revc only
+    PA=dict(W=2.0, L=0.5, m=1),    # HV PMOS precharge of the cascode nodes ap/an, gate = strobe (WO-56 rev d)
     LN=dict(W=4.0, L=0.5, m=1),    # 1.8 V cross-coupled NMOS (sources on dp/dn), set B
     LP=dict(W=4.0, L=0.5, m=1),    # 1.8 V cross-coupled PMOS, set B
     RS=dict(W=1.0, L=0.15, m=1),   # 1.8 V PMOS precharge, 4x (op, on, dp, dn)
@@ -47,7 +50,8 @@ TDEC_SPOT_SS40 = 1.120e-9          # WO-44 spot t_dec at 1 mV, ss/-40/1.62 V (T2
 #   nolatch: SR latch removed, q/qb = buffered on/op (transparent)   -> T10 near-zero / capture REJECT
 #   in18   : input pair as nfet_01v8                                -> T8 device stress REJECT
 #   nocas  : no HV cascode (rev b)                                    -> T8 info: shows the fix
-MUTS = ("starve", "qswap", "nobuf", "nolatch", "in18", "nocas")
+#   revc   : WO-51 netlist (cascode, 1.8 V tail, ap/an not precharged) -> info: T7/T2 memory and T8 tail (diagnosis)
+MUTS = ("starve", "qswap", "nobuf", "nolatch", "in18", "nocas", "revc")
 
 
 def comp_subckt(mut=""):

@@ -16,7 +16,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from sizes_draft import SIZES, HVN, NF, PF  # noqa: E402
+from sizes_draft import SIZES, HVN, HVP, NF, PF  # noqa: E402
 
 PORTS = ("inp", "inn", "clk", "q", "qb", "vdd", "vss")
 
@@ -24,22 +24,32 @@ PORTS = ("inp", "inn", "clk", "q", "qb", "vdd", "vss")
 def devices(sizes=SIZES, mut=""):
     """Device list: (name, model, d, g, s, b, params) with subckt-local node names."""
     s = {k: dict(v) for k, v in sizes.items()}
-    if "starve" in mut:
-        s["TAIL"] = dict(W=1.0, L=4.0, m=1)
+    if "starve" in mut:   # 64x less W/L than the HV tail
+        s["TAIL"] = dict(W=1.25, L=2.0, m=1)
     pair = NF if "in18" in mut else HVN
     # WO-51 (T8): HV cascode (gate = vdd) between each pair drain (ap/an) and dp/dn. When x2 moves while the strobe
     # is high and the pair device is off, its Cgd kick lands on ap/an (HV), not on the floating 1.8 V node dp/dn
     # (WO-48/51: dp reached 2.35-2.44 V, clamped only by the precharge PMOS drain-body diode). "nocas" = rev b.
+    # WO-56 (rev d): (1) ap/an precharged to vdd by HV PMOS (gate = clk). In rev c they were only charged through the
+    # cascode to vdd - VT,HV, slowly in subthreshold, so after a big decision ap/an started the next strobe unequal:
+    # memory (T7/T2 failed every cycle after a +-0.3 V one). (2) Tail is HV: tl is the common source of the pair and
+    # floats up with ap/an (rev c: tail Vds 2.38-2.55 V); with an HV tail tl touches only HV devices.
+    # "revc" = WO-51 netlist (cascode, 1.8 V tail, no ap/an precharge), "nocas" = rev b; both info copies.
+    tail = NF if ("nocas" in mut or "revc" in mut) else HVN
+    tsz = s["TAIL"] if tail == HVN else s["TAIL18"]
     if "nocas" in mut:
-        D = [("T", NF, "tl", "clk", "vss", "vss", s["TAIL"]),
+        D = [("T", tail, "tl", "clk", "vss", "vss", tsz),
              ("M1", pair, "dp", "inp", "tl", "vss", s["IN"]),
              ("M2", pair, "dn", "inn", "tl", "vss", s["IN"])]
     else:
-        D = [("T", NF, "tl", "clk", "vss", "vss", s["TAIL"]),
+        D = [("T", tail, "tl", "clk", "vss", "vss", tsz),
              ("M1", pair, "ap", "inp", "tl", "vss", s["IN"]),
              ("M2", pair, "an", "inn", "tl", "vss", s["IN"]),
              ("K1", HVN, "dp", "vdd", "ap", "vss", s["CAS"]),
              ("K2", HVN, "dn", "vdd", "an", "vss", s["CAS"])]
+        if "revc" not in mut:
+            D += [("P1", HVP, "ap", "clk", "vdd", "vdd", s["PA"]),
+                  ("P2", HVP, "an", "clk", "vdd", "vdd", s["PA"])]
     D += [
          ("M3", NF, "op", "on", "dp", "vss", s["LN"]),
          ("M4", NF, "on", "op", "dn", "vss", s["LN"]),

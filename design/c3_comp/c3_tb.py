@@ -126,9 +126,14 @@ def cyc_deck(corner, temp, vdd, vcm, fs, mut=""):
         f"VXN sxn 0 {_pwl([(t, vcm - d / 2) for t, d in pts])}", f"RXN sxn x2n {R}", f"CXN x2n 0 {C_X2}",
         "XC x2p x2n clk q qb vdd 0 c3_comp", f"CQ q 0 {C_Q_LOAD}", f"CQB qb 0 {C_Q_LOAD}",
         "Bqm qm 0 V=min(v(q),v(qb))", "Btmp tmp 0 V=temper"] + _ic("xc", vdd, mut) + [
-        ".save v(q) v(qb) v(qm) v(vdd) v(tmp) v(clk) vdds#branch", ".control", f"tran 5p {_f(tstop)} 0 1p"]
+        ".save v(q) v(qb) v(qm) v(vdd) v(tmp) v(clk) vdds#branch v(xc.ap) v(xc.an) v(xc.tl)", ".control",
+        f"tran 5p {_f(tstop)} 0 1p"]
     names = []
     for n, (d, kind) in enumerate(SEQ):
+        # WO-56 probe (info): cascode nodes 0.2 ns before each fire (memory diagnosis)
+        L += [f"meas tran pap{n} find v(xc.ap) at={_f(fires[n] - 0.2e-9)}",
+              f"meas tran pan{n} find v(xc.an) at={_f(fires[n] - 0.2e-9)}"]
+        names += [f"pap{n}", f"pan{n}"]
         cap = T0 + (n + 1) * T
         w0, w1 = cap - T_SU - 1e-9, cap + T_H + 1e-9
         g0, g1 = fnom[n] + tdmax, min(fnom[n + 1] if n + 1 < N else tstop, tstop)
@@ -375,6 +380,10 @@ def deck_list():
         D[f"st_ff-40_{o}"] = (st_deck, ("ff", -40, o), {}, {"T8": "pass"})
     D["st_brk_in18"] = (st_deck, ("tt", 27, "a"), {"mut": "in18"}, {"T8": "reject"})
     D["st_nocas_tt27_a"] = (st_deck, ("tt", 27, "a"), {"mut": "nocas"}, {"T8": "info"})   # rev b, gate stimulus
+    D["st_revc_tt27_a"] = (st_deck, ("tt", 27, "a"), {"mut": "revc"}, {"T8": "info"})     # rev c (WO-51)
+    for c, t, v in (SS40, ("tt", 27, 1.80)):              # rev c function, with the ap/an probe (WO-56 diagnosis)
+        D[f"cyc_info_revc_{nm(c, t, v)}"] = (cyc_deck, (c, t, v, 1.5, 4e6), {"mut": "revc"},
+                                             {"T2": "info", "T7": "info"})
     for c, t, o in (("tt", 27, "a"), ("ff", -40, "b")):    # info copies
         D[f"st_fast_{c}{t}_{o}"] = (st_deck, (c, t, o), {"stim": "fast"}, {"T8": "info"})
         D[f"st_async_{c}{t}_{o}"] = (st_deck, (c, t, o), {"stim": "async"}, {"T8": "info"})
@@ -473,8 +482,11 @@ def eval_cyc(r, m):
         td = None if tq is None else tq - m["fires"][n]
         tds.append(td)
         upd("T2", td is not None and 0 < td < tdmax, n, f"tdec={td}")
+    pa = [(r.get(f"pap{n}"), r.get(f"pan{n}")) for n in range(len(SEQ))]
     info = dict(tdec_ns=[None if t is None else round(t * 1e9, 3) for t in tds],
-                i_uA=None if r.get("qdd") is None else abs(r["qdd"]) / m["tstop"] * 1e6)
+                i_uA=None if r.get("qdd") is None else abs(r["qdd"]) / m["tstop"] * 1e6,
+                ap_an_pre_fire_mV=[None if None in x else round((x[0] - x[1]) * 1e3, 2) for x in pa],
+                ap_pre_fire_V=[None if x[0] is None else round(x[0], 3) for x in pa])
     return rows, info
 
 
