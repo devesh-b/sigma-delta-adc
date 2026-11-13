@@ -849,3 +849,30 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - WO-57 done (346995c): acc2 24 b, CL-32, 929 cells / 223 FF. WO-58A (re-verify) + WO-58B (PnR) dispatched as fresh agents. Note: the IIC container cannot mount /home/mempool/regr.
 - WO-58B partial (a166371, 3e1e9ea, 88911ba): first full PnR running in WO-58B/3e1e9ea (pnr1.log ends with EXIT=; metrics via ext.sh). So far: synth 860 cells / 11,790 µm² / 223 FF; floorplan util 0.515; post-CTS tt setup +8.76 ns, hold +0.27 ns. Rule slip: pkill -f over ssh killed its own session (no harm to others).
 - WO-58B done (147c6c3): PnR clean on DRC/LVS/antenna/hold; setup −1.60 ns at the ss_100C_1v40 stand-in, 54 fanout violations (clkdlybuf used as fanout buffers). D79 (user): ban clkdlybuf + register fs_tick early, one change per run. WO-60A (flow) dispatched; WO-60B (RTL) after WO-58A.
+- WO-52 reruns done: gate B fs/125 3.14 ppm (up from 2.17 with L 8, under the 3.33 share) and ss/−40 0.71 ppm ACCEPT; tb9 at 4 corners + mut ACCEPT; tb7 ran but the summary crashes (KeyError en_white_nV); op/AC 9 jobs failed on a relative-path bug. → WO-61 (fresh agent). Resumed rate-limited WO-59, WO-60A, WO-58A.
+- WO-60A done (e450ae2; README staged, commit blocked on signing): EXTRA_EXCLUDED_CELLS = clkdlybuf4s* + dlymetal6s*. Setup at ss_1v40 −1.60 → −1.18 ns (Fmax 45.4 MHz), still failing; tt period/2 still failing; slew violations up (336 at ss_1v40, 22 at ss_1v60); fanout 54. Physical clean. Kept as the baseline. WO-60B RTL (fs_tick one clk early) dispatched now, in parallel with the WO-58A pool (separate frozen copy).
+- WO-60B RTL done (uncommitted, git lock/signing; frozen at WO-60B-e450ae2-dirty): fs_tick/s_tick registered one clk early, terminal constants registered from div_code; 858 cells / 231 FF (+18). Verification agent dispatched to prove cycle-exactness + retime mutants. Then PnR rerun.
+- WO-61 partial (uncommitted, signing): root cause was the relative out dir with ngspice cwd=out (paths doubled). Fixed with abspath in c1b_opac.py and c1b_tb7.py.
+  - **The WO-52 tb7 jsons held no data,** so the L 8 noise numbers were never measured.
+  - Reruns: 19 jobs in WO-52-bf4a565/out/logs61 (POOL_DONE). Pickup in results/wo52/README.md.
+- DESIGN_BOOK review: 1 critical (the ENOB formula), several majors (the 85 dB OSR claim, kT/C value mix-up, S2 attribution, stale C9 status), minors.
+  - It confirmed two real gaps:
+    - **precision gate B at 2 MHz never run** (D48(1) authoritative) → WO-63;
+    - **fast-mode current ≈ 180 µA nominal** (REASONED: OTA1 122 + OTA2 ~51 + bias 6) against the 172 µA estimate and the 200 µA budget → open risk.
+  - WO-62 (book fixes) and WO-63 dispatched as fresh agents.
+- **1Password signing locked:** several commits pending (design book 253d9bf may be committed; check). Also uncommitted: WO-60A README, WO-60B RTL, WO-61 files, WO-62/63 WO files, RESUME.
+- WO-63 running (uncommitted c1b_gateb.py --mode prec + results/wo63/README): 30-part precision gate B pool in WO-63-e450ae2 (out/ALL_DONE; auto-combine). Smoke prec 0.718 ppm (N 64, run check only). Worst case 18–22 h at the current load.
+- **WO-56 C3 rev d** (results/wo56/summary.txt): function fixed.
+  - The cyc rows pass at all PVT. Offset MC: tt 3σ 44.9 mV, ss/−40 45.5 mV, both ACCEPT against 60.
+  - T8 still fails on Vsb 2.37–2.39 V, now governed by D80 (junction to rating).
+  - The cl10 kickback broken copy now ACCEPTs (blind). → WO-65.
+- **WO-55 C6** (results/wo55/summary.txt), still failing:
+  - I0 1.45 µA (the re-tune did not land); own current 5.7–6.4 µA, over 6; TC −3.7…−4.2 % against 3 %;
+  - sf/27 non-physical again;
+  - every 125 °C transient SIMFAILs;
+  - 1 µs ramps settle in 20–30 µs (OK under D78 if the row is re-defined);
+  - bias_ok fires at VDD 1.38–1.69 V (the VAPWR-good condition is needed).
+  - → WO-64.
+- **WO-60B verification:** the retime is proven cycle-exact by unbounded formal (EQ-DIV + EQ-ENV, with failing broken copies). The simulation pool continues in WO-60B-v-1 (POOL_DONE in pool/pool.status). → PnR rerun WO-66 now.
+- D80 (user): D40 oxide pairs ≤ 1.98 V; junctions to rating.
+- WO-66 done (uncommitted, signing): retimed RTL PnR, setup and hold met at all 12 corners (ss_1v40 +2.582 ns, Fmax 54.8 MHz; tt reg-to-reg 6.66 ns < T/2); physical clean; DRV open (46 fanout, 256 + 44 slew, 3 cap). WO-67 (single-change DRV run) dispatched.
