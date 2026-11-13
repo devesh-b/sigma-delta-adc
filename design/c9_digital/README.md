@@ -24,5 +24,5 @@ Run (sandbox, IIC-OSIC-TOOLS): `verilator --lint-only -Wall --top-module sd_adc_
 - **status[8] is tied to 0** (SPEC 3.8a status word: [8] = 0). Do not use it as a flag.
 
 ## WO-49 (D72, D74)
-- acc1 is 14 b and acc2 25 b on chip (N <= 4096), sign-extended to 32 b on the hold outputs; hold registers are narrow too. Frame words unchanged.
+- acc1 is 14 b and acc2 24 b on chip (D77, CL-29: max |acc2| = N(N-1)/2 < 2^23, exact; the width mutant that must REJECT is acc2 at 23 b) (N <= 4096), sign-extended to 32 b on the hold outputs; hold registers are narrow too. Frame words unchanged.
 - `comp_in` goes straight into the DAC flop on fs_tick (CL-28); `comp_s` and the s_tick port of `c9_seq` are gone (s_tick stays internal to `c9_fsdiv` for the bit-clock fall).
