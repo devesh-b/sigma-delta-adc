@@ -110,8 +110,8 @@ M = {
             ["d_bus02_latency", "s01_reset_idle"]),
     "M44": ([(CORE, "ota_chop_phase, sys_swap, rst_analog", "sys_swap, ota_chop_phase, rst_analog")], ["d_bus03_debug"]),
     "M45": ([(TOP, "assign uio_oe = 8'hFF;", "assign uio_oe = rst_n ? 8'hFF : 8'h00;")], ["s01_reset_idle"]),
-    "M46": ([(DIV, "3'd0:    begin div_m1 = 8'd11;  half_m1 = 8'd5;  end",
-              "3'd0:    begin div_m1 = 8'd23;  half_m1 = 8'd11;  end")], ["d_fs01_div_codes"]),
+    "M46": ([(DIV, "3'd0:    begin fs_c = 8'd10;  half_c = 8'd4;  end",   # WO-60B re-anchor (div-2 constants)
+              "3'd0:    begin fs_c = 8'd22;  half_c = 8'd10;  end")], ["d_fs01_div_codes"]),
     "M47": ([(CFG, "? 3'd1 : fsd_raw", "? 3'd0 : fsd_raw")], ["d_fs01_div_codes", "d_cfg05_sequences"]),
     "M48": ([(CFG, ACTQ, "act         <= {act_n[12:10], shadow_n[9:7], act_n[6:0]};")],
             ["d_fs01_div_codes", "d_cfg05_sequences"]),
@@ -139,12 +139,23 @@ M = {
            ["d_dec03_streams"] + GOLD),   # WO-49B CL-29: acc1 13 b must REJECT
     "W2": ([(DEC, A2, "wire [22:0] a2t = acc2[22:0] + {{9{acc1[13]}}, acc1}; wire [23:0] a2n = {a2t[22], a2t};")],
            ["d_dec03_streams"] + GOLD),   # WO-58 CL-32: acc2 23 b must REJECT (24 b = design)
-    "M58": ([(DIV, "default: begin div_m1 = 8'd23;", "default: begin div_m1 = 8'd24;")],
+    "M58": ([(DIV, "default: begin fs_c = 8'd22;", "default: begin fs_c = 8'd23;")],
             ["s01_reset_idle", "d_fs01_div_codes"]),
     "M59": ([(CORE, "1'b0, hold_tag[7:0]};", "1'b0, slot_ctr};")], ["d_dec01_golden_vectors", "d_frm04_overrun"]),
     # WO-40 additions: give F17 and F10 a mutant (no plan mutant breaks them)
     "M60": ([(SEQ, "rst_analog <= 1'b1; sys_swap <= 1'b0;", "rst_analog <= 1'b0; sys_swap <= 1'b0;")], ["s01_reset_idle"]),
     "M61": ([(SEQ, "bit_valid  <= ~rst_n_nx;", "bit_valid  <= ~rst_n_nx & ~(c == 13'd5);")], ["a_seq01_trace_ctl"]),
+    # WO-60B retime mutants (fs_tick/s_tick registered 1 clk early): M62, M63 must REJECT; M64 expected equivalent
+    "M62": ([(DIV, "fs_tick <= (dc == tc_fs);", "fs_tick <= (dc == tc_fs + 8'd1);")],
+            ["d_fs01_div_codes", "s01_reset_idle"]),   # terminal = div-1 in the early flop: period div+1
+    "M63": ([(DIV, "tc_fs   <= fs_c;", "if (fs_tick) tc_fs <= fs_c;"),
+             (DIV, "tc_half <= half_c;", "if (fs_tick) tc_half <= half_c;")],
+            ["d_fs01_div_codes", "d_cfg05_sequences"]),   # stale constant for the whole first period after a change
+    "M64": ([(DIV, "reg s_tick; ", "reg s_tick; reg [7:0] fs_p, hp; "),
+             (DIV, "tc_half <= 8'd10;", "tc_half <= 8'd10; fs_p <= 8'd22; hp <= 8'd10;"),
+             (DIV, "tc_fs   <= fs_c;", "tc_fs <= fs_p; fs_p <= fs_c;"),
+             (DIV, "tc_half <= half_c;", "tc_half <= hp; hp <= half_c;")],
+            ["d_fs01_div_codes"]),   # constants 1 clk staler: equivalent (stale value only meets dc 0,1)
 }
 FORMAL = ["M07", "M07b", "M19", "M20", "M21", "M22", "M24", "M30", "M31", "M35", "M36", "M37", "M45",
           "M03", "M10", "M15", "M16", "M53", "M58", "M60", "M61"]

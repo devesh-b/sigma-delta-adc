@@ -625,3 +625,19 @@ Metastability itself is not simulated (waiver kept). M39 (rd without a sync) is 
 - **Comparator BFM (hostile, default).** `comp_in` carries the correct bit only on the clk whose rising edge is the capture edge; it carries the inverted bit on every other clk of the conversion window. `C9_COMP_WIN=k` widens the valid window to k clk before the edge (default 0). A DUT that captures one clk early or late fails clk-exact on `dac_y` and fails the golden.
 - **Widths (CL-29).** The bench sees only the 32-bit frame words, so the narrow accumulators are checked through the golden and the N 4096 full-scale streams (D-DEC-03). W1 (acc1 13 b) and W2 (acc2 23 b, WO-58 / CL-32) are the width mutants; both must be killed. Arithmetic note: with N ≤ 4096, the exclusive acc2 stays within ±N(N−1)/2 = ±8 386 560 < 2^23, so the 24-bit acc2 of D77 holds every legal value and a 24-bit mutant is equivalent (retired, AMB-25). A 23-bit acc2 (range ±2^22) overflows on the N 4096 full-scale streams. M01 is acc2 22 b.
 - **Job kinds** in `wo42_job.sh`: `test NAME SEED` (one test, with the collector) and `suite STEP`. The job file is `wo49b_jobs.txt`.
+
+## 13. WO-60B retime check (fs_tick / s_tick registered one clk early, 2026-11-13)
+Claim under test: pin behaviour cycle-exact unchanged vs e450ae2. Frozen run `regr/tt/WO-60B-v-1`, jobs `tb/wo60b_jobs.txt`.
+- EQ-TOP (`tb/formal/eq/eq_job.sh top|topbmc`): full-chip miter, new tree vs the e450ae2 tree (pre-retime
+  `c9_fsdiv` kept as `tb/formal/eq/c9_fsdiv_e450ae2.v`, all modules renamed `*_o`), shared free inputs, every
+  output compared every clk; `abc pdr` (unbounded) and yices BMC 400. All C9 flops have an async reset, so
+  the step-0 reset gives identical states.
+- EQ-DIV (`div`): divider-local miter under the environment "div_code changes only on the clk after fs_tick";
+  EQ-ENV (`env`) proves that environment on the real core (act[9:7] changes only after fs_tick or around rs).
+- Fail evidence: `unconstr` (environment dropped), M62 (early flop compares div-1: period div+1), M63
+  (constants refreshed only on fs_tick: stale for a whole period after a change) must FAIL EQ-DIV and be
+  killed in sim; `envmut` (latch not gated by fs_tick) must FAIL EQ-ENV. M64 (constants one clk staler)
+  is expected equivalent: a stale constant is only compared against dc = 0, 1 and every constant is >= 4.
+- Sim: agree, lint, sby formal + per-property base, fcov seeds 1-3 (full suite), C9_FULL 4 shards + other,
+  d_fs01 / a_rst01 seeds 4-6 (CL-15 change at the latch edge, D70 release latency), GL, 68 mutants
+  (M46 / M58 re-anchored on the fs_c constants), R-01 4-20, X-01 1-2.
