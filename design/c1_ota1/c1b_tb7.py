@@ -431,7 +431,15 @@ def summary(out):
             m = "f" if b else "b"
             pick = lambda k: next((r for r in nom if r["corner"] == cn and r["copy"] == m + k), None)
             ri, rl, ro = pick("int"), pick("lump"), pick("ol")
-            okr = ri["thermal_ok"] and ri["op_ok"] and ri.get("loop_ok") and ri["m8_ok"] \
+            # WO-61: a missing / non-finite row (op failed, noise op != op, no spectrum) is a REJECT of that row, not a crash
+            miss = [f"{n}:{k}" for n, rr_, ks in (("int", ri, ("thermal_vg_uV", "thermal_m8_uV", "thermal_hand_uV", "flicker_vg_uV")),
+                                                  ("ol", ro, ("en_white_nV", "en_hand_nV", "fc_kHz")))
+                    for k in ks if rr_ is None or not (isinstance(rr_.get(k), (int, float)) and math.isfinite(rr_[k]))]
+            if miss:
+                fails.append(f"{cn} {m} missing data {miss[:3]}")
+                print(f"{cn} | {m} | REJECT missing data {miss} lint {(ri or {}).get('lint', [])[:1]}/{(ro or {}).get('lint', [])[:1]}")
+                continue
+            okr =ri["thermal_ok"] and ri["op_ok"] and ri.get("loop_ok") and ri["m8_ok"] \
                 and ro["op_ok"] and ro["m8_ok"] and (rl is None or rl["op_ok"])
             if not okr:
                 fails.append(f"{cn} {m}")
@@ -446,10 +454,16 @@ def summary(out):
                   f"m8 {ri['m8_ok']}/{ro['m8_ok']} lint {ri['lint'][:1]}")
             if not b:
                 feed[cn] = (ro["en_white_nV"], ro["fc_kHz"] * 1e3, ri["thermal_vg_uV"] * 1e-6)
-    r0 = next((r for r in nom if r["copy"] == "bint" and r["corner"].startswith("tt/27")), None) or \
-        next(r for r in nom if r["copy"] == "bint")
+    good = [r for r in nom if r["copy"] == "bint" and isinstance(r.get("thermal_vg_uV"), float) and math.isfinite(r["thermal_vg_uV"])
+            and r.get("contrib_pct") and math.isfinite(r["sw"]["sci1"]["cgg"])]
+    if not good:   # WO-61: nothing usable, REJECT instead of a crash
+        fails.append("no usable base int row (chopper bound, contributors, tier-0 not evaluated)")
+        print("VERDICT", "REJECT " + "; ".join(fails))
+        return fails
+    r0 = next((r for r in good if r["corner"].startswith("tt/27")), None) or good[0]
     print(f"contributors {r0['corner']} base (thermal power %):", json.dumps({k: round(z, 1) for k, z in r0["contrib_pct"].items()}))
-    wst = max((r for r in nom if r["kind"] == "int"), key=lambda r: r["thermal_vg_uV"])
+    wst = max((r for r in nom if r["kind"] == "int" and isinstance(r.get("thermal_vg_uV"), float) and math.isfinite(r["thermal_vg_uV"])),
+              key=lambda r: r["thermal_vg_uV"])
     print(f"worst thermal: {wst['corner']} {wst['copy']} {wst['thermal_vg_uV']:.1f} uV; contributors",
           json.dumps({k: round(z, 1) for k, z in wst["contrib_pct"].items()}))
     ch = chopper_rows(r0, 80.3)
@@ -472,7 +486,11 @@ def summary(out):
               json.dumps({k: (round(z, 3) if isinstance(z, float) else z) for k, z in mod[cn].items()}))
     # broken copies
     mr = {r["copy"]: r for r in mut}
-    if mr:
+    fin = lambda r_, k: r_ is not None and isinstance(r_.get(k), (int, float)) and math.isfinite(r_[k])
+    if mr and not (fin(mr.get("mrgint"), "thermal_vg_uV") and fin(mr.get("mrgol"), "en_white_nV") and fin(mr.get("msinkint"), "thermal_vg_uV")):
+        fails.append("broken copies: missing data (mrg / msink rows not finite)")   # WO-61
+        print("broken copies: REJECT missing data")
+    elif mr:
         rg, rs = mr["mrgint"], mr["msinkint"]
         # WO-52 (D75): mrg must REJECT the 390 uV row, the tier-0 direct-path row and the ol M8 row (series R adds en; the
         # int M8 row is like for like and does not see R by construction). msink cannot cross 390 uV (sink share ~1/3):
@@ -514,5 +532,7 @@ if __name__ == "__main__":
         for kv in sys.argv[sys.argv.index("--sink") + 1].split(","):
             k, _, z_ = kv.partition("=")
             SINK[k] = float(z_)
+    # WO-61: absolute out dir. ngspice runs with cwd=out, a relative deck path doubled -> no file, empty stdout, every value NaN
+    sys.argv[1] = os.path.abspath(sys.argv[1])
     os.makedirs(sys.argv[1], exist_ok=True)
     corner_job(sys.argv[1], sys.argv[2] if sys.argv[2] == "mut" else int(sys.argv[2]), "--fast" in sys.argv)

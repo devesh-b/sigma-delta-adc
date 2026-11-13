@@ -26,6 +26,23 @@ Status at hand-off: RUNNING (gate B parts take up to ~3 h each).
   dualpath now checks the TG and inverter; device count +3 n / +1 p. New broken copies: clamp_weak, clamp_stuck (dualpath),
   clamp_weak and inverter removed (count). 20 passed on the sandbox.
 
+## WO-61 update (2026-11-13): root cause of the op/AC and tb7 failures, reruns RUNNING
+- Cause (both tools): `main` passed the RELATIVE out dir; ngspice runs with `cwd=out` and the deck path is `out/..`, so the
+  path doubled, ngspice found no deck, stdout was empty. c1b_opac: "no data ... ac.csv not found". c1b_tb7: every value NaN
+  (`gm_in_uS` nan, `noise op != op` on all 20 nominal + 2 mut `ol` rows), which made `--summary` crash on `en_white_nV`.
+  So the earlier tb7 jsons (EXIT=0) held no data; Gate B and tb9 (c1b_gateb / c1b_tb9 use absolute or own paths) are not affected.
+- Fixes (local, UNCOMMITTED: `git commit` failed twice, "1Password: failed to fill whole buffer", signing agent locked):
+  `c1b_opac.py` and `c1b_tb7.py` `os.path.abspath` on the out dir; `c1b_tb7.py --summary` reports a missing / non-finite
+  int or ol row (and missing broken-copy rows, or no usable base row) as a REJECT line + `fails` entry instead of raising.
+  Both files copied into the frozen copy (`design/c1_ota1/`).
+- Reruns: `jobs61.txt` (tb7 idx 0..8 + mut, opac idx 0..8; 19 jobs), launcher `run61.sh`, logs `out/logs61`, marker
+  `out/logs61/POOL_DONE`, started 15:25 IST. Old `out/tb7`, `out/opac` deleted first. NOT finished at hand-off; the op/AC
+  VERDICT table and the tb7 per-corner table are NOT yet written (no verified numbers).
+- Pickup: `ssh sandbox; R=/home/mempool/regr/tt/WO-52-bf4a565; cd $R; ls out/logs61/POOL_DONE; grep -L "EXIT=0" out/logs61/job_*.log`
+  then env as below, `python design/c1_ota1/c1b_tb7.py --summary out/tb7 > out/tb7_summary.txt`,
+  `grep -h VERDICT out/logs61/job_*.log`, `find out -name '*.csv' -delete`; fill the tables here. Gate B / tb9 numbers: see the
+  WO-52 job logs (`out/logs*`, `out/gb/*/combine.out`).
+
 ## Pickup (after POOL_DONE)
 ```
 ssh sandbox; R=/home/mempool/regr/tt/WO-52-bf4a565; cd $R; ls out/logs/POOL_DONE; grep -L "EXIT=0" out/logs/job_*.log

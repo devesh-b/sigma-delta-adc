@@ -534,7 +534,7 @@ def summary(out):
 def main():
     if sys.argv[1] == "--summary":
         sys.exit(1 if summary(sys.argv[2]) else 0)
-    out, idx = sys.argv[1], sys.argv[2]
+    out, idx = os.path.abspath(sys.argv[1]), sys.argv[2]   # WO-61: absolute, ngspice runs with cwd=out (relative path doubled)
     os.makedirs(out, exist_ok=True)
     nfail, rows = 0, []
     if "0" in idx.split(","):   # WO-28: validate the return-ratio extraction on the hand-solvable behavioural loop first
