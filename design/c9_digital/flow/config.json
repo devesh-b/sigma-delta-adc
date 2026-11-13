@@ -39,7 +39,8 @@
   "PDN_MULTILAYER": false,
   "RT_MAX_LAYER": "met4",
 
-  "RUN_HEURISTIC_DIODE_INSERTION": true,
+  "// WO-69": "D81: RUN_HEURISTIC_DIODE_INSERTION set to false (LibreLane 3.1.0.dev3 default, flows/classic.py:166; gates Odb.HeuristicDiodeInsertion via flows/classic.py:277). In WO-66 pnr1 the heuristic step put one diode per sink on long nets (342 diodes); 36 of the 46 max-fanout violations and part of the max-slew/cap load come from those diode pins. GRT antenna check before insertion reported 0 violations. Antenna protection stays: RUN_ANTENNA_REPAIR default true (classic.py:171, OpenROAD.RepairAntennas) and the post-route OpenROAD.CheckAntennas must report 0. DIODE_ON_PORTS stays \"in\" (Odb.PortDiodePlacement, steps/odb.py:740), unchanged.",
+  "RUN_HEURISTIC_DIODE_INSERTION": false,
   "DIODE_ON_PORTS": "in",
 
   "RUN_LINTER": true,
