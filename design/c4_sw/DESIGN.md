@@ -2,6 +2,10 @@
 
 WO-46 (C4a), stage 1 of the PLAN Stage C recipe: this note, hand calculations and spot sims only. The netlist and the
 gate testbench come in the next WO, after `sd-adc-design-reviewer` has checked this note.
+
+**Rev b (WO-54, C4b, 2026-11-13):** revised per REVIEW-C4a and D76; netlist `design/c4_sw/netlist.py`, gate testbench
+`design/c4_sw/c4_tb.py`, results `work/v1-design/results/wo54/README.md`. Changes are marked **[b]**; §11 lists the
+C4b rows. Order 1 is final (WO-53 passed: extra loop delay stable, x1 peak 0.486 V/side, ~10 bits at N 4096).
 Spot-sim script: `design/c4_sw/spot.py`. Results: `work/v1-design/results/wo46/README.md` (frozen run
 `/home/mempool/regr/tt/WO-46-03e28fe/spot/summary.md`).
 
@@ -37,17 +41,17 @@ V_ICM + Vin_cm − Vref_cm = 0.18–2.22 V over Vin_cm 0…VREF (review F2 input
 | # | Switch (tier-1 name) | Nodes | Phase | Signal range | Type (proposal) | Owner |
 |---|---|---|---|---|---|---|
 | 1 | Input / sys-swap / short, **merged** (Sin1) | VIN+ or VIN− or CM → b1 (Cs1 bottom) | φSl · ¬swap / φSl · swap / φSl · short | 0–2.25 V | 3.3 V TG, ≈ 12/0.5 n + 36/0.5 p (§3) | C4 |
-| 2 | DAC (Sdh1, Sdl1) | b1 → VREF+ / VREF− | φIl · y / φIl · ¬y | VREF+ 1.0–2.25, VREF− ≈ 0 | 3.3 V TG, ≈ 4/12 (both, matched injection) | C4 (C8 τ_ref tb) |
+| 2 | DAC (Sdh1, Sdl1) | b1 → VREF+ / VREF− | φIl · y / φIl · ¬y | VREF+ 1.0–2.25, VREF− ≈ 0 | **[b] VREF+: 3.3 V TG 4/12; VREF−: NMOS-only 4/0.5 (m7)** | C4 (C8 τ_ref tb) |
 | 3 | D12 top-plate short (Stp1d), one per pair | tp1p ↔ tp1n | φSe | 0.18–2.22 V | 3.3 V TG, **small**: 2/4 (§4) | C4 |
-| 4 | vg connect (Sg1) | tp1 → vg1 island | φIe | 1.07–1.33 V | 3.3 V NMOS only (CL-5 reasoning) | C4 |
+| 4 | vg connect (Sg1) | tp1 → vg1 island | φIe | 1.07–1.33 V | 3.3 V NMOS only (CL-5 reasoning), **[b] W 5 / L 0.5 (m3, D76); T-switch is the fallback if the leak row fails** | C4 |
 | 5 | Island shunt, input chopper, fold chopper, CMFB TGs, output clamp | — | isl, chp/chn, chlp/chln, ph1/ph2(b), rstb | — | sized in C1 | C1 (C4 drives the clocks) |
 | 6 | Cs2 sample (S2in) | o1 → b2 | φSl | 0.89–2.11 V | 3.3 V TG, ≈ 4/12 | C4 |
-| 7 | Cs2 plate short (S2cm, CL-2), one per pair | b2p ↔ b2n | φI | 0.89–2.11 V | 3.3 V TG, ≈ 4/12 | C4 |
+| 7 | Cs2 plate short (S2cm, CL-2), one per pair | b2p ↔ b2n | **[b] φIl (m6)** | 0.89–2.11 V | 3.3 V TG, ≈ 4/12 | C4 |
 | 8 | D12 top-plate short stage 2 (Stp2d) | tp2p ↔ tp2n | φSe | ≈ 0.6–1.8 V | 3.3 V TG 2/4 | C4 |
 | 9 | vg2 connect (Sg2) | tp2 → vg2 | φIe | 1.07–1.33 V | 3.3 V NMOS only | C4 |
-| 10 | Ck2 DAC (Skh, Skl) | bk → VREF+ / VREF− | φIl · y / φIl · ¬y | as #2 | 3.3 V TG ≈ 4/12 | C4 |
-| 11 | Ck2 rest (Sk0) | bk → cm (tier 1); **proposal: bkp ↔ bkn short** | φS | as #2 | 3.3 V TG ≈ 4/12 | C4 (Q3) |
-| 12 | Int2 islands / reset; **order-1 per-cycle reset (D74)** | Cint2 / vg2 | rst2 (slot reset) **or** rst2_o1 (order 1, every cycle, late φS after the strobe decision) | — | C2 | C2 (C4 drives) |
+| 10 | Ck2 DAC (Skh, Skl) | bk → VREF+ / VREF− | φIl · y · order2 / φIl · ¬y · order2 | as #2 | 3.3 V TG 4/12 (VREF+), NMOS 4/0.5 (VREF−) | C4 |
+| 11 | Ck2 rest (Sk0) | **bkp ↔ bkn short** (Q3 yes) | **[b] φSl, held closed in order 1** (k0 = φSl + ¬order2) | as #2 | 3.3 V TG 4/12 | C4 |
+| 12 | Int2 islands / reset; **order-1 per-cycle reset (D74, final after WO-53)** | Cint2 / vg2 | r2 = rst (slot reset) **or** rst2_o1 = ¬order2 · φSe · dec (dec = C3 decision done, NAND(q, qb)) | — | C2 | C2 (C4 drives) |
 | 13 | Comparator input | x2 only (**no mux**, D74) | strobe φC in φS | — | — | C3 |
 
 Notes.
@@ -65,6 +69,13 @@ Notes.
   from the end of φI until the comparator has decided. So rst2_o1 is placed late in φS (after strobe + decision
   time, ≥ 40 ns at 4 MHz) and ends before the S→I gap; at 4 MHz that leaves ≈ 70 ns of reset, against the reset
   settling of Cint2 (≈ 1 kΩ × 1 pF, 15 τ ≈ 15 ns). The C2 reset switch must meet that; check in C4b (Q7).
+- **[b] Order 1, final (REVIEW-C4a M1, D76, WO-53 passed):** the extra loop delay (y[n+1] = sign(x1[n])) is accepted;
+  the model shows it stable (x1 peak 0.486 V/side) with ~10 bits at N 4096; no comparator mux. rst2_o1 is not a
+  fixed delay: it is gated by the comparator's own decision-done signal (dec = NAND(q, qb), 1.8 V, one more
+  lsbuflv2hv in the C7 count), so it can never overlap strobe + decision at any corner, and it ends with φSe, i.e. at
+  the start of the S→I transition, before φIe. Ck2 stays in its rest short (k0 closed) and its DAC is off. C4b row
+  `order1`: reset starts after dec, ends before φIe starts, width ≥ 15 ns; broken copy `o1early` (reset not gated by
+  dec) ⇒ REJECT.
 
 ## 3. TG vs NMOS-only, sizing (Ron, settling)
 
@@ -145,6 +156,25 @@ Hand numbers use Cox ≈ 3 fF/µm² for g5v0d10v5 (tox ≈ 11–12 nm; to be rea
 - **Early/late:** φSe falls before φSl, φIe before φIl. The early phase must be fully off before the late one starts
   to turn off: early delay (50 % points) ≥ the early phase's fall time (≈ 0.8 ns at 200 fF). Proposal: ≥ 1 ns at the
   fast corner. tier 1 used 5 ns; nothing in the settling budget depends on it beyond shortening the early phase.
+- **[b] Early-before-late rule (M2):** the gate is at the switch thresholds, not at 50 %: the early phase is fully
+  off (true < 10 %, complement > 90 %) before the late phase (including its gated nets pas/swp/sho, dh/dl) starts to
+  turn off (true < 90 % or complement > 10 %): eb ≥ 0 at every corner. K_E = 2 inverters with 100 fF per node
+  (≈ 1.5 ns at ff/−40, spot 40 fF gave 0.70 ns). The C4a 50 % "early" figure is info only.
+- **[b] Gated controls (m1):** #1 uses three gated nets pas = φSl·¬swap·¬short, swp = φSl·swap·¬short,
+  sho = φSl·short (NAND + drivers in the 3.3 V domain). Rule: C9 changes swap / short only on the fs rising edge,
+  i.e. while φSl is already off (SPEC §3.8a: sys_swap on cycle 0 of the slot, also a rising edge). Row `glitch_s`:
+  in every φS only the scheduled net is on, aligned with φSl within 3 ns; all three below 10 % in φI. Broken copy
+  `ctlmid` (controls change mid-φS) ⇒ REJECT. A 3.3 V gap latch is not needed under the rule.
+- **[b] Dead time on the gated nets (m2):** g is measured on the nets that reach the gates, i.e. gated nets
+  included, and as min over the turning-on phases of the first threshold crossing of either gate (n rising 10 %,
+  p falling 90 %) minus max over the turning-off phases of the last (n 10 %, p 90 %). That covers the cross terms.
+- **[b] Edge rate (Q5, D76):** no separate edge_max gate. Edges matter only through dead time and injection
+  order, both measured at the thresholds (g, eb). Edge 10–90 % is info; drivers are inv_8. Broken copy `edge1`
+  (inv_1 final drivers) must REJECT on eb.
+- **[b] y timing:** option (a), relying on the gap, is kept: y reaches the gated DAC nets through the same LS
+  type as fs, and φIl cannot rise before the gap chain has run (feedback from φSl). Row `glitch_d`: in each φI
+  only the DAC net for the current y is on; the other stays below 10 %. Broken copy `ylate` (y 8 ns late, beyond
+  the gap) ⇒ REJECT. A retiming latch (b) would see the same race one stage earlier, so it is not added.
 - **Rule 13 (OTA-chop edge only in a non-overlap interval):** `ota_chop_phase` changes on the rising edge, i.e. at the
   start of the S→I gap. C4 retimes it in the 3.3 V domain: the chopper clocks (input chopper `chp/chn` at 3.3 V,
   fold chopper `chlp/chln` at 1.8 V through one `lsbufhv2lv`) switch only after φSl is off (Cs2 has finished
@@ -174,6 +204,19 @@ Hand numbers use Cox ≈ 3 fF/µm² for g5v0d10v5 (tox ≈ 11–12 nm; to be rea
   choppers parked until VDPWR is up and rst_analog is valid. (ii) VDPWR up, VAPWR down: every 3.3 V switch is off and
   the 1.8 V LS input devices see no stress; when VAPWR ramps, (i) applies until the detector releases. Both orders
   get a PWL ramp tb (pthomas learning: no `.op` handing the circuit its state).
+- **[b] Detector + isolation LS (M4, D76):** pwrok = VDPWR-present detector in the 3.3 V domain: HV NMOS 2/0.5
+  gated by VDPWR against an always-on HV PMOS 0.42/20 load, three hvl inverters. pwrok drives SLEEP_B of every
+  1.8→3.3 V shifter. Cell: `lsbuflv2hv_clkiso_hlkg_3`; `lsbuflv2hv_isosrchvaon_1` is not used because its PDK
+  spice model has no device connected to VPWR or VGND (virtual rails only), so it cannot be simulated as is.
+  pwrok also gates the generator (fs and ¬fs into the cross-coupled NANDs through NOR with ¬pwrok), so with
+  VDPWR missing every phase is off whatever the isolated LS outputs are, and isl = rst + ¬pwrok closes the islands
+  (C1 rstb = ¬isl clamps the outputs). The chopper latch is transparent then and parks at the isolated value.
+- **[b] C7 count:** up-shifters fs, y, swap, short, chop, rst, order, dec (8, isolation cells) + C6 statics; down-
+  shifters (lsbufhv2lv_1): chlp, chln, **comparator strobe φC (m4)** (3).
+- **[b] Ramp rows (`rampa` / `rampb`):** `safe` (order a, while VDPWR < 1.0 V and VAPWR ≥ 1.5 V: every switch
+  phase net < 0.3 V, isl ≥ 0.8·VAPWR; copy `nodet`), `crowbar` (charge through an input switch and a DAC switch at
+  the same time ≤ 50 fC per fs period, VIN 0.3 / 1.7 V, VREF+ 2.0 V; copy `overlap`), `stress` (1.8 V nets chlp,
+  chln, φC ≤ VDPWR + 50 mV at all times; copy `hvfold`), `release` (pwrok up, phases running, isl open after rst).
 
 ## 8. Checks, spot limits and broken copies
 
@@ -186,7 +229,7 @@ Spot limits used in `spot.py` (proposals for the C4b gate; the reviewer may tigh
 | Dead time at 50 % points | ≤ 0.025/fs = 6.25 ns (4 MHz) | gap chain × 4 ≈ 0.05/fs (`gbig`), SPEC row's copy |
 | Early → late delay (50 %) | ≥ 0.5 ns (spot); C4b: ≥ early fall time | late = early (`noearly`) |
 | t_half of the late phases (50 %) | ≥ 0.45/fs = 112.5 ns | (covered by `gbig`) |
-| Phase edges 10–90 % at 200 fF | ≤ 1.0 ns | — (info in spot; C4b copy: driver inv_1) |
+| Phase edges 10–90 % at 200 fF | ≤ 1.0 ns **[b] info only (D76); gated through g and eb** | — (info in spot; C4b copy: driver inv_1) |
 | LS output edge 10–90 % | ≤ 1.0 ns | +1 pF on the LS output (`lsload`) |
 
 **C4b testbench plan (next WO, after review), every §6 corner, 0.25 / 2 / 4 MHz:**
@@ -220,6 +263,37 @@ REJECT). Consequences for the sizes in §2/§3:
 - Generator: dead time 1.82 ns (thresholds, ff/−40) to 5.50 ns (50 %, ss/125), t_half ≥ 118.1 ns, early ≥ 0.70 ns;
   phase edge 1.22 ns at ss/125 fails the 1 ns spot limit → inv_8 final drivers in C4b.
 - LS: delay 0.27–1.83 ns, edge ≤ 0.25 ns, duty error ≤ 0.48 %.
+
+## 11. [b] C4b gate rows (`c4_tb.py`), corner subset and broken copies
+
+Corners: the timing rows run on the C4a spot set (tt/27, ss/−40, ss/125, ff/−40, ff/125, sf/27, fs/27 at nominal
+supplies; LS axis ss/−40 3.6/1.62, ff/−40 3.0/1.98, **sf/−40 3.6/1.62** = the review's LS-contention worst case) at
+0.25 / 2 / 4 MHz. Why this subset: the generator is a delay chain, so its spread is set by process × T × VAPWR
+(fast = ff/−40/3.6, slow = ss/125/3.0), and the LS by the VDPWR × VAPWR skew corners; mismatch / MC does not apply
+to logic delays. DC Ron at tt, ss/−40, ss/125, ff/−40, ff/125 (ss/−40/3.0 binds). Injection at tt, ss/−40/3.0,
+ff/125/3.6 (largest channel charge); settling at ss/−40/3.0 (+ tt, ss/125); leakage at ff/125/3.6 and ff/100/3.6
+(the vg rows); ramps at tt, ss/−40, ff/−40, sf/−40/3.6/1.62.
+
+| Row | Gate | Broken copy (must REJECT) |
+|---|---|---|
+| ron (#1) | Ron_max per switch over its range: sin ≤ 1.5 kΩ; DAC ≤ 9.5 kΩ (τ_ref = Ron·0.75 pF + 500 Ω·5.75 pF ≤ 10 ns); stp ≤ 31 kΩ; Sg ≤ 4 kΩ (Ron·Cs ≤ 2 ns); Cs2 / Ck2 rest ≤ 8 kΩ (14 τ in t_half/2 on 0.5 pF) | `onetype` (TG without PMOS, NMOS-only → PMOS-only) |
+| g_min | ≥ 1 ns at the thresholds, gated nets + cross terms | `overlap` |
+| g50_max | ≤ 0.025/fs | `gbig` |
+| t_half_min | ≥ 0.45/fs (late + gated nets) | (via `gbig`) |
+| eb_min | ≥ 0 (early fully off before late starts) | `noearly`, `edge1` |
+| ls_edge_max | ≤ 1 ns | `lsload` |
+| glitch_s (m1) | scheduled net only, aligned ≤ 3 ns | `ctlmid` |
+| glitch_d (y race) | wrong DAC net < 10 % | `ylate` |
+| rule13 | chopper edges after φS fully off, before φI starts | `rawchop` |
+| strobe (#10) | φC after φI fully off; ≥ 0.3·t_half + 1 ns before the next fs_tick | `wrongstrobe` |
+| order1 (#11) | rst2_o1 after dec, off before φIe starts, width ≥ 15 ns | `o1early` |
+| injdm (M3) | INL of (real − ideal switches) ≤ 2 ppm of 2·VREF, 3σ Cs mismatch in | `order_inv` |
+| injcm | CM→DM ε_inj ≤ 2.8e-4 | `top8` |
+| settle (#4) | τ_eff ≤ 18.75 ns with the pad model | `ronx3` |
+| leak (#9) | Sg share ≤ 50 % of the vg row (45 / 10 pA), sign recorded vs Vin_cm | `tg` |
+| rampa / rampb (#8) | safe, crowbar, stress, release (§7) | `nodet`, `overlap`, `hvfold` |
+
+#7 (reset residue, D46a) needs the C2 reset switch and OTA2 and runs at the C1/C2 integration; C4 supplies r2.
 
 ## 10. Questions for the reviewer
 
