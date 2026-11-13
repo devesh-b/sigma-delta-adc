@@ -123,3 +123,7 @@ macro (uio_oe = 0xFF via tie cells); `ena`, `uio_in` unused.
 - `CTS_SINK_CLUSTERING_SIZE: 8` (LibreLane 3.1.0.dev3 steps/openroad.py:2495 -> cts.tcl:67 `-sink_clustering_size`). Auto clustering had chosen
   10, but leaves ended at 12-13 sinks. Result: max fanout 10 -> 0 at all 12 corners; setup/hold met; DRC/LVS/XOR/antenna 0; power +3 %
   (37 clock buffers, 17 dummy loads). Slew at ss_1v40 unchanged (43 pins, buf_1 fanout nets). Details: work/v1-design/results/wo71/README.md.
+
+## WO-72 (8898159): RUN_POST_GRT_DESIGN_REPAIR true, no effect
+- Post-GRT repair_design (slew margin 10 %) changed 0 cells. All metrics are identical to WO-71; slew is 43/11 at ss_1v40, worst 1.72 ns.
+- Estimated parasitics show 0 slew violators at ss_1v40. The overrun appears only with RCX SPEF. Next (unrun): GRT_DESIGN_REPAIR_MAX_SLEW_PCT 30. Details: work/v1-design/results/wo72/README.md.
