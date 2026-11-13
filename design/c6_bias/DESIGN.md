@@ -155,4 +155,39 @@ Area (estimate, pre-layout): pnp array 3×3 + dummy ring ≈ 1,300 µm²; xhrpol
 ### 6.5 Status after WO-50 (open)
 - 10 ms ramp, tt/27/3.3 (WO-50-dde5031): starts and holds within ±1 % (0.000 % from ramp end + 10 µs; inside ±1 % 657 µs before the ramp ends), peak 1.06 × I0, one bias_ok assertion. It still REJECTs on the bias_ok row: the final assertion is at VAPWR ≈ 1.1 V with I at 4 % of the 3.3 V value, because the leaker (gate 0, |V_GS| = VAPWR) and hence the release threshold scale with VAPWR. So bias_ok alone does not mean "reference near its value" during a slow ramp; C9 needs a VAPWR-good condition as well (or a supply-independent threshold).
 - 1 µs ramp, tt/27/3.3: **still relaxes** (15 bias_ok assertions, peak 5.4 × I0, ±201 % in the window). Mpo charges o1 while the core lags the fast ramp; the current overshoots, after release the amp pulls o1 down at its (large) tail current, undershoots into the zero-gain region and the start-up fires again.
-- Superseded by §6.6 (WO-55). Candidates listed at the time (options): (a) bound the injection: Mpo charges o1 only up to a replica of the M5 gate voltage at ≈ 1.5 × I0 (clamp), so the overshoot is small; (b) release with a delay (an RC or counter on sua) so the core is near I0 before Mpo stops, plus a re-trigger that needs a longer low time; (c) smaller Cc / larger tail so the post-release recovery is not slew-limited; (d) a VAPWR-independent threshold current for the detector (e.g. leaker from a PTAT/VBE branch of its own).
+- Superseded by §6.6 (WO-55).
+- Note found in WO-55: the WO-50 DC "errors" (ss/27 12.35 µA with 5.5 mA own current; tt/−40 18.8 µA; fs/−40 23.4 µA; ss/−40 15.4 µA) are **nonphysical .dc solutions** (V_A ≈ −1400 V), not circuit states. The transients at those corners end at 1.05 µA. The WO-55 deck now starts every DC from a hint near the operating point and rejects any result with V_A or VG off the rails (`phys`).
+
+### 6.6 WO-55 (C6c): architecture choice and the robust start-up
+
+**Root cause (WO-50 loop-break, re-read).** The problem is not the start-up circuit; it is that the core loop has no restoring force below ≈ 50–60 % of I0, because V_B − V_A is in the µV range while the amp offset is ≈ 2 mV. At sf/27 and ff/125 the loop-break sweep finds a real **unstable equilibrium** at 0.27 µA (25 %) and 0.06 µA (6 %). Any start-up that releases into that region can stall, and any start-up strong enough to jump over it overshoots and relaxes (WO-50, 1 µs ramps).
+
+**Candidates (SPEC rows 102–104: ΔI/I ≤ 3 % over T, own ≤ 6 µA, ≤ 7000 µm², start-up 1 µs–10 ms, no zero-current state).**
+
+| | (a) Banba + current-sensing start-up, off in steady state | (b) beta-multiplier (constant-gm) + PTAT/CTAT correction (pthomas) | (c) Banba + amp with a built-in offset margin |
+|---|---|---|---|
+| Equilibria | unchanged core: 0, an unstable one at 6–25 % (sf, ff), and I0. The start-up must hold the core above the unstable point until the loop has gain: release threshold > 25 % at every corner, from a VDD- and T-dependent leaker (WO-50 spread 0.39–1.68 × I0, ×4) | constant-gm core: 0 and one stable point (classic start-up works, pthomas) | 0 (amp dead, VG = VDD) and I0 only: in the low-current region V_B − V_A ≈ 0 < Voff, so the amp always drives the current up |
+| TC (row 102) | Banba, −2.1/+0.2 % (WO-50) | I ∝ 1/(µ R²): ≈ +0.8 %/K with xhrpoly tc1 −1470 ppm/K, ≈ +130 % over −40…125. A ≤ 3 % fix needs a VBE/R CTAT branch, which brings back a VBE loop with its own amp (and the same degenerate region) | Banba plus a PTAT-like offset (nVT ln SKEW adds to ΔVBE); R2/R1 is re-tuned |
+| Own current / area | as WO-50 | 20 µA class in pthomas; at 1 µA, R ≈ 2 MΩ+ for the beta-multiplier plus the CTAT R | +1 comparator (8 VG units) ≈ +0.4 µA; R1/R2 × 1.15 (+≈ 300 µm²) |
+| Verdict | needs a threshold accurate to better than ×2 over VDD/T/corner, which the gate-0 leaker cannot provide | **rejected on row 102** (hand analysis) | **chosen** |
+
+**Implementation (deck `c6_spot.py`, WO-55).**
+- **Core amp skew:** mb (gate B, output side) is W 8 vs ma W 4 (SKEW 2). The amp balances at V_B − V_A = +Voff (≈ 15 mV, between weak and moderate inversion) instead of 0, which is ≈ 7σ of the random offset. I0 rose ≈ 15 % (1.235 µA at R1 82 µm), so R1 is now 94 µm (× 1.15) and R2/R1 is re-tuned at tt/27 (`tune`).
+- **Kick:** while ok is low, a gate-0 PMOS chain (8 units, ≈ I_lk ≈ 0.1–0.2 µA, which is below the amp's ≈ 0.38 µA sink) pushes current into o1 through a PMOS switch (gate ok). It cannot overpower the amp, so it cannot hold the core away from I0. After ok it is off (gate at VDD).
+- **bias_ok = pnp-on comparator:** q is high when V_B − V_C (= I_Q2·R1: ≈ 0 while the pnps are off, 70–115 mV at the operating point, tt/ss smoke) exceeds the comparator's own threshold (the diode-side input is 3× wider, ≈ nVT ln 3 ≈ 30–37 mV, PTAT-like like the signal). The tail is 8 VG units. The threshold and the signal both come from the core, so bias_ok tracks the core state, not VAPWR.
+  - Default-low: Mqd (gate tsu) pulls q low while the master current is below I_lk / 0.525 (the WO-50 leaker, now only a "core off" flag; THR_MAX 0.8 still gated).
+  - Hysteresis: one VG unit into q while ok is high.
+- **Checks:**
+  - `loop` (find all equilibria, 5 corners × 3 T; gated): exactly one stable crossing ≥ 0.75 µA and no crossing between 0.02 µA and 0.9·I_good.
+  - `dci`: transients at fixed VDD from `.ic` all nodes = 0 and = VDD (pnp emitters capped at 0.8 V), 300 µs. Both must agree with the DC op within 0.5 % / 1 % and be settled (p2p ≤ 0.5 %), with ok high.
+  - `tran`: as before, plus "exactly one bias_ok rise".
+  - Broken copies: nosu, early (bias_ok from the leaker flag, Mk × 16), noskew (loop at sf/27 and ff/125), ptat, trim_open, dci nosu.
+
+**Smoke (frozen WO-55-4ea14b9, ratio 4.6, not tuned).**
+- Loop: tt/27 and sf/27 have one stable equilibrium and no mid crossing (ACCEPT). noskew sf/27 REJECTs (mid crossing).
+- dci sf/27: from 0 and from VDD, 1.06845 / 1.06845 µA vs op 1.06844 (ACCEPT; WO-50 landed at 0.268 µA from VDD).
+- tran 1 µs tt/27/3.3: lands on the DC point (end error 0.02–0.03 %), but t90 ≈ 9–20 µs after the ramp, peak 1.9–2.5 × and 2–3 bias_ok rises. **±1 % is reached only ≈ 26–32 µs after the ramp (gate: 10 µs).**
+- Cc / kick variants (tt/27, 1 µs): Cc 1 pF with NKK 4, and Cc 0.5 pF, relax (16–17 rises). Cc 1 pF with NKK 8, and Cc 3 pF with NKK 4, settle at ≈ 26 µs. Kept: Cc 3 pF, NKK 8.
+- Floor: VG carries ≈ 71 PMOS units of 0.42 × 20 µm (≈ 2 pF of gate) plus Cvg 1 pF, and is slewed by M6 at ≈ 0.4 µA ⇒ ≈ 1.3 V × 3 pF / 0.4 µA ≈ 10 µs for VG alone. A settle within 10 µs after a 1 µs ramp is below what the sub-µA core can do as sized.
+
+**Sequencer (item 3).** bias_ok = "core in its normal region" (pnp on). It is not "settled". C9 should hold rstb low for a fixed count after bias_valid, sized from the measured worst t(±1 %) − t_ok (results/wo55), and also needs VAPWR-good. Numbers are in results/wo55/README.md. Candidates listed at the time (options): (a) bound the injection: Mpo charges o1 only up to a replica of the M5 gate voltage at ≈ 1.5 × I0 (clamp), so the overshoot is small; (b) release with a delay (an RC or counter on sua) so the core is near I0 before Mpo stops, plus a re-trigger that needs a longer low time; (c) smaller Cc / larger tail so the post-release recovery is not slew-limited; (d) a VAPWR-independent threshold current for the detector (e.g. leaker from a PTAT/VBE branch of its own).
