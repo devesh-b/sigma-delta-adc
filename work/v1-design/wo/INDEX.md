@@ -74,3 +74,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-65 C3e close rev d (D80 stress row, T5 copy): dispatched 2026-11-13
 - WO-66 C9 PnR on the retimed RTL: dispatched 2026-11-13
 - WO-67 C9 DRV closure (fanout/slew/cap) on the retimed macro: dispatched 2026-11-13
+- WO-68 C3f latch Vds + T5 per D81 + close: dispatched 2026-11-13
