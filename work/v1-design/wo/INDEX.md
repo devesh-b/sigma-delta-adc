@@ -66,3 +66,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-57 C9 acc2 24 b (D77): done 346995c (CL-32)
 - WO-58 C9 re-verify (A) + first full PnR (B, pd-expert): dispatched 2026-11-13
 - WO-59 design book (DESIGN_BOOK.md, writer agent; reviewer accuracy pass after): dispatched 2026-11-13
+- WO-60 C9 timing fixes (D79): A flow-only PnR dispatched 2026-11-13; B RTL after WO-58A
