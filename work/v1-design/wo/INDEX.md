@@ -75,3 +75,5 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-66 C9 PnR on the retimed RTL: dispatched 2026-11-13
 - WO-67 C9 DRV closure (fanout/slew/cap) on the retimed macro: dispatched 2026-11-13
 - WO-68 C3f latch Vds + T5 per D81 + close: dispatched 2026-11-13
+- WO-67 done (9413a36, 80bb74d): the buf_1 ban made things worse; reverted in 8ddea05
+- WO-69 C9 heuristic diode insertion off (single change): dispatched 2026-11-13
