@@ -13,9 +13,10 @@ Deck families (each row ACCEPT/REJECT; every row has a broken copy that must REJ
          nolatch (T10nz), nobuf (T7).
   one  : single fire from reset at constant x2 (WO-44 spot conditions). Rows T5 kickback (diff peak / recovery at
          both edges, CM reported), T2band (ss/-40/1.62, 4 MHz: t_dec(1 mV) within [0.5, 3] x the WO-44 spot value).
-         Variant asym (+-10 % R/C per side). Broken: starve (T2band), nohvc (T5, WO-65: HV cascode and ap/an
-         precharge removed, pair drains on dp/dn). Info: nopa (ap/an precharge removed), cl10 (C_x2 / 10; blind on
-         rev d, WO-56).
+         Variant asym (+-10 % R/C per side). Broken: starve (T2band). T5 per D81 (margin by construction): checker
+         copies chk_kick1 (fs/125/1.98 data at a 1 mV kick limit) and chk_rec02 (asym data at a 0.2 mV recovery
+         limit), both must REJECT. Info: nohvc (WO-65: HV cascode and ap/an precharge removed, pair drains on dp/dn;
+         2.7 mV), nopa (ap/an precharge removed), cl10 (C_x2 / 10; blind on rev d, WO-56).
   st   : T8 device stress, both power-up orders, x2 0..3.6 V and -0.5 V (D80 split: 1.8 V oxide pairs + Vds vs
          1.98 V, 1.8 V junctions Vsb/Vdb vs VJ18_MAX, HV every pair vs 5.5 V). Broken: in18 (input pair 1.8 V,
          oxide); chk_jn20 (checker copy: same deck as st_tt27_a judged at a 2.0 V junction limit, must REJECT).
@@ -387,8 +388,12 @@ def deck_list():
     D["one_ss40_asym10"] = (one_deck, (*SS40, 1.5, 4e6), {"asym": "x10"}, {"T5": "info"})
     D["one_brk_starve"] = (one_deck, (*SS40, 1.5, 4e6), {"mut": "starve"}, {"T2band": "reject"})
     D["one_info_cl10"] = (one_deck, (*SS40, 1.5, 4e6), {"mut": "cl10"}, {"T5": "info"})   # blind on rev d (WO-56)
-    D["one_brk_nohvc"] = (one_deck, (*SS40, 1.5, 4e6), {"mut": "nohvc"}, {"T5": "reject"})  # WO-65 item 2
+    # D81 (WO-68): T5 has margin by construction (nohvc, isolation removed, 2.7 mV < 5 mV), so nohvc is info and two
+    # checker copies (same deck as a gate deck, judged at a tight limit) show that each limb of the row is live.
+    D["one_info_nohvc"] = (one_deck, (*SS40, 1.5, 4e6), {"mut": "nohvc"}, {"T5": "info"})  # WO-65 item 2
     D["one_info_nopa"] = (one_deck, (*SS40, 1.5, 4e6), {"mut": "nopa"}, {"T5": "info"})
+    D["one_chk_kick1"] = (one_deck, ("fs", 125, 1.98, 1.5, 4e6), {}, {"T5": "reject"}, dict(kick_max=1e-3))
+    D["one_chk_rec02"] = (one_deck, (*SS40, 1.5, 4e6), {"asym": "real"}, {"T5": "reject"}, dict(rec_max=0.2e-3))
     for o in ("a", "b"):                                   # st: T8 (gate: OTA2 slew, phase plan)
         D[f"st_tt27_{o}"] = (st_deck, ("tt", 27, o), {}, {"T8": "pass"})
         D[f"st_ff-40_{o}"] = (st_deck, ("ff", -40, o), {}, {"T8": "pass"})
@@ -396,6 +401,7 @@ def deck_list():
     D["st_chk_jn20"] = (st_deck, ("tt", 27, "a"), {"jlim": 2.0}, {"T8": "reject"})   # D80 junction limb is live
     D["st_nocas_tt27_a"] = (st_deck, ("tt", 27, "a"), {"mut": "nocas"}, {"T8": "info"})   # rev b, gate stimulus
     D["st_revc_tt27_a"] = (st_deck, ("tt", 27, "a"), {"mut": "revc"}, {"T8": "info"})     # rev c (WO-51)
+    D["st_noclamp_tt27_a"] = (st_deck, ("tt", 27, "a"), {"mut": "noclamp"}, {"T8": "info"})  # rev d latch (WO-68)
     for c, t, v in (SS40, ("tt", 27, 1.80)):              # rev c function, with the ap/an probe (WO-56 diagnosis)
         D[f"cyc_info_revc_{nm(c, t, v)}"] = (cyc_deck, (c, t, v, 1.5, 4e6), {"mut": "revc"},
                                              {"T2": "info", "T7": "info"})
@@ -426,9 +432,10 @@ def gen(out):
     out = os.path.abspath(out)
     os.makedirs(out, exist_ok=True)
     jobs = []
-    for k, (fn, args, kw, exp) in deck_list().items():
+    for k, (fn, args, kw, exp, *jd) in deck_list().items():
         text, meta = fn(*args, **kw)
         meta["expect"] = exp
+        meta.update(jd[0] if jd else {})          # judge-only overrides (checker copies, D81)
         d = os.path.join(out, k)
         os.makedirs(d, exist_ok=True)
         open(os.path.join(d, "deck.sp"), "w").write(text)
@@ -508,7 +515,11 @@ def eval_cyc(r, m):
 def eval_one(r, m):
     rows = {}
     k = [r.get(x) for x in ("kpk1", "kpk2", "krec1", "krec2")]
-    rows["T5"] = [None not in k and max(k[:2]) <= KICK_MAX and max(k[2:]) <= KICK_REC, []]
+    kmax, rmax = m.get("kick_max", KICK_MAX), m.get("rec_max", KICK_REC)
+    ok_k = None not in k and max(k[:2]) <= kmax
+    ok_r = None not in k and max(k[2:]) <= rmax
+    rows["T5"] = [ok_k and ok_r, ([] if ok_k else [f"over:kick>{kmax * 1e3:g}mV"]) +
+                  ([] if ok_r else [f"over:rec>{rmax * 1e3:g}mV"])]
     tq = r.get("tq")
     td = None if tq is None else tq - m["fires"][0]
     rows["T2band"] = [td is not None and 0.5 * TDEC_SPOT_SS40 <= td <= 3 * TDEC_SPOT_SS40, [f"tdec={td}"]]

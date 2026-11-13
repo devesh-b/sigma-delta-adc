@@ -76,11 +76,19 @@ def devices(sizes=SIZES, mut=""):
     else:
         lq, lqb = ("ql", "qlb")
         # NAND SR latch: ql = NAND(sa, qlb), qlb = NAND(sb, ql). inp > inn -> op falls -> ob2 falls -> ql = 1.
+        # WO-68 (rev e): stack-node clamp S{tag}5, sq/sb -> vss, gate = the complement of the set input (ob1/nb1).
+        # Rev d: on a flip, ql falls while nb2 is low, so sb floats (Sb3, Sb4 off) and takes Sb4's channel charge:
+        # -0.345 V (junction-clamped) for the whole strobe phase, Vds(Sb3) = qlb - sb = 2.32 V. The clamp holds the
+        # node at vss exactly while the top device is off, so the logic is unchanged (pull-down needs the set input
+        # high, then the clamp is off). "noclamp" = rev d latch (T8 info copy).
+        cpl = {"ob2": "ob1", "nb2": "nb1"}
         for out, a, b, tag in (("ql", sa, "qlb", "q"), ("qlb", sb, "ql", "b")):
             D += [(f"S{tag}1", PF, out, a, "vdd", "vdd", s["SP"]),
                   (f"S{tag}2", PF, out, b, "vdd", "vdd", s["SP"]),
                   (f"S{tag}3", NF, out, a, f"s{tag}", "vss", s["SN"]),
                   (f"S{tag}4", NF, f"s{tag}", b, "vss", "vss", s["SN"])]
+            if a in cpl and "noclamp" not in mut:
+                D.append((f"S{tag}5", NF, f"s{tag}", cpl[a], "vss", "vss", s["SC"]))
     D += inv("Oq1", "qo1", lq, "O1N", "O1P") + inv("Oq2", "q", "qo1", "O2N", "O2P")
     D += inv("Ob1", "qbo1", lqb, "O1N", "O1P") + inv("Ob2", "qb", "qbo1", "O2N", "O2P")
     return D
