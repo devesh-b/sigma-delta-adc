@@ -37,7 +37,7 @@ M = {
     "M03": ([(SEQ, "bit_valid  <= ~rst_n_nx;", "bit_valid  <= ~rst_n_nx & ~(c == 13'd1);")], GOLD),
     "M04": ([(DEC, "if (acc_clear) begin acc1 <= 14'd0; acc2 <= 25'd0; end",
               "if (acc_clear) begin acc1 <= (y ? 14'd1 : 14'h3FFF); acc2 <= 25'd0; end")], GOLD),
-    "M05": ([(DEC, "(y ? 32'd1 : 32'hFFFFFFFF)", "(y ? 32'hFFFFFFFF : 32'd1)")], GOLD),
+    "M05": ([(DEC, "(y ? 14'd1 : 14'h3FFF)", "(y ? 14'h3FFF : 14'd1)")], GOLD),
     "M06": ([(CORE, "tag_in = {sys_swap,", "tag_in = {~sys_swap,")], GOLD + ["a_seq01_trace_ctl"]),
     "M07": ([(SEQ, SW, "if (c == 13'd0 && !boot) sys_swap <= sys_en_n & slot_ctr[0];")], ["a_seq01_trace_ctl"]),
     "M07b": ([(SEQ, "reg [12:0] c;", "reg [12:0] c; reg sw_d;\n    always @(posedge clk or negedge rst_n) "
