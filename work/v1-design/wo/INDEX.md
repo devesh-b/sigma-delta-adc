@@ -80,3 +80,5 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-70 C4c tb netlist bug fix + rerun + D78 Sg re-split: dispatched 2026-11-13
 - WO-69 done (7841d57): heuristic diodes off
 - WO-71 C9 CTS sink clustering <= 10 (single change): dispatched 2026-11-13
+- WO-71 done (fe8b8bf, 401fb33): CTS clustering 8, fanout 0
+- WO-72 C9 post-GRT design repair (single change): dispatched 2026-11-13
