@@ -502,7 +502,7 @@ Mutants are throwaway copies under `verif/mutants/` (never committed back). Each
 | M56 | cfg_pending inverted, or compared against the hold config | D-CFG-04, A-CFG-02 |
 | M57 | (WO-49B, CL-28) comparator captured one fs cycle late (extra flop on fs_tick, the CL-23 loop delay) | GOLD |
 | M57b | (WO-49B, CL-28) comparator captured 1 clk before fs_tick (strobe on the wrong phase) | A-SEQ-01, GOLD (strict BFM) |
-| W1 / W2 | (WO-49B, CL-29) acc1 13 b / acc2 24 b internal width | D-DEC-03, GOLD |
+| W1 / W2 | (WO-49B CL-29, WO-58 CL-32) acc1 13 b / acc2 23 b internal width (must REJECT; acc2 24 b = design, D77) | D-DEC-03, GOLD |
 | M58 | bit clock period = div + 1 | D-FS-01, BUS-04 |
 | M59 | status frame_ctr = live counter instead of the hold frame_ctr | D-FRM-03, A-FRM-01 |
 
@@ -623,5 +623,5 @@ Metastability itself is not simulated (waiver kept). M39 (rd without a sync) is 
 
 - **Capture edge (CL-28).** Ref A captures `comp` on the fs-cycle start edge (pre-state cnt = div−1) straight into the DAC flop; the CL-23 falling-edge sample is gone. The decision captured at the end of cycle c is still y[n] with n = c − 1, so the golden (fs-cycle granular) expectations do not change.
 - **Comparator BFM (hostile, default).** `comp_in` carries the correct bit only on the clk whose rising edge is the capture edge; it carries the inverted bit on every other clk of the conversion window. `C9_COMP_WIN=k` widens the valid window to k clk before the edge (default 0). A DUT that captures one clk early or late fails clk-exact on `dac_y` and fails the golden.
-- **Widths (CL-29).** The bench sees only the 32-bit frame words, so the narrow accumulators are checked through the golden and the N 4096 full-scale streams (D-DEC-03). W1 (acc1 13 b) and W2 (acc2 24 b) are the width mutants. Arithmetic note: with N ≤ 4096, the exclusive acc2 stays within ±N(N−1)/2 = ±8 386 560 < 2^23. A 24-bit signed acc2 therefore holds every legal value, so W2 cannot be killed by legal stimulus (see the WO-49B report).
+- **Widths (CL-29).** The bench sees only the 32-bit frame words, so the narrow accumulators are checked through the golden and the N 4096 full-scale streams (D-DEC-03). W1 (acc1 13 b) and W2 (acc2 23 b, WO-58 / CL-32) are the width mutants; both must be killed. Arithmetic note: with N ≤ 4096, the exclusive acc2 stays within ±N(N−1)/2 = ±8 386 560 < 2^23, so the 24-bit acc2 of D77 holds every legal value and a 24-bit mutant is equivalent (retired, AMB-25). A 23-bit acc2 (range ±2^22) overflows on the N 4096 full-scale streams. M01 is acc2 22 b.
 - **Job kinds** in `wo42_job.sh`: `test NAME SEED` (one test, with the collector) and `suite STEP`. The job file is `wo49b_jobs.txt`.

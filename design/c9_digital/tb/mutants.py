@@ -1,4 +1,4 @@
-"""C9 RTL mutants (C9_VERIF_PLAN section 6, M01-M59 + M07b), WO-40.  Throwaway copies only.
+"""C9 RTL mutants (C9_VERIF_PLAN section 6, M01-M59 + M07b), WO-40.  WO-58: re-anchored on D77 (acc2 24 b); M01 = acc2 22 b, W2 = acc2 23 b.  Throwaway copies only.
 
     python3 mutants.py make MID DEST     copy ../rtl to DEST/rtl and apply mutant MID (each edit must match once)
     python3 mutants.py tests MID         planned killing tests first, then every other test (space separated)
@@ -19,7 +19,7 @@ DEC, SEQ, CFG = "c9_dec.v", "c9_seq.v", "c9_cfg.v"
 CORE, BUS, DIV, TOP = "c9_core.v", "c9_rdbus.v", "c9_fsdiv.v", "tt_um_sd_adc_c9.v"
 GOLD = ["s02_reset_pair_golden", "d_dec01_golden_vectors", "d_dec03_streams"]
 A1 = "wire [13:0] a1n = acc1 + (y ? 14'd1 : 14'h3FFF);"
-A2 = "wire [24:0] a2n = acc2 + {{11{acc1[13]}}, acc1};"
+A2 = "wire [23:0] a2n = acc2 + {{10{acc1[13]}}, acc1};"
 SW = "if (slot_start) sys_swap <= sys_en_n & ctr_n[0];"
 ACTN = "wire [12:0] act_n    = latch ? shadow : act;"
 ACTQ = "act         <= act_n;"
@@ -30,13 +30,13 @@ LDR = "wire       ld_rise = cfg_ld_s  & ~ld_p;"
 YD = "y_dac      <= (c == 13'd1) ? 1'b1 : comp_in;"
 
 M = {
-    "M01": ([(DEC, A2, "wire [22:0] a2t = acc2[22:0] + {{9{acc1[13]}}, acc1}; wire [24:0] a2n = {{2{a2t[22]}}, a2t};")],
+    "M01": ([(DEC, A2, "wire [21:0] a2t = acc2[21:0] + {{8{acc1[13]}}, acc1}; wire [23:0] a2n = {{2{a2t[21]}}, a2t};")],
             ["d_dec03_streams", "d_dec01_golden_vectors"]),
     "M02": ([(DEC, A1, "wire [11:0] a1t = acc1[11:0] + (y ? 12'd1 : 12'hFFF); wire [13:0] a1n = {{2{a1t[11]}}, a1t};")],
             ["d_dec03_streams"]),
     "M03": ([(SEQ, "bit_valid  <= ~rst_n_nx;", "bit_valid  <= ~rst_n_nx & ~(c == 13'd1);")], GOLD),
-    "M04": ([(DEC, "if (acc_clear) begin acc1 <= 14'd0; acc2 <= 25'd0; end",
-              "if (acc_clear) begin acc1 <= (y ? 14'd1 : 14'h3FFF); acc2 <= 25'd0; end")], GOLD),
+    "M04": ([(DEC, "if (acc_clear) begin acc1 <= 14'd0; acc2 <= 24'd0; end",
+              "if (acc_clear) begin acc1 <= (y ? 14'd1 : 14'h3FFF); acc2 <= 24'd0; end")], GOLD),
     "M05": ([(DEC, "(y ? 14'd1 : 14'h3FFF)", "(y ? 14'h3FFF : 14'd1)")], GOLD),
     "M06": ([(CORE, "tag_in = {sys_swap,", "tag_in = {~sys_swap,")], GOLD + ["a_seq01_trace_ctl"]),
     "M07": ([(SEQ, SW, "if (c == 13'd0 && !boot) sys_swap <= sys_en_n & slot_ctr[0];")], ["a_seq01_trace_ctl"]),
@@ -44,8 +44,8 @@ M = {
                "if (!rst_n) sys_swap <= 1'b0; else sys_swap <= sw_d;"),
               (SEQ, "rst_analog <= 1'b1; sys_swap <= 1'b0;", "rst_analog <= 1'b1; sw_d <= 1'b0;"),
               (SEQ, SW, "if (slot_start) sw_d <= sys_en_n & ctr_n[0];")], ["a_seq01_trace_ctl"]),
-    "M08": ([(DEC, A2, "wire [24:0] a2n = acc2 + {{11{a1n[13]}}, a1n};")], GOLD),
-    "M09": ([(DEC, "h2         <= a2n;", "h2         <= {1'b0, a2n[23:0]};")], ["d_dec03_streams"] + GOLD),
+    "M08": ([(DEC, A2, "wire [23:0] a2n = acc2 + {{10{a1n[13]}}, a1n};")], GOLD),
+    "M09": ([(DEC, "h2         <= a2n;", "h2         <= {1'b0, a2n[22:0]};")], ["d_dec03_streams"] + GOLD),
     "M10": ([(SEQ, "y_dac      <= (c == 13'd1) ? 1'b1 : comp_in;", "y_dac      <= comp_in;")], GOLD),
     "M11": ([(CORE, "assign y_dac = y;", "assign y_dac = y & ~y_force;")], ["a_seq01_trace_ctl", "d_bus03_debug"]),
     "M12": ([(SEQ, "acc_clear  <= (c == 13'd0) & ~slot_start;", "acc_clear  <= slot_start;")],
@@ -122,7 +122,7 @@ M = {
     "M52": ([(CFG, "if (ld_rise)       shift <= 16'd0;", "if (1'b0)       shift <= 16'd0;")], ["d_cfg02_shift"]),
     "M53": ([(CORE, "always @(posedge clk or negedge rst_n) begin\n        if (!rst_n) begin r1",
               "always @(posedge clk) begin\n        if (!rst_n) begin r1")], ["a_rst01_async_mid"]),
-    "M54": ([(DEC, "h1 <= 14'd0; h2 <= 25'd0;", ""),
+    "M54": ([(DEC, "h1 <= 14'd0; h2 <= 24'd0;", ""),
              (DEC, "frame_ready <= 1'b0; overrun <= 1'b0; snap", "overrun <= 1'b0; snap")],
             ["a_rst01_async_mid", "s01_reset_idle"]),
     "M55": ([(CFG, ACTQ, "act         <= {act_n[12:5], shadow_n[4], act_n[3:0]};")],
@@ -137,8 +137,8 @@ M = {
              ["a_seq01_trace_ctl"] + GOLD),   # WO-49B: capture 1 clk before fs_tick (wrong strobe phase, CL-28 broken copy)
     "W1": ([(DEC, A1, "wire [12:0] a1t = acc1[12:0] + (y ? 13'd1 : 13'h1FFF); wire [13:0] a1n = {a1t[12], a1t};")],
            ["d_dec03_streams"] + GOLD),   # WO-49B CL-29: acc1 13 b must REJECT
-    "W2": ([(DEC, A2, "wire [23:0] a2t = acc2[23:0] + {{10{acc1[13]}}, acc1}; wire [24:0] a2n = {a2t[23], a2t};")],
-           ["d_dec03_streams"] + GOLD),   # WO-49B CL-29: acc2 24 b must REJECT
+    "W2": ([(DEC, A2, "wire [22:0] a2t = acc2[22:0] + {{9{acc1[13]}}, acc1}; wire [23:0] a2n = {a2t[22], a2t};")],
+           ["d_dec03_streams"] + GOLD),   # WO-58 CL-32: acc2 23 b must REJECT (24 b = design)
     "M58": ([(DIV, "default: begin div_m1 = 8'd23;", "default: begin div_m1 = 8'd24;")],
             ["s01_reset_idle", "d_fs01_div_codes"]),
     "M59": ([(CORE, "1'b0, hold_tag[7:0]};", "1'b0, slot_ctr};")], ["d_dec01_golden_vectors", "d_frm04_overrun"]),
