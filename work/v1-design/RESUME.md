@@ -827,3 +827,21 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - **WO-52 C1 reruns:** the first relaunch had no env (ngspice not on PATH; jobs 2–36 failed fast). Relaunched with env in out/logs4. Gate B fs/125 part 0 = 2.179 ppm ACCEPT.
   - **WO-51 C3 (results/wo51/summary.txt):** the HV cascode broke function (T2/T7/T10 REJECT at all corners, missed decisions) and T8 still fails (2.38–2.55 V, now on the tail). The offset row and its ×6 copy are fine. → WO-56.
   - **WO-50 C6 (results/wo50/summary.txt):** worse. The DC lands wrong at ss/27 (12 µA, 5.5 mA own) and tt/−40 (18.8 µA); start-up fails at nearly all corners and ramps. → WO-55 (re-architecture allowed).
+- WO-49B done (968bd7a, d104ed1, 61ceeb8, 52a50d9): C9 on the D72/D74 RTL.
+  - All tests pass; coverage bins 250/250; mutants 64/65 (W2 equivalent → D77).
+  - Remaining risks: SOAK only 3000 slots; R-01 only seeds 4–20 on the new RTL; no LibreLane GL/SDF.
+  - Next: small RTL WO for D77 (new agent), then PnR.
+- WO-54 partial (abe620c, e6022d3, 8eacc99): C4 rev b, netlist, tb (89 jobs).
+  - Pool in WO-54-e6022d3 (run/pool/POOL_DONE; report: python ../c4_sw/c4_tb.py report .); smoke2 in WO-54-smoke2.
+  - Findings for the user:
+    - the PDK clkiso/isosrc LS models are unusable in SPICE, so isolation is done in logic instead;
+    - Sg leak 68 pA at ff/125 against a 45 pA share.
+- WO-56 partial (2e55372, 11cacf8): C3 rev d.
+  - Diagnosis: no precharge on the cascode nodes gave decision memory.
+  - Fix: HV PMOS precharge + HV tail.
+  - Pool in WO-56-2e55372 (60 decks).
+- WO-55 partial (4ea14b9, 2662364, 82605c4): C6 option (c) skewed-amp Banba + core-derived bias_ok.
+  - The WO-50 DC "errors" were non-physical .dc solutions.
+  - Smoke: single equilibrium; sf/27 initial-state test OK.
+  - The 1 µs ramp misses ±1 % at +10 µs (26–40 µs).
+  - Pool in WO-55-2662364. User decision on the 10 µs gate.
