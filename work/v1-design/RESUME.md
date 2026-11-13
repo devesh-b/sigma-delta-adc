@@ -847,3 +847,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
   - Pool in WO-55-2662364. User decision on the 10 µs gate.
 - D78 (user): C4 logic isolation; Sg re-split with the C1 share; C6 ~40 µs settle covered by the C9 hold (row → settled before rstb release; single bias_ok rise).
 - WO-57 done (346995c): acc2 24 b, CL-32, 929 cells / 223 FF. WO-58A (re-verify) + WO-58B (PnR) dispatched as fresh agents. Note: the IIC container cannot mount /home/mempool/regr.
+- WO-58B partial (a166371, 3e1e9ea, 88911ba): first full PnR running in WO-58B/3e1e9ea (pnr1.log ends with EXIT=; metrics via ext.sh). So far: synth 860 cells / 11,790 µm² / 223 FF; floorplan util 0.515; post-CTS tt setup +8.76 ns, hold +0.27 ns. Rule slip: pkill -f over ssh killed its own session (no harm to others).
