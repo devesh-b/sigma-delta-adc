@@ -33,7 +33,7 @@ on → inv → inv → nb2 ┘ latch   → qlb → inv → inv → qb
 | C. 1.8 V input pair | PDK MC covers it | gate sees x2 up to VAPWR: violates D40 (T8 broken copy `in18`) |
 | Static preamp | kickback isolation, lower offset | 10–30 µA static against a 189/200 µA worst case (D46c); rows 105/106 do not need it |
 
-**Why the tail is 1.8 V (D74, REVIEW-C3a 4):** with clk low, dp/dn are precharged to VDPWR and M1/M2 act as source followers onto `tl` from drains at VDPWR, so tl ≤ VDPWR whatever x2 does; the tail sees ≤ VDPWR on every terminal pair. A 1.8 V gate on a 1.8 V strobe gives more overdrive than the HV tail of rev a. The pair gates still need HV (Vgs up to VAPWR + 0.5 V at overload). T8 proves both.
+**Rev d (WO-56) supersedes this paragraph:** with the cascode the pair drains no longer sit at VDPWR, so the tail is HV and the cascode nodes are precharged (§4b). Original rev b reasoning, kept for the record. **Why the tail is 1.8 V (D74, REVIEW-C3a 4):** with clk low, dp/dn are precharged to VDPWR and M1/M2 act as source followers onto `tl` from drains at VDPWR, so tl ≤ VDPWR whatever x2 does; the tail sees ≤ VDPWR on every terminal pair. A 1.8 V gate on a 1.8 V strobe gives more overdrive than the HV tail of rev a. The pair gates still need HV (Vgs up to VAPWR + 0.5 V at overload). T8 proves both.
 
 **Latch / buffers:** buffers (not the latch gates) load op/on, and both buffer outputs are high in precharge whatever the held state, so the loading is symmetric (pthomas: NAND latch directly on op/on gave ≈ 10 mV-equivalent hysteresis; T7 broken copy `nobuf`). NAND with both inputs high = hold, so q/qb keep the decision through precharge until the next strobe. **Output buffer (REVIEW-C3a 7):** 0.5/1 then 2/4 inverters per side drive the routed q net; the tb load is 100 fF (≈ 300 µm met2 + D pin, rounded up) instead of the optimistic 5 fF of rev a, and the latch no longer sees the routed load.
 
@@ -108,11 +108,29 @@ Unresolved at t if |Δ| < Δ_crit = (V_DD/2/A_n)·exp(−(t − t_int)/τ_reg). 
 ## 4. Supply, levels, current
 VDPWR 1.62–1.98 V; strobe from C4's 1.8 V side; q/qb straight into C9 (no shifter). All 1.8 V terminal pairs ≤ 1.98 V by construction (dp/dn, tl ≤ VDPWR), proven by T8 over both power-up orders and x2 from −0.5 V to 3.6 V. Current: dynamic only, ≈ 0.5–0.8 µA from VDPWR at 4 MHz (WO-44), T9 reports it.
 
+### 4b. Rev d (WO-56): cascode-node precharge and HV tail
+**Rev c (WO-51)** put an HV cascode K1/K2 (gate = VDPWR) between the pair drains ap/an and dp/dn. Two faults followed:
+1. **Memory (T2/T7/T10 REJECT at every corner).** ap/an had no precharge. In reset they charged only through K1/K2 towards VDPWR − VT,HV, and the last part of that runs in subthreshold, so it does not settle within a 250 ns period. After a ±0.3 V decision one node was pulled to ≈ tl and the other was not, so the next strobe started with ap ≠ an. The lower node turns its cascode on first, which favours the previous decision. The −0.5 mV and +0.5 mV cycles that follow a big one (c1, c4) then read the wrong sign, and q only moves on the next big cycle, which is why t_dec shows ≈ 500 / 250 ns. CM 1.8 V passed because with more pair overdrive both nodes are pulled to tl in every decision. Evidence: the `cyc` probe `ap_an_pre_fire_mV` (ap − an 0.2 ns before each fire) on `cyc_info_revc_*` vs rev d (results/wo56).
+2. **T8 moved to the tail (2.38–2.55 V, `st_t_ds`).** tl is the common source of the pair. In rev b it followed dp/dn, which the precharge PMOS drain diode clamps at ≈ VDPWR + 0.4 V. In rev c the pair drains are the floating cascode nodes, so with x2 high tl followed ap/an up and the 1.8 V tail saw it.
+
+**Options compared (item 2):**
+| Option | For | Against | Verdict |
+|---|---|---|---|
+| **Fix the cascode: HV PMOS precharge of ap/an (gate = strobe) + HV tail (chosen)** | ap/an start each strobe equal and at VDPWR (no memory); tl, ap, an touch only HV devices, so no 1.8 V terminal can see x2; dp/dn stay behind the cascode | 2 HV PMOS (2/0.5) + tail HV 5/0.5 ×4 (≈ 10 µm² more); the HV tail has a higher VT, so W/L goes 16 → 40 to keep t_dec in the T2band | chosen |
+| Self-biased / precharged cascode gate only | no new devices on ap/an | leaves ap/an floating → memory stays; does not bound tl → T8 stays | rejected |
+| Input series R + clamp | protects any core | x2 is a 3.3 V-domain node that normally sits at 1.5 ± 0.7 V; a clamp to VDPWR would clip the normal swing, a clamp to VAPWR does not protect 1.8 V devices; series R adds τ to the kick recovery (row 108) | rejected |
+| Fully HV StrongARM | no 1.8 V device near x2 | HV latch at 1.62 V: VT,HV ≈ 0.7–1 V leaves little overdrive, t_dec and T2band at risk at ss/−40; needs a 1.8 V output stage anyway | not needed |
+| Stress-aware sequencing | no circuit change | TT supplies are external, power-up order is not ours; overload (x2 at VAPWR) also happens in operation | rejected |
+
+T8 then needs every 1.8 V terminal pair ≤ 1.98 V with the gate stimulus (OTA2 slew, φI only), both orders, tt/27 and ff/−40; `in18` stays the broken copy; `nocas` (rev b) and `revc` (rev c) are info copies.
+
 ## 5. Sizes (`sizes_draft.py`, set A′, D74)
 | Device | Type | W/L (µm) × m | Note |
 |---|---|---|---|
 | M1/M2 input pair | nfet_g5v0d10v5 | 5/0.5 × 4 | set A pair (CM kick ≈ 45 mV) |
-| T tail | nfet_01v8 | 4/0.5 × 2 | 1.8 V (D74) |
+| T tail | nfet_g5v0d10v5 | 5/0.5 × 4 | HV since rev d (WO-56, §4b); rev b/c: nfet_01v8 4/0.5 × 2 |
+| K1/K2 cascode | nfet_g5v0d10v5 | 5/0.5 × 4 | gate = VDPWR (WO-51) |
+| P1/P2 ap/an precharge | pfet_g5v0d10v5 | 2/0.5 | gate = strobe (WO-56) |
 | M3/M4 latch N | nfet_01v8 | 4/0.5 | set B latch |
 | M5/M6 latch P | pfet_01v8 | 4/0.5 | set B latch |
 | R0–R3 precharge | pfet_01v8 | 1/0.15 | op, on, dp, dn |
