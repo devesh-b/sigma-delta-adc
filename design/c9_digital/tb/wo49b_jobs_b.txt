@@ -1,0 +1,3 @@
+# WO-49B pool b: M05 rerun (re-anchored) in frozen -b; fcov merge of pool a results in frozen -a.
+cd /home/mempool/tt-sd && scripts/iic "cd /foss/designs/regr/WO-49B-61ceeb8-b/design/c9_digital/tb && ./mut_job.sh M05"
+cd /home/mempool/tt-sd && scripts/iic "cd /foss/designs/regr/WO-49B-968bd7a-a/design/c9_digital/tb && ./wo42_job.sh merge"
