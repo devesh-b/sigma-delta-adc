@@ -45,8 +45,9 @@ UW, UL = 0.42, 20.0            # PMOS unit (all VG-gated legs)
 N_CORE, N_TAIL, N_M6 = 17, 8, 8
 G0, GT, CODE_RESET = 17, 19.8, 4
 NPNP = 8
-R1_L = 82.0                    # um of 0p69 xhrpoly
-CC, CVG = 3e-12, 1e-12
+R1_L = 94.0                    # um of 0p69 xhrpoly (WO-55: x1.15 vs WO-45 82 um, recentres I0 after the amp skew)
+CC = float(os.environ.get("C6_CC", 3e-12))     # env overrides: WO-55 smoke variants only
+CVG = 1e-12
 VSENSE = 0.9                   # trim-copy drain sense voltage
 TEMPS = (-40, 27, 125)
 CORNERS = ("tt", "ss", "ff", "sf", "fs")
@@ -60,7 +61,7 @@ COVER = (1 + EPS_TRIM) / (1 - EPS_TRIM) * (1 - RESID) / (1 + RESID)
 SKEW = 2.0                     # main amp: mb W = 4 * SKEW (built-in Voff, V_B > V_A at balance)
 CMP_SKEW = 3.0                 # pnp-on comparator: diode-side input (gate B) W = 4 * CMP_SKEW
 N_CT = 8                       # comparator tail units from VG
-NKK = 8                        # kick chain: NKK x unit PMOS in series, gate 0
+NKK = int(os.environ.get("C6_NKK", 8))         # kick chain: NKK x unit PMOS in series, gate 0
 NLK = 8                        # core-off leaker: NLK x unit PMOS in series, gate 0
 MN_W, MN_L = 2.0, 4.0          # master NMOS diode
 MK_W, MK_L = 1.05, 4.0         # Mk: R_K = 0.525 -> core-off flag clears at I_lk / 0.525
@@ -128,8 +129,8 @@ def deck(kind, corner, temp, vdd, mut="none", tr=1e-6, ratio=4.6, out="o.csv", i
     L += [x("mm", "mo", "vg", "vdd", "vdd", P5, UW, UL, G0 + CODE_RESET), "Vsm mo vn 0",
           x("mn", "vn", "vn", "0", "0", N5, MN_W, MN_L)]
     if init in ("0", "v"):                   # dci: .ic every node = 0 / = VDD (with uic)
-        val = 0.0 if init == "0" else vdd
-        L.append(".ic " + " ".join(f"v({n})={val:g}" for n in nn))
+        val = 0.0 if init == "0" else vdd            # pnp emitters capped at 0.8 V (3 V on a pnp is not a state)
+        L.append(".ic " + " ".join(f"v({n})={(min(val, 0.8) if n in ('a', 'b', 'c') else val):g}" for n in nn))
     elif kind in ("dct", "dcv", "op"):       # hint towards the operating point; the result is checked for physics
         hint = dict(a=0.6, b=0.6, c=0.54, vg=vdd - 1.3, o1=0.9, n1=0.9, t=1.9, vn=0.9, mo=0.9, tsu=0.05, ok=vdd,
                     sua=0, q=vdd - 1, tc=2.0)
@@ -162,7 +163,7 @@ def deck(kind, corner, temp, vdd, mut="none", tr=1e-6, ratio=4.6, out="o.csv", i
             tstop = 10e-9 + tr + (60e-6 if tr < 1e-4 else 200e-6)
             tmax = 5e-9 if tr < 1e-4 else 2e-6
         an = f".tran {tmax:.3g} {tstop:.6g} 0 {tmax:.3g} uic"
-        L.append(".option method=gear")
+        L.append(".option method=gear rshunt=1e12 itl4=200")   # WO-55 smoke: ff/125 aborted at t = 10 ns without
         vecs = ["i(vsm)", "v(ok)", "v(vdd)", "v(vg)", "v(tsu)", "v(a)", "v(b)", "v(o1)"]
     L += [an, ".control", "set wr_singlescale", "set wr_vecnames", "option numdgt=8", "run",
           f"wrdata {out} {' '.join(vecs)}", ".endc", ".end"]
@@ -352,8 +353,9 @@ def run(out, kind, corner, temp, vdd, mut="none", tr=1e-6):
     else:
         op = op_point(out, tag, corner, temp, vdd, ratio, "none" if mut == "nosu" else mut)
         d = sim(deck("tran", corner, temp, vdd, mut, tr=tr, ratio=ratio, out=base + ".csv"), base)
-        if d is None or op is None:
+        if d is None or op is None or d["x"][-1] < 10e-9 + tr + TSET:
             r["verdict"] = "SIMFAIL"
+            r["t_last"] = None if d is None else d["x"][-1]
         else:
             r.update(tran_eval(d, op["i(vsm)"][0], tr), op_phys=phys(op, vdd))
             if not r["op_phys"]:
