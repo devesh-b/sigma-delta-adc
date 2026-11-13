@@ -1,5 +1,5 @@
 {
-  "//": "WO-47 DRAFT LibreLane (Classic flow) config for the C9 digital macro. Not a signoff config. DIE_AREA is a placeholder until the WO-47 synthesis probe area is in (see HARDENING.md 3). Paths are relative to this file.",
+  "//": "WO-58B LibreLane (Classic flow) config for the C9 digital macro sd_adc_c9 (first full PnR). Paths relative to this file. Corners: PDK default tt/ss_100C_1v60/ff plus ss_100C_1v40 as the 125 C / 1.62 V stand-in (D72); 125 C / 1.98 V has no hd liberty (documented gap). LIB is given explicitly because adding a corner needs it; the three PDK entries are the same files the PDK default uses (pdk_compat.py LIB_SYNTH/SLOWEST/FASTEST). TIMING_VIOLATION_CORNERS widened from the PDK default ['*tt*'] to all corners (checks are deferred errors; nothing is waived).",
   "meta": { "version": 2, "flow": "Classic" },
 
   "DESIGN_NAME": "sd_adc_c9",
@@ -17,12 +17,26 @@
   "PNR_SDC_FILE": "dir::c9.sdc",
   "SIGNOFF_SDC_FILE": "dir::c9.sdc",
 
+  "LIB": {
+    "*_tt_025C_1v80": ["pdk_dir::libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib"],
+    "*_ss_100C_1v60": ["pdk_dir::libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__ss_100C_1v60.lib"],
+    "*_ss_100C_1v40": ["pdk_dir::libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__ss_100C_1v40.lib"],
+    "*_ff_n40C_1v95": ["pdk_dir::libs.ref/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__ff_n40C_1v95.lib"]
+  },
+  "STA_CORNERS": [
+    "nom_tt_025C_1v80", "nom_ss_100C_1v60", "nom_ss_100C_1v40", "nom_ff_n40C_1v95",
+    "min_tt_025C_1v80", "min_ss_100C_1v60", "min_ss_100C_1v40", "min_ff_n40C_1v95",
+    "max_tt_025C_1v80", "max_ss_100C_1v60", "max_ss_100C_1v40", "max_ff_n40C_1v95"
+  ],
+  "DEFAULT_CORNER": "nom_tt_025C_1v80",
+  "TIMING_VIOLATION_CORNERS": ["*"],
+
   "FP_SIZING": "absolute",
-  "DIE_AREA": [0, 0, 150, 80],
+  "DIE_AREA": [0, 0, 190, 150],
   "PL_TARGET_DENSITY_PCT": 60,
   "IO_PIN_ORDER_CFG": "dir::pin_order.cfg",
 
-  "FP_PDN_MULTILAYER": false,
+  "PDN_MULTILAYER": false,
   "RT_MAX_LAYER": "met4",
 
   "RUN_HEURISTIC_DIODE_INSERTION": true,
