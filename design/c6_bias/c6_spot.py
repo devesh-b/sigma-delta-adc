@@ -45,8 +45,14 @@ UW, UL = 0.42, 20.0            # PMOS unit (all VG-gated legs)
 N_CORE, N_TAIL, N_M6 = 17, 8, 8
 G0, GT, CODE_RESET = 17, 19.8, 4
 NPNP = 8
-R1_L = 94.0                    # um of 0p69 xhrpoly (WO-55: x1.15 vs WO-45 82 um, recentres I0 after the amp skew)
+R1_L = 94.0                    # um of 0p69 xhrpoly; WO-64: default only, the tuned value comes from OUT/tune.json
+I_TGT = 1.07e-6                # WO-64: master (code 100) current at tt/27/3.3 for the C1 port design currents
+LIM_I0 = 0.02                  # tt/27 I0 within +-2 % of I_TGT
+OWN_MAX = 6e-6                 # SPEC row 104
+R1_S1 = 165.0                  # WO-64 tune stage-1 R1 (estimate: I ~ 1/R, zero-TC ratio ~2.2)
+TUNE1 = [round(1.6 + 0.15 * i, 2) for i in range(9)]
 CC = float(os.environ.get("C6_CC", 3e-12))     # env overrides: WO-55 smoke variants only
+TRANFIX = os.environ.get("C6_TRANFIX", "op")   # WO-64: op = no uic (t=0 op at VAPWR 0); uic = WO-55; gmin = uic+gmin 1e-12
 CVG = 1e-12
 VSENSE = 0.9                   # trim-copy drain sense voltage
 TEMPS = (-40, 27, 125)
@@ -66,8 +72,14 @@ NLK = 8                        # core-off leaker: NLK x unit PMOS in series, gat
 MN_W, MN_L = 2.0, 4.0          # master NMOS diode
 MK_W, MK_L = 1.05, 4.0         # Mk: R_K = 0.525 -> core-off flag clears at I_lk / 0.525
 R_K = (MK_W / MK_L) / (MN_W / MN_L)
+N_HY = 4                       # WO-64: hysteresis units into q while ok high (WO-55: 1 -> 3-4 ok rises); mut hy1 = 1
 # gates
-TSET, LIM_SU = 10e-6, 0.01     # within +-1 % of DC from end of ramp + 10 us to the end
+TSET, LIM_SU = 10e-6, 0.01     # (WO-55 window, superseded) / +-1 % band
+H_HOLD = 256 / 4e6             # D78: C9 rstb hold after the final bias_ok rise, 256 fs cycles at 4 MHz = 64 us
+T_CNT = 2 ** 16 / 4e6          # WO-64 VAPWR-good = C9 count: 2^16 fs cycles (16.4 ms) after rst_n release (ramp start)
+VPRE = 0.05                    # tran: VAPWR before the ramp (V); below every device threshold
+WIN_MIN = 20e-6               # at least this much simulated time after rstb release
+HINT_AGREE = 0.005             # dct first point vs transient-from-0 current
 IOK_MIN = 0.5                  # bias_ok's final assertion only with I >= 50 % of DC
 IDC_MIN = 0.75e-6              # separator good / low state
 THR_MAX = 0.8                  # core-off flag must be clear at the operating point: I_lk / (R_K I) <= 0.8
@@ -79,17 +91,25 @@ def x(name, d, g, s, b, dev, w, l, m=1):
     return f"X{name} {d} {g} {s} {b} {dev} w={w:g} l={l:g} m={m}"
 
 
-def deck(kind, corner, temp, vdd, mut="none", tr=1e-6, ratio=4.6, out="o.csv", init=None):
-    r2l = R1_L * ratio
-    L = [f"* c6_spot {kind} {corner} {temp} {vdd} {mut} {tr:g} ratio {ratio:.4f} init {init}", f".lib {LIB} {corner}",
-         ".option gmin=1e-15 reltol=1e-5 abstol=1e-14"]
-    L.append(f"Vdd vdd 0 pwl(0 0 10n 0 {10e-9 + tr:.6g} {vdd})" if kind == "tran" else f"Vdd vdd 0 {vdd}")
+def deck(kind, corner, temp, vdd, mut="none", tr=1e-6, ratio=4.6, out="o.csv", init=None, r1=R1_L, hint=None):
+    R1L = r1
+    r2l = R1L * ratio
+    if kind == "hint":                       # transient from all-0 at fixed VDD: physical state for the dct nodeset
+        kind, init = "dci", "0"
+        hint_run = True
+    else:
+        hint_run = False
+    L = [f"* c6_spot {kind} {corner} {temp} {vdd} {mut} {tr:g} ratio {ratio:.4f} r1 {R1L:.4g} init {init}",
+         f".lib {LIB} {corner}", ".option gmin=1e-15 reltol=1e-5 abstol=1e-14"]
+    # WO-64: the ramp starts from 50 mV, not 0 V. From the exact all-0 state every 125 C ramp with the kick chain stopped
+    # at t = 10 ns (vsm#branch, any tol/method/gmin/rshunt); without the chain, or from 50 mV, it runs (exp125 v10/v11).
+    L.append(f"Vdd vdd 0 pwl(0 {VPRE} 10n {VPRE} {10e-9 + tr:.6g} {vdd})" if kind == "tran" else f"Vdd vdd 0 {vdd}")
     if kind != "dct":
         L.append(f".temp {temp}")
     nn = ["a", "b", "c", "t", "n1", "o1", "vg", "vn", "mo", "tsu", "ok", "sua"]
     # core
     L += [x("m1", "a", "vg", "vdd", "vdd", P5, UW, UL, N_CORE), x("m2", "b", "vg", "vdd", "vdd", P5, UW, UL, N_CORE),
-          f"Xq1 0 0 a {PNP} m=1", f"Xq2 0 0 c {PNP} m={NPNP}", f"Xr1 b c 0 {RX} l={R1_L:.4g}"]
+          f"Xq1 0 0 a {PNP} m=1", f"Xq2 0 0 c {PNP} m={NPNP}", f"Xr1 b c 0 {RX} l={R1L:.4g}"]
     if mut != "ptat":
         L += [f"Xr2a a 0 0 {RX} l={r2l:.4g}", f"Xr2b b 0 0 {RX} l={r2l:.4g}"]
     sk = 1.0 if mut == "noskew" else SKEW
@@ -116,7 +136,7 @@ def deck(kind, corner, temp, vdd, mut="none", tr=1e-6, ratio=4.6, out="o.csv", i
               x("mcc", "q", "c", "tc", "tc", P5, 4, 4), x("mcb", "n2", "b", "tc", "tc", P5, 4 * CMP_SKEW, 4),
               x("ml3", "n2", "n2", "0", "0", N5, 1, 8), x("ml4", "q", "n2", "0", "0", N5, 1, 8),
               x("mqd", "q", "tsu", "0", "0", N5, 1, 1),
-              x("mhy1", "hy", "vg", "vdd", "vdd", P5, UW, UL), x("mhy2", "q", "sua", "hy", "vdd", P5, 1, 1),
+              x("mhy1", "hy", "vg", "vdd", "vdd", P5, UW, UL, 1 if mut == "hy1" else N_HY), x("mhy2", "q", "sua", "hy", "vdd", P5, 1, 1),
               x("i1p", "sua", "q", "vdd", "vdd", P5, UW, UL), x("i1n", "sua", "q", "0", "0", N5, 1, 1)]
     L += [x("i2p", "ok", "sua", "vdd", "vdd", P5, 1, 1), x("i2n", "ok", "sua", "0", "0", N5, 1, 1)]
     # kick into o1 while ok is low (not in the loop-break deck)
@@ -131,7 +151,9 @@ def deck(kind, corner, temp, vdd, mut="none", tr=1e-6, ratio=4.6, out="o.csv", i
     if init in ("0", "v"):                   # dci: .ic every node = 0 / = VDD (with uic)
         val = 0.0 if init == "0" else vdd            # pnp emitters capped at 0.8 V (3 V on a pnp is not a state)
         L.append(".ic " + " ".join(f"v({n})={(min(val, 0.8) if n in ('a', 'b', 'c') else val):g}" for n in nn))
-    elif kind in ("dct", "dcv", "op"):       # hint towards the operating point; the result is checked for physics
+    elif kind == "dct" and hint and mut != "oldhint":   # WO-64: nodeset from the transient-from-0 state (physical)
+        L.append(".nodeset " + " ".join(f"v({k})={v:.6g}" for k, v in hint.items() if k in nn))
+    elif kind in ("dct", "dcv", "op"):       # static hint (WO-55; oldhint broken copy); result checked for physics
         hint = dict(a=0.6, b=0.6, c=0.54, vg=vdd - 1.3, o1=0.9, n1=0.9, t=1.9, vn=0.9, mo=0.9, tsu=0.05, ok=vdd,
                     sua=0, q=vdd - 1, tc=2.0)
         L.append(".nodeset " + " ".join(f"v({k})={v:g}" for k, v in hint.items() if k in nn))
@@ -160,11 +182,19 @@ def deck(kind, corner, temp, vdd, mut="none", tr=1e-6, ratio=4.6, out="o.csv", i
         if kind == "dci":
             tstop, tmax = 300e-6, 20e-9
         else:
-            tstop = 10e-9 + tr + (60e-6 if tr < 1e-4 else 200e-6)
+            # WO-64: run past rstb release (final ok + H_HOLD; slow ramps: the C9 VAPWR-good count T_CNT)
+            tstop = 10e-9 + tr + 150e-6 if tr < 1e-4 else 10e-9 + T_CNT + 200e-6
             tmax = 5e-9 if tr < 1e-4 else 2e-6
-        an = f".tran {tmax:.3g} {tstop:.6g} 0 {tmax:.3g} uic"
+        # WO-64: every 125 C ramp died at t = 10 ns (timestep too small, vsm#branch) from the uic all-0 state.
+        # Default "op": no uic, the t = 0 operating point is solved at VAPWR = 0 (consistent leakage state).
+        uic = " uic" if (kind == "dci" or TRANFIX in ("uic", "gmin")) else ""
+        an = f".tran {tmax:.3g} {tstop:.6g} 0 {tmax:.3g}{uic}"
         L.append(".option method=gear rshunt=1e12 itl4=200")   # WO-55 smoke: ff/125 aborted at t = 10 ns without
+        if kind == "tran" and TRANFIX == "gmin":
+            L.append(".option gmin=1e-12")
         vecs = ["i(vsm)", "v(ok)", "v(vdd)", "v(vg)", "v(tsu)", "v(a)", "v(b)", "v(o1)"]
+        if hint_run:
+            vecs = ["i(vsm)"] + [f"v({n})" for n in nn]
     L += [an, ".control", "set wr_singlescale", "set wr_vecnames", "option numdgt=8", "run",
           f"wrdata {out} {' '.join(vecs)}", ".endc", ".end"]
     return "\n".join(L) + "\n", ["x"] + vecs
@@ -192,15 +222,21 @@ def phys(d, vdd):
 
 
 def ratio_of(out):
+    return params_of(out)[0]
+
+
+def params_of(out):
+    """(R2/R1, R1 length um) from OUT/tune.json (WO-64 tune writes both)."""
     try:
-        return json.load(open(os.path.join(out, "tune.json")))["ratio"]
+        j = json.load(open(os.path.join(out, "tune.json")))
+        return j["ratio"], j.get("r1", R1_L)
     except OSError:
-        return 4.6
+        return 4.6, R1_L
 
 
-def op_point(out, tag, corner, temp, vdd, ratio, mut="none"):
+def op_point(out, tag, corner, temp, vdd, ratio, mut="none", r1=R1_L):
     base = os.path.join(out, tag + "_op")
-    return sim(deck("op", corner, temp, vdd, mut, ratio=ratio, out=base + ".csv"), base)
+    return sim(deck("op", corner, temp, vdd, mut, ratio=ratio, out=base + ".csv", r1=r1), base)
 
 
 def tc_eval(d):
@@ -249,7 +285,7 @@ def loop_eval(d):
                 verdict="ACCEPT" if ok else "REJECT")
 
 
-def tran_eval(d, idc, tr):
+def tran_eval(d, idc, tr, mut="none"):
     t, I, ok, vd = d["x"], d["i(vsm)"], d["v(ok)"], d["v(vdd)"]
     tend = 10e-9 + tr
     hi = [vd[k] > 1.0 and ok[k] > 0.5 * vd[k] for k in range(len(t))]
@@ -258,7 +294,7 @@ def tran_eval(d, idc, tr):
         kf -= 1
     rises = sum(1 for k in range(1, len(t)) if hi[k] and not hi[k - 1])
     win = [k for k in range(len(t)) if t[k] >= tend + TSET]
-    dev = max(abs(I[k] / idc - 1) for k in win)
+    dev = max((abs(I[k] / idc - 1) for k in win), default=1.0)   # WO-55 window, reported only
     t90 = next((t[k] for k in range(len(t)) if I[k] >= 0.9 * idc), None)
     t1 = None                                         # last entry into the +-1 % band
     for k in range(len(t) - 1, -1, -1):
@@ -267,9 +303,23 @@ def tran_eval(d, idc, tr):
             break
     tok = t[kf] if kf < len(t) else None
     iok = I[kf] / idc if kf < len(t) else None
-    okw = all(ok[k] > 0.9 * vd[k] for k in win)
-    started = (dev <= LIM_SU and okw and iok is not None and iok >= IOK_MIN and idc >= IDC_MIN and rises == 1)
-    return dict(idc_uA=idc * 1e6, iend_uA=I[-1] * 1e6, end_err_pct=100 * (I[-1] / idc - 1), dev_win_pct=100 * dev,
+    # WO-64 / D78 gate: settled +-1 % before rstb release and inside +-1 % from release to the end of the run.
+    # release = final ok rise + H_HOLD (hold0: + 0); slow ramps also wait for the C9 VAPWR-good count (nocnt: not).
+    rel = None
+    if tok is not None:
+        rel = tok + (0.0 if mut == "hold0" else H_HOLD)
+        if tr >= 1e-4 and mut != "nocnt":
+            rel = max(rel, 10e-9 + T_CNT)
+    rwin = [k for k in range(len(t)) if rel is not None and t[k] >= rel]
+    rdev = max((abs(I[k] / idc - 1) for k in rwin), default=1.0)
+    settled = t1 is None or (rel is not None and t1 <= rel)
+    longwin = rel is not None and t[-1] - rel >= WIN_MIN
+    okw = bool(rwin) and all(ok[k] > 0.9 * vd[k] for k in rwin)
+    started = (rdev <= LIM_SU and settled and longwin and okw and iok is not None and iok >= IOK_MIN
+               and idc >= IDC_MIN and rises == 1)
+    return dict(rel_after_ramp_us=None if rel is None else (rel - tend) * 1e6, dev_rel_pct=100 * rdev,
+                settled_before_rel=settled, win_after_rel_us=None if rel is None else (t[-1] - rel) * 1e6,
+                margin_hold=None if (t1 is None or tok is None) else H_HOLD / max(t1 - tok, 1e-12),idc_uA=idc * 1e6, iend_uA=I[-1] * 1e6, end_err_pct=100 * (I[-1] / idc - 1), dev_win_pct=100 * dev,
                 t90_after_ramp_us=None if t90 is None else (t90 - tend) * 1e6,
                 t1pct_after_ramp_us=None if t1 is None else (t1 - tend) * 1e6,
                 tok_after_ramp_us=None if tok is None else (tok - tend) * 1e6,
@@ -291,12 +341,18 @@ def ic_eval(d):
 
 def run(out, kind, corner, temp, vdd, mut="none", tr=1e-6):
     temp, vdd, tr = float(temp), float(vdd), float(tr)
-    ratio = ratio_of(out)
+    ratio, r1 = params_of(out)
     tag = f"{kind}_{corner}_{temp:g}_{vdd:g}_{mut}" + (f"_{tr:g}" if kind == "tran" else "")
     base = os.path.join(out, tag)
-    r = dict(tag=tag, kind=kind, corner=corner, temp=temp, vdd=vdd, mut=mut, tr=tr, ratio=ratio)
+    r = dict(tag=tag, kind=kind, corner=corner, temp=temp, vdd=vdd, mut=mut, tr=tr, ratio=ratio, r1=r1)
     if kind == "dct":
-        d = sim(deck("dct", corner, None, vdd, mut, ratio=ratio, out=base + ".csv"), base)
+        # WO-64: the sweep starts at -40 C; its nodeset comes from a 300 us transient from all-0 at -40 C (physical state)
+        hb = base + "_hint"
+        hd = sim(deck("hint", corner, -40, vdd, "none" if mut == "oldhint" else mut, ratio=ratio, out=hb + ".csv",
+                      r1=r1), hb)
+        hint = None if hd is None else {k[2:-1]: v[-1] for k, v in hd.items() if k.startswith("v(")}
+        i_hint = None if hd is None else hd["i(vsm)"][-1]
+        d = sim(deck("dct", corner, None, vdd, mut, ratio=ratio, out=base + ".csv", r1=r1, hint=hint), base)
         if d is None:
             r["verdict"] = "SIMFAIL"
         else:
@@ -314,9 +370,16 @@ def run(out, kind, corner, temp, vdd, mut="none", tr=1e-6):
                      thr_min=min(thr), thr_max=max(thr), vr1_mV_min=min(vr1), vr1_mV_max=max(vr1), ok_min_frac=okmin,
                      phys=ph, I_T={f"{t:g}": i * 1e6 for t, i in zip(T, d["i(vsm)"]) if t in TEMPS or t == 25},
                      tc_ok=tc_ok, trim=tr_res, trim_ok=tr_ok)
-            r["verdict"] = "ACCEPT" if (ph and tc_ok and tr_ok and max(thr) <= THR_MAX and okmin > 0.9) else "REJECT"
+            # WO-64 gates: first sweep point = transient-from-0 state; own current <= 6 uA; tt/27 I0 at I_TGT +-2 %
+            hagree = 1.0 if not i_hint else abs(d["i(vsm)"][0] / i_hint - 1)
+            own_ok = r["own_uA_max"] * 1e-6 <= OWN_MAX
+            i0_ok = corner != "tt" or abs(i27 / I_TGT - 1) <= LIM_I0
+            r.update(i_hint_uA=None if i_hint is None else i_hint * 1e6, hint_agree_pct=100 * hagree, own_ok=own_ok,
+                     i0_err_pct=100 * (i27 / I_TGT - 1), i0_ok=i0_ok, r_len_um=r1 * (1 + 2 * ratio))
+            r["verdict"] = "ACCEPT" if (ph and tc_ok and tr_ok and max(thr) <= THR_MAX and okmin > 0.9
+                                        and hagree <= HINT_AGREE and own_ok and i0_ok) else "REJECT"
     elif kind == "dcv":
-        d = sim(deck("dcv", corner, temp, vdd, mut, ratio=ratio, out=base + ".csv"), base)
+        d = sim(deck("dcv", corner, temp, vdd, mut, ratio=ratio, out=base + ".csv", r1=r1), base)
         if d is None:
             r["verdict"] = "SIMFAIL"
         else:
@@ -331,9 +394,9 @@ def run(out, kind, corner, temp, vdd, mut="none", tr=1e-6):
         res = {}
         for init in ("0", "v"):
             b = f"{base}_ic{init}"
-            d = sim(deck("dci", corner, temp, vdd, mut, ratio=ratio, out=b + ".csv", init=init), b)
+            d = sim(deck("dci", corner, temp, vdd, mut, ratio=ratio, out=b + ".csv", init=init, r1=r1), b)
             res[init] = None if d is None else ic_eval(d)
-        op = op_point(out, tag, corner, temp, vdd, ratio, mut)
+        op = op_point(out, tag, corner, temp, vdd, ratio, mut, r1)
         if None in res.values() or op is None:
             r["verdict"] = "SIMFAIL"
         else:
@@ -348,16 +411,16 @@ def run(out, kind, corner, temp, vdd, mut="none", tr=1e-6):
                     and min(res["0"]["ok_end"], res["v"]["ok_end"]) > 0.9 * vdd)
             r["verdict"] = "ACCEPT" if good else "REJECT"
     elif kind == "loop":
-        d = sim(deck("loop", corner, temp, vdd, mut, ratio=ratio, out=base + ".csv"), base)
+        d = sim(deck("loop", corner, temp, vdd, mut, ratio=ratio, out=base + ".csv", r1=r1), base)
         r.update(loop_eval(d) if d else dict(verdict="SIMFAIL"))
     else:
-        op = op_point(out, tag, corner, temp, vdd, ratio, "none" if mut == "nosu" else mut)
-        d = sim(deck("tran", corner, temp, vdd, mut, tr=tr, ratio=ratio, out=base + ".csv"), base)
-        if d is None or op is None or d["x"][-1] < 10e-9 + tr + TSET:
+        op = op_point(out, tag, corner, temp, vdd, ratio, "none" if mut == "nosu" else mut, r1)
+        d = sim(deck("tran", corner, temp, vdd, mut, tr=tr, ratio=ratio, out=base + ".csv", r1=r1), base)
+        if d is None or op is None or d["x"][-1] < 10e-9 + tr + 100e-6:
             r["verdict"] = "SIMFAIL"
             r["t_last"] = None if d is None else d["x"][-1]
         else:
-            r.update(tran_eval(d, op["i(vsm)"][0], tr), op_phys=phys(op, vdd))
+            r.update(tran_eval(d, op["i(vsm)"][0], tr, mut), op_phys=phys(op, vdd))
             if not r["op_phys"]:
                 r["verdict"] = "REJECT"
     with open(base + ".json", "w") as f:
@@ -366,28 +429,47 @@ def run(out, kind, corner, temp, vdd, mut="none", tr=1e-6):
     return r
 
 
-def tune(out):
-    os.makedirs(out, exist_ok=True)
-    grid = [round(3.0 + 0.3 * i, 2) for i in range(13)]
-    tab = []
-    for rt in grid:
-        base = os.path.join(out, f"tune_{rt:g}")
-        d = sim(deck("dct", "tt", None, 3.3, ratio=rt, out=base + ".csv"), base)
-        if d is None or not phys(d, 3.3):
-            tab.append(dict(ratio=rt, fail=True))
-            continue
+def tunept(out, stage, rt, r1):
+    """WO-64: one tune point (tt/27/3.3 dct with the transient hint) -> OUT/tune_s<stage>_<rt>.json"""
+    rt, r1 = float(rt), float(r1)
+    base = os.path.join(out, f"tune_s{stage}_{rt:g}")
+    hd = sim(deck("hint", "tt", -40, 3.3, ratio=rt, out=base + "_hint.csv", r1=r1), base + "_hint")
+    hint = None if hd is None else {k[2:-1]: v[-1] for k, v in hd.items() if k.startswith("v(")}
+    d = sim(deck("dct", "tt", None, 3.3, ratio=rt, out=base + ".csv", r1=r1, hint=hint), base)
+    if d is None or not phys(d, 3.3):
+        res = dict(ratio=rt, r1=r1, fail=True)
+    else:
         i27, dmax, dmin, slope = tc_eval(d)
-        tab.append(dict(ratio=rt, i27_uA=i27 * 1e6, slope_pct=100 * slope, tc_max_pct=100 * dmax,
-                        tc_min_pct=100 * dmin))
-        print(tab[-1])
-    ok = [t for t in tab if not t.get("fail")]
-    best = min(ok, key=lambda t: max(t["tc_max_pct"], -t["tc_min_pct"]))["ratio"]
-    for a, b in zip(ok, ok[1:]):
-        if a["slope_pct"] * b["slope_pct"] <= 0:
-            best = a["ratio"] + (b["ratio"] - a["ratio"]) * a["slope_pct"] / (a["slope_pct"] - b["slope_pct"])
-            break
-    json.dump(dict(ratio=best, grid=tab), open(os.path.join(out, "tune.json"), "w"), indent=1)
-    print("ratio", best)
+        res = dict(ratio=rt, r1=r1, i27_uA=i27 * 1e6, slope_pct=100 * slope, tc_max_pct=100 * dmax,
+                   tc_min_pct=100 * dmin, tc_abs_pct=100 * max(dmax, -dmin))
+    json.dump(res, open(base + ".tj", "w"))
+    print(res)
+
+
+def tunejobs(out, stage, jobfile):
+    """Stage 1: R1 = R1_S1, ratio grid TUNE1. Stage 2: R1 rescaled to I_TGT, ratio best +-0.1 in 0.05 steps."""
+    me = os.path.abspath(__file__)
+    if stage == "1":
+        pts = [(rt, R1_S1) for rt in TUNE1]
+    else:
+        s1 = json.load(open(os.path.join(out, "tune1.json")))
+        pts = [(round(s1["ratio"] + 0.05 * k, 3), s1["r1"]) for k in range(-2, 3)]
+    with open(jobfile, "w") as f:
+        f.write("\n".join(f"python {me} tunept {os.path.abspath(out)} {stage} {rt:g} {r1:.5g}" for rt, r1 in pts) + "\n")
+
+
+def tunepick(out, stage):
+    tab = [json.load(open(os.path.join(out, f))) for f in sorted(os.listdir(out))
+           if f.startswith(f"tune_s{stage}_") and f.endswith(".tj")]
+    ok = sorted((t for t in tab if not t.get("fail")), key=lambda t: t["ratio"])
+    best = min(ok, key=lambda t: t["tc_abs_pct"])
+    # I ~ 1/R at fixed ratio: rescale R1 so the tt/27 master current lands on I_TGT
+    r1 = best["r1"] * best["i27_uA"] * 1e-6 / I_TGT
+    edge = best is ok[0] or best is ok[-1]
+    res = dict(ratio=best["ratio"], r1=round(r1, 2), best=best, edge=edge, grid=tab)
+    json.dump(res, open(os.path.join(out, "tune1.json" if stage == "1" else "tune.json"), "w"), indent=1)
+    print(f"stage {stage}: ratio {best['ratio']} TC {best['tc_min_pct']:+.2f}/{best['tc_max_pct']:+.2f} % "
+          f"I27 {best['i27_uA']:.4f} uA at R1 {best['r1']} -> R1 {r1:.2f}" + (" GRID EDGE" if edge else ""))
 
 
 def jobs(out, jobfile):
@@ -396,9 +478,11 @@ def jobs(out, jobfile):
     L = [f"{py} tran {c} {t} {v} none {tr:g}" for c, t, v in TRAN for tr in TRS]          # long ones first
     L += [f"{py} tran {c} {t} 3.0 nosu {tr:g}" for c, t in (("ss", -40), ("ff", 125)) for tr in TRS]
     L += [f"{py} tran {c} {t} 3.0 early 1e-06" for c, t in (("ss", -40), ("ff", 125))]
+    L += [f"{py} tran tt 27 3.3 hy1 1e-06", f"{py} tran sf -40 3.0 hy1 1e-06", f"{py} tran tt 27 3.3 hold0 1e-06",
+          f"{py} tran tt 27 3.3 nocnt 0.01", f"{py} tran ss -40 3.0 nocnt 0.01"]
     L += [f"{py} dci {c} {t} 3.0" for c in CORNERS for t in TEMPS] + [f"{py} dci ss -40 3.0 nosu"]
     L += [f"{py} dct {c} 27 {v}" for c, v in DCT]
-    L += [f"{py} dct tt 27 3.3 ptat", f"{py} dct tt 27 3.3 trim_open", f"{py} dcv tt 27 3.3",
+    L += [f"{py} dct tt 27 3.3 ptat", f"{py} dct tt 27 3.3 trim_open", f"{py} dct sf 27 3.0 oldhint", f"{py} dcv tt 27 3.3",
           f"{py} dcv ss -40 3.0", f"{py} dcv ff 125 3.6"]
     L += [f"{py} loop {c} {t} 3.0" for c in CORNERS for t in TEMPS]
     L += [f"{py} loop sf 27 3.0 noskew", f"{py} loop ff 125 3.0 noskew"]
@@ -407,13 +491,13 @@ def jobs(out, jobfile):
 
 
 EXPECT = {"none": "ACCEPT", "nosu": "REJECT", "ptat": "REJECT", "trim_open": "REJECT", "early": "REJECT",
-          "noskew": "REJECT"}
+          "noskew": "REJECT", "hy1": "REJECT", "hold0": "REJECT", "nocnt": "REJECT", "oldhint": "REJECT"}
 
 
 def summary(out):
     R = [json.load(open(os.path.join(out, f))) for f in sorted(os.listdir(out))
-         if f.endswith(".json") and f != "tune.json"]
-    print("tune ratio R2/R1 =", ratio_of(out), "| R_K", round(R_K, 3), "SKEW", SKEW, "CMP_SKEW", CMP_SKEW)
+         if f.endswith(".json") and not f.startswith("tune")]
+    print("tune ratio R2/R1, R1 um =", params_of(out), "| N_HY", N_HY, "TRANFIX", TRANFIX, "| R_K", round(R_K, 3), "SKEW", SKEW, "CMP_SKEW", CMP_SKEW)
     bad = 0
     for r in R:
         exp = "INFO" if r["kind"] == "dcv" else EXPECT.get(r["mut"], "ACCEPT")
@@ -423,7 +507,9 @@ def summary(out):
             s = (f"I27 {r.get('i27_uA', 0):.4f} uA TC {r.get('tc_min_pct', 0):+.2f}/{r.get('tc_max_pct', 0):+.2f} % "
                  f"own {r.get('own_uA_27', 0):.2f}/{r.get('own_uA_max', 0):.2f} uA thr {r.get('thr_min', 0):.2f}.."
                  f"{r.get('thr_max', 0):.2f} VR1 {r.get('vr1_mV_min', 0):.1f}..{r.get('vr1_mV_max', 0):.1f} mV "
-                 f"okmin {r.get('ok_min_frac', 0):.2f} phys {r.get('phys')} trim_ok {r.get('trim_ok')} ")
+                 f"okmin {r.get('ok_min_frac', 0):.2f} phys {r.get('phys')} trim_ok {r.get('trim_ok')} "
+                 f"I0err {r.get('i0_err_pct', 0):+.2f} % hint {fmt(r.get('i_hint_uA'))} uA agree "
+                 f"{r.get('hint_agree_pct', 0):.3f} % Rlen {r.get('r_len_um', 0):.0f} um ")
             for q in r.get("trim", []):
                 s += f"| T{q['T']:g}: stepmin {q['step_min_u']:.2f}u stepmax {q['step_max_pct']:.2f}% cover {q['cover']:.4f} "
         elif r["kind"] == "dcv":
@@ -445,7 +531,9 @@ def summary(out):
                  f"t90 {fmt(r.get('t90_after_ramp_us'))} t1% {fmt(r.get('t1pct_after_ramp_us'))} tok "
                  f"{fmt(r.get('tok_after_ramp_us'))} us settle-after-ok {fmt(r.get('settle_after_ok_us'))} us "
                  f"VDD@ok {fmt(r.get('vdd_at_ok'))} I@ok {fmt(r.get('I_at_ok_frac'))} rises {r.get('ok_rises')} "
-                 f"Imax {fmt(r.get('i_max_frac'))} op_phys {r.get('op_phys')}")
+                 f"Imax {fmt(r.get('i_max_frac'))} op_phys {r.get('op_phys')} rel {fmt(r.get('rel_after_ramp_us'))} us "
+                 f"dev@rel {r.get('dev_rel_pct', 0):.3f} % settled {r.get('settled_before_rel')} "
+                 f"win {fmt(r.get('win_after_rel_us'))} us hold/settle {fmt(r.get('margin_hold'))}")
         print(f"{r['tag']:<36} {r['verdict']:<7} (expect {exp}) {'OK' if good else 'MISMATCH'} :: {s}")
     tr = [r for r in R if r["kind"] == "tran" and r["mut"] == "none" and r["verdict"] == "ACCEPT"]
     if tr:
@@ -463,8 +551,12 @@ def fmt(v):
 
 if __name__ == "__main__":
     a = sys.argv[1:]
-    if a[0] == "tune":
-        tune(a[1])
+    if a[0] == "tunept":
+        tunept(*a[1:5])
+    elif a[0] == "tunejobs":
+        tunejobs(a[1], a[2], a[3])
+    elif a[0] == "tunepick":
+        tunepick(a[1], a[2])
     elif a[0] == "jobs":
         jobs(a[1], a[2])
     elif a[0] == "run":

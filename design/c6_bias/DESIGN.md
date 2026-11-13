@@ -191,3 +191,11 @@ Area (estimate, pre-layout): pnp array 3×3 + dummy ring ≈ 1,300 µm²; xhrpol
 - Floor: VG carries ≈ 71 PMOS units of 0.42 × 20 µm (≈ 2 pF of gate) plus Cvg 1 pF, and is slewed by M6 at ≈ 0.4 µA ⇒ ≈ 1.3 V × 3 pF / 0.4 µA ≈ 10 µs for VG alone. A settle within 10 µs after a 1 µs ramp is below what the sub-µA core can do as sized.
 
 **Sequencer (item 3).** bias_ok = "core in its normal region" (pnp on). It is not "settled". C9 should hold rstb low for a fixed count after bias_valid, sized from the measured worst t(±1 %) − t_ok (results/wo55), and also needs VAPWR-good. Numbers are in results/wo55/README.md. Candidates listed at the time (options): (a) bound the injection: Mpo charges o1 only up to a replica of the M5 gate voltage at ≈ 1.5 × I0 (clamp), so the overshoot is small; (b) release with a delay (an RC or counter on sua) so the core is near I0 before Mpo stops, plus a re-trigger that needs a longer low time; (c) smaller Cc / larger tail so the post-release recovery is not slew-limited; (d) a VAPWR-independent threshold current for the detector (e.g. leaker from a PTAT/VBE branch of its own).
+
+### 6.7 WO-64 (C6d) close-out changes
+Full diagnosis and pickup: `work/v1-design/results/wo64/README.md`.
+- **Tune:** the skew's n·VT·ln 2 PTAT term moves the zero-TC R2/R1 from ≈ 4.6 to ≈ 2.2. The WO-55 grid (3.0–6.6) never bracketed it and returned its edge, so I0 was 1.45 µA and TC −4 %. Now a two-stage tune (R1 165 µm, r 1.6–2.8; then R1 rescaled to 1.07 µA, r ±0.1). Resistor length ≈ 890 µm (+≈ 150 µm² vs §5).
+- **dct nodeset** comes from a transient from all-0 (the sf/27 5.7 mA "state" was a solver artefact; the dci from 0 and from VDD agree on 1.457 µA).
+- **tran** starts at VAPWR 50 mV (the exact-0 state with the kick chain is singular at 125 °C).
+- **Start-up row (D78):** settled ±1 % before rstb release = final bias_ok + 64 µs (256 fs cycles at 4 MHz). Hysteresis 4 VG units (was 1).
+- **VAPWR-good = C9 count**, 2^16 fs cycles after rst_n release, ANDed with the bias_ok hold. A C6 supply detector was not chosen: no T-stable threshold is available without resistor area or current. Cost: no brown-out detection.
