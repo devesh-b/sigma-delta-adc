@@ -290,7 +290,12 @@ ff/125/3.6 (largest channel charge); settling at ss/−40/3.0 (+ tt, ss/125); le
 | injdm (M3) | INL of (real − ideal switches) ≤ 2 ppm of 2·VREF, 3σ Cs mismatch in | `order_inv` |
 | injcm | CM→DM ε_inj ≤ 2.8e-4 | `top8` |
 | settle (#4) | τ_eff ≤ 18.75 ns with the pad model | `ronx3` |
-| leak (#9) | Sg share ≤ 50 % of the vg row (45 / 10 pA), sign recorded vs Vin_cm | `tg` |
+| leak (#9) | D78 (WO-70): Sg ≤ vg row (90 / 20 pA) − C1's share measured in the same deck (island 2/0.5 + 2 × chopper 4/0.5 on vg), sign recorded vs Vin_cm. First result ff/125: C1 81 pA ⇒ Sg limit 8.8 pA, Sg 68 pA | `tg` |
+
+WO-70 testbench fix: the WO-54 "incomplete or empty netlist" errors were ngspice's batch follow-on message after
+"Timestep too small" (the decks were complete). Causes and fixes in `c4_tb.py`: ideal `sw` roff/ron 1e13 → 1e11
+(ron 10, roff 1e12); E-source integrators held in reset until T0 − 5 ns; digital inputs driven through 100 Ω + 5 fF
+instead of bare ideal sources (LS input snap); `method=gear` on inj / settle / ramp; case-insensitive error capture.
 | rampa / rampb (#8) | safe, crowbar, stress, release (§7) | `nodet`, `overlap`, `hvfold` |
 
 #7 (reset residue, D46a) needs the C2 reset switch and OTA2 and runs at the C1/C2 integration; C4 supplies r2.
