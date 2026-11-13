@@ -54,7 +54,8 @@ R2 = 0.5 * 112.5e-9 / 14 / 0.5e-12              # 14 tau inside half of t_half(4
 RON = dict(sin=(0.0, VMAX, 1500.0), sdh=(1.0, VMAX, RDAC), sdl=(0.0, 0.1, RDAC), stp=(0.18, 2.22, 31e3),
            sg=(1.07, 1.33, 4000.0), s2in=(0.89, 2.11, R2), s2cm=(0.89, 2.11, R2), skh=(1.0, VMAX, RDAC),
            skl=(0.0, 0.1, RDAC), sk0=(0.0, VMAX, R2))
-LEAK_LIM = {"ff_125": 45e-12, "ff_100": 10e-12}  # Sg share = 50 % of the vg row (90 / 20 pA per node), proposal
+LEAK_ROW = {"ff_125": 90e-12, "ff_100": 20e-12}  # SPEC vg row per node. D78: Sg limit = row - C1 measured share
+#                                                 (same deck, metrics_leak); replaces the 50 % proposal (45 / 10 pA)
 LIM = dict(g_min=1.0e-9, eb_min=0.0, ls_edge_max=1.0e-9, inl_ppm=2.0, eps_inj=2.8e-4, tau_in=18.75e-9,
            r2_width=15e-9, crowbar_q=50e-15, safe_v=0.3, v18_over=0.05)
 GEN_MUTS = ("overlap", "gbig", "noearly", "edge1", "lsload", "wrongstrobe", "rawchop", "nodet", "hvfold", "o1early")
@@ -165,12 +166,21 @@ def deck_tim(corner, fsk, mut, csv):
     return "\n".join(L + ctrl(csv, [f"v({v})" for v in vecs])) + "\n", vecs, tstop
 
 
+def drv(node):
+    """WO-70: digital pad input = source -> 100 ohm -> node, 5 fF. A bare ideal source on an LS input stopped the
+    inj / settle / ramp decks on 'Timestep too small' at the LS input snap (node vord#branch / brs#branch)."""
+    return [f"Rdrv_{node} {node}_s {node} 100", f"Cdrv_{node} {node} 0 5f"]
+
+
 def common_src(corner, T, order_v=None, y_v=0.0):
     _, _, va, vd = CORNERS[corner]
-    return [f"Vdd vdd 0 {va}", f"Vdl vdl 0 {vd}",
-            f"Vclk clk0 0 PULSE(0 {vd} {T0:.4g} 0.2n 0.2n {T / 2 - 0.2e-9:.6e} {T:.6e})", "Rclk clk0 fsin 10",
-            "Cfs fsin 0 5f", f"Vy yin 0 {y_v}", "Vsw swin 0 0", "Vsh shin 0 0", "Vch chin 0 0", "Vrs rsin 0 0",
-            f"Vord ordin 0 {vd if order_v is None else order_v}"] + dec_line()
+    L = [f"Vdd vdd 0 {va}", f"Vdl vdl 0 {vd}",
+         f"Vclk clk0 0 PULSE(0 {vd} {T0:.4g} 0.2n 0.2n {T / 2 - 0.2e-9:.6e} {T:.6e})", "Rclk clk0 fsin 10",
+         "Cfs fsin 0 5f", f"Vy yin_s 0 {y_v}", "Vsw swin_s 0 0", "Vsh shin_s 0 0", "Vch chin_s 0 0", "Vrs rsin_s 0 0",
+         f"Vord ordin_s 0 {vd if order_v is None else order_v}"]
+    for n in ("yin", "swin", "shin", "chin", "rsin", "ordin"):
+        L += drv(n)
+    return L + dec_line()
 
 
 def inj_points(kind):
@@ -186,11 +196,16 @@ def deck_inj(kind, corner, mut, csv):
     pts = list(zip(cms, dms))
     seq = [pts[0]] + pts                                   # cycle 0 = warm-up
     tR = lambda k: T0 + k * T                              # noqa: E731
-    L = head(f"{kind} {corner} {mut}", corner, ".option reltol=1e-6 abstol=1e-15 vntol=1e-9 chgtol=1e-18")
-    L += common_src(corner, T) + [f".model SWI sw vt={va / 2:.4g} vh=0.01 ron=1 roff=1e13",
-                                  ".model SWR sw vt=0.5 vh=0.01 ron=1 roff=1e13",
+    # WO-70: ideal-switch roff/ron <= 1e11 (ngspice limit ~1e12; 1e13 stopped every inj deck on 'Timestep too
+    # small' at the first fs edge, node vinn#branch); both integrators held in reset until T0 - 5 ns (the 1e5-gain
+    # E-source integrators otherwise start from an undefined DC point at ~13 V). Same models on the real and the
+    # ideal copy, so the residual roff leakage cancels in the difference.
+    L = head(f"{kind} {corner} {mut}", corner, ".option reltol=1e-6 abstol=1e-15 vntol=1e-9 chgtol=1e-18 method=gear")
+    L += common_src(corner, T) + [f".model SWI sw vt={va / 2:.4g} vh=0.01 ron=10 roff=1e12",
+                                  ".model SWR sw vt=0.5 vh=0.01 ron=10 roff=1e12",
                                   "Vicm vicm 0 1.2", f"Vbi vbi 0 {VREF / 2}", f"Vcmin vcmin 0 {VREF / 2}",
-                                  f"Vrst rstc 0 PULSE(0 1 {T0 + T / 2 + 40e-9:.6e} 0.1n 0.1n {T / 2 - 55e-9:.6e} {T:.6e})"]
+                                  f"Vrst rstc 0 PULSE(0 1 {T0 + T / 2 + 40e-9:.6e} 0.1n 0.1n {T / 2 - 55e-9:.6e} {T:.6e})",
+                                  f"Vrst0 rst0 0 PWL(0 1 {T0 - 5e-9:.6e} 1 {T0 - 4.9e-9:.6e} 0)"]
     for s, sg in (("p", 0.5), ("n", -0.5)):
         pw = [f"0 {seq[0][0] + sg * seq[0][1]:.6f}"]
         for k in range(1, len(seq)):
@@ -204,11 +219,12 @@ def deck_inj(kind, corner, mut, csv):
         L += N.switch(f"ssh{s}", "vcmin", f"b{s}", "sho_t", "sho_c", key="sin")
         L += [f"Sbi{s} b{s} vbi il_t 0 SWI", f"Ccs{s} b{s} tp{s} {cs:.6g}"]
         L += N.switch(f"sg{s}", f"tp{s}", f"vg{s}", "ie_t", "ie_c", key="sg")
-        L += [f"Eop{s} ox{s} 0 vicm vg{s} 1e5", f"Cint{s} vg{s} ox{s} {CINT:g}", f"Srs{s} vg{s} ox{s} rstc 0 SWR"]
+        L += [f"Eop{s} ox{s} 0 vicm vg{s} 1e5", f"Cint{s} vg{s} ox{s} {CINT:g}", f"Srs{s} vg{s} ox{s} rstc 0 SWR",
+              f"Sr0{s} vg{s} ox{s} rst0 0 SWR"]
         # ideal copy
         L += [f"Sisin{s} vin{s} ib{s} pas_t 0 SWI", f"Sibi{s} ib{s} vbi il_t 0 SWI", f"Cics{s} ib{s} itp{s} {cs:.6g}",
               f"Sisg{s} itp{s} ivg{s} ie_t 0 SWI", f"Eiop{s} iox{s} 0 vicm ivg{s} 1e5", f"Ciint{s} ivg{s} iox{s} {CINT:g}",
-              f"Sirs{s} ivg{s} iox{s} rstc 0 SWR"]
+              f"Sirs{s} ivg{s} iox{s} rstc 0 SWR", f"Sir0{s} ivg{s} iox{s} rst0 0 SWR"]
     wn, wp = (8.0, 24.0) if mut == "top8" else N.SW["stp"]
     L += N.switch("stp", "tpp", "tpn", f"{gt}_t", f"{gt}_c", wn=wn, wp=wp) + ["Sistp itpp itpn se_t 0 SWI"]
     L += gen_block(None) + loads()
@@ -220,7 +236,7 @@ def deck_inj(kind, corner, mut, csv):
 
 def deck_settle(corner, mut, csv):
     T = 1.0 / FSS["4M"]
-    L = head(f"settle {corner} {mut}", corner, ".option reltol=1e-6 abstol=1e-15 vntol=1e-9")
+    L = head(f"settle {corner} {mut}", corner, ".option reltol=1e-6 abstol=1e-15 vntol=1e-9 method=gear")
     L += common_src(corner, T)
     wn, wp = (4.0, 12.0) if mut == "ronx3" else N.SW["sin"]
     for s, v in (("a", VMAX), ("b", 1.65)):
@@ -242,8 +258,16 @@ def deck_leak(corner, mut, csv):
     L += N.switch("sg", "vg", "tp", "0", "vdd", key="sg")
     if mut == "tg":
         L += [N.mos("sgx", "vg", "vdd", "tp", "vdd", N.HVP, 15.0, N.L_SW)]
+    # D78 (WO-70): C1's share of the same vg node, measured in the same deck on its own ammeter. C1 DESIGN.md M5:
+    # island switch nfet_g5v0d10v5 W 2/L 0.5 (off, gate 0, far side V_ICM 1.2 V); input chopper W 4/L 0.5, two per
+    # vg node: one on (gate VAPWR) to the pair gate (node gpa, only that device), one off (gate 0) to the other
+    # side's gate held at 1.2 V. Junction-dominated (leak_temp.md), so both shares have the same sign and add.
+    L += ["Vamc vgx vgc 0", "Vicm1 vicm1 0 1.2",
+          N.mos("c1isl", "vgc", "0", "vicm1", "0", N.HVN, 2.0, 0.5),
+          N.mos("c1cha", "vgc", "vdd", "gpa", "0", N.HVN, 4.0, 0.5), "Cgpa gpa 0 1f",
+          N.mos("c1chb", "vgc", "0", "vicm1", "0", N.HVN, 4.0, 0.5)]
     L.append(".dc Vtp 0.18 2.22 0.01")
-    vecs = ["v(tp)", "i(Vam)"]
+    vecs = ["v(tp)", "i(Vam)", "i(Vamc)"]
     return "\n".join(L + ctrl(csv, vecs)) + "\n", vecs, 2.22
 
 
@@ -252,13 +276,15 @@ def deck_ramp(kind, corner, mut, csv):
     T = 1.0 / FSS["4M"]
     up1, up2 = "0 0 1u 0 6u", "0 0 10u 0 15u"
     pa, pd = (up1, up2) if kind == "rampa" else (up2, up1)
-    L = head(f"{kind} {corner} {mut}", corner)
+    L = head(f"{kind} {corner} {mut}", corner, ".option reltol=1e-4 method=gear")
     L += [f"Vdd vdd 0 PWL({pa} {va})", f"Vdl vdl 0 PWL({pd} {vd})",
-          f"Vck ck 0 PULSE(0 1 {T0:.4g} 0.2n 0.2n {T / 2 - 0.2e-9:.6e} {T:.6e})", "Bfs fsin 0 V = V(vdl)*V(ck)",
-          f"Vyk yk 0 PULSE(0 1 {T0 + TCQ:.4g} 0.2n 0.2n {T - 0.2e-9:.6e} {2 * T:.6e})", "Byy yin 0 V = V(vdl)*V(yk)",
-          "Bch chin 0 V = V(vdl)*V(yk)", "Vsw swin 0 0", "Vsh shin 0 0", "Vord ordin 0 0",
-          "Vrk rk 0 PWL(0 1 20u 1 20.01u 0)", "Brs rsin 0 V = V(vdl)*V(rk)",
+          f"Vck ck 0 PULSE(0 1 {T0:.4g} 0.2n 0.2n {T / 2 - 0.2e-9:.6e} {T:.6e})", "Bfs fsin_s 0 V = V(vdl)*V(ck)",
+          f"Vyk yk 0 PULSE(0 1 {T0 + TCQ:.4g} 0.2n 0.2n {T - 0.2e-9:.6e} {2 * T:.6e})", "Byy yin_s 0 V = V(vdl)*V(yk)",
+          "Bch chin_s 0 V = V(vdl)*V(yk)", "Vsw swin_s 0 0", "Vsh shin_s 0 0", "Vord ordin_s 0 0",
+          "Vrk rk 0 PWL(0 1 20u 1 20.01u 0)", "Brs rsin_s 0 V = V(vdl)*V(rk)",
           "Vinp vinp 0 0.3", "Vinn vinn 0 1.7", "Vrp vrp 0 2.0", "Vrm vrm 0 0", "Vtp vtp 0 1.2"]
+    for n in ("fsin", "yin", "chin", "swin", "shin", "ordin", "rsin"):
+        L += drv(n)
     L += dec_line()
     for s, vin, vo in (("p", "vinp", "vinn"), ("n", "vinn", "vinp")):
         L += [f"Vai{s} xi{s} b{s} 0", f"Vad{s} xd{s} b{s} 0"]
@@ -316,8 +342,12 @@ def spice(deck, tag, out):
     r = subprocess.run(["ngspice", "-b", tag + ".sp"], cwd=out, capture_output=True, text=True, timeout=5400, env=env)
     log = r.stdout + r.stderr
     open(os.path.join(out, tag + ".log"), "w").write(log)
-    bad = [ln for ln in log.splitlines() if ln.lower().startswith("error") or "timestep too small" in ln
-           or "singular matrix" in ln.lower() or "unknown subckt" in ln.lower() or "could not find" in ln.lower()]
+    # WO-70: case-insensitive match. ngspice prints "Timestep too small" and then the follow-on "Error: incomplete
+    # or empty netlist" (batch mode, aborted run), and only the follow-on was caught, so WO-54 reported an empty deck.
+    lo = [ln for ln in log.splitlines()]
+    bad = [ln for ln in lo if "timestep too small" in ln.lower() or "singular matrix" in ln.lower()
+           or "unknown subckt" in ln.lower() or "could not find" in ln.lower() or "aborted" in ln.lower()]
+    bad += [ln for ln in lo if ln.lower().startswith("error")]
     return r.returncode, bad
 
 
@@ -532,6 +562,10 @@ def metrics_leak(d, corner):
     m = dict(leak_max_abs=float(np.abs(leak).max()), leak_at_018=float(leak[0]), leak_at_222=float(leak[-1]),
              leak_span=float(leak.max() - leak.min()))
     m["sign"] = "+" if leak.mean() > 0 else "-"
+    c1 = -d[:, 3]
+    m["c1_share"] = float(np.abs(c1).max())
+    m["c1_sign"] = "+" if c1.mean() > 0 else "-"
+    m["sg_lim"] = LEAK_ROW[corner] - m["c1_share"]          # D78 re-split: row minus C1's measured share
     return m
 
 
@@ -593,8 +627,7 @@ def checks(kind, corner, fsk, m):
     if kind == "settle":
         return dict(tau_in=(m["tau_eff"], m["tau_eff"] is not None and m["tau_eff"] <= LIM["tau_in"]))
     if kind == "leak":
-        lim = LEAK_LIM.get(corner, 45e-12)
-        return dict(leak=(m["leak_max_abs"], m["leak_max_abs"] <= lim))
+        return dict(leak=(m["leak_max_abs"], m["leak_max_abs"] <= m["sg_lim"]))
     return checks_ramp(m, kind, corner)
 
 
@@ -678,7 +711,7 @@ def report(out):
     L = ["# WO-54 C4b gate (generated by design/c4_sw/c4_tb.py report)", "",
          f"Limits: {json.dumps(LIM)}; Ron limits per switch: " +
          ", ".join(f"{k} {v[2]:.0f} ohm over {v[0]:.2f}..{v[1]:.2f} V" for k, v in RON.items()) +
-         f"; leak (Sg share 50 %): {LEAK_LIM}", ""]
+         f"; leak row per vg node {LEAK_ROW}, Sg limit = row - C1 measured share (D78)", ""]
     for kind in ("ron", "tim", "injdm", "injcm", "settle", "leak", "rampa", "rampb"):
         sel = [(j, r) for j, r in rows.items() if j[0] == kind]
         if not sel:
@@ -715,7 +748,7 @@ def report(out):
             elif kind in ("injdm", "injcm"):
                 info = f" | offset {m['offset_uV']:.2f} uV, slope {m['slope']:.3e}"
             elif kind == "leak":
-                info = f" | sign {m['sign']}, at tp 0.18 {fmt(m['leak_at_018'])} A, at 2.22 {fmt(m['leak_at_222'])} A, span {fmt(m['leak_span'])} A"
+                info = f" | Sg lim {fmt(m['sg_lim'])} (C1 share {fmt(m['c1_share'])} sign {m['c1_sign']}); Sg sign {m['sign']}, at tp 0.18 {fmt(m['leak_at_018'])} A, at 2.22 {fmt(m['leak_at_222'])} A, span {fmt(m['leak_span'])} A"
             elif kind.startswith("ramp"):
                 info = (f" | isl margin {fmt(m['safe_isl_margin'])} window {m['safe_window_us']:.2f} us, v18 abs "
                         f"{fmt(m['v18_abs_max'])}, VREF+ well current {fmt(m['vref_well_i_max'])} A, pwrok {m['rel_pwrok']:.2f}")
