@@ -97,3 +97,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-75 resumed after network drop (pool done, collecting)
 - WO-77 handed off (0328c57): tb7 noise deck nodeset from op, mutants split per deck; pool /home/mempool/regr/tt/WO-77-87a05a2/out/logs/POOL_DONE, pickup in results/wo77/README.md (coordinator collects)
 - WO-76 handed off (f00f9bf): diag interim, lead hypothesis integrate-phase PM 49.9 deg at ss/-40; O2 + bias-scale 0.8/1.3 + tight pools in /home/mempool/regr/tt/WO-76-f00f9bf (out/ALL_DONE, B_DONE, C_DONE), ~1 day; options A-E, provisional C; user decision after dx results. Rule slip: one empty local python3 - (no effect)
+- D87 (C3 T8 basis + rev f clamp) logged; WO-81 C3h dispatched 2026-11-14
