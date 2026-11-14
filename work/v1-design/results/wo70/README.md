@@ -58,3 +58,21 @@ no output limit: add a finite output R or a tanh-limited B source; (3) a short 2
   /home/mempool/regr/tt/WO-70-01fc505/run; python ../c4_sw/c4_tb.py report .'` and copy `summary.md` here.
 - Fix inj in `c4_tb.py`, new frozen copy, rerun only `injdm|injcm` jobs (`c4_tb.py jobs OUT injdm` style filter).
 - Reviewer pass on C4 rev b not requested yet (no inj verdict).
+
+## 4. WO-79 collection and triage (2026-11-14)
+
+`POOL_DONE` present; 61 jobs EXIT=0, 28 EXIT=1. `c4_tb.py report .` exits 2 (errored jobs); `run/summary.md` (131 lines)
+written. **All 28 EXIT=1 jobs are one cause: a transient timestep abort, i.e. a bench / simulator artefact. None is a
+design verdict.** Every abort names the branch current of an ideal voltage source (`Timestep too small ... node "vX#branch"`):
+
+| group | jobs | node | when |
+|---|---|---|---|
+| injdm / injcm, all corners + `order_inv` / `top8` copies | 10 | vinn#branch | t = 20 ns exactly (first fs edge, a breakpoint) |
+| tim (ss_m40 2M, ff_125 4M, ss_m40_ls 4M/2M, sf_m40_ls 4M/2M/0M25) | 7 | vord#branch (vrs once) | 36 ns .. 4 us, LS edges |
+| tim broken copies (overlap tt_27, wrongstrobe / ylate / ctlmid / o1early ff_m40, ylate tt_27) | 6 | vord#branch | 0.4 .. 0.8 us |
+| settle ss_m40, ss_125; settle ss_m40 `ronx3` | 3 | vtpb#branch, vdl#branch | 38 ns .. 1.1 us |
+| rampa ff_m40, sf_m40_ls | 2 | vadn#branch | 12.4 / 13.3 us (VDPWR ramp, LS snap) |
+
+So: 0 expected REJECTs among the EXIT=1 jobs (a broken copy that aborts has no verdict; those copies are rerun),
+0 real design failures among them. The real design findings are in the EXIT=0 rows: `leak_ff_125` and `leak_ff_100`
+FAIL (section 2; ff/100: Sg 14.8 pA + C1 8.6 pA = 23.4 pA against the 20 pA row). Root cause and fix: `results/wo79/`.
