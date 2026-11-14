@@ -88,3 +88,10 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-74 done (76fe624, df9bded): lint/synth clean, 259 FF (+28), 1068 cells (+102)
 - WO-75 C9 bench for D85 + full regression: dispatched 2026-11-14
 - WO-73 done (9def89a, f58d6eb): slew 43 to 32, waived (D86)
+- WO-63/61/68/70/64 collected 2026-11-14: C1 prec gate B ss/-40 1.71 ppm REJECT (others pass); tb7 all REJECT on 'noise op != op' lint + blind broken copies; C3 T8 single-peak rule still in checker; C4 28/89 EXIT=1; C6 MISMATCH 18 (125 C SIMFAIL, fast-ramp dev metric)
+- WO-76 C1 precision gate B diagnosis + options (Opus): dispatched 2026-11-14
+- WO-77 C1 tb7/op-AC mutant bench fix (Sonnet): dispatched 2026-11-14
+- WO-78 C3g T8 per D83 + off-expectation rows (Opus): dispatched 2026-11-14
+- WO-79 C4d triage + inj abort + D82 (Opus): dispatched 2026-11-14
+- WO-80 C6e MISMATCH 18 + R1 144.8 verify (Opus): dispatched 2026-11-14
+- WO-75 resumed after network drop (pool done, collecting)

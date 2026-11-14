@@ -905,3 +905,22 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - WO-74 (76fe624): RTL bias_ok + 2^16 counter (PW_BITS/BIAS_BITS params) and SPEC CL-34/35/36. Lint/synth were not run (ssh was locked); the agent was resumed to finish. Golden v3.2 needs an update for the new slot-0 timing (bias_ok, hold) → C9 bench WO after lint.
 - WO-74 done: lint/synth clean, FF 231 → 259, cells 966 → 1068. WO-75 (C9 bench for D85) dispatched; final PnR after it, with the WO-73 flow settings.
 - WO-73 (9def89a, f58d6eb): slew margin 40 % → ss_1v40 slew 43 → 32 pins (worst 1.728 ns); setup +2.961 ns; all else clean; LVS not extracted. D86 (user): waive slew at the ss_1v40 stand-in, carry 40 % into the final D85 PnR (pin_order needs bias_ok). The 2 floating nets are still unnamed (RSZ-0020).
+
+## 2026-11-14 14:50 IST
+After a network drop and a 1Password lock, the five pools were collected.
+
+Findings:
+- **C1 precision gate B:** ss/-40 REJECT at 1.71 ppm (gate 1.333). tt/27 0.69, ss/125 0.70, fs/125 0.97 ppm pass. srknee broken copy REJECTs at 1.37 ppm.
+- **C1 tb7:** all rows REJECT on the lint 'noise op != op', and the broken copies are blind. Job 11 mutants are INVALID because of the transient-op lint.
+- **C3 T8:** the checker still uses the single-peak rule; D83 is not applied yet. T3 and T5 pass.
+- **C4:** 28 of 89 jobs failed.
+- **C6:** MISMATCH 18, from 125 C SIMFAIL and a fast-ramp dev metric.
+
+Actions:
+- Dispatched WO-76 to WO-80 as fresh agents.
+- Resumed WO-75.
+
+Next steps:
+- Collect the WO-76 to WO-80 reports.
+- C1 gate B options go to the user. This is likely a precision-bias or current decision; check it against the fast-mode budget.
+- After WO-75: the final C9 PnR WO.
