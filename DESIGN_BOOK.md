@@ -1,6 +1,6 @@
 # DESIGN BOOK: tt-iadc, a second-order incremental ΣΔ ADC on Tiny Tapeout (sky130A)
 
-Snapshot: 2026-11-13. Covers SPEC v1 (frozen 2026-11-09) through change-log entry CL-32 and decisions D1 to D78.
+Snapshot: 2026-11-15. Covers SPEC v1 (frozen 2026-11-09) through change-log entry CL-39 and decisions D1 to D90, with results up to WO-88 (2026-11-15 early morning).
 
 ## How to read this book
 
@@ -8,11 +8,12 @@ This book explains the design from first principles to the current transistor-le
 
 | Document | Role | Wins on |
 |---|---|---|
-| `SPEC.md` | frozen specification + change log (CL-1 … CL-32) | numbers and limits |
-| `work/v1-design/DECISIONS.md` | decision log (D1 … D78) | history and who decided |
+| `SPEC.md` | frozen specification + change log (CL-1 … CL-39) | numbers and limits |
+| `work/v1-design/DECISIONS.md` | decision log (D1 … D90) | history and who decided |
 | `work/v1-design/PLAN.md` | gated plan (S → C → V) | stage gates |
 | `design/<block>/DESIGN.md` | per-block design notes | block sizes and hand calculations |
-| `work/v1-design/results/*/README.md` | per-work-order evidence (WO-23 … WO-56) | measured (simulated) values |
+| `work/v1-design/results/*/README.md` | per-work-order evidence (WO-23 … WO-88) | measured (simulated) values |
+| `work/v1-design/RESUME.md`, `STATE-2026-11-14.md` | coordinator log and state snapshot | values collected but not yet written into a results file |
 
 **Citation convention.** Every number carries an inline source:
 - `SPEC §x` is a SPEC section; `SPEC row` means the per-block table of SPEC §3.0.
@@ -23,10 +24,80 @@ This book explains the design from first principles to the current transistor-le
 - `HARD` is `design/c9_digital/HARDENING.md`, `VPLAN` is `work/v1-design/C9_VERIF_PLAN.md`, and `GOLD` is `golden/README.md`.
 - `GUIDE`, `CTX`, `ROAD`, `NOTES`, `MCP` and `MODEL` are `DESIGN_GUIDE.md`, `CONTEXT.md`, `ROADMAP.md`, `NOTES.md`, `MCP3421_TARGET.md` and `model/README.md`.
 
-**Status words.** "SIM" means a simulated value, "HAND" a hand calculation and "MODEL" a tier-0 Python result. **PENDING** marks a value whose run had not been collected as of 2026-11-13.
+**Status words.** "SIM" means a simulated value, "HAND" a hand calculation and "MODEL" a tier-0 Python result. **PENDING** marks a value whose run had not been collected as of 2026-11-15; the WO that will settle it is named next to it. "Coordinator note 2026-11-15" marks a value the coordinator collected from a sandbox pool that is not yet in a results file (see Appendix E).
+
+## Proposal summary
+
+Status 2026-11-15. This section only summarises; every row points to the section of the book that holds the numbers and their sources. Values that are not final are marked PENDING.
+
+**What the design is.** A second-order, 1-bit, discrete-time incremental ΣΔ ADC for a 2×2 analog tile on sky130A Tiny Tapeout (II.1.2; II.2.1–II.2.3). The modulator is a fully differential switched-capacitor CIFB loop with c1 0.125, c2 0.5, k 0.5 (II.2.3), Cs 0.5 pF and Cint1 4 pF (II.2.5). The reference is external and ratiometric, VREF 2.048 V on ua2 with a Kelvin REF− on ua3 (II.1.2; II.2.4). Each conversion resets the loop and runs N = 64 / 256 / 1024 / 4096 cycles at fs 0.25–2 MHz (precision) or 4 MHz with bias boost (fast) (II.2.6; II.2.7). A cascade-of-integrators decimator, sequencer, configuration register and 16-bit read bus live in a hardened digital macro inside the analog tile (III.6).
+
+**Targets against the case-study part and prior TT designs.**
+
+| | This design (SPEC targets) | MCP3421 (datasheet) | Prior analog ΣΔ on TT sky130 |
+|---|---|---|---|
+| Architecture | 2nd-order DT SC incremental, fully differential, 1-bit, on-chip CoI decimator | ΔΣ + PGA + internal reference + oscillator + I²C | 1st order (CT: Paul Thomas ttsky26c, single-ended; SC: tilesos dual ADC); no on-chip decimator |
+| Noise | ≤ 2.5 µV rms @ 15 SPS; ≤ 5 µV @ 240 SPS (model at spec: 0.94 µV) | 1.5 µV rms @ 3.75 SPS | Paul Thomas: ≈ 57 dB SNDR precision, ≈ 40 dB fast (simulated) |
+| INL | ≤ 20 ppm FSR (model at spec: 3.4 ppm) | 10 ppm typ, 35 max | not reported |
+| Offset / gain error | ≤ 5 µV / ≤ 0.5 % | 15 µV typ / 0.05 % typ | not reported |
+| CMRR | ≥ 100 dB with system chop; ≥ 60 dB without | 105–110 dB | not reported |
+| Reference | external, ratiometric 2.048 V | internal 2.048 V | — |
+| Supply current | ≤ 200 µA analog design budget | 145 µA @ 3 V | — |
+| Silicon data | none yet | product | none measured; the only measured analog ADC among the references is Wulff's tt06 SAR (≈ 7 ENOB) |
+
+Sources: II.1.1 (MCP3421 and prior art); II.1.3 (budgets); `NOTES.md` (survey table, prior-design rows). The design aims at DC precision and resolution, not bandwidth (II.1.1). MCP3421 parity is not claimed: the on-chip reference and 10 ppm INL are out of reach on a first chip (II.1.1).
+
+**What is new on TT.**
+- **Order 2.** Every earlier analog ΣΔ on sky130 TT is 1st order (II.1.1; NOTES).
+- **Incremental operation** with exact reconstruction from the two accumulators, so each conversion is independent and N trades rate for resolution (I.5; II.2.1).
+- **On-chip decimator** inside the analog tile, hardened as a separate LibreLane macro; no earlier TT ΣΔ has one (II.1.1; III.6).
+- **Chopping:** system chopping (input polarity swap between the two sub-conversions of a pair) and optional OTA1 chopping, always paired with system chop (II.2.8; D18).
+- **CM-rejecting input switching** by top-plate shorting (II.2.10; D12).
+
+**Verification approach.** A gated flow from system to block to top (IV.1): a Python model (tier 0), behavioural SPICE (tier 1), transistor-level blocks in the loop (tier 2) and, later, PEX (tier 3). Every gate row takes its limit from SPEC, prints ACCEPT/REJECT, fails on missing data, and has a broken copy that must REJECT (III.0; IV.3). Blocks run at all PVT corners plus Monte Carlo (D2). The authoritative OTA1 check is an in-loop INL gate with the transistor OTA (gate B, D48; III.1.8). The digital macro has an independent bench with its own reference model, mutation testing and formal properties (III.6.3). A read-only reviewer checks every design change (IV.8). False passes found on the way are logged as lessons (IV.4).
+
+**Status per block (2026-11-15; details in V.1).**
+
+| Block | State | Open |
+|---|---|---|
+| C1 OTA1 + CMFB | transistor schematic, sink L 8; boost gate B passes (fs/125 3.14 ppm vs 5) | precision gate B ss/−40: O1 1.706 ppm vs 1.333, O2 parts 0.142 / 0.160 ppm; verdict PENDING (WO-76); tb7/op-AC rerun PENDING (WO-77) |
+| C2 OTA2 | not started | inputs gathered (III.2) |
+| C3 comparator | rev f; T2/T3/T5 pass | T8 precharge-edge cap (2.206 V vs 2.2 V at ff/−40 with kp2); rev g PENDING (WO-88) |
+| C4 switches / phases / level shifters | rev b; bench numerics fixed | gate pools PENDING (WO-79, WO-85); ff/100 20 pA row open |
+| C6 bias | architecture (c); DC rows pass at 5 corners | transient rows under D89 PENDING (WO-87) |
+| C9 digital | RTL with D85/D88; benches pass; pre-D85 PnR timing-clean at 12 corners (slew waived, D86) | final PnR PENDING; formal at real widths open |
+| C5, C7, C8, C10, top level, PEX | inside C1/C4 or not started | — |
+
+**Top risks and open items** (V.3; V.4):
+1. The C1 precision INL verdict rests on the O2 combine at ss/−40 (WO-76).
+2. C3 T8 overshoot at the precharge edge is above the 2.2 V cap at ff/−40 (WO-86, WO-88).
+3. Fast-mode current: ≈ 180 µA nominal by reasoning, against the 200 µA budget, before OTA2 exists (V.2).
+4. OTA2 must swing ≈ 1.41 V differential at A ≥ 75 dB (III.2).
+5. Virtual-ground leakage forces a temperature derating of the slowest mode (D82); the 20 pA ff/100 row is open.
+6. No PEX and no analog layout yet; every margin is schematic-level.
+7. C9 counter properties are formally proven only at reduced widths (WO-75, WO-83).
+
+**Area and power budget.**
+
+| Item | Value | Status | Source |
+|---|---|---|---|
+| Tile | 319.24 × 225.76 µm = 72,071 µm² (template) | fixed | II.1.2 |
+| MIM capacitors | ≈ 9,000 µm² (≈ 12 % of the tile) | estimate | II.2.5; SPEC §3.0 |
+| C6 bias | ≤ 7,000 µm² (row); resistor length 854 µm at R1 144.8 µm | row / SIM | III.5; WO-80 |
+| C9 digital macro | die 190 × 150 µm = 28,500 µm² (≈ 40 % of the tile), std-cell utilisation 0.676 | PnR on pre-D85 RTL; final PENDING | III.6.4; WO-73 |
+| C1, C2, C3, C4 layout area | — | PENDING (no layout) | V.4 |
+| Analog current budget | ≤ 200 µA in every mode (design budget) | SPEC | II.1.3; D46 |
+| OTA1 current (netlist) | base 60.1–61.6 µA; boost 121.8–123.9 µA | SIM | III.1.9; WO-28 |
+| C6 own current | 4.34–4.96 µA (≤ 6 µA row) | SIM | III.5; WO-80 |
+| Comparator | 0.50–0.76 µA dynamic, on VDPWR (outside the 200 µA analog budget) | SIM (rev a) | III.3; WO-44 |
+| Fast-mode system total | ≈ 180 µA nominal (REASONED) against 172 µA SPEC estimate | needs C2 | V.2 |
+| C9 power | 1.705 mW at default switching activity (LibreLane estimate, 1.8 V domain) | PnR estimate | WO-72; WO-73 |
+
+**What silicon would measure.** The SPEC rows give the measurement list (II.1.3; SPEC §3.0): noise versus N and fs with a shorted input; INL against a precision DC source with the ratiometric reference; offset and gain error with system chop on and off; CMRR with chop on and off; supply current per mode and boost setting; the trim range and the "lowest passing code + 2" calibration rule (D73); start-up through the VAPWR-good hold (D85); order-1 mode as characterisation only (II.2.9; D21); fast-mode INL at N 64 / 256 / 1024 (II.1.3); and the 125 °C derating of the 0.25 MHz mode (D82). Two practical limits apply: the TT demo board has no precision source or ADC, so a low-noise source and reference must be brought in (NOTES, PCB section), and at 4 MHz / N 64 the host must read ≥ 0.36 Mword/s, which MicroPython cannot do (V.4). The model sets an intrinsic floor only; the one measured TT analog ADC came in ≈ 0.6 b below simulation (V.4).
 
 ## Contents
 
+- Proposal summary
 - Part I: Fundamentals
 - Part II: System design (Stage S)
 - Part III: Block designs (Stage C)
@@ -975,7 +1046,9 @@ On the WO-28 netlist (WO-28 run 2):
 | D71 | the direct tier-0 path counts (I.10); reduce sink gm/I for ≥ 20 % margin (200 µV design target); the broken copy becomes sink noise × 2; recalibrate the hand γ | D71 |
 | WO-43 sweep | no candidate reached 200 µV. Worst thermal: c0 baseline 257, **c1 L 8: 242 (boost span 1.43 V kept)**, c2 240, c3 RS 2.5 kΩ 221, c4 224; c2–c4 cut the boost span to 1.265–1.29 V (< 1.40). Measured γ: pfet_01v8 0.58, nfet_g5v0d10v5 1.31 (the 2/3 hand value explains most of the WO-41 hand-row gap) | WO-43; RESUME 2026-11-13 |
 | D75 / CL-31 | take sink L 8; drop the 200 µV target; row v_vg ≤ 390 µV (I.10); system direct path 0.75–0.92 µV against 2.5 | D75; CL-31 |
-| WO-52 | sink L 4 → 8 (W 72 kept; m_nr / m_rn / m_it derive from it, 0 µA); tb7 op fix (noiseless 1 GΩ instead of 1 MH inductors; op and noise decks split; fallback accepted only if gm matches the op within 0.1 %); full runs **PENDING** (gate B fs/125 part 0 = 2.179 ppm) | WO-52; RESUME 2026-11-13 |
+| WO-52 | sink L 4 → 8 (W 72 kept; m_nr / m_rn / m_it derive from it, 0 µA); tb7 op fix (noiseless 1 GΩ instead of 1 MH inductors; op and noise decks split; fallback accepted only if gm matches the op within 0.1 %); gate B reruns done (III.1.8) | WO-52; RESUME 2026-11-13 |
+| WO-61 | the WO-52 tb7 and op/AC jobs held **no data**: the scripts passed a relative output dir while ngspice ran in another cwd, so every tb7 value was NaN and op/AC found no `ac.csv`. Fixed with absolute paths. Gate B and tb9 were not affected | WO-52 README (WO-61 update) |
+| WO-77 | the rerun then failed every tb7 row on the `noise op != op` lint: the `.noise` deck repeated the op from scratch and fell back to a transient op 0.6 % off in gm_in. Fix: the converged `op` node voltages become the noise deck's `.nodeset`; the 0.1 % match tolerance is kept. The mrg/msink copies looked blind only because the same lint invalidated their op. op/AC mutants now run one deck each (a merged deck fell to transient op). Rerun **PENDING**; jobs 3–5 timed out under the 2026-11-14 overload | WO-77; RESUME 2026-11-14 18:45 |
 
 ### III.1.8 Gate B history (in-loop, transistor OTA1, boost, N 1024, 4 MHz)
 
@@ -985,9 +1058,43 @@ On the WO-28 netlist (WO-28 run 2):
 | WO-26 (D59) | 3.314 (at the 3.33 share) | 0.797 | 1.686 | 0.454 | sr95: 43,600–54,600 ppm (combine INVALID: endpoint memory → combine rule fixed in WO-29) | WO-26 |
 | WO-31 (D59–D64) | **2.170** | 1.291 | 1.337 | 0.452 | sr95 fs/125 51,956, sf/−40 50,231: REJECTED | WO-31 |
 | WO-32 (TG clamp) | 2.171 | — | — | — | srknee 17.37: REJECTED | WO-32 |
-| WO-52 (sink L 8) | part 0 2.179; full combine **PENDING** | PENDING | — | — | — | RESUME 2026-11-13; WO-52 |
+| WO-52 (sink L 8) | **3.14** (under the 3.33 share) | 0.71 | — | — | — | RESUME 2026-11-14 (WO-52 reruns) |
 
-All recorded gate B runs pass the 5 ppm gate. The 2 MHz precision gate B (≤ 1.333 ppm) is an authoritative gate (D48(1), SPEC:94) that has no run in the WO-24 … WO-52 result files read for this book; that is a missing gate run. WO-63 is the work order for it. It is listed as open in Part V.
+All recorded boost gate B runs pass the 5 ppm gate. Sink L 8 raised fs/125 from 2.17 to 3.14 ppm (RESUME 2026-11-14).
+
+### III.1.8a Precision gate B at 2 MHz (WO-63, WO-76)
+
+The 2 MHz precision gate B (≤ 1.333 ppm; D48(1), SPEC row 94) had never been run before WO-63. Setup (WO-63): the WO-52 transistor OTA1 (sink L 8) in the tier-1 deck, OTA2 behavioural at its precision point (13.5 V/µs, GBW 10 MHz, β2 0.497), fs 2 MHz, boost 0, N 1024, 21 points in 6 parts, solver level O1. O2 is required when O1 ≥ gate/2 = 0.667 ppm (D48 rule as applied in WO-63). The broken copy `srknee` scales all six bias ports by 0.6234, i.e. a base SR of 0.8 × the 10.3 V/µs floor.
+
+| Corner | O1 combined INL (ppm) | Verdict | Note | Source |
+|---|---|---|---|---|
+| tt/27/3.3 | 0.692 | ACCEPT | ≥ gate/2: O2 needed, not yet scheduled | WO-63 |
+| ss/−40/3.0 | **1.706** | **REJECT at O1** | jagged, pattern-dependent residual; O2 PENDING | WO-63; WO-76 |
+| ss/125/3.0 | 0.698 | ACCEPT | ≥ gate/2: O2 needed, not yet scheduled | WO-63 |
+| fs/125/3.0 | 0.967 | ACCEPT | O2 PENDING (WO-76) | WO-63 |
+| fs/125 `srknee` (must REJECT) | 1.375 | REJECTED | only 3 % over the gate; only part 0 rejects on its own | WO-63 |
+
+**Diagnosis so far (WO-76).** Every combine is healthy (endpoint spread ≤ 0.017 ppm). The residual shapes differ:
+- tt/27, ss/125 and fs/125 show a smooth odd "S", the signature of a GBW/settling nonlinearity, plus ≤ 0.3 ppm of jitter.
+- ss/−40 is jagged: neighbouring points jump by up to 1.3 ppm, which points to a step-history (bit-pattern) dependent error, not a static A(v) (WO-76 §1).
+- Static gain is ruled out (A0 is highest at ss/−40, 85.9 dB), as is slew alone (SR 13.2–13.5 V/µs at every corner) and CMFB (best f_cm and PM_cm at ss/−40). The first hypothesis was integrate-phase phase margin: 49.9° at ss/−40, fp2/GBW 1.02, the lowest of all corners (WO-76 §3).
+
+**Bias sweep: the error moves, it is not fixed.** Per-part O1 INL at ss/−40 with all OTA1 bias ports scaled (diagnostic decks only; coordinator note 2026-11-15; RESUME 2026-11-14 22:55 and 23:40):
+
+| Part | nominal | bias × 0.8 | bias × 1.3 |
+|---|---|---|---|
+| p0 | 1.330 | **1.830** | — |
+| p1 | 1.263 | 1.349 | — |
+| p2 | 1.706 | 1.281 | 1.494 |
+| p3 | 0.368 | 0.114 | — |
+| p4 | 1.671 | 1.226 | 1.421 |
+| p5 | 1.259 | 1.302 | — |
+
+Both directions lower p2 and p4, but × 0.8 raises p0 from 1.330 to 1.830 ppm. The coordinator's reading: the error shifts between parts, which points away from a simple PM or SR cause and toward a pattern-dependent term, possibly numerical at O1; bias options are not supported by these data (RESUME 2026-11-14 23:40).
+
+**O2 parts.** At ss/−40, O2 gives p0 **0.142 ppm** (O1 1.330) and p2 **0.160 ppm** (O1 1.706) (RESUME 2026-11-15 00:45 and 01:40; coordinator note 2026-11-15). That is a strong sign that the ss/−40 O1 failure is a numerical artefact of the O1 solver settings. The other O2 parts and the fs/125 O2 parts are still running (`WO-76-f00f9bf/out/logs_o2`). **The gate verdict is PENDING the 6-part O2 combine**; D48 requires O2 here because O1 ≥ gate/2, and O2 is then the converged result. A `--tight` O2 deck (reltol 1e-6, vntol 1e-8) aborted with "timestep too small", past the solver floor (WO-76 §2).
+
+**Gate rule gap.** tt/27 (0.692) and ss/125 (0.698) are also ≥ gate/2, so the same rule asks for O2 there; those runs are not in the WO-76 job list (WO-63). Listed in V.2.
 
 **Gate B mechanics.**
 - N 1024, 21 input points, split into 6 parts.
@@ -1016,8 +1123,10 @@ All recorded gate B runs pass the 5 ppm gate. The 2 MHz precision gate B (≤ 1.
 
 ### III.1.10 Open items for C1
 
-- WO-52 collection: tb7, op/AC, tb9, gate B combines. **PENDING.**
-- The precision-mode gate B at 2 MHz (≤ 1.333 ppm, SPEC row 94; D48(1)) is a missing authoritative gate run; see WO-63.
+- Precision gate B verdict: the 6-part O2 combine at ss/−40 and the fs/125 O2 parts. **PENDING** (WO-76).
+- O2 runs at tt/27 and ss/125, which the gate rule asks for (O1 ≥ gate/2). No WO yet.
+- A stronger precision broken copy: `srknee` rejects by only 3 % (WO-63; WO-76 §4).
+- tb7 noise on the sink-L 8 netlist and the op/AC mutants. **PENDING** (WO-77 rerun).
 - MC of the 1:8 ratios and the replica is open (C1 §1.1 layout intent).
 - tb8 offset MC, tb8b 3.3 V mirror MC, tb10 device stress, tb12 boost toggle and tb13 vg switches are in the C1b plan (C1 §4). Their results are not in the result files read here.
 - PEX re-simulation (C7/C10) is not started.
@@ -1035,7 +1144,7 @@ C2 has no design note yet. Inputs gathered so far:
 | Offset | ≤ 9 mV 3σ; 52.7 µV input-referred at N 4096 without sys chop (cancels with it) | SPEC OTA offset row |
 | Leak / Cs2 interface | Cs2 plates shorted in OTA2 integrate; CM kick ≤ 10 mV | CL-2 |
 
-## III.3 C3: comparator (rev a → d)
+## III.3 C3: comparator (rev a → f; rev g pending)
 
 **Purpose and interface.**
 - Decides the sign of $x_2$ once per fs cycle.
@@ -1060,7 +1169,11 @@ C2 has no design note yet. Inputs gathered so far:
 | — | REVIEW-C3a → D74 | strobe in φS + capture on fs_tick (removes one cycle of loop delay); A_VT 12 total (inject 7.6 mV·µm on tt_mm); set A′ (pair ×4, latch 4/0.5); 1.8 V tail; order 1 via int2 follower | D74 |
 | b | WO-48 | netlist + full tb (47 decks): T1/T2/T7/T10/T10nz/T5 ACCEPT at 9 PVT, every broken copy REJECTs | **fails:** T3 offset σ 14.4 mV, \|μ\| + 3σ 44.8 mV against 20 (hand 17.7); T8 stress dp 2.36–2.44 V > 1.98 V; T5 asymmetric kick 7.7–8.2 mV > 5 |
 | c | WO-51 | offset row re-based (D75, CL-30); HV cascode K1/K2 for T8; T5 gate at R ±5 % / C ±1 % | offset ACCEPT (44.8 / 45.0 mV ≤ 60); **cascode broke function**: T2/T7/T10 REJECT at every corner (decision memory) and T8 moved to the tail (2.38–2.55 V) |
-| d | WO-56 | HV PMOS precharge of the cascode nodes ap/an (gate = strobe) + HV tail (5/0.5 ×4) | full run (60 decks) **PENDING** |
+| d | WO-56, WO-65 | HV PMOS precharge of the cascode nodes ap/an (gate = strobe) + HV tail (5/0.5 ×4) | function restored; under the D80 split the junctions pass (2.38–2.39 V vs 4.95 V), but the oxide class still fails: SR-latch Sq3/Sb3 Vds 2.32–2.33 V (also present in rev b/c, hidden under the junction number); T5 has no physical copy that REJECTs → D81 |
+| e | WO-68 | latch clamp NMOS `S{q,b}5` 0.42/0.15 from each NAND stack node to vss, gate on the complement of that NAND's set input | the stack node sq/sb had floated to −0.345 V for 105 ns on every latch flip; with the clamp, Sq3/Sb3 Vds 2.32 → 2.047 V for ≤ 0.65 ns. The remaining fails are edge overshoots of 2.02–2.06 V on 1.8 V nodes → D83 |
+| — | WO-78 | T8 checker per D83 (sustained S over 1 ns windows, peak P ≤ 2.2 V, duration D < 1 ns) | rev e still REJECTs: op/on sit ≈ 66 mV above VDPWR for a whole strobe phase (S 2.046 V for 126 ns) because nothing drives them while the pair is off: a real design issue → D87 |
+| f | WO-81, WO-84, WO-86 | op/on keeper `KPo/KPn` pfet_01v8 0.42/0.15, gate on the first buffer inverter of the same node; D87 bench basis | S 2.046 → 1.980344 V; P 2.224 V (tt/27), 2.251 V (ff/−40); T2/T3/T5 pass (below). T8 still REJECTs on sus, cap and dur → D90 |
+| g | WO-88 | candidates: slower op/on precharge (R0/R1 0.5/0.15, 1.0/0.3, 1.0/0.5, each with the 2× keeper kp2); kp3 as info | **PENDING** (WO-88 pool A) |
 
 **Offset limit from loop impact (D75, CL-30).** Model `offset_loop.py`, ±0.9 FS, 4001 points (C3 §3.1b):
 
@@ -1074,7 +1187,44 @@ C2 has no design note yet. Inputs gathered so far:
 
 **The rev c memory fault (C3 §4b; WO-56).** The cascode nodes ap/an had no precharge. They charged only through K1/K2 toward VDPWR − VT,HV, ending in subthreshold. After a ±0.3 V decision, one node was left low, and the next strobe favoured the previous decision. The small cycles that followed read the wrong sign, which showed up as t_dec ≈ 500 / 250 ns. Rev d precharges ap/an and makes the tail HV, so tl, ap and an touch only HV devices.
 
-**Sizes, rev d (C3 §5).**
+**The 1.8 V stress rule and the T8 bench (D80, D83, D87, D90).** The T8 row checks that no 1.8 V device in the comparator sees more than its rating. The row was refined four times, each by a user decision, because the original wording was stricter than the physics (STATE-2026-11-14 §2, lesson 4):
+
+| Step | Rule | Why | Source |
+|---|---|---|---|
+| D80 / CL-33 | oxide pairs (Vgs, Vgd, Vgb) and Vds ≤ 1.98 V; junction reverse bias ≤ 4.95 V (PDK `_05v5` diode rating 5.5 V − 10 %) | rev d's 2.38 V was source-to-bulk on a reverse-biased junction, with no oxide stress | D80; WO-65 |
+| D83 / CL-35 | 1.98 V applies **sustained** (> ~1 ns); short switching overshoot allowed up to 2.2 V for < 1 ns; a checker copy must prove the rule is live | after the rev e clamp, the remaining fails were 2.02–2.06 V edges lasting < 1 ns against a limit equal to the maximum supply | D83; WO-68 |
+| D87 | stress judged against an ideal 1.98 V pin (the bench's 10 Ω feed drop is not device stress); strobe overshoot judged on C4's real phiC edge per corner (0.1 ns ideal edge → info); x2 stimulus bounded by OTA2's range plus margin (0.3–2.7 V per side; the −0.5 V step → info); rev f keeper | the WO-78 numbers mixed a real fault (op/on at 2.046 V) with bench artefacts (supply rise to 1.98194 V, 0.1 ns edge, −0.5 V x2 step) | D87; WO-78; WO-81 |
+| D90 / CL-39 | sustained level judged ≤ 1.981 V (1 mV numerical/leakage tolerance), also the threshold of the duration limb; checker copy at 1.985 V must REJECT | on a stiff pin, op/on sit a fixed +0.344 mV above the pin | D90; WO-86; WO-88 |
+
+**The stiff switched supply basis (WO-84, WO-86).** An ideal source tied straight onto vdd aborts at the start of the power-up ramp ("timestep too small"), the same mechanism as the C4 bench aborts (III.4). WO-84 therefore uses a 10 Ω feed for the ramp only, then closes a 1 mΩ switch in parallel 100 ns after the ramp ends; vdd then never exceeds its source (vddmax 1.98000 V). The coordinator adopted this as the D87(a) basis (wo/INDEX). On it, rev f gives S = 1.980344 V on op/on, P 2.2240 V and D 144.3 ns (WO-84).
+
+**The +0.344 mV result (WO-86).** S stays at 1.980344 V to the µV with a 10× stiffer switch, with reltol 1e-6 and with a fixed 0.01 Ω feed. A 2.00 V pin gives 2.000343 V. So the excess is a fixed +0.344 mV above whatever the pin is, not a bench drop and not solver noise. Doubling the keeper (kp2) cuts it to 0.150 mV (× 0.44), which behaves like a steady injection of tens of nA into a supply-held node through the pull-up resistance. The injecting device is not named yet: the WO-86 probe failed on vector names, and WO-88 fixed the probe (save `[id]` only) and re-launched it (**PENDING**). The candidate is the HV nodes ap/an, kicked to 2.29–2.39 V by x2, leaking through K1/K2 into dp/dn and M3/M4 (WO-84, inference). nb2/ob2 sit above vdd by less (≈ 10 µV), but D counted any excess > 1.98 V, hence 144 ns. Because the stress equals the supply itself plus 0.3 mV, the user set the 1 mV tolerance (D90). Under D90 the sustained limb and the duration threshold move to 1.981 V; the re-judged rows are **PENDING** (WO-88).
+
+**The precharge-edge cap (WO-86, WO-88).** The peak P is on M4 gb, node op, at the strobe **falling** (precharge) edge. The losing node (on) is pulled from 0 to vdd by R1 in about 0.2 ns. Through the Cgd of M5 and M3 (gate on, drain op), that edge couples the held-high op upward, and only the keeper pulls it back (WO-88 item 3). That is why kp2 lowers P:
+
+| Variant | P tt/27 | P ff/−40 | Against 2.2 V | Source |
+|---|---|---|---|---|
+| rev f | 2.2240 V | 2.2511 V | fails | WO-86 |
+| rev f + kp2 (KPo/KPn 0.84/0.15) | 2.1792 V | **2.2062 V** | fails by 6 mV at ff/−40 | WO-86 |
+| rev g candidates (slower R0/R1 precharge: 0.5/0.15, 1.0/0.3, 1.0/0.5, each with kp2; kp3 info) | — | — | **PENDING** (WO-88) | WO-88 |
+
+Narrower R0/R1 also halves their Cgd overlap, which should reduce the strobe-rise kick on op/on; longer L lowers mismatch but adds channel charge; the precharge time has ≈ 100 ns of margin (WO-88).
+
+**Rev f against rev e on the other rows (WO-86).**
+
+| Row | rev e | rev f | rev f + kp2 |
+|---|---|---|---|
+| T3 MC tt, \|μ\| + 3σ (σ) | 49.59 mV (16.32) | 45.07 mV (14.81), n 200 | not run |
+| T3 MC ss/−40, \|μ\| + 3σ (σ) | 49.26 mV (15.17) | 42.74 mV (14.21), n 50 | not run |
+| T2 one_ss-40_162 t_dec | 2.035 ns | 1.354 ns | 1.291 ns |
+| T5 diff kick, ss/−40 / worst (fs/125) | — / 1.82 mV | 0.617 / 2.524 mV | 1.142 / 3.399 mV (limit 5 mV) |
+| T5 CM kick, all one_ corners | 40.1–48.1 mV | 38.96–47.41 mV | 38.92–46.82 mV |
+
+The T3 rows are flagged only on the `plaus` limb (sensitivity decks not in the pool), as in earlier pools; the count and |μ| + 3σ limbs pass. The rev f cyc rows were never run in WO-81; they are in the WO-88 pool (**PENDING**). The T2 gain from rev e to rev f is not explained, because the D87 x2 stimulus changed between the two runs (WO-86).
+
+**T5 under D81.** The worst differential kick is 2.7 mV even with the cascode and precharge removed (WO-65: nohvc 2.67 mV), so no realistic physical copy can fail the 5 mV row. D81 accepts margin by construction; checker copies judge real data at tight limits (`one_chk_kick1` at 1 mV, `one_chk_rec02` at 0.2 mV recovery) and REJECT (WO-68; WO-86). The CM kick stays a reported number for C2.
+
+**Sizes, rev f (C3 §5; WO-68; WO-81).**
 
 | Device | Size |
 |---|---|
@@ -1083,6 +1233,8 @@ C2 has no design note yet. Inputs gathered so far:
 | K1/K2 cascode | HV 5/0.5 × 4, gate VDPWR |
 | P1/P2 precharge | HV PMOS 2/0.5 |
 | Latch | 01v8 4/0.5 |
+| Latch stack clamps Sq5/Sb5 (rev e) | NMOS 0.42/0.15 |
+| op/on keepers KPo/KPn (rev f) | pfet_01v8 0.42/0.15 (kp2 candidate 0.84/0.15) |
 | Output buffer | drives 100 fF routed |
 
 **Testbench rows (C3 §6).** Each row has its own broken copy:
@@ -1100,8 +1252,11 @@ C2 has no design note yet. Inputs gathered so far:
 
 Numerical rules: gear, reltol 1e-5, tmax 1 ps.
 
-**Open items (C3 §8).**
-- WO-56 collection.
+**Open items (C3 §8; WO-86; WO-88).**
+- Rev g: pick a precharge-edge candidate from the WO-88 sweep, then the full T2/T3/T5/T8 set. **PENDING.**
+- Name the device that injects into op/on (WO-88 probe `runI`). **PENDING.**
+- T8 re-judged at 1.981 V (D90); T3 MC on the final revision; the rev f cyc rows. **PENDING** (WO-88 and after).
+- Reviewer pass on the final revision.
 - Kickback fixes are listed, not applied: halve the pair, or add a neutralisation pair.
 - Layout: routed q load (100 fF assumed) and common-centroid HV pair.
 
@@ -1143,11 +1298,25 @@ Numerical rules: gear, reltol 1e-5, tmax 1 ps.
 - The Sg leakage share fails: 68 pA at ff/125 against a proposed 45 pA share of the 90 pA row. D78 re-splits the row using C1's measured share; the fallbacks are W 4 or a T-switch.
 - Ron at tt/27 is inside every limit: sin 382 Ω, DAC 1.15 kΩ, VREF− 519 Ω, stp 3.45 kΩ, Sg 816 Ω.
 
-**C4b gate rows** (C4 §11): ron, g_min, g50_max, t_half_min, eb_min, ls_edge_max, glitch_s, glitch_d, rule13, strobe, order1, injdm, injcm, settle, leak, rampa/rampb. Each has a broken copy. The full 89-job pool is **PENDING** (WO-54).
+**C4b gate rows** (C4 §11): ron, g_min, g50_max, t_half_min, eb_min, ls_edge_max, glitch_s, glitch_d, rule13, strobe, order1, injdm, injcm, settle, leak, rampa/rampb, and since D82 a `rating` row. Each has a broken copy.
+
+**Bench root causes (WO-70, WO-79, WO-85).** No C4 run so far has produced a design verdict, because three bench problems hid it in turn. None is a design finding, and no tolerance or limit was changed to fix them:
+
+| WO | Symptom | Root cause | Fix |
+|---|---|---|---|
+| WO-70 | ≈ 40 WO-54 jobs reported "incomplete or empty netlist" | ngspice's batch-mode follow-on message after a "timestep too small" abort; the error capture was case-sensitive and missed the real line. The inj integrators also started from an undefined DC point (13.2 V) | Ron/Roff 10 Ω / 1e12 on ideal switches, integrators held in reset until T0 − 5 ns, digital inputs through 100 Ω + 5 fF, gear on inj/settle/ramp, case-insensitive capture |
+| WO-79 | 28 of 89 WO-70 jobs still aborted (inj at 20 ns on `vinn#branch`, settle, ramp) | an ideal source tied straight to pF of device capacitance: its branch current C·dV/dt is numerical noise at the 1e-22 s steps after a breakpoint and cannot meet abstol, so the step collapses; adding a source R moves the abort to the next ideal source on the node | `soften()`: a series R on every grounded independent source (10 Ω signals, 1 Ω vdd/vdl); `C4TB_TIGHT=1` copies show the results do not move with tighter tolerances |
+| WO-85 | tim decks then aborted on HV body-junction nodes (`nfet_g5v0d10v5#dbody`) | the 1 Ω in series with an undecoupled vdd/vdl leaves only device capacitance on the supply node (sub-ps time constant); crowbar current moves it every edge. Gear does not help; ideal supplies run clean | tim decks keep ideal supplies (`supplies=False`), as in WO-70; tim therefore sees no supply bounce. A bond-R + decap supply model is an option for later |
+
+**Leakage and D82.** WO-70 measured C1's own vg-node devices on the same node: 81.2 pA at ff/125, about 90 % of the 90 pA row, with Sg adding 68.5 pA, so ≈ 150 pA per node. Shrinking Sg (W 4) or a T-switch cannot close that. D82 / CL-34 derates instead: 0.25 MHz N 1024 is rated to ≤ 100 °C, and at 125 °C the 0.25 MHz mode is limited to N ≤ 256; faster modes are unaffected because drift scales with 1/fs. The new `rating` row checks drift = I_tot·N_rated/(0.25 MHz · 2.01 pF) ≤ 0.2 V, with broken copies `noderate` (N 1024 at 125 °C, expected ≈ 0.31 V) and `sgx6` (WO-79). Expected from the WO-70 numbers: ff/125 ≈ 0.076 V and ff/100 N 1024 0.048 V pass, but the **20 pA ff/100 row (N 4096) fails at 23.4 pA** (0.19 V of drift against 0.2 V). That row is still open and goes to the user after the rerun confirms it (WO-79; wo/INDEX).
+
+**Pools.** The non-tim rows run in `WO-79-139a29d/run/pool2` (relaunched under the global cap after the 2026-11-14 overload) and the tim rows in WO-85 (54 jobs; the WO-79 tim rows are void). Both are **PENDING**; WO-85 job 1 (tim ss/−40 2 MHz) timed out at 5400 s under the overload and must be rerun (RESUME 2026-11-14 18:05, 18:45).
+
+**Phase edge used by C3.** WO-81 measured C4's phiC edge from the WO-70 tim waveforms for the C3 T8 bench (D87): 10–90 % rise 0.40–1.35 ns and fall 0.18–0.32 ns over five corners (WO-81).
 
 **Level shifters (C7) (C4 §7).** Up-shifters (`lsbuflv2hv_1`): fs, y, swap, short, chop, rst, order, dec, plus the C6 static lines boost and trim. Down-shifters (`lsbufhv2lv_1`): chlp, chln and the comparator strobe φC.
 
-## III.5 C6: bias reference (WO-45 → WO-55)
+## III.5 C6: bias reference (WO-45 → WO-87)
 
 **Purpose.**
 - A constant-current reference (D42) with a 3-bit trim.
@@ -1159,8 +1328,8 @@ Own current ≤ 6 µA; area ≤ 7,000 µm² (SPEC rows 102–104). OTA1 port cur
 **Core (C6 §2).** Banba core with these elements:
 - PMOS legs: 17 units of 0.42/20 each.
 - Q1: 1 × pnp_05v5. Q2: 8 units, 3 × 3 common-centroid.
-- Resistors: xhrpoly 2 kΩ/sq. R1 82 µm ≈ 258 kΩ, later 94 µm (WO-55).
-- R2/R1: ≈ 4.6 by hand; 4.1988 from the WO-45 tune.
+- Resistors: xhrpoly 2 kΩ/sq. R1 82 µm ≈ 258 kΩ, later 94 µm (WO-55), now **144.8 µm** (WO-64 tune, verified in WO-80); total resistor length 854 µm (WO-80).
+- R2/R1: ≈ 4.6 by hand; 4.1988 from the WO-45 tune; **2.45** after the 2:1 amp skew of architecture (c), whose n·VT·ln 2 PTAT term moves the zero-TC ratio down (WO-64 estimate ≈ 2.2; tuned value 2.45) (WO-64 §1; WO-80).
 - Two-stage amplifier: Cc 3 pF, Cvg 1 pF.
 
 **Trim (C6 §3; D73).** $G_0 = 17$ plus binary legs of 1, 2 and 4 units; the reset code 100 is 21 units. Three linear bits cannot meet ±20 % range, ≤ 6 % step and ±3 % residual at once; they miss by 0.04 %. So the trim covers the process part, ±19 % ($I_7/I_0 \ge 1.3836$). The TC part cannot be trimmed at room temperature anyway (D73). Calibration rule: firmware uses the lowest passing code + 2, landing at ≈ 0.85–0.97 × nominal. That keeps ≥ 4.6 % margin under the +1.6 % OTA1 ceiling at ff/125 and stays above the SR knee with TC margin (D73; C6 §4).
@@ -1173,15 +1342,39 @@ Own current ≤ 6 µA; area ≤ 7,000 µm² (SPEC rows 102–104). OTA1 port cur
 | WO-50 | diagnosis: a zero-gain region below ≈ 50–60 % I0 (V_B − V_A −0.00003 mV at 10 %, −0.69 mV at 50 %); thresholded start-up with hysteresis, Mpo injection into o1 | 10 ms ramp at tt holds within ±1 % but bias_ok asserts at VAPWR ≈ 1.1 V (4 % of I); 1 µs ramp relaxes (15 assertions, peak 5.4 × I0); the WO-50 DC "errors" were later shown to be nonphysical .dc solutions (V_A ≈ −1400 V) | WO-50; C6 §6.5 |
 | WO-55 | **architecture (c)**: amp input pair skewed 2:1 (balances at V_B − V_A ≈ +15 mV, ≈ 7σ); bounded kick into o1; bias_ok from a pnp-on comparator on V_R1 (core-derived, not VAPWR-derived); R1 → 94 µm | smoke: one stable equilibrium at tt/27 and sf/27 (noskew broken copy REJECTs); dci from 0 and VDD 1.06845 / 1.06845 µA vs op 1.06844; 1 µs ramp settles to 0.03 % but ±1 % only 26–40 µs after the ramp (gate 10 µs) | WO-55; C6 §6.6 |
 | D78 | accept a ≈ 40 µs settle; row → settled ±1 % before rstb release; C9 holds rstb after bias_ok for a count set from the measured worst (e.g. 256 fs cycles ≈ 64 µs at 4 MHz); one bias_ok rise required | — | D78 |
+| WO-64 | diagnosis: I0 1.45 µA and TC −3.7…−4.2 % had one cause, a tune grid (R2/R1 3.0–6.6) that never bracketed zero TC; two-stage tune (R1 165 µm, then rescaled to 1.07 µA); sf/27 "third state" was a solver artefact (nodeset now from a transient); 125 °C SIMFAIL traced to the bench; D78 rows implemented | pool collected 2026-11-14: MISMATCH 18 (125 °C SIMFAIL, fast-ramp metric) → WO-80 | WO-64; RESUME 2026-11-14 14:50 |
+| D85 | VAPWR-good is a C9 counter, not a C6 detector: rstb held 2^16 fs cycles after rst_n release AND bias_ok high 256 cycles; board asserts rst_n only after VAPWR is up | bias_ok fired at VAPWR 1.4–1.7 V; an analog detector would need a 2.3–2.85 V threshold over temperature | D85; CL-36 |
+| WO-80 | R1 144.8 / R2/R1 2.45, no re-tune; 125 °C SIMFAIL root cause = deck gmin 1e-15 (tran decks now gmin 1e-12, abstol 1e-12, error ≈ 3 pA per node); `dev` relabelled info; bias_ok pulses measured | DC/loop/dci rows all ACCEPT (table below); tran rows REJECT on `rises == 1`; final summary MISMATCH 16; worst settle after the final rise 1.68 ms | WO-80; `results/wo80/summary.txt` |
+| D89 | start-up row redefined (CL-38): from the final bias_ok rise, settle to ±1 % within 0.25 × the 2^16-cycle hold (4.1 ms at 4 MHz) and stay there from release; earlier pulses reported, not gated; broken copy must settle too slowly | — | D89; CL-38 |
+| WO-87 | D89 gate in `tran_eval`; a current never inside ±1 % at the last sample now counts as "never settled" (was read as settled); new copies `slow` (τ 1.2 ms master leg) and `earlyx`; `oldhint` retired to info (no longer breaks at the new operating point), replaced by `zhint`/`zhintnk`; 125 °C 1 µs ramps get gmin 1e-11 (≈ 30 pA per junction) | rerun pool (42 jobs) **PENDING** | WO-87; wo/INDEX |
+
+**R1 144.8 µm, DC results (WO-80, five dct corners).**
+
+| Row | Result | Limit |
+|---|---|---|
+| TC over −40…125 °C | −2.56/+0.08 % (ff, worst) … −2.12/+0.15 % (fs) | ±3 % |
+| I0 at tt/27 | 1.0677 µA (−0.21 %) | 1.07 µA ± 2 % |
+| Own current | 4.34–4.96 µA | ≤ 6 µA |
+| Trim cover / step | 1.410–1.411 / ≤ 5.06 % | ≥ 1.3836 / ≤ 6 % |
+| Start-up from rest (dci from 0 and from VDD, 15 points) and loop rows | one stable point, no mid crossing, all ACCEPT | — |
+| PSRR (dcv, info) | 70.5–72.5 dB | ≥ 40 dB |
+
+**bias_ok pulse findings (WO-80; RESUME 2026-11-15 00:10).** At low VDD nothing holds the bias_ok output q low: the default-low device is gated by tsu, which is still below the NMOS threshold, so q follows the supply through the inverters. Measured pulses:
+- fast (1 µs) ramps: early pulses of 0.1–1.0 µs at VDD ≈ 1.01 V with near-zero current; ff/−40 adds a 4.2 µs pulse at full VDD;
+- slow (10 ms) ramp at sf/−40: a **104 µs pulse at VDD 1.02 V with I ≈ 0**, longer than the 64 µs C9 bias filter;
+- fs/125 10 ms: the final rise comes at VDD 1.08 V with 2 % of the current.
+
+The worst settle after the final rise is 1.68 ms, well inside the ≈ 16 ms C9 hold. The user chose to redefine the row (D89) rather than change the circuit, relying on the board rule (D85) and on the bias-run restart (D88). Two old broken copies, `early` and `hy1`, were rejected only by the removed `rises` rule and are expected to ACCEPT under D89; whether to retire them to info or add a separate hysteresis row is an open decision (WO-87 §1).
 
 **Alternatives rejected at WO-55 (C6 §6.6).**
 - (a) Banba with a current-sensing start-up: it needs a release threshold accurate to better than ×2 over VDD/T/corner, and the leaker spreads ×4.
 - (b) Beta-multiplier (constant-gm): $I \propto 1/(\mu R^2)$ gives ≈ +0.8 %/K with xhrpoly, ≈ +130 % over −40…125 °C, against the 3 % row.
 
 **Open items.**
-- WO-55 full pool: re-tune plus 71 jobs, **PENDING**.
+- WO-87 transient rerun under D89 (42 jobs). **PENDING.**
+- `early` / `hy1` copies: retire or add a hysteresis row (user's call; WO-87 §1).
 - The ivbl0 clamp current from C1 tb9 (C6 §5).
-- VAPWR-good for the sequencer (WO-55 §3).
+- VAPWR-good for the sequencer: answered by the C9 counter (D85, CL-36, CL-37).
 - The bias-readback oscillator (D49), conditional on area.
 
 ## III.6 C9: digital (RTL, verification, hardening)
@@ -1206,6 +1399,11 @@ Accumulator widths:
 
 Firmware-visible facts: the acc LSBs are always 0 for even N, and status[8] is tied to 0 (README C9, WO-42).
 
+**RTL revisions since D77** (wo/INDEX; CL-36, CL-37):
+- D79 retime (WO-60B; PnR in WO-66): fs_tick / s_tick registered one clk early and the divider terminal constants registered, which removed the fs_div compare → overrun path from the critical path.
+- D85 (WO-74, RTL df9bded): new input `bias_ok` (2-FF synchronised) and the VAPWR-good hold, parameterised by PW_BITS / BIAS_BITS (16 / 8 on chip). FF 231 → 259, cells 966 → 1068.
+- D88 (WO-82, RTL baa0706): the bias run clears on any low sample until release, saturates at done and freezes after release. One RTL line; 259 FF, cells 1068 → 1077 (generic count; CL-37).
+
 ### III.6.2 Port contract and contract decisions
 
 | Decision | Content |
@@ -1216,6 +1414,9 @@ Firmware-visible facts: the acc LSBs are always 0 for even N, and status[8] is t
 | D72 (CL-29) | narrow accumulators, macro renamed, STA proxy corner ss_100C_1v40 (125 °C / 1.98 V unchecked), one PnR run |
 | D74 (CL-28) | comp_in captured straight into the DAC flop on fs_tick; comp_s removed (one cycle less loop delay) |
 | D77 (CL-32) | acc2 24 b, not 25; the 23 b mutant must REJECT, 24 b is equivalent |
+| D79 | PnR fixes one change per run: clock-delay cells banned from the resizer, then the fs_tick retime |
+| D85 (CL-36) | `bias_ok` input and VAPWR-good hold: no slot and rst_analog = 1 until 2^16 fs cycles after the synchronised release AND bias_ok high for 256 cycles; the board asserts rst_n only after VAPWR is up |
+| D88 (CL-37) | AMB-30: bias_ok must be high for the last 256 consecutive fs cycles before release (the count restarts on a drop; sticky only after release); AMB-31: fs_clk keeps toggling during the hold |
 
 **Control signals to analog** (SPEC §3.8a): `rst_analog`, `sys_swap`, `ota_chop_phase`, `short`, `order`, `boost`, `trim[2:0]`, `y_force`, `bit_valid`, plus the fs bit clock. All are active-high direct flop outputs. **F-IF-1:** the comparator output must be latched, with a minimum delay clk → comp_in ≥ 1 ns (HARD §6). C3's SR latch holds q through precharge (C3 §2).
 
@@ -1228,7 +1429,10 @@ Firmware-visible facts: the acc LSBs are always 0 for even N, and status[8] is t
 - **Mutation.** 64/65 killed on the D72/D74 RTL. The survivor W2 (acc2 24 b) was provably equivalent, which led to D77 (RESUME; D77). WO-58 re-anchored the width mutants: W2 = 23 b, M01 = 22 b (git log 80bb23e).
 - **Formal.** SVA properties F-01…F-17 on `c9_core` via sby (yices / abc pdr). Each property must fail on at least one mutant, otherwise it is reported as vacuous (VPLAN §5). F-01 was strengthened to fail on M07, M07b and M19 (VPLAN §11.2).
 - **CDC.** A static review (VPLAN §11.1): rst_n async assert / sync release; 2-FF synchronisers on cfg_clk, cfg_dat, cfg_ld and rd. Multi-bit `addr` may show a wrong word for 1 clk, inside the 3-clk settle.
-- **Remaining risks** (RESUME 2026-11-13): SOAK only 3000 slots; R-01 seeds 4–20 on the new RTL; no gate-level / SDF yet.
+- **WO-75, bench for D85** (RTL df9bded; VPLAN §14). Golden v3.2 stays the arbiter from slot 0 on, because the hold only adds a prefix before slot 0. Ref A models the hold from the SPEC text, and an independent observer in the bench checks the slot-0 tick. Ref A agreement, lint, suite seeds 1–3 (27/27 each, including the new hold tests d_hold01–04), C9_FULL, R-01 seeds 1–20, GL quick (27/27) and d_hold01 at the real 16/8 widths all PASS. Formal F01–F18 PASS at reduced widths (F18 at 3/2), and F18 FAILs on hold mutants, so it is live. Every mutant is killed except M64, the known equivalent; M45 first survived because the bench top bypassed the tt_um wrapper, which was then fixed. No RTL bug was found; the bench raised AMB-30/31, which became D88 (WO-75).
+- **WO-83, bench for D88** (RTL baa0706; VPLAN §15). `defparam` was removed so Verilator builds the bench top again (X-01 s1 7/7 PASS). Ref A and `exp_slot0()` are written from the CL-37 text; a new test d_hold05_d88 has six hand-derived slot-0 cases; new mutants M71–M74 and re-derived M66/M68; F18 follows CL-37 and a new F19 checks that slot 0 is not late. Smoke: F18 and F19 PASS at 3/2. Full regression: **106 of 107 jobs EXIT=0 so far**, the rest PENDING (coordinator note 2026-11-15).
+- **Formal width limit.** The counter properties are proven only at reduced widths. At the real 16/8 widths F18 timed out at 8673 s with no proof, and F19 was killed at more than 5 GB of memory during the 2026-11-14 overload. The real widths are covered by RTL simulation (d_hold01 and d_hold05 at 16/8). The formal reruns are to go alone under `ulimit -v` (WO-83; RESUME 2026-11-14 18:45). A width ladder (4/2 … 12/6) in the WO-83 pool shows the widest width proven.
+- **Remaining risks** (RESUME 2026-11-13; WO-83): SOAK only 3000 slots; no gate-level / SDF simulation of the final layout yet; the `c9_seq.v` comment on the bias bit is stale after D88.
 
 ### III.6.4 Hardening (HARD; WO-47, WO-58B)
 
@@ -1238,7 +1442,19 @@ Firmware-visible facts: the acc LSBs are always 0 for even N, and status[8] is t
 - **After narrowing.**
   - D72: 936 cells / 225 FF.
   - D77: 929 cells / 223 FF (RESUME 2026-11-13; generic yosys count). LibreLane sky130 synthesis in WO-58B gives 860 cells / 223 FF; the two counts use different bases.
-- **PnR config (WO-58B, commit a166371).** PDN_MULTILAYER rename, 190 × 150 die, ss_100C_1v40 corner, all-corner timing checks. first PnR (WO-58B, `results/wo58b/README.md`) finished with EXIT=2: setup fails at ss_100C_1v40 (WS −1.599 ns max RC, Fmax 44.6 MHz), 54 max-fanout violations at every corner, slew violations (203 at ss_1v40 max RC); physical checks clean (Magic/KLayout DRC 0, LVS 0, antenna 0). WO-60A (`results/wo60a/README.md`, clkdlybuf/dlymetal6s banned, D79) improved setup WS to −1.181 ns (Fmax 45.4 MHz) with 2 violating paths per RC corner, but slew violations rose to 336 and fanout stays at 54; physical checks still clean. D79 / WO-60 fixes are in progress (the fs_tick retime in WO-60B is pending verification).
+- **PnR config (WO-58B, commit a166371).** PDN_MULTILAYER rename, 190 × 150 die, ss_100C_1v40 corner, all-corner timing checks. first PnR (WO-58B, `results/wo58b/README.md`) finished with EXIT=2: setup fails at ss_100C_1v40 (WS −1.599 ns max RC, Fmax 44.6 MHz), 54 max-fanout violations at every corner, slew violations (203 at ss_1v40 max RC); physical checks clean (Magic/KLayout DRC 0, LVS 0, antenna 0). WO-60A (`results/wo60a/README.md`, clkdlybuf/dlymetal6s banned, D79) improved setup WS to −1.181 ns (Fmax 45.4 MHz) with 2 violating paths per RC corner, but slew violations rose to 336 and fanout stays at 54; physical checks still clean. D79 then started a sequence of single-change PnR runs, each with every check re-run (STATE-2026-11-14 §2, lesson 5):
+
+| Run | Single change | Result | Source |
+|---|---|---|---|
+| WO-60A | clkdlybuf/dlymetal6s banned (D79) | setup WS −1.599 → −1.181 ns at ss_1v40; slew 203 → 336 | WO-60A |
+| WO-66 | fs_tick retime RTL (D79) | **setup and hold met at all 12 corners** (ss_1v40 +2.582 ns, Fmax 54.8 MHz); tt reg-to-reg 6.66 ns < T/2; physical clean; fanout 46, slew 256 (ss_1v40), cap 3 | WO-66 |
+| WO-67 | buf_1 banned | worse: the resizer used delay cells as fanout buffers (ss_1v40 +0.17 ns); reverted (8ddea05) | wo/INDEX; HARD (WO-67) |
+| WO-69 | heuristic diode insertion off | fanout 46 → 10, slew 43 pins (ss_1v40 only), cap 0, diodes 342 → 13; utilisation 0.668 | WO-69 |
+| WO-71 | CTS sink clustering size 8 | fanout 0 at 12 corners; setup +2.777 ns; slew unchanged | WO-71 |
+| WO-72 | post-GRT design repair on | no effect: the resizer's parasitic estimate shows no slew violator, while routed slew is 1.37–1.49 × the GRT estimate | WO-72; WO-73 |
+| WO-73 | GRT slew margin 10 → 40 % (D84) | slew 43 → 32 pins at ss_1v40, worst 1.728 vs 1.5 ns; setup +2.961 ns; hold +0.108 ns; DRC and antenna 0; LVS not extracted; 2 floating nets (RSZ-0020) unnamed | WO-73 |
+
+D86 waives max slew at the ss_100C_1v40 stand-in corner only: it occurs only at the pessimistic 1.40 V stand-in for 125 °C, setup slack there is +2.96 ns, and ss_1v60 and every other corner are clean. The **final PnR** on the D85/D88 RTL carries the WO-73 flow settings with `bias_ok` added to `pin_order.cfg`, then re-checks slew, LVS and the 2 floating nets; it is **PENDING** (D86; STATE-2026-11-14 §6). WO-73's first copy failed for exactly that reason: HEAD already had the `bias_ok` RTL but `pin_order.cfg` did not list the pin (WO-73).
 - **STA gap.** sky130_fd_sc_hd has no 125 °C or 1.98 V liberty, so 125 °C / 1.98 V stays unchecked (D72).
 - **Precheck traps** (HARD §8):
   - run the Magic antenna check ourselves;
@@ -1249,7 +1465,7 @@ Firmware-visible facts: the acc LSBs are always 0 for even N, and status[8] is t
 
 ## III.7 C5, C7, C8, C10: status
 
-| Block | Status (2026-11-13) | Source |
+| Block | Status (2026-11-15) | Source |
 |---|---|---|
 | C5 choppers | the OTA1 choppers are inside C1 (input chopper at the gates, 3.3 V NMOS 4/0.5; fold-node chopper 1.8 V 4/0.15); the system-chop swap is merged into the C4 input switch (#1); no separate C5 design note | C1 §1.4; C4 §2 |
 | C7 level shifters / layout | cell choice and count in C4 rev b; isolation done in logic (D78); layout rules carried by pd-expert (common-centroid references with edge dummies, D59); top-level assembly not started | C4 §7; D59; D78 |
@@ -1375,6 +1591,12 @@ Two bugs were found and fixed (WO-50 §3; RESUME 2026-11-13):
 - A relaunch without the environment failed fast, because ngspice was not on PATH (WO-52 relaunch, RESUME).
 - The IIC container cannot mount `/home/mempool/regr` (RESUME, final note).
 
+**The 2026-11-14 overload and the global cap** (RESUME 2026-11-14 18:05, 18:45; coordinator note 2026-11-15). About 15 of the project's own pools ran at once, each sizing itself to the load independently. Load reached 44–53 on 6 cores and memory 15/15 GB when a 10.6 GB yosys-abc PDR (WO-83 F18 at real widths) ran beside them, and ssh hung. Several decks timed out and must be rerun (WO-76 diagnostics, WO-77 jobs 3–5, WO-85 job 1), and the real-width formal runs gave no result. The user decided:
+- lpool has a **global cap of GMAX = 5 slots** shared by all pools, implemented with flock slot locks in `/home/mempool/regr/tt/.lpool_slots` (commit 2f2e0a0). Tested: a cap of 2 gave at most 2 concurrent jobs, and a broken cap of 9 gave 3. Frozen copies must take lpool from the repo or tt-sd to pick up the cap; older pools drained uncapped.
+- Heavy formal or PDR runs go alone, under a memory limit (`ulimit -v`).
+
+Lessons: per-pool load sizing does not bound the total when many pools start together; long decks need timeouts sized for a loaded box (30,000–40,000 s for C1 gate B parts); a timed-out deck is a missing result, neither a pass nor a fail, and no decision is taken until the data exists (RESUME 2026-11-14 20:45).
+
 ## IV.8 Review gates
 
 **Reviewer.** `sd-adc-design-reviewer` (read-only) reviews every design change: a design note before the netlist, and again after results land (CLAUDE.md working rules; GUIDE §5 item 6). Reviews on record:
@@ -1397,64 +1619,82 @@ These are the `work/v1-design/REVIEW-*.md` files.
 
 ---
 
-# Part V: Status, open items and risks (as of 2026-11-13)
+# Part V: Status, open items and risks (as of 2026-11-15)
 
 ## V.1 Stage status
 
 | Stage / block | Status | Last evidence |
 |---|---|---|
-| S0–S7 | closed; SPEC v1 frozen 2026-11-09 (D50) | D50 |
-| C1 OTA1 + CMFB | op/AC 9 PVT, tb9 and gate B (4 corners, boost) passed on the WO-31/32 netlists; sink L 8 (D75) reruns **PENDING** (WO-52) | WO-31, WO-32, WO-52 |
+| S0–S7 | closed; SPEC v1 frozen 2026-11-09 (D50); post-freeze change log now runs to CL-39 | D50; SPEC change log |
+| C1 OTA1 + CMFB | sink L 8 netlist (D75). Boost gate B passes: fs/125 3.14 ppm, ss/−40 0.71 ppm against 5 ppm. Precision gate B (2 MHz, ≤ 1.333 ppm): tt/27 0.692, ss/125 0.698 and fs/125 0.967 ppm pass at O1; ss/−40 fails at O1 (1.706 ppm). The first two O2 parts at ss/−40 read 0.142 and 0.160 ppm. **Verdict PENDING** the 6-part O2 combine (WO-76). tb7 noise and op/AC mutant benches are fixed; rerun **PENDING** (WO-77) | RESUME 2026-11-14 (WO-52 reruns); WO-63; WO-76; WO-77 |
 | C2 OTA2 | not started | III.2 |
-| C3 comparator | rev d full run **PENDING** (WO-56); offset row ACCEPT on rev b MC (44.8 / 45.0 mV ≤ 60) | WO-51, WO-56 |
-| C4 switches / generator | rev b netlist + tb written; 89-job gate pool **PENDING** (WO-54) | WO-54 |
+| C3 comparator | rev f (op/on keeper) on the D87 bench basis. T2, T3 and T5 pass on rev f (T3 \|μ\| + 3σ 42.7–45.1 mV ≤ 60 mV). T8 still fails: the sustained excess (+0.344 mV over the pin) is now inside the D90 tolerance (≤ 1.981 V), but the re-judged run is **PENDING**; the precharge-edge peak is 2.224 V (tt/27) and 2.251 V (ff/−40) against the 2.2 V cap (2.179 / 2.206 V with the 2× keeper kp2). Rev g candidates **PENDING** (WO-88) | WO-86; WO-88; D90 |
+| C4 switches / generator | rev b. Every WO-54/WO-70 error was traced to bench numerics and fixed (WO-70, WO-79, WO-85); D82 rating rows added. Gate pools **PENDING** (WO-79 `pool2` for the non-tim rows, WO-85 for the tim rows). The ff/100 20 pA row read 23.4 pA in WO-70: **open** | WO-70; WO-79; WO-85 |
 | C5 choppers | inside C1 / C4 | III.7 |
-| C6 bias | architecture (c) chosen; full pool **PENDING** (WO-55); ≈ 40 µs settle accepted (D78) | WO-55; D78 |
+| C6 bias | architecture (c), R2/R1 2.45, R1 144.8 µm. All DC, loop and start-up-from-rest rows pass at the 5 corners (TC −2.56/+0.08 % worst, I0 1.0677 µA at tt/27, own current 4.34–4.96 µA, trim cover 1.410). The bias_ok start-up row was redefined (D89, CL-38); transient rerun **PENDING** (WO-87, 42 jobs) | WO-80; WO-87 |
 | C7 / C8 / C10 | not started (rules and spec rows only) | III.7 |
-| C9 digital | RTL D72/D74/D77; bench all pass, bins 250/250, mutants 64/65 → equivalent survivor retired (D77); PnR config committed (WO-58B); first PnR: setup fails at ss_100C_1v40, Fmax 44.6 → 45.4 MHz after WO-60A, slew/fanout violations, physical checks clean; D79/WO-60 fixes in progress (fs_tick retime pending verification) | RESUME; `results/wo58b/README.md`; `results/wo60a/README.md` |
+| C9 digital | RTL baa0706 (D72, D74, D77, D79, D85, D88): 259 FF, 1077 cells (generic count). WO-75 bench on D85: every row passes, mutants all killed except the known equivalent M64. WO-83 bench on D88: 106 of 107 regression jobs EXIT=0 so far; formal proofs only at small counter widths. PnR on the pre-D85 RTL (WO-73) meets setup and hold at 12 corners with DRC and antenna clean; max slew is waived at the ss_100C_1v40 stand-in (D86). Final PnR on the D85/D88 RTL **PENDING** | WO-75; WO-83; WO-73; D86; coordinator note 2026-11-15 |
 | Stage V | not started | GUIDE §2 |
 
 ## V.2 Values still pending a run
 
 | Item | Pending run | Source |
 |---|---|---|
-| C1 thermal_vg ≤ 390 µV and the direct path ≤ 1.2 µV with sink L 8, all PVT | WO-52 tb7 | WO-52 |
-| C1 gate B on the sink-L 8 netlist (fs/125, ss/−40 combines) | WO-52 | WO-52 |
-| C1 op/AC and tb9 on the sink-L 8 netlist | WO-52 jobs 22–35 | WO-52 |
-| C1 precision gate B (2 MHz, ≤ 1.333 ppm) | authoritative gate run missing (D48(1), SPEC:94); to be run in WO-63 | D48(1); SPEC row 94; WO-63 |
+| C1 precision gate B, ss/−40: 6-part O2 combine (O1 1.706 ppm; O2 so far p0 0.142, p2 0.160 ppm) | WO-76 `out/logs_o2` | WO-76; coordinator note 2026-11-15 |
+| C1 precision gate B, fs/125 at O2 | WO-76 `out/logs_o2` | WO-76 |
+| C1 precision gate B at O2 for tt/27 (O1 0.692) and ss/125 (O1 0.698). The D48 rule asks for O2 whenever O1 ≥ gate/2 (0.667 ppm); these two corners are not in the WO-76 job list | no WO yet | WO-63 |
+| C1 tb7: thermal v_vg ≤ 390 µV and the tier-0 direct path with sink L 8, all PVT; mrg and msink copies must REJECT; op/AC mutants per deck | WO-77 rerun; jobs 3–5 timed out under the overload and must be rerun | WO-77; RESUME 2026-11-14 18:45 |
 | C1 tb8 / tb8b MC, tb10 stress, tb12 boost toggle, tb13 vg switches | not found in the results read | C1 §4 |
-| C3 rev d: function rows, T8 stress, MC offset with the new core, T2band with the HV tail | WO-56 | WO-56 |
-| C4 rev b: all 16 gate rows, leakage sign vs Vin_cm | WO-54 | WO-54 |
-| C6: TC after the re-tune, trim monotonicity per corner, start-up per corner, worst settle after bias_ok (sets the C9 rstb hold count) | WO-55 | WO-55; D78 |
-| C9: setup closure at ss_100C_1v40 (WNS −1.181 ns after WO-60A), slew/fanout violations, fs_tick retime (WO-60B); gate-level/SDF sim. Area, DRC, LVS clean in PnR runs 1 and 2 | WO-60 | `results/wo58b/README.md`; `results/wo60a/README.md`; D79 |
-| System current in fast mode with real blocks | needs C2 and C6 numbers; OTA1 alone draws 121.8–123.9 µA in boost on the WO-28 netlist, against the SPEC system estimate of ≈ 172 µA nominal / 189 µA worst. Reviewer estimate (REASONED, not simulated): OTA1 boost ≈ 122 µA + OTA2 ≈ 51 µA (≈ 19 µA tail × 2.7) + bias ≈ 6 µA ≈ 180 µA nominal, against 172 µA (SPEC) and the 200 µA budget; open risk | WO-28; SPEC §1; WO-62 reviewer |
+| C3 rev g: precharge-edge cap candidates (R0/R1 0.5/0.15, 1.0/0.3, 1.0/0.5 with kp2; kp3 as info), the rev f cyc rows that were never run, and the leak-path probe | WO-88 pool A and `runI` | WO-88 |
+| C3 T8 re-judged at the D90 tolerance (1.981 V), with the `sus1985` checker copy | WO-88 and after | D90; CL-39; WO-88 |
+| C3 T3 offset MC on rev f + kp2 or on rev g | not run | WO-86 |
+| C4 inj, settle, ramp, leak and rating rows on the softened bench | WO-79 `run/pool2` | WO-79; RESUME 2026-11-14 18:05 |
+| C4 tim rows (dead time, strobe placement, order-1 reset) with ideal supplies in tim | WO-85 (54 jobs; job 1 timed out at 5400 s and must be rerun) | WO-85; RESUME 2026-11-14 18:45 |
+| C4 ff/100 20 pA leakage row (23.4 pA in WO-70) | WO-79 / WO-85 reruns, then a user decision | WO-79; D82 |
+| C6 transient rows under D89: settle ≤ 4.1 ms after the final bias_ok rise, broken copies `slow` and `earlyx`, 125 °C fast ramps at gmin 1e-11 | WO-87 | WO-87; CL-38 |
+| C9 F18 / F19 at the real 16/8 widths | rerun alone with `ulimit -v` ≈ 8 GB | WO-83; RESUME 2026-11-14 18:45 |
+| C9 WO-83 regression: the last of 107 jobs | WO-83 pool | coordinator note 2026-11-15 |
+| C9 final PnR (D85/D88 RTL, slew margin 40 %, `bias_ok` in `pin_order.cfg`), LVS re-extraction, the 2 unnamed floating nets, then the gate-level / SDF sim | next C9 PnR WO | D86; WO-73; STATE-2026-11-14 §6 |
+| System current in fast mode with real blocks | needs C2 and C6 numbers. OTA1 alone draws 121.8–123.9 µA in boost on the WO-28 netlist. Reviewer estimate (REASONED, not simulated): OTA1 ≈ 122 + OTA2 ≈ 51 + bias ≈ 6 µA ≈ 180 µA nominal, against the 172 µA SPEC estimate and the 200 µA budget | WO-28; SPEC §1; WO-62 reviewer |
 | Reset residue r ≤ 1e-4 in 2 cycles at 4 MHz boost and 0.25 MHz | C1/C2 integration (needs C2) | C4 §11; D46a |
 | System noise / INL with PEX parameters (V9) | Stage V | SPEC §3.0 noise row |
 
 ## V.3 Open decisions and items
 
-1. **C4 Sg leakage.** 68 pA against a 45 pA proposed share. Re-split with C1's measured share, or W 4, or a T-switch (D78).
-2. **C6.** ivbl0 clamp current from C1 tb9; VAPWR-good for the sequencer; the C9 rstb hold count from the measured worst settle (WO-55; D78).
-3. **C3 kickback options.** Halve the pair, or add a neutralisation pair; not applied (C3 §3.4b).
-4. **C2 swing.** OTA2 must hold A ≥ 75 dB to ≈ 1.41 V differential plus the 45 mV CM kick (C3 §3.1b).
-5. **D49 bias-readback oscillator.** Conditional on C6 floorplan area.
-6. **SPEC-AMB-24** (cfg_ld / rd minimum width) is open from WO-42 (RESUME).
-7. **C9 STA.** 125 °C / 1.98 V is not modelled by the liberty set (D72).
+1. **C1 precision gate B.** If the 6-part O2 combine passes, the D48 rule takes O2 as the converged result and no design change follows; this is reported to the user as the finding (RESUME 2026-11-15 00:45). If it fails, options go to the user with data. Bias scaling is not supported by the data so far: it moves the error between parts instead of removing it (RESUME 2026-11-14 23:40).
+2. **C1 precision broken copy.** `srknee` rejects at 1.375 ppm, only 3 % over the 1.333 ppm gate, and only part 0 rejects on its own. It is a weak discriminator (WO-63; WO-76 §4).
+3. **C3 T8 precharge-edge cap.** Choose a rev g candidate from the WO-88 sweep, then run the full C3 set; name the leak path that lifts op/on (WO-88).
+4. **C6 broken copies `early` and `hy1`.** Under D89 they are expected to ACCEPT. Retire them to INFO, or keep a separate hysteresis row with a noise-injected bias_ok bench (WO-87 §1). User's call.
+5. **C4 ff/100 20 pA row.** 23.4 pA in WO-70; a user decision follows once the rerun confirms it (WO-79; wo/INDEX).
+6. **C6 ivbl0 clamp current** from C1 tb9 (C6 §5).
+7. **C3 kickback options.** Halve the pair, or add a neutralisation pair; not applied (C3 §3.4b). The CM kick stays ≈ 39–47 mV on rev f and kp2 (WO-86).
+8. **C2 swing.** OTA2 must hold A ≥ 75 dB to ≈ 1.41 V differential plus the CM kick (C3 §3.1b; WO-86).
+9. **D49 bias-readback oscillator.** Conditional on C6 floorplan area.
+10. **SPEC-AMB-24** (cfg_ld / rd minimum width) is open from WO-42 (RESUME).
+11. **C9 STA.** 125 °C / 1.98 V is not modelled by the liberty set (D72); max slew is waived at the ss_100C_1v40 stand-in (D86).
+12. **To raise when relevant** (STATE-2026-11-14 §5): the fast-mode current budget when C2 starts; a C9 die shrink (utilisation ≈ 0.68); the SOAK scale (10⁶ slots is not reachable at the current simulation speed).
 
 ## V.4 Risks
 
 | Risk | Basis | Source |
 |---|---|---|
+| C1 precision INL depends on solver settings at ss/−40: O1 1.706 ppm against O2 0.142–0.160 ppm on the parts run so far | the gate verdict rests on the O2 combine; a pattern-dependent error that moves between parts under bias scaling | WO-76; RESUME 2026-11-14/15 |
+| C3 T8: precharge-edge overshoot on 1.8 V oxide pairs above the 2.2 V / < 1 ns cap (2.206 V at ff/−40 even with kp2) | rev g not chosen yet; any extra device on the HV nodes may move T5 kick and T2 | WO-86; WO-88 |
+| C3 sustained sub-mV excess above VDPWR on op/on and nb2/ob2 | accepted by the D90 tolerance; the injection path is not yet named | D90; WO-86 |
+| Virtual-ground leakage ≈ 150 pA per node at ff/125 (C1 81 pA + Sg 68.5 pA) against the 90 pA row | handled by derating (D82): 0.25 MHz N 1024 rated to ≤ 100 °C, N ≤ 256 at 125 °C; the ff/100 20 pA row is open (23.4 pA) | WO-70; D82; CL-34 |
 | Sys-off CMRR margin 1.1–1.5 dB over 60 dB; the 66 dB target depends on layout (ΔCp,top ≤ 0.15 fF) | model with allocations, not PEX | `s4_corners.md`; D36 |
 | MIM voltage coefficient and bottom-plate parasitic not in the PDK model | appears only in PEX/silicon; covered by the 4 ppm INL reserve | SPEC §6 |
 | Digital → analog substrate coupling inside the tile not simulated | isolation by placement and guard rings only | SPEC §6; HARD §2 |
 | HV-device mismatch from hand Pelgrom (A_VT 12 assumed) | PDK MC has no vth0 term | C1 §2.11; WO-44 |
-| Fast-mode current against the 200 µA budget | 189 µA worst after trim is accepted risk; OTA1 alone ≈ 124 µA boost on the netlist; reviewer reasoned estimate ≈ 180 µA nominal (OTA1 ≈ 122 + OTA2 ≈ 51 + bias ≈ 6 µA) vs 172 µA SPEC, open risk | D46c; WO-28 |
+| Fast-mode current against the 200 µA budget | 189 µA worst after trim is accepted risk; OTA1 alone ≈ 124 µA boost on the netlist; reviewer reasoned estimate ≈ 180 µA nominal vs 172 µA SPEC | D46c; WO-28 |
 | C6 reference window: only +1.6 % above nominal at ff/125 base before the OTA1 ceiling | calibration "+2" rule lands at 0.85–0.97 × | WO-32; D73 |
-| C9 area ≈ 35–45 % of the tile in the probe (before narrowing) | tile was 66–89 % full by estimate | HARD §3; D42 |
-| C9 timing at 48 MHz | setup fails at the ss_100C_1v40 stand-in: WS −1.599 ns (WO-58B), then −1.181 ns with clock-delay cells banned (WO-60A); Fmax 45.4 MHz; tt path 12.25 ns > T/2; slew violations up to 336; fs_tick retime (WO-60B) pending verification and a PnR rerun. Fallback: run the TT clock slower (loses 4 MHz mode) | `results/wo58b`, `results/wo60a`; D79 |
+| bias_ok can pulse high before the bias is valid (0.1–1 µs at ≈ 1 V on fast ramps; 104 µs at 1.02 V on a slow sf/−40 ramp) | covered at system level by the board rule (rst_n only after VAPWR is up, D85), the bias-run restart (D88) and the 2^16-cycle hold; no brown-out detection | WO-80; D85; D88; D89 |
+| C9 counter-width proofs: F18/F19 proven only at small widths; real 16/8 runs timed out (8673 s) or ran out of memory (> 5 GB) | real widths covered only by RTL simulation (H-01, H-05 at 16/8) | WO-75; WO-83; coordinator note 2026-11-15 |
+| C9 timing at 48 MHz | met at 12 corners on the pre-D85 RTL (ss_1v40 stand-in +2.96 ns); slew waived at the stand-in (D86); the final PnR on the D85/D88 RTL (≈ +9 cells) is not run | WO-73; D86 |
+| C9 area: die 190 × 150 µm = 28,500 µm², ≈ 40 % of the 72,071 µm² tile | the analog blocks have no layout yet; the tile was 66–89 % full by estimate | WO-60A; HARD §2–3; D42 |
 | Untested 48 MHz assumption for the TT clock | fs_div table valid only at 48 MHz | SPEC §3.8a |
 | Host read rate | at 4 MHz / N 64 the host needs ≥ 0.36 Mword/s; MicroPython cannot keep up | SPEC §3.8a |
+| Sandbox capacity | overload on 2026-11-14 (load 44–53, 15/15 GB) delayed C1, C4 and C9 runs; several decks timed out and must be rerun | RESUME 2026-11-14 18:05; IV.7 |
 | No PEX anywhere yet | every block margin is schematic-level | PLAN; GUIDE §5 |
 | Model gap to silicon | the model is the intrinsic floor: no reference noise, coupling or board noise; Wulff's SAR came in ≈ 0.6 b below sim | MODEL caveats; CTX §4 |
 
@@ -1580,6 +1820,18 @@ These are the `work/v1-design/REVIEW-*.md` files.
 | D76 | model order-1 delay first; edge rate info; small Sg; power-up detector |
 | D77 | acc2 24 b; 23 b mutant must REJECT |
 | D78 | C4 logic isolation; Sg re-split; C6 ≈ 40 µs settle covered by the C9 hold |
+| D79 | C9 first-PnR fixes, one change per run: ban clkdlybuf* from the resizer; register fs_tick one clk early (RTL, re-verified before PnR) |
+| D80 | 1.8 V stress rule split: oxide pairs and Vds ≤ 1.98 V; junction reverse bias judged against the PDK junction rating with margin (CL-33) |
+| D81 | C3 T5 kickback has margin by construction (2.7 mV worst without isolation vs 5 mV); a checker copy proves the row is live |
+| D82 | vg leakage: derate the slowest mode at 125 °C (0.25 MHz N 1024 to ≤ 100 °C, N ≤ 256 at 125 °C); 20 pA ff/100 row still checked (CL-34) |
+| D83 | 1.8 V stress limit 1.98 V applies sustained (> ~1 ns); short overshoot allowed up to 2.2 V for < 1 ns; checker copy required (CL-35) |
+| D84 | C9: one more single-change PnR run, GRT_DESIGN_REPAIR_MAX_SLEW_PCT 10 → 30 after measuring estimated vs routed slew |
+| D85 | VAPWR-good is a C9 counter: hold rstb 2^16 fs cycles after rst_n release AND bias_ok for 256 cycles; board asserts rst_n only after VAPWR is up (CL-36) |
+| D86 | C9: max slew waived at the ss_100C_1v40 stand-in corner; slew margin 40 % and `bias_ok` in pin_order carried into the final PnR |
+| D87 | C3 T8 bench basis: stress judged against an ideal 1.98 V pin (no bench-drop counting), on C4's real phiC edge, with x2 bounded by OTA2's range; rev f op/on keeper |
+| D88 | C9 AMB-30: the bias count restarts on any low bias_ok sample until release (last 256 consecutive cycles); AMB-31: fs_clk toggles during the hold (CL-37) |
+| D89 | C6 bias_ok start-up row redefined: settle to ±1 % after the final bias_ok rise, well inside the C9 hold; earlier pulses reported, not gated (CL-38) |
+| D90 | D83 sustained limit gets a stated 1 mV numerical/leakage tolerance (judged ≤ 1.981 V); checker at 1.985 V must REJECT (CL-39) |
 
 ## C. Change-log index (SPEC post-freeze)
 
@@ -1620,6 +1872,13 @@ These are the `work/v1-design/REVIEW-*.md` files.
 | CL-30 | comparator offset | \|μ\| + 3σ ≤ 60 mV from loop impact | D75 |
 | CL-31 | OTA1 thermal | v_vg ≤ 390 µV from the 1.2 µV direct-path share | D75 |
 | CL-32 | accumulators | acc2 24 b; 23 b mutant REJECT | D77 |
+| CL-33 | OTA1/OTA2 devices (row 99), every 1.8 V stress row | oxide pairs and Vds ≤ 1.98 V; junctions ≤ 4.95 V (PDK `_05v5` diodes, 5.5 V − 10 %) | D80 |
+| CL-34 | virtual ground (row 113) | 0.25 MHz N 1024 rated to ≤ 100 °C; N ≤ 256 at 125 °C in 0.25 MHz mode; 20 pA ff/100 row kept | D82 |
+| CL-35 | every 1.8 V stress row | 1.98 V applies sustained (> ~1 ns); overshoot cap 2.2 V for < 1 ns; live-rule checker copy | D83 |
+| CL-36 | §3.8a rst_n, new input `bias_ok` | VAPWR-good hold: 2^16 fs cycles after release AND bias_ok high 256 cycles; slot-0 timing updated | D85 |
+| CL-37 | §3.8a rst_n | bias_ok must be high for the last 256 consecutive cycles before release (count restarts on a drop); fs_clk toggles in the hold; slot-0 formula replaced | D88 |
+| CL-38 | bias reference start-up row | from the final bias_ok rise, settle to ±1 % within 4.1 ms (0.25 × the 2^16-cycle hold at 4 MHz); earlier pulses reported only | D89 |
+| CL-39 | every 1.8 V stress row | sustained level judged ≤ 1.981 V (1 mV tolerance), also the duration-limb threshold; checker at ~1.985 V must REJECT | D90 |
 
 ## D. Symbol table
 
@@ -1654,20 +1913,28 @@ These are the `work/v1-design/REVIEW-*.md` files.
 | $A_{VT}, A_\beta$ | Pelgrom coefficients | 12 mV·µm (gating), 1 %·µm | C1 §2.11; D74 |
 | $r$ | reset residue | ≤ 1e-4 | SPEC "Reset" row |
 | $G_0$ | trim master units | 17 (code 100 = 21) | D73; C6 §3 |
-| $I_0$ | bandgap branch current | $V_T\ln 8/R_1 + V_{EB1}/R_2$, ≈ 1.07 µA | C6 §2; WO-55 |
+| $I_0$ | bandgap branch current | $V_T\ln 8/R_1 + V_{EB1}/R_2$, ≈ 1.07 µA (1.0677 µA at tt/27 with R1 144.8 µm) | C6 §2; WO-55; WO-80 |
 | acc1, acc2 | CoI accumulators | 14 b, 24 b on chip; 32 b on readout | CL-29, CL-32 |
 
 ## E. Gaps in this book's sourcing
 
-These values are marked PENDING or "not found" above because no source read for this book contained them:
-- **C1:** precision-mode gate B (2 MHz) is a missing authoritative gate run (D48(1), SPEC:94; WO-63); tb8/8b/10/12/13 results.
-- **C3:** rev d results (WO-56).
-- **C4:** rev b gate results (WO-54).
-- **C6:** pool results (WO-55).
-- **C9:** closing PnR results after D79/WO-60 (first two runs are recorded in III.6).
+These values are marked PENDING or "not found" above because no source read for this book (as of 2026-11-15) contained them:
+- **C1:** the precision gate B O2 combines at ss/−40 and fs/125 (WO-76), and O2 at tt/27 and ss/125, which the D48 rule asks for but no WO runs yet; the WO-77 tb7 and op/AC mutant rerun; tb8/8b/10/12/13 results. The WO-76 per-part O1/O2 numbers quoted here for parts not in `results/wo76/README.md` come from the coordinator's note of 2026-11-15 and RESUME, not from a results file.
+- **C3:** rev g (WO-88), the leak-path probe, T8 re-judged at D90, and T3 on rev f + kp2.
+- **C4:** the gate verdicts from the WO-79 `pool2` and WO-85 pools; the ff/100 20 pA row.
+- **C6:** the WO-87 transient rows under D89.
+- **C9:** the last WO-83 job, F18/F19 at real widths, the final PnR on the D85/D88 RTL, LVS on that layout, the gate-level / SDF sim.
 - **C2, C7, C8, C10:** any design numbers.
-- **Any PEX number.**
+- **Any PEX number, and any layout area for the analog blocks.**
 
 The book does not estimate them.
 
-**SPEC text inconsistency.** SPEC.md:18 and SPEC.md:25 give different labels for the 0.71 µV figure: it is the WO-04 ota+sys model value (D22), while kT/C-only at Cs 0.5 pF and 15 SPS is 0.556 µV (`s3_budget.md:31`). SPEC was not edited.
+**Conflicts and stale text found in the sources** (the newer decision is used in the book):
+- SPEC.md:18 and SPEC.md:25 give different labels for the 0.71 µV figure: it is the WO-04 ota+sys model value (D22), while kT/C-only at Cs 0.5 pF and 15 SPS is 0.556 µV (`s3_budget.md:31`). SPEC was not edited.
+- `results/wo52/README.md` calls the 390 µV noise row "SPEC CL-30"; the SPEC change log has it as CL-31 (CL-30 is the comparator offset row). The book uses CL-31.
+- WO-89 names `design/c9_digital/flow/HARDENING.md`; the file is `design/c9_digital/HARDENING.md`. Its WO-log section ends at WO-72: WO-73 and the D86 slew waiver (which D86 says is "recorded in HARDENING.md with the net list") are not there yet. The book takes WO-73 and D86 from `results/wo73/README.md` and DECISIONS.md.
+- `STATE-2026-11-14.md` lists SPEC as "CL-1…CL-36" and DECISIONS as "D1–D86"; SPEC and DECISIONS now run to CL-39 and D90.
+- C6 rstb hold: WO-55 proposed 128 fs cycles, D78 proposed 256 cycles (64 µs) after bias_ok; D85 / CL-36 / CL-37 replaced both with the 2^16-cycle VAPWR-good hold plus a 256-cycle bias run, and D89 / CL-38 gates the settle at 0.25 × the 2^16-cycle hold (4.1 ms at 4 MHz).
+- The WO-86 T3 table labels its rev f numbers "abs(mu)+3s" 45.07 / 42.74 mV, while STATE-2026-11-14 quotes 44.9 mV for rev e; WO-86 gives 49.59 / 49.26 mV for rev e. The book uses WO-86.
+- C9 cell counts use different bases: generic yosys (1068 → 1077 after D88, CL-37) versus LibreLane sky130 synthesis (860 in WO-58B). Only the generic count is quoted for the current RTL.
+- `c9_seq.v` line 29 still calls the bias bit a sticky done flag; after D88 it clears on a low sample until release (WO-83 open item; RTL comment not edited by verification).
