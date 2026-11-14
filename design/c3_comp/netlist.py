@@ -66,6 +66,15 @@ def devices(sizes=SIZES, mut=""):
     if "nobuf" not in mut:
         for side, src in (("o", "op"), ("n", "on")):
             D += inv(f"B{side}1", f"{side}b1", src, "BN", "BP") + inv(f"B{side}2", f"{side}b2", f"{side}b1", "BN", "BP")
+            # WO-81 (rev f, D87): op/on keeper, PMOS vdd -> op/on, gate = ob1/nb1 (the first buffer inverter of the
+            # same node). Rev e: with the input pair off (x2 low) nothing drives op/on in the strobe-high phase; the
+            # strobe rising edge couples through the precharge PMOS R0/R1 Cgd and leaves op/on ~66 mV above VDPWR for
+            # the whole phase (WO-78: S 2.046 V for 126 ns). While op/on are high, ob1/nb1 are low, so the keeper is
+            # on and returns the node to VDPWR; once op/on fall past the inverter threshold it turns off (no static
+            # current after a decision). Minimum device (0.42/0.15): smallest area and the fastest return of the
+            # minimum-area options; any weaker keeper needs a longer L. "nokeep" = rev e.
+            if "nokeep" not in mut:
+                D.append((f"KP{side}", PF, src, f"{side}b1", "vdd", "vdd", s["KP"]))
         sa, sb = ("ob2", "nb2")
     else:
         sa, sb = ("op", "on")          # broken copy: latch gates load the regeneration nodes

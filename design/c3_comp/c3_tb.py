@@ -61,6 +61,20 @@ JN_PAIRS = ("sb", "db")
 # same physical rule seen two ways; the checker copies (chk_sus195, chk_cap20, chk_dur01) move one judge parameter each, so each
 # limb is shown live on its own; st_brk_noclamp (rev d latch, 2.32 V for 105 ns) is the design broken copy. Junctions (D80, single peak vs VJ18_MAX) and HV pairs (single peak vs 5.5 V) unchanged.
 V18_CAP, T18_SUS, T18_DUR = 2.2, 1e-9, 1e-9
+# D87 (WO-81) T8 bench basis.
+# (a) Supply: ideal V_ST at the vdd pin (0 V source, no 10 ohm feed: its drop is not device stress); limit stays 1.98 V.
+# (b) Strobe edge: C4 phiC 10-90 % rise / fall per corner, from the WO-70 C4 tim decks (/home/mempool/regr/tt/
+#     WO-70-01fc505/run/tim_<corner>_*.csv, net phc = se -> 2 hvl inverters -> lsbufhv2lv_1, 50 fF load, design/c4_sw
+#     netlist.py): tt/27/1.8 V 0.626/0.252 ns, ff/-40/1.98 V 0.448/0.177, ff/125/1.98 V 0.403/0.238, ss/-40/1.62 V
+#     1.337/0.320, sf/-40/1.62 V 1.354/0.220 ns. The deck ramp is 1.25x (0-100 %). fs (not measured) takes ff numbers.
+#     The 0.1 ns ideal edge stays as an info row.
+# (c) x2: OTA2 operating range = CM 1.2..1.8 V (cyc cm12/cm18 rows) +- 0.705 V (x2 peak 1.41 V diff, DESIGN.md 3.1b,
+#     at the edge of the SPEC 1.4 V A >= 75 dB swing row) = 0.495..2.505 V per side, + 0.2 V margin: 0.3..2.7 V.
+#     Power-up keeps both sides at the 3.6 V VAPWR rail. The -0.5 V / 3.6 V step stimulus stays as an info row.
+V_ST = 1.98
+EDGE_C4 = {"tt": (0.626e-9, 0.252e-9), "ff": (0.448e-9, 0.177e-9), "ss": (1.337e-9, 0.320e-9),
+           "sf": (1.354e-9, 0.220e-9), "fs": (0.448e-9, 0.177e-9)}
+X2_LO, X2_HI = 0.3, 2.7
 POST_DT = 5e-12
 SR_X2 = 27e6                      # V/s, OTA2 boost slew (SPEC OTA2 row), applied per side (conservative: diff SR)
 # T5 asymmetry (WO-51 item 3): gate = per-side R +-5 % (OTA2 closed-loop gm mismatch), C +-1 % (MIM + routing);
@@ -231,11 +245,15 @@ def _slew_follow(events, tstop, fs, locked, dt=1e-9):
     return keep
 
 
-def st_deck(corner, temp, order, mut="", stim="slew", jlim=VJ18_MAX):
+def st_deck(corner, temp, order, mut="", stim="slew", jlim=VJ18_MAX, vd=V_ST, edge="c4", xlo=X2_LO, xhi=X2_HI,
+            rvdd=False):
     """stim: 'slew' (gate) x2 at the OTA2 slew rate through R_X2/C_X2, moving only in phiI, strobe on the 4 MHz
     phase plan (phiS); 'async' (info) same slew but x2 also moves while the strobe is high; 'fast' (info) the WO-48
-    stimulus (4.1 V in 20 ns through 10 ohm, free-running 100 ns strobe)."""
-    vd, fs = 1.98, 4e6
+    stimulus (4.1 V in 20 ns through 10 ohm, free-running 100 ns strobe).
+    D87 (WO-81): vd ideal at the vdd pin (rvdd=True: the old 10 ohm bench feed, info); edge 'c4' = C4 phiC 10-90 %
+    rise/fall of this corner (EDGE_C4) as a linear ramp of 1.25x that, 'ideal' = the old 0.1 ns (info);
+    x2 differential steps between xlo and xhi (X2_LO/X2_HI; -0.5/3.6 = the old stimulus, info)."""
+    fs = 4e6
     if stim == "fast":
         if order == "a":     # VAPWR (x2) first, VDPWR later
             vdp = [(0, 0), (300e-9, 0), (400e-9, vd)]
@@ -256,19 +274,21 @@ def st_deck(corner, temp, order, mut="", stim="slew", jlim=VJ18_MAX):
             vdp, t36 = [(0, 0), (400e-9, 0), (500e-9, vd)], 0.0
         else:
             vdp, t36 = [(0, 0), (100e-9, 0), (200e-9, vd)], 300e-9
-        ev_p = [(t36, 3.6), (1250e-9, -0.5), (1800e-9, -0.5), (2250e-9, 1.5)]
-        ev_n = [(t36, 3.6), (700e-9, -0.5), (1250e-9, 3.6), (1800e-9, -0.5), (2250e-9, 1.5)]
+        # power-up: both sides at the VAPWR rail (3.6 V, OTA2 output before its CMFB settles); then steps in [xlo, xhi]
+        ev_p = [(t36, 3.6), (1250e-9, xlo), (1800e-9, xlo), (2250e-9, 1.5)]
+        ev_n = [(t36, 3.6), (700e-9, xlo), (1250e-9, xhi), (1800e-9, xlo), (2250e-9, 1.5)]
         xp = _slew_follow(ev_p, tstop, fs, stim == "slew")
         xn = _slew_follow(ev_n, tstop, fs, stim == "slew")
         T, g, th, _ = tim(fs)
         ck = [(0.0, 0.0)]
+        er, ef = (0.1e-9, 0.1e-9) if edge == "ideal" else tuple(1.25 * e for e in EDGE_C4[corner])
         for n in range(int(tstop / T) + 1):
             r, f = n * T + T / 2 + g + 1e-9, n * T + T - g / 2
-            ck += [(r, 0.0), (r + 0.1e-9, 1.0), (f, 1.0), (f + 0.1e-9, 0.0)]
+            ck += [(r, 0.0), (r + er, 1.0), (f, 1.0), (f + ef, 0.0)]
         clk = f"VCP cp 0 {_pwl([p for p in ck if p[0] <= tstop])}"
         rx, cx = str(RX2[fs]), C_X2
     L = _hdr(f"C3 stress {corner}/{temp} order {order} mut {mut} stim {stim}", corner, temp, mut) + [
-        f"VDDS vdds 0 {_pwl(vdp)}", "RVDD vdds vdd 10", "CDD vdd 0 2p",
+        f"VDDS vdds 0 {_pwl(vdp)}", "RVDD vdds vdd 10" if rvdd else "VRDD vdds vdd 0", "CDD vdd 0 2p",
         clk, "Bclk clkr 0 V=v(vdd)*v(cp)", "RCLK clkr clk 10",
         f"VXP sxp 0 {_pwl(xp)}", f"RXP sxp x2p {rx}", f"VXN sxn 0 {_pwl(xn)}", f"RXN sxn x2n {rx}"] + (
         [f"CXP x2p 0 {cx}", f"CXN x2n 0 {cx}"] if cx else []) + [
@@ -294,7 +314,7 @@ def st_deck(corner, temp, order, mut="", stim="slew", jlim=VJ18_MAX):
     L += ["meas tran tempr find v(tmp) at=1n", "let tend = vecmax(time)"]
     L += _echo(names + ["tempr", "tend"]) + [".endc", ".end"]
     meta = dict(fam="st", corner=corner, temp=temp, vdd=vd, order=order, mut=mut, stim=stim, devs=devs, tstop=tstop,
-                jlim=jlim, pairs=pairs)
+                jlim=jlim, edge=edge, xlo=xlo, xhi=xhi, rvdd=rvdd, pairs=pairs)
     return "\n".join(L) + "\n", meta
 
 
@@ -499,6 +519,13 @@ def deck_list():
     D["st_chk_sus195"] = (st_deck, ("tt", 27, "a"), {}, {"T8": "reject"}, dict(sus_lim=1.95, judge_from="st_tt27_a"))
     D["st_chk_cap20"] = (st_deck, ("tt", 27, "a"), {}, {"T8": "reject"}, dict(cap=2.0, judge_from="st_tt27_a"))
     D["st_chk_dur01"] = (st_deck, ("tt", 27, "a"), {}, {"T8": "reject"}, dict(dur_max=0.1e-9, judge_from="st_tt27_a"))
+    # D87 (WO-81): bench-basis broken / info copies
+    D["st_brk_vdd200"] = (st_deck, ("tt", 27, "a"), {"vd": 2.0}, {"T8": "reject"})       # (a) ideal 2.0 V supply
+    D["st_brk_nokeep"] = (st_deck, ("tt", 27, "a"), {"mut": "nokeep"}, {"T8": "reject"})  # rev e on the D87 basis
+    D["st_brk_nokeep_ff-40_b"] = (st_deck, ("ff", -40, "b"), {"mut": "nokeep"}, {"T8": "reject"})
+    D["st_info_edge01_tt27_a"] = (st_deck, ("tt", 27, "a"), {"edge": "ideal"}, {"T8": "info"})   # (b) 0.1 ns edge
+    D["st_info_x2m05_tt27_a"] = (st_deck, ("tt", 27, "a"), {"xlo": -0.5, "xhi": 3.6}, {"T8": "info"})  # (c)
+    D["st_info_rvdd_tt27_a"] = (st_deck, ("tt", 27, "a"), {"rvdd": True}, {"T8": "info"})  # (a) old 10 ohm feed
     for c, t, v in (SS40, ("tt", 27, 1.80)):              # rev c function, with the ap/an probe (WO-56 diagnosis)
         D[f"cyc_info_revc_{nm(c, t, v)}"] = (cyc_deck, (c, t, v, 1.5, 4e6), {"mut": "revc"},
                                              {"T2": "info", "T7": "info"})
