@@ -33,17 +33,21 @@ Runtime ratio prec/boost 1.64 (not 2×). The WO-52 boost N 1024 parts took 1190-
 2100 s at light load. Deck timeout 10800 s, job timeout 11000 s.
 
 ## Results (N 1024, m 21, O1)
-Status at hand-off (15:45 IST): RUNNING. lpool started at 15:41. Box load is 6-8 on 6 cores (the WO-61 reruns are also
-running), so lpool runs 1 job at a time. Serial worst case: 30 x ~35-45 min, about 18-22 h. It shortens as the load drops.
-No N 1024 numbers yet. Do not fill this table from the smoke.
+Filled by WO-76 (2026-11-14) from `out/gb/*/combine.out` in `/home/mempool/regr/tt/WO-63-e450ae2`. pool finished, ALL_DONE present.
+All 30 part logs end with EXIT; the 7 EXIT=1 logs are srknee parts p1-p5 (each passes on its own) and
+ss/-40 parts p2 and p4 (each REJECTs on its own). Every combine is healthy (no problems, endpoint spread <= 0.017 ppm).
 
 | corner | INL ep (combined) [ppm] | union ep / bf [ppm] | verdict |
 |---|---|---|---|
-| c0 tt/27/3.3 nom | | | |
-| c1 ss/-40/3.0 nom | | | |
-| c2 ss/125/3.0 nom | | | |
-| c3 fs/125/3.0 nom | | | |
-| c3 fs/125/3.0 srknee (must REJECT) | | | |
+| c0 tt/27/3.3 nom | 0.692 | 0.686 / 0.589 | ACCEPT (>= gate/2, O2 needed) |
+| c1 ss/-40/3.0 nom | **1.706** | 1.706 / 1.378 | **REJECT** |
+| c2 ss/125/3.0 nom | 0.698 | 0.697 / 0.594 | ACCEPT (>= gate/2, O2 needed) |
+| c3 fs/125/3.0 nom | 0.967 | 0.968 / 0.763 | ACCEPT (>= gate/2, O2 needed) |
+| c3 fs/125/3.0 srknee (must REJECT) | 1.375 | 1.374 / 1.203 | REJECTED (good), margin only 3 % over the gate |
+
+Per-part srknee INL p0..p5: 1.375, 1.180, 1.135, 0.044 (p3: points -0.54, 0, 0.54 sit on zero crossings of its residual), 1.15, 1.18, 1.37 ppm;
+only p0 and the combine reject. Gate rule: O1 >= gate/2 (0.667) needs O2 at tt (0.692), ss/125 (0.698) and fs/125 too;
+WO-76 runs O2 at ss/-40 and fs/125 only. only the combine rejects. Per-point residuals and the WO-76 follow-up: `results/wo76/README.md`.
 
 ## Pickup
 ```
