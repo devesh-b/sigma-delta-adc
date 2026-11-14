@@ -900,3 +900,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
     - VAPWR-good: a C9 count of 2^16 fs cycles (16.4 ms) after rst_n → user decision (RTL change).
     - Pool running in WO-64-e450ae2w.
 - D83 (overshoot rule), D84 (C9 slew margin run), D85 (C9 VAPWR counter) logged.
+- WO-74 (76fe624): RTL bias_ok + 2^16 counter (PW_BITS/BIAS_BITS params) and SPEC CL-34/35/36. Lint/synth were not run (ssh was locked); the agent was resumed to finish. Golden v3.2 needs an update for the new slot-0 timing (bias_ok, hold) → C9 bench WO after lint.
