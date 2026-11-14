@@ -208,7 +208,11 @@ def deck(kind, corner, temp, vdd, mut="none", tr=1e-6, ratio=4.6, out="o.csv", i
             # leaves the near-zero-bias matrix at VAPWR ~50 mV / 125 C ill-conditioned (timestep too small on vsm#branch
             # at 11 ns or 20 us, or > 5400 s runs). abstol 1e-12 alone, trap, or reltol 1e-4 do not fix it; gmin 1e-12 +
             # abstol 1e-12 does (exp/: s1, f2, t3 all complete, t3 254 s). Error: ~1e-12 S x 3 V = 3 pA per node vs 1 uA.
-            L.append(".option gmin=1e-12 abstol=1e-12")
+            # WO-87: the 1 us ramps at 125 C still aborted (timestep too small, vsm#branch, at VAPWR 0.12-0.41 V, t = 35-132 ns).
+            # One-change variants on tt/125 and ff/125 (exp2/exp3): trap, abstol 1e-11, reltol 1e-4, tmax 1 ns, rshunt 1e10
+            # all still abort; gmin 1e-11 alone completes both (268 s, 339 s). Fast ramps only; error ~1e-11 S x 3 V = 30 pA
+            # per junction vs 1 uA (30 ppm). Tighter check: every fast row that ran at 1e-12 in WO-80 is compared in results/wo87.
+            L.append(f".option gmin={1e-11 if tr < 1e-4 else 1e-12:g} abstol=1e-12")
         vecs = ["i(vsm)", "v(ok)", "v(vdd)", "v(vg)", "v(tsu)", "v(a)", "v(b)", "v(o1)"]
         if hint_run:
             vecs = ["i(vsm)"] + [f"v({n})" for n in nn]
