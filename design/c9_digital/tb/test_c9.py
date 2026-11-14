@@ -131,6 +131,8 @@ class TB:
         d.ena.value = 1
         d.uio_in.value = 0
         d.ui_in.value = 0
+        d.rst_n.value = 1                      # WO-75 TB-10: a real negedge so async-reset flops clear before edge 1
+        await Timer(1, unit="ns")              # (X-01 s2: rand-init flops never saw a negedge from rst_n = 0 at t = 0)
         d.rst_n.value = 0
         self._drive_comp(0)
         d.bias_ok.value = 1

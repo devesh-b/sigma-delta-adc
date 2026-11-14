@@ -1,0 +1,9 @@
+# WO-75 rerun c: bench top wraps tt_um (M45), TB-10 reset negedge, cover depth 240. @FROZEN@ sed before launch.
+cd /home/mempool/tt-sd && scripts/iic "cd /foss/designs/regr/@FROZEN@/design/c9_digital/tb && ./mut_job.sh M45"
+cd /home/mempool/tt-sd && scripts/iic "cd /foss/designs/regr/@FROZEN@/design/c9_digital/tb && ./wo42_job.sh x01 1"
+cd /home/mempool/tt-sd && scripts/iic "cd /foss/designs/regr/@FROZEN@/design/c9_digital/tb && ./wo42_job.sh x01 2"
+cd /home/mempool/tt-sd && scripts/iic "cd /foss/designs/regr/@FROZEN@/design/c9_digital/tb && ./wo42_job.sh fcov 1"
+cd /home/mempool/tt-sd && scripts/iic "cd /foss/designs/regr/@FROZEN@/design/c9_digital/tb && ./wo42_job.sh suite formal"
+cd /home/mempool/tt-sd && scripts/iic "cd /foss/designs/regr/@FROZEN@/design/c9_digital/tb && ./wo42_job.sh real"
+cd /home/mempool/tt-sd && scripts/iic "cd /foss/designs/regr/@FROZEN@/design/c9_digital/tb && ./mut_job.sh M65"
+cd /home/mempool/tt-sd && scripts/iic "cd /foss/designs/regr/@FROZEN@/design/c9_digital/tb && ./mut_job.sh M67"

@@ -24,9 +24,10 @@ module c9_tb #(parameter PW_BITS = 16, parameter BIAS_BITS = 8) (
     output wire       bit_valid,
     output wire       y_dac
 );
-    wire _unused = &{1'b0, ena, uio_in};
-    assign uio_oe = 8'hFF;
-    sd_adc_c9 #(.PW_BITS(PW_BITS), .BIAS_BITS(BIAS_BITS)) u_core (.clk(clk), .rst_n(rst_n), .ui_in(ui_in),
+    // WO-75 rerun: wraps the real tt_um_ sim wrapper (M45 survived when this file bypassed it); hold length via defparam
+    defparam u_wrap.u_core.PW_BITS = PW_BITS;
+    defparam u_wrap.u_core.BIAS_BITS = BIAS_BITS;
+    tt_um_sd_adc_c9 u_wrap (.clk(clk), .rst_n(rst_n), .ena(ena), .ui_in(ui_in), .uio_in(uio_in), .uio_oe(uio_oe),
         .comp_in(comp_in), .bias_ok(bias_ok), .uo_out(uo_out), .uio_out(uio_out), .fs_clk(fs_clk),
         .rst_analog(rst_analog), .sys_swap(sys_swap), .ota_chop_phase(ota_chop_phase), .short_o(short_o),
         .order_o(order_o), .boost_o(boost_o), .trim_o(trim_o), .y_force(y_force), .bit_valid(bit_valid),
