@@ -288,7 +288,7 @@ def st_deck(corner, temp, order, mut="", stim="slew", jlim=VJ18_MAX, vd=V_ST, ed
         clk = f"VCP cp 0 {_pwl([p for p in ck if p[0] <= tstop])}"
         rx, cx = str(RX2[fs]), C_X2
     L = _hdr(f"C3 stress {corner}/{temp} order {order} mut {mut} stim {stim}", corner, temp, mut) + [
-        f"VDDS vdds 0 {_pwl(vdp)}", "RVDD vdds vdd 10" if rvdd else "VRDD vdds vdd 0", "CDD vdd 0 2p",
+        f"VDDS vdds 0 {_pwl(vdp)}", "RVDD vdds vdd 10", "CDD vdd 0 2p",
         clk, "Bclk clkr 0 V=v(vdd)*v(cp)", "RCLK clkr clk 10",
         f"VXP sxp 0 {_pwl(xp)}", f"RXP sxp x2p {rx}", f"VXN sxn 0 {_pwl(xn)}", f"RXN sxn x2n {rx}"] + (
         [f"CXP x2p 0 {cx}", f"CXN x2n 0 {cx}"] if cx else []) + [
@@ -379,12 +379,18 @@ def st_post(d):
         w = _read_raw(rp)
         t = w["time"]
         node = lambda e: np.zeros_like(t) if e == "0" else w[e[2:-1].lower()]
+        # D87 (a), WO-81: the 10 ohm bench feed stays (an ideal source on the pin aborts at the ramp, "timestep too
+        # small ... vrdd#branch", the WO-79 root cause), and its drop is not counted: every 1.8 V oxide pair is judged
+        # on |V| - max(0, vdd(t) - V_set). rvdd=True (info) judges the raw |V|. P cross-check uses the raw peak (Pr).
+        vw = w["xc.vdd" if "xc.vdd" in w else "vdd"]
+        exc = None if m.get("rvdd") else np.maximum(0.0, vw - m["vdd"])
         for key, _, a, c, cls in m["pairs"]:
             if cls != "18":
                 continue
-            x = np.abs(node(a) - node(c))
+            xr = np.abs(node(a) - node(c))
+            x = xr - exc if exc is not None else xr
             dur, t_d = _longest_above(t, x, V18_MAX)
-            out += [f"RES {key}_P {x.max():.7g}", f"RES {key}_S {_sus_level(t, x, T18_SUS):.7g}", f"RES {key}_D {dur:.6g}",
+            out += [f"RES {key}_Pr {xr.max():.7g}", f"RES {key}_P {x.max():.7g}", f"RES {key}_S {_sus_level(t, x, T18_SUS):.7g}", f"RES {key}_D {dur:.6g}",
                     f"RES {key}_tP {t[int(np.argmax(x))]:.6g}", f"RES {key}_tD {t_d:.6g}"]
         out.append(f"RES post_vddmax {w['xc.vdd' if 'xc.vdd' in w else 'vdd'].max():.7g}")
         out.append(f"RES post_npts {len(t)}")
@@ -680,7 +686,7 @@ def eval_st(r, m):
         if None in x.values():
             miss += 1
             continue
-        if abs(x["P"] - v) > 1e-4:       # raw read / pair mapping must reproduce ngspice's own vecmax
+        if abs(r.get(f"{key}_Pr", x["P"]) - v) > 1e-4:       # raw read / pair mapping must reproduce ngspice's own vecmax
             bad_pk.append(key)
         for q in ("P", "S", "D"):
             worst[q] = max(worst[q], (x[q], key))
