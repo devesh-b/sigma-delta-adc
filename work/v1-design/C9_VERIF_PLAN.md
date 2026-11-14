@@ -670,3 +670,27 @@ would only re-encode a counter that Ref A models directly from CL-36, at the cos
 Mutants (must REJECT): M65 pw_ctr one bit short, M66 b_ctr not cleared on a low sample, M67 bias_ok unsynchronised,
 M67b one FF only, M68 hold not sticky (b clears after done), M69 bias ignored, M70 no hold. GL: yosys generic netlist
 with `chparam` 4/2 (the real 16/8 counter widths are covered only in RTL sim H-01 real and F18 real).
+
+## 15. WO-83: D88 / CL-37 bias run restarts until release (RTL baa0706, bench 9f4bab2, 2026-11-14)
+
+Golden v3.2 stays the arbiter from slot 0 on (option (a), as in section 14). Changes against section 14:
+- **Bench parameters.** `tb/hdl/c9_tb.v` no longer uses `defparam` (Verilator rejects the hierarchical form).
+  `run_cocotb.py` writes a copy of the RTL (or mutant) `tt_um_sd_adc_c9.v` with `#(.PW_BITS, .BIAS_BITS)` on `u_core`
+  into `C9_OUT` and builds it in place of the original. The tt_um_ text still comes from `C9_RTL`, so wrapper mutants
+  (M45) still reach the bench; the build fails loudly if the `u_core` instance does not match exactly once.
+- **Ref A (CL-37).** `b` clears on any low synchronised sample until release (also after it reached 2^B), counts
+  while high, saturates at 2^B; nothing is evaluated after release. **Independent check** `exp_slot0()` is now the
+  CL-37 wording itself: J = first tick t >= 2^PW whose window t-2^B+1..t was all high; slot 0 = J + 1.
+- **Formal.** F18 monitor follows CL-37 (restart until release, saturate, freeze after). New **F19**: no late
+  slot 0 (rst_analog has fallen by 1 clk after the 3rd fs rise past done). New cover: a completed run dropped
+  before release, then slot 0. Widths from `-DF_PW/-DF_B` (match the chparam); `wo42_job.sh fmlw PW B PROP [TO]`.
+
+| ID | Test | Hunts |
+|---|---|---|
+| H-05 | d_hold05_d88 (bench params; also at 16/8 via `wo42_job.sh real d_hold05_d88`) | drop after a completed run before pw done (slot 0 delayed to t0 + 2^B + 1), drop on the last hold tick (2^PW + 2^B + 1), drop on the slot-0 tick and after release (no effect), high run of exactly 2^B - 1 vs 2^B ending at tick 2^PW; each case has a hand-derived slot-0 tick that must equal `exp_slot0` |
+| F19 | formal/c9_props.sv | slot 0 not later than CL-37 allows |
+
+Mutants (must REJECT): M66 re-derived (no clear on a low sample), M68 re-derived (gate removed: no freeze after
+release, hold not sticky), M71 old df9bded line (sticky at the first completed run), M72 b_ctr wraps (no saturation),
+M73 a run of 2^B - 1 accepted, M74 gate on `boot` instead of `pwr_ok` (one tick late: a drop on the slot-0 tick
+re-enters the hold). Section 14 text on "sticky J" is superseded by CL-37.
