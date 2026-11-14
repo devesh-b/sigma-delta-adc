@@ -1,0 +1,6 @@
+cd /home/mempool/tt-sd && scripts/iic "cd /foss/designs/regr/WO-83-9f4bab2/design/c9_digital/tb && for m in M66 M68 M71 M72 M73 M74; do python3 mutants.py make \$m ../mut/\$m; done"
+cd /home/mempool/tt-sd && scripts/iic "cd /foss/designs/regr/WO-83-9f4bab2/design/c9_digital/tb && ./wo42_job.sh x01 1"
+cd /home/mempool/tt-sd && scripts/iic "cd /foss/designs/regr/WO-83-9f4bab2/design/c9_digital/tb && ./wo42_job.sh test d_hold05_d88 1"
+cd /home/mempool/tt-sd && scripts/iic "cd /foss/designs/regr/WO-83-9f4bab2/design/c9_digital/tb && ./wo42_job.sh test d_hold02_bias_late 1"
+cd /home/mempool/tt-sd && scripts/iic "cd /foss/designs/regr/WO-83-9f4bab2/design/c9_digital/tb && ./wo42_job.sh fmlw 3 2 F19 900"
+cd /home/mempool/tt-sd && scripts/iic "cd /foss/designs/regr/WO-83-9f4bab2/design/c9_digital/tb && ./wo42_job.sh fmlw 3 2 F18 900"
