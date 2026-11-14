@@ -28,9 +28,9 @@ Run (sandbox, IIC-OSIC-TOOLS): `verilator --lint-only -Wall --top-module sd_adc_
 - `comp_in` goes straight into the DAC flop on fs_tick (CL-28); `comp_s` and the s_tick port of `c9_seq` are gone (s_tick stays internal to `c9_fsdiv` for the bit-clock fall).
 - WO-60B: `fs_tick` and `s_tick` in `c9_fsdiv` are flops: the terminal-count compare runs one clk ahead against registered constants `tc_fs`/`tc_half` (+18 FF), so `act[9:7]` no longer feeds the compare combinationally. Pin timing is unchanged.
 
-## WO-74 (D85, CL-36): VAPWR-good counter (not yet linted/synthesised: sandbox ssh refused the key, see WO report)
+## WO-74 (D85, CL-36): VAPWR-good counter
 - New input `bias_ok` (2-FF synced in `c9_core.v`, `sbias`), new ports on `sd_adc_c9` and the sim wrapper. `c9_seq` has two sticky counters on `fs_tick`: `pw_ctr` (PW_BITS+1 = 17 b, counts 2^16 fs cycles from the synchronised release) and `b_ctr` (BIAS_BITS+1 = 9 b, counts consecutive `bias_ok_s` high ticks, clears on a low sample). `pwr_ok` = both done flags; `boot <= ~pwr_ok` on every tick, so rst_analog stays 1 and no slot starts until `pwr_ok`.
 - Parameters `PW_BITS` (16) and `BIAS_BITS` (8) on `sd_adc_c9` / `c9_seq` let a TB shorten the hold; defaults are the D85 values.
 - First-slot timing: the boot tick (slot 0, c = 0) is the first fs_tick after both counters are done: tick max(2^16, J) + 1, i.e. (2^16 + 1)·div clk after release with `bias_ok` high (was `div` clk). During the hold every tick re-latches shadow into active (boot) and keeps inv_pair = 1, so cfg writes made in the hold take effect at slot 0.
-- Estimated cost: +26 FF (17 + 9, plus 2 sync) before synthesis; sandbox numbers pending.
+- Measured (yosys synth -flatten, IIC-OSIC-TOOLS 2026.10): FF 231 -> 259 (+28 = 17 + 9 counters + 2 sync), cells 966 -> 1068 (+102). verilator -Wall clean for sd_adc_c9 and tt_um_sd_adc_c9; check -assert passes. Frozen copy: /home/mempool/regr/tt/WO-74-2c129ea.
 - Golden v3.2 impact (not edited): `hold_reset` and every sequence that starts from rst_n release assume slot 0 at `div` clk after release with no `bias_ok`; they need `bias_ok = 1` driven and the slot-0 offset moved to (2^16+1)·div clk (or the TB overrides PW_BITS/BIAS_BITS). Frame tag/status contents at reset are unchanged.
