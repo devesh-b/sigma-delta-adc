@@ -19,7 +19,8 @@ KIND (DESIGN.md 8, C4b plan + REVIEW-C4a additions):
   injcm   CM sweep 0..VREF at Vd = 0: CM->DM slope = eps_inj <= 2.8e-4. Copy `top8` (8/24 top short).
   settle  #4  input settling with the pad model (R_src 1k + 500 ohm + 5 pF) from VREF- at 4 MHz: tau_eff <= 18.75 ns.
               Copy `ronx3` (input TG W / 3).
-  leak    #9  Sg off leakage into vg vs Vin_cm (tp 0.18..2.22 V), sign recorded. Copy `tg` (PMOS added).
+  leak    #9  Sg off leakage into vg vs Vin_cm (tp 0.18..2.22 V), sign recorded; D82 rating (I_tot = Sg + C1). Copies
+              `noderate` (no 125 C derate), `sgx6` (Sg W x6).
   rampa / rampb  #8 power-up, order a (VAPWR first) / b (VDPWR first), fs running: safe states while VDPWR is
               missing, no VIN<->VREF crowbar, 1.8 V nets <= VDPWR, release. Copies `nodet`, `overlap`, `hvfold`.
 Every metric comes from waveform crossings; a missing crossing is MISSING (fails the row), never a default.
@@ -56,6 +57,11 @@ RON = dict(sin=(0.0, VMAX, 1500.0), sdh=(1.0, VMAX, RDAC), sdl=(0.0, 0.1, RDAC),
            skl=(0.0, 0.1, RDAC), sk0=(0.0, VMAX, R2))
 LEAK_ROW = {"ff_125": 90e-12, "ff_100": 20e-12}  # SPEC vg row per node. D78: Sg limit = row - C1 measured share
 #                                                 (same deck, metrics_leak); replaces the 50 % proposal (45 / 10 pA)
+# D82 / CL-34 (WO-79): rating check. Stage-2 drift = I_tot * N / (fs * C_side) <= 0.2 V, C_side 2.01 pF (the smaller
+# side), fs 0.25 MHz (slowest mode; faster modes scale with 1/fs). I_tot = Sg + C1 vg-node devices (same sign, add).
+# Rated N: 256 at 125 C, 1024 at <= 100 C. Broken copies: `noderate` (125 C rated at N 1024, no derate) and `sgx6`.
+C_SIDE2, FS_SLOW, DRIFT_MAX = 2.01e-12, 0.25e6, 0.2
+RATED_N = {"ff_125": 256, "ff_100": 1024}
 LIM = dict(g_min=1.0e-9, eb_min=0.0, ls_edge_max=1.0e-9, inl_ppm=2.0, eps_inj=2.8e-4, tau_in=18.75e-9,
            r2_width=15e-9, crowbar_q=50e-15, safe_v=0.3, v18_over=0.05)
 GEN_MUTS = ("overlap", "gbig", "noearly", "edge1", "lsload", "wrongstrobe", "rawchop", "nodet", "hvfold", "o1early")
@@ -76,7 +82,8 @@ BROKEN = {
     "order_inv": ("inl", [("injdm", c, "4M") for c in ("tt_27", "ff_125")]),
     "top8": ("eps_inj", [("injcm", c, "4M") for c in ("tt_27", "ff_125")]),
     "ronx3": ("tau_in", [("settle", "ss_m40", "4M")]),
-    "tg": ("leak", [("leak", "ff_125", "x")]),
+    "noderate": ("rating", [("leak", "ff_125", "x")]),
+    "sgx6": ("rating", [("leak", "ff_125", "x")]),
     "nodet": ("safe", [("rampa", c, "4M") for c in ("tt_27", "ss_m40")]),
     "overlapr": ("crowbar", [("rampb", "tt_27", "4M")]),
     "hvfold": ("stress", [("rampa", "tt_27", "4M")]),
@@ -125,6 +132,43 @@ def gen_block(mut):
     return [N.gen(gm), N.inst()]
 
 
+def soften(L):
+    """WO-79: source impedance on every grounded independent V source of a transient deck (signals 10 ohm, supplies
+    vdd / vdl 1 ohm, i.e. bond + package R); sources already behind drv() (node *_s) are left alone.
+    Root cause of the WO-54 / WO-70 aborts: an ideal source tied straight to pF of device / Cs capacitance has a
+    branch current C*dV/dt that is numerically noisy at the femtosecond steps ngspice takes after a breakpoint, so
+    it can never meet abstol, and the step collapses ('Timestep too small ... node "vinn#branch"' at the first fs
+    edge). Evidence (results/wo79/exp): the injdm deck aborts at t = 20 ns as-is, with a 1 GHz op-amp model, with
+    smooth switches, and with both; 10 ohm on Vinp / Vinn moves the abort to the next ideal source on the same node
+    (vcmin#branch). Tolerances are not changed. The series R carries no current where the source only feeds a
+    B / E input, and the real / ideal inj copies share the sources, so the difference is unaffected."""
+    out = []
+    for ln in L:
+        p = ln.split(None, 3)
+        if len(p) == 4 and p[0][0] in "Vv" and p[2] == "0" and not p[1].endswith("_s") and "\n" not in ln:
+            r = 1 if p[1] in ("vdd", "vdl") else 10
+            out += [f"{p[0]} {p[1]}_z 0 {p[3]}", f"Rz_{p[1]} {p[1]}_z {p[1]} {r}"]
+        else:
+            out.append(ln)
+    return out
+
+
+def tight(deck):
+    """WO-79 tolerance-invariance runs: C4TB_TIGHT=1 divides reltol / abstol of the deck by 10 (default 1e-3 / 1e-12)."""
+    if not os.environ.get("C4TB_TIGHT"):
+        return deck
+    L = deck.split("\n")
+    for i, ln in enumerate(L):
+        if ln.startswith(".option"):
+            for k, dv in (("reltol", 1e-3), ("abstol", 1e-12)):
+                m = [w for w in ln.split() if w.startswith(k + "=")]
+                v = float(m[0].split("=")[1]) if m else dv
+                ln = (ln.replace(m[0], "") if m else ln) + f" {k}={v / 10:g}"
+            L[i] = ln
+            break
+    return "\n".join(L)
+
+
 def ctrl(csv, vecs):
     return [".control", "set wr_singlescale", "set wr_vecnames", "set numdgt=12", "run",
             f"wrdata {csv} {' '.join(vecs)}", ".endc", ".end"]
@@ -155,10 +199,14 @@ def deck_tim(corner, fsk, mut, csv):
     L += [f"Vdd vdd 0 {va}", f"Vdl vdl 0 {vd}",
           f"Vclk clk0 0 PULSE(0 {vd} {T0:.4g} 0.2n 0.2n {T / 2 - 0.2e-9:.6e} {T:.6e})", "Rclk clk0 fsin 10",
           "Cfs fsin 0 5f",
-          pulse("Vy", "yin", vd, T0 + TCQ + dly, T, 2 * T), pulse("Vsw", "swin", vd, T0 + T + TCQ + dm, 2 * T, 4 * T),
-          pulse("Vsh", "shin", vd, T0 + 3 * T + TCQ + dm, T, 8 * T), pulse("Vch", "chin", vd, T0 + TCQ, T, 2 * T),
-          "Vrs rsin 0 0", "Vord ordin 0 0"]
+          pulse("Vy", "yin_s", vd, T0 + TCQ + dly, T, 2 * T),
+          pulse("Vsw", "swin_s", vd, T0 + T + TCQ + dm, 2 * T, 4 * T),
+          pulse("Vsh", "shin_s", vd, T0 + 3 * T + TCQ + dm, T, 8 * T), pulse("Vch", "chin_s", vd, T0 + TCQ, T, 2 * T),
+          "Vrs rsin_s 0 0", "Vord ordin_s 0 0"]
+    for n in ("yin", "swin", "shin", "chin", "rsin", "ordin"):   # WO-79: bare sources on LS inputs (vord#branch)
+        L += drv(n)
     L += dec_line() + gen_block(mut) + loads()
+    L = soften(L)
     tstop = T0 + 4 * T
     tmax = 50e-12 if FSS[fsk] >= 2e6 else 100e-12
     L.append(f".tran {tmax:.3g} {tstop:.6e} 0 {tmax:.3g}")
@@ -229,6 +277,7 @@ def deck_inj(kind, corner, mut, csv):
     L += N.switch("stp", "tpp", "tpn", f"{gt}_t", f"{gt}_c", wn=wn, wp=wp) + ["Sistp itpp itpn se_t 0 SWI"]
     L += gen_block(None) + loads()
     tstop = tR(len(seq) + 1)
+    L = soften(L)
     L.append(f".tran 50p {tstop:.6e} 0 50p")
     vecs = ["v(oxp)", "v(oxn)", "v(ioxp)", "v(ioxn)", "v(fsin)"]
     return "\n".join(L + ctrl(csv, vecs)) + "\n", vecs, tstop, pts
@@ -240,12 +289,13 @@ def deck_settle(corner, mut, csv):
     L += common_src(corner, T)
     wn, wp = (4.0, 12.0) if mut == "ronx3" else N.SW["sin"]
     for s, v in (("a", VMAX), ("b", 1.65)):
-        L += [f"Vs{s} s{s} 0 {v}", f"Rs{s} s{s} pd{s} 1k", f"Cp{s} pd{s} 0 5p", f"Rp{s} pd{s} pin{s} 500"]
+        L += [f"Vs{s} s{s}_s 0 {v}", f"Rs{s} s{s}_s pd{s} 1k", f"Cp{s} pd{s} 0 5p", f"Rp{s} pd{s} pin{s} 500"]
         L += N.switch(f"sin{s}", f"pin{s}", f"b{s}", "pas_t", "pas_c", wn=wn, wp=wp)
         L += N.switch(f"sdl{s}", f"b{s}", "0", "dl_t", "dl_c", key="sdl")
         L += [f"Cs{s} b{s} tp{s} {CS:g}", f"Vtp{s} tp{s} 0 1.2"]
     L += gen_block(None) + loads()
     tstop = T0 + 7 * T
+    L = soften(L)
     L.append(f".tran 50p {tstop:.6e} 0 50p")
     vecs = ["v(ba)", "v(bb)", "v(pas_t)"]
     return "\n".join(L + ctrl(csv, vecs)) + "\n", vecs, tstop
@@ -255,9 +305,7 @@ def deck_leak(corner, mut, csv):
     _, _, va, _ = CORNERS[corner]
     L = head(f"leak {corner} {mut}", corner, ".option gmin=1e-15 reltol=1e-6 abstol=1e-16")
     L += [f"Vdd vdd 0 {va}", "Vvg vgx 0 1.2", "Vam vgx vg 0", "Vtp tp 0 1.2"]
-    L += N.switch("sg", "vg", "tp", "0", "vdd", key="sg")
-    if mut == "tg":
-        L += [N.mos("sgx", "vg", "vdd", "tp", "vdd", N.HVP, 15.0, N.L_SW)]
+    L += N.switch("sg", "vg", "tp", "0", "vdd", wn=N.SW["sg"][0] * (6 if mut == "sgx6" else 1), wp=0)
     # D78 (WO-70): C1's share of the same vg node, measured in the same deck on its own ammeter. C1 DESIGN.md M5:
     # island switch nfet_g5v0d10v5 W 2/L 0.5 (off, gate 0, far side V_ICM 1.2 V); input chopper W 4/L 0.5, two per
     # vg node: one on (gate VAPWR) to the pair gate (node gpa, only that device), one off (gate 0) to the other
@@ -295,6 +343,7 @@ def deck_ramp(kind, corner, mut, csv):
         L += [f"Cs{s} b{s} tp{s} {CS:g}", f"Rtp{s} tp{s} vtp 1k"]
     L += gen_block(mut) + loads()
     tstop = 25e-6
+    L = soften(L)
     L.append(f".tran 0.2n {tstop:.6e} 0 0.2n")
     nets = ["ie_t", "il_t", "se_t", "sl_t", "pas_t", "swp_t", "sho_t", "dh_t", "dl_t", "r2_t"]
     vecs = ["v(vdd)", "v(vdl)", "v(isl)", "v(pwrok)", "v(chlp)", "v(chln)", "v(phc)"] + [f"v({n})" for n in nets] + \
@@ -337,7 +386,7 @@ def wmax(t, v, t0, t1):
 
 def spice(deck, tag, out):
     open(os.path.join(out, ".spiceinit"), "w").write("set num_threads=1\n")
-    open(os.path.join(out, tag + ".sp"), "w").write(deck)
+    open(os.path.join(out, tag + ".sp"), "w").write(tight(deck))
     env = dict(os.environ, OMP_NUM_THREADS="1")
     r = subprocess.run(["ngspice", "-b", tag + ".sp"], cwd=out, capture_output=True, text=True, timeout=5400, env=env)
     log = r.stdout + r.stderr
@@ -557,7 +606,7 @@ def metrics_settle(d, corner):
     return m
 
 
-def metrics_leak(d, corner):
+def metrics_leak(d, corner, mut="none"):
     leak = -d[:, 2]           # into the vg node (+ charges vg up)
     m = dict(leak_max_abs=float(np.abs(leak).max()), leak_at_018=float(leak[0]), leak_at_222=float(leak[-1]),
              leak_span=float(leak.max() - leak.min()))
@@ -566,6 +615,12 @@ def metrics_leak(d, corner):
     m["c1_share"] = float(np.abs(c1).max())
     m["c1_sign"] = "+" if c1.mean() > 0 else "-"
     m["sg_lim"] = LEAK_ROW[corner] - m["c1_share"]          # D78 re-split: row minus C1's measured share
+    tot = np.abs(leak + c1)
+    m["tot_max_abs"] = float(tot.max())
+    m["n_rated"] = 1024 if mut == "noderate" else RATED_N[corner]
+    m["drift_rated_V"] = m["tot_max_abs"] * m["n_rated"] / (FS_SLOW * C_SIDE2)
+    m["drift_n1024_V"] = m["tot_max_abs"] * 1024 / (FS_SLOW * C_SIDE2)
+    m["drift_n4096_V"] = m["tot_max_abs"] * 4096 / (FS_SLOW * C_SIDE2)
     return m
 
 
@@ -627,7 +682,10 @@ def checks(kind, corner, fsk, m):
     if kind == "settle":
         return dict(tau_in=(m["tau_eff"], m["tau_eff"] is not None and m["tau_eff"] <= LIM["tau_in"]))
     if kind == "leak":
-        return dict(leak=(m["leak_max_abs"], m["leak_max_abs"] <= m["sg_lim"]))
+        r = dict(rating=(m["drift_rated_V"], m["drift_rated_V"] <= DRIFT_MAX))
+        if corner == "ff_100":     # D82: the 20 pA ff/100 row (N 4096, D39) is still checked; at 125 C the derate replaces it
+            r["leak"] = (m["leak_max_abs"], m["leak_max_abs"] <= m["sg_lim"])
+        return r
     return checks_ramp(m, kind, corner)
 
 
@@ -670,7 +728,7 @@ def run(kind, corner, fsk, mut, out):
         elif kind == "settle":
             m = metrics_settle(d, corner)
         elif kind == "leak":
-            m = metrics_leak(d, corner)
+            m = metrics_leak(d, corner, mut)
         else:
             m = metrics_ramp(d, vecs, kind, corner)
         res["m"] = m
@@ -711,7 +769,7 @@ def report(out):
     L = ["# WO-54 C4b gate (generated by design/c4_sw/c4_tb.py report)", "",
          f"Limits: {json.dumps(LIM)}; Ron limits per switch: " +
          ", ".join(f"{k} {v[2]:.0f} ohm over {v[0]:.2f}..{v[1]:.2f} V" for k, v in RON.items()) +
-         f"; leak row per vg node {LEAK_ROW}, Sg limit = row - C1 measured share (D78)", ""]
+         f"; leak row per vg node {LEAK_ROW}, Sg limit = row - C1 measured share (D78); D82 rating: drift = I_tot N_rated / (0.25 MHz x 2.01 pF) <= 0.2 V, N_rated {RATED_N}", ""]
     for kind in ("ron", "tim", "injdm", "injcm", "settle", "leak", "rampa", "rampb"):
         sel = [(j, r) for j, r in rows.items() if j[0] == kind]
         if not sel:
@@ -748,6 +806,7 @@ def report(out):
             elif kind in ("injdm", "injcm"):
                 info = f" | offset {m['offset_uV']:.2f} uV, slope {m['slope']:.3e}"
             elif kind == "leak":
+                info = f" | I_tot {fmt(m['tot_max_abs'])} A, N_rated {m['n_rated']}, drift N1024 {m['drift_n1024_V']:.3f} V, N4096 {m['drift_n4096_V']:.3f} V"
                 info = f" | Sg lim {fmt(m['sg_lim'])} (C1 share {fmt(m['c1_share'])} sign {m['c1_sign']}); Sg sign {m['sign']}, at tp 0.18 {fmt(m['leak_at_018'])} A, at 2.22 {fmt(m['leak_at_222'])} A, span {fmt(m['leak_span'])} A"
             elif kind.startswith("ramp"):
                 info = (f" | isl margin {fmt(m['safe_isl_margin'])} window {m['safe_window_us']:.2f} us, v18 abs "
