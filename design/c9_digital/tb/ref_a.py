@@ -280,9 +280,9 @@ class RefA:
 
     def _hold_tick(self, pre_shadow, b_lvl):
         """CL-36: one fs tick of the VAPWR-good hold. Slot 0 (boot tick) is the first tick whose pre-edge state has
-        both counts done: tick max(2^PW, J) + 1.  Hold ticks latch shadow into active (cfg writes in the hold apply
-        at slot 0) and keep rst_analog = 1.  b clears on a low sample until it is done; done counts are sticky (the
-        "J = the tick at which (b) completes" wording of CL-36; AMB logged)."""
+        both counts done: tick max(2^PW, J) + 1 (J per CL-37).  Hold ticks latch shadow into active (cfg writes in the hold apply
+        at slot 0) and keep rst_analog = 1.  WO-83 (D88, CL-37): b clears on any low sample until release (also after it
+        reached 2^B), counts while high and saturates at 2^B; after release nothing is evaluated (sticky)."""
         pw_done = self.pw >= (1 << self.pw_bits)
         b_done = self.b >= (1 << self.bias_bits)
         self.holding = True
@@ -294,8 +294,7 @@ class RefA:
             return
         if not pw_done:
             self.pw += 1
-        if not b_done:
-            self.b = self.b + 1 if b_lvl else 0
+        self.b = min(self.b + 1, 1 << self.bias_bits) if b_lvl else 0   # CL-37: restart on a low sample until release
         self.pre_latch_active = self.active
         self.active = eff(pre_shadow)
         self.active_raw = pre_shadow & 0x1FFF

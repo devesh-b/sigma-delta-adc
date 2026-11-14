@@ -1,7 +1,8 @@
 // WO-75 (verification only, not design RTL): parameterised bench top. Same pins as the tt_um_ sim wrapper
 // (SPEC 3.8a TT pins + port contract incl. bias_ok, D85) so the bench can shorten the CL-36 hold through
-// PW_BITS / BIAS_BITS (C9_PW_BITS / C9_BIAS_BITS). Real D85 values: 16 / 8.
-module c9_tb #(parameter PW_BITS = 16, parameter BIAS_BITS = 8) (
+// PW_BITS / BIAS_BITS (C9_PW_BITS / C9_BIAS_BITS). Real D85 values: 16 / 8. WO-83: the values are now set in a
+// generated copy of the RTL tt_um_ wrapper (run_cocotb.py; Verilator rejects hierarchical defparam), not here.
+module c9_tb (
     input  wire [7:0] ui_in,
     output wire [7:0] uo_out,
     input  wire [7:0] uio_in,
@@ -24,9 +25,7 @@ module c9_tb #(parameter PW_BITS = 16, parameter BIAS_BITS = 8) (
     output wire       bit_valid,
     output wire       y_dac
 );
-    // WO-75 rerun: wraps the real tt_um_ sim wrapper (M45 survived when this file bypassed it); hold length via defparam
-    defparam u_wrap.u_core.PW_BITS = PW_BITS;
-    defparam u_wrap.u_core.BIAS_BITS = BIAS_BITS;
+    // WO-75 rerun: wraps the real tt_um_ sim wrapper (M45 survived when this file bypassed it)
     tt_um_sd_adc_c9 u_wrap (.clk(clk), .rst_n(rst_n), .ena(ena), .ui_in(ui_in), .uio_in(uio_in), .uio_oe(uio_oe),
         .comp_in(comp_in), .bias_ok(bias_ok), .uo_out(uo_out), .uio_out(uio_out), .fs_clk(fs_clk),
         .rst_analog(rst_analog), .sys_swap(sys_swap), .ota_chop_phase(ota_chop_phase), .short_o(short_o),

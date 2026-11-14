@@ -16,14 +16,23 @@ srcs = sorted(glob.glob(os.path.join(rtl, "*.v")))
 if not srcs:
     print(f"no RTL in {rtl}")
     sys.exit(2)
-if top == "c9_tb":
-    srcs.append(os.path.join(here, "hdl", "c9_tb.v"))
+if top == "c9_tb":   # WO-83: generated wrapper copy (Verilator rejects hierarchical defparam): the RTL tt_um_ file
+    # (possibly a mutant) with #(.PW_BITS, .BIAS_BITS) on u_core, so tt_um_ wrapper edits still reach the bench.
+    import re
+    pw, bb = int(os.environ.get("C9_PW_BITS", "4")), int(os.environ.get("C9_BIAS_BITS", "2"))
+    wf = os.path.join(rtl, "tt_um_sd_adc_c9.v")
+    wtxt, nsub = re.subn(r"\bsd_adc_c9\s+u_core\b", f"sd_adc_c9 #(.PW_BITS({pw}), .BIAS_BITS({bb})) u_core", open(wf).read())
+    if nsub != 1:
+        print(f"RESULT FAIL: wrapper u_core instance matched {nsub} times in {wf}")
+        sys.exit(2)
+    os.makedirs(out, exist_ok=True)
+    gw = os.path.join(out, f"c9_tb_wrap_{pw}_{bb}.v")
+    open(gw, "w").write(wtxt)
+    srcs = [s for s in srcs if os.path.basename(s) != "tt_um_sd_adc_c9.v"] + [gw, os.path.join(here, "hdl", "c9_tb.v")]
 bd = os.path.join(out, f"build_{sim}")
 r = get_runner(sim)
 kw = dict(timescale=("1ns", "1ps")) if sim == "icarus" else {}
 ba = os.environ.get("C9_BUILD_ARGS", "").split()
-if top == "c9_tb":   # CL-36 hold length for the bench (Ref A reads the same env, test_c9.HOLD_*)
-    kw["parameters"] = dict(PW_BITS=int(os.environ.get("C9_PW_BITS", "4")), BIAS_BITS=int(os.environ.get("C9_BIAS_BITS", "2")))
 if ba:
     kw["build_args"] = ba
 r.build(sources=srcs, hdl_toplevel=top, build_dir=bd, always=True, **kw)

@@ -5,10 +5,10 @@ cover
 
 [options]
 bmc: mode bmc
-bmc: depth 100
+bmc: depth 120
 prove: mode prove
 cover: mode cover
-cover: depth 240
+cover: depth 400
 multiclock off
 
 [engines]

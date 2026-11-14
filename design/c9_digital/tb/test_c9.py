@@ -1209,15 +1209,14 @@ async def c07_addr(dut):
 
 # ====================================================================== WO-75: D85 / CL-36 VAPWR-good hold
 def exp_slot0(lvl, max_ticks):
-    """Spec-side slot-0 tick (CL-36): tick t samples lvl(t) (synchronised bias_ok); pw = ticks since release;
-    b = consecutive high samples, cleared on a low sample until it reaches 2^B (J = completion tick, sticky);
-    slot 0 = first tick whose pre-edge state has pw >= 2^PW and b >= 2^B, i.e. max(2^PW, J) + 1."""
-    P, Bn, b = 1 << HOLD_PW, 1 << HOLD_B, 0
-    for t in range(1, max_ticks + 1):
-        if t - 1 >= P and b >= Bn:
-            return t
-        if b < Bn:
-            b = b + 1 if lvl(t) else 0
+    """Spec-side slot-0 tick, WO-83 rewrite from the CL-37 wording (replaces the CL-36 sticky-J form): tick t samples
+    lvl(t) (synchronised bias_ok); J = the first tick t >= 2^PW at which lvl was high on all of ticks t-2^B+1..t
+    (ticks >= 1 only: the run restarts at release); slot 0 = tick max(2^PW, J) + 1 = J + 1."""
+    P, Bn, run = 1 << HOLD_PW, 1 << HOLD_B, 0
+    for t in range(1, max_ticks):
+        run = run + 1 if lvl(t) else 0      # length of the all-high window ending at t
+        if t >= P and run >= Bn:
+            return t + 1
     return None
 
 
@@ -1269,7 +1268,7 @@ async def d_hold01_len(dut):
 
 @cocotb.test(timeout_time=20, timeout_unit="sec")
 async def d_hold02_bias_late(dut):
-    """CL-36 (b): bias_ok low then high late, one low sample just before pw done, low after b done (sticky J),
+    """CL-36 (b) / CL-37 (WO-83): bias_ok low then high late, one low sample just before pw done, low after b done (restarts the run),
     never high (no slot), reset re-asserted mid-hold (both counts restart)."""
     tb = await mk(dut, host=False)
     P, Bn = 1 << HOLD_PW, 1 << HOLD_B
@@ -1385,3 +1384,28 @@ async def d_hold04_cfg_sticky(dut):
             tb.fail(f"slot {s} tag (invalid, n_code) {inv.get(s)} != ({exp}, 0)")
         tb.chk("hold_inv")
     tb.report(need=("hold_cfg", "hold_sticky", "hold_inv", "host_frame", "bus"))
+
+
+@cocotb.test(timeout_time=20, timeout_unit="sec")
+async def d_hold05_d88(dut):
+    """WO-83, D88 / CL-37: bias_ok drop after a completed 2^B run but before pw done (slot 0 delayed), drop on the
+    last hold tick, drop on the slot-0 tick and after (no effect), a high run of exactly 2^B - 1 vs 2^B ending at
+    tick 2^PW.  Each case carries a hand-derived slot-0 tick that must equal exp_slot0 (TB self-check) and the DUT.
+    Run also at the real widths (wo42_job.sh real d_hold05_d88)."""
+    tb = await mk(dut, host=False)
+    P, Bn = 1 << HOLD_PW, 1 << HOLD_B
+    assert P > 2 * Bn, "case set needs 2^PW > 2^(B+1)"
+    t0 = P - Bn + 2                                   # > Bn: a full run (ticks 1..Bn) completed before the drop
+    cases = [("drop_after_run_before_pw", lambda t: 0 if t == t0 else 1, t0 + Bn + 1),
+             ("drop_last_hold_tick", lambda t: 0 if t == P else 1, P + Bn + 1),
+             ("drop_on_slot0_tick", lambda t: 0 if t == P + 1 else 1, P + 1),
+             ("low_after_release", lambda t: 0 if t > P else 1, P + 1),
+             ("run_Bn-1", lambda t: 1 if (P - Bn + 2 <= t <= P or t >= P + 5) else 0, P + 5 + Bn),
+             ("run_Bn", lambda t: 1 if (P - Bn + 1 <= t <= P or t >= P + 5) else 0, P + 1)]
+    for name, lv_, hand in cases:
+        mx = P + 4 * Bn + 16
+        if exp_slot0(lv_, mx) != hand:
+            tb.fail(f"{name}: TB error, CL-37 formula gives {exp_slot0(lv_, mx)} vs hand-derived {hand}")
+        got = await hold_run(tb, lv_, mx)
+        hold_chk(tb, got, lv_, name, mx)
+    tb.report(need=("hold_len", "rst_lat", "bus"))
