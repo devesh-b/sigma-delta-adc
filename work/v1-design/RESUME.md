@@ -901,3 +901,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
     - Pool running in WO-64-e450ae2w.
 - D83 (overshoot rule), D84 (C9 slew margin run), D85 (C9 VAPWR counter) logged.
 - WO-74 (76fe624): RTL bias_ok + 2^16 counter (PW_BITS/BIAS_BITS params) and SPEC CL-34/35/36. Lint/synth were not run (ssh was locked); the agent was resumed to finish. Golden v3.2 needs an update for the new slot-0 timing (bias_ok, hold) → C9 bench WO after lint.
+- WO-74 done: lint/synth clean, FF 231 → 259, cells 966 → 1068. WO-75 (C9 bench for D85) dispatched; final PnR after it, with the WO-73 flow settings.

@@ -85,3 +85,5 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-72 done (8898159): post-GRT repair no effect
 - WO-73 C9 slew margin PnR run (D84): dispatched 2026-11-14
 - WO-74 C9 VAPWR counter RTL (D85) + SPEC CL for D82/D83/D85: dispatched 2026-11-14
+- WO-74 done (76fe624, df9bded): lint/synth clean, 259 FF (+28), 1068 cells (+102)
+- WO-75 C9 bench for D85 + full regression: dispatched 2026-11-14
