@@ -559,7 +559,18 @@ def main():
             groups = [(f"{tag}_{x}", [byx[x], byx[OPEN[x]]]) for x in pairs] + [
                 (f"{tag}_kp", [q for q in cps if q[0] not in pairs and q[0] not in OPEN.values()])]
         if mutant_copies(c, t):
-            groups.append((tag + "_mut", mutant_copies(c, t)))
+            # WO-77: one deck per mutant (the cm_open pair mcc4 / mcc4o together). One merged deck fell to transient op on
+            # all of them (the 1 F loop break of mcc4o keeps its initial charge), so every mutant was INVALID by the lint.
+            # The lint stays strict: each mutant op must now converge directly in its own small deck.
+            mcp = mutant_copies(c, t)
+            used = set()
+            for q in mcp:
+                if q[0] in used:
+                    continue
+                twin = OPEN.get(q[0])
+                grp = [q] + [r_ for r_ in mcp if r_[0] == twin] if twin else [q]
+                used.update(r_[0] for r_ in grp)
+                groups.append((f"{tag}_mut_{q[0]}", grp))
         grows, acmap = [], {}
         for gtag, gcps in groups:
             gr, lint, err, ac = run_deck_group(c, t, v, gtag, gcps, out)

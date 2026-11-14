@@ -86,7 +86,7 @@ def sizes_for(mut):
     return z
 
 
-def deck(c, t, v, x, b, kind, mut, nodesets=None, part="op"):
+def deck(c, t, v, x, b, kind, mut, nodesets=None, part="op", opnodes=None):
     """part 'op': op + every print (the gated op, its lint); part 'noise': .noise only, then the totals and the DEVS gm
     (WO-52: the noise analysis repeats the op from a fresh start; it is checked against the 'op' part, see run())."""
     sub = f"ota1_{x}"
@@ -124,11 +124,14 @@ def deck(c, t, v, x, b, kind, mut, nodesets=None, part="op"):
               "Bs 0 s I = 1e-3*(V(outp) - V(outn))", "Rdcs s 0 1e12", "Csrv s 0 1e9",
               f"Cop outp 0 {cext:g}", f"Con outn 0 {cext:g}",
               f".nodeset v(s)=0 v(outp)={S.V_OCM} v(outn)={S.V_OCM}"]
+    if opnodes:
+        L = [ln for ln in L if not ln.startswith(".nodeset")]   # the converged op replaces the ol / default nodesets
+    if opnodes:   # WO-77: noise deck starts at the converged 'op' deck solution (see run()), so its own op is not a fresh start
+        L += [".nodeset " + " ".join(f"v({k})={z_:.9g}" for k, z_ in opnodes.items())]
     L += [".control", "set wr_singlescale", "set wr_vecnames"]
     if part == "op":
         L += ["op", "print i(vdd) v(outp) v(outn) v(gip) v(gin)"]
-        if kind == "ol":
-            L += ["print all"]
+        L += ["print all"]   # WO-77: every kind (the noise deck's nodeset is built from it)
         L += [f"print {par(x, i, z[k]['dev'], q)}" for i, k in DEVS.items() for q in DQ]
         L += [f"print {par(x, i, 'nfet_g5v0d10v5', q)}" for i in SWQ for q in ("cgg", "cdd", "vth")]
         L += [f"print v(x{x}.{n})" for n in ("fa", "xa", "sa")]
@@ -159,11 +162,19 @@ LINT = r"(error|unknown|singular|no convergence|timestep too small|could not fin
 def run(out, c, t, v, x, b, kind, mut, nodesets=None):
     tag = f"{x}_{kind}"
     out_ = {}
+    opn = None
     for part in ("op", "noise"):   # WO-52: two runs, so each analysis starts fresh and its lint is its own
         fn = os.path.join(out, f"{tag}_{part}.sp")
-        open(fn, "w").write(deck(c, t, v, x, b, kind, mut, nodesets, part))
+        open(fn, "w").write(deck(c, t, v, x, b, kind, mut, nodesets, part, opn))
         r = subprocess.run(["ngspice", "-b", fn], cwd=out, capture_output=True, text=True, timeout=1500)
         out_[part] = (parse(r.stdout), [l.strip() for l in (r.stdout + r.stderr).splitlines() if re.search(LINT, l, re.I)])
+        if part == "op" and not out_["op"][1]:
+            # WO-77 cause of 'noise op != op': .noise redoes the op from a fresh start; here Newton / gmin / source stepping
+            # failed and the transient-op fallback ends at a different point (not DC-settled: the vg nodes sit behind the
+            # 1 GOhm bias R, a ~35 Hz pole), gm_in +0.6 % vs the converged op (OP_MATCH 0.1 %). The tolerance is right.
+            # Fix: the converged op deck's node voltages become the noise deck's .nodeset, so its op starts at the solution.
+            opn = {k[2:-1]: z_ for k, z_ in out_["op"][0].items()
+                   if k.startswith("v(") and k.endswith(")") and not any(ch in k for ch in "#[@") and math.isfinite(z_)}
     vals, lint = out_["op"]
     nvals, nlint = out_["noise"]
     # the gated op is the 'op' run (no fallback allowed). The .noise run may fall back to transient op (seen at fs/125 with
