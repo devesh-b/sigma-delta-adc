@@ -36,46 +36,64 @@ Status 2026-11-15. This section only summarises; every row points to the section
 
 | | This design (SPEC targets) | MCP3421 (datasheet) | Prior analog ΣΔ on TT sky130 |
 |---|---|---|---|
-| Architecture | 2nd-order DT SC incremental, fully differential, 1-bit, on-chip CoI decimator | ΔΣ + PGA + internal reference + oscillator + I²C | 1st order (CT: Paul Thomas ttsky26c, single-ended; SC: tilesos dual ADC); no on-chip decimator |
-| Noise | ≤ 2.5 µV rms @ 15 SPS; ≤ 5 µV @ 240 SPS (model at spec: 0.94 µV) | 1.5 µV rms @ 3.75 SPS | Paul Thomas: ≈ 57 dB SNDR precision, ≈ 40 dB fast (simulated) |
-| INL | ≤ 20 ppm FSR (model at spec: 3.4 ppm) | 10 ppm typ, 35 max | not reported |
-| Offset / gain error | ≤ 5 µV / ≤ 0.5 % | 15 µV typ / 0.05 % typ | not reported |
+| Architecture | 2nd-order DT SC incremental, fully differential, 1-bit; the two CoI decimating accumulators are on chip, the final scaling (acc2 + 4·acc1, normalisation) and chop demodulation run in firmware | ΔΣ + PGA + internal reference + oscillator + I²C | 1st order (CT: Paul Thomas ttsky26c, single-ended; SC: tilesos dual ADC, ttsky26c; CT: shimomi ttsky26a, "first-order 1-bit continuous-time DSM"); no on-chip decimator |
+| Noise | ≤ 2.5 µV rms @ 15 SPS at fs ≥ 2 MHz across corners (0.25 MHz: ≤ 2.5 µV to 85 °C, ≤ 3.0 µV at 125 °C, D27); ≤ 5 µV @ 240 SPS. Tier-0 model, intrinsic floor: 0.94 µV (V.4) | 1.5 µV rms @ 3.75 SPS | Paul Thomas: ≈ 57 dB SNDR precision (≈ 100 kHz band), ≈ 40 dB fast (≈ 1 MHz band), simulated. SNDR over a band is a different metric from µV rms at DC and is not directly comparable |
+| INL | ≤ 20 ppm FSR in the precision modes; fast mode N 64 ≤ 200 ppm, N 256 ≤ 20 ppm, N 1024 ≤ 5 ppm (SPEC §1). Tier-0 model, intrinsic floor: 3.4 ppm (V.4) | 10 ppm typ, 35 max | not reported |
+| Offset / gain error | ≤ 5 µV / ≤ 0.5 %; ratiometric, so the gain error excludes the reference | 15 µV typ / 0.05 % typ; the gain error includes the internal reference | not reported |
 | CMRR | ≥ 100 dB with system chop; ≥ 60 dB without | 105–110 dB | not reported |
 | Reference | external, ratiometric 2.048 V | internal 2.048 V | — |
-| Supply current | ≤ 200 µA analog design budget | 145 µA @ 3 V | — |
+| Supply current, analog (VAPWR) | ≤ 200 µA design budget; fast mode ≈ 180 µA nominal by reasoning, not simulated (needs C2) | 145 µA @ 3 V, whole chip | — |
+| Digital power (VDPWR) | C9 macro 1.705 mW at LibreLane default switching activity (WO-73), ≈ 0.95 mA at 1.8 V; an estimate, not a measurement | included in the 145 µA | — |
 | Silicon data | none yet | product | none measured; the only measured analog ADC among the references is Wulff's tt06 SAR (≈ 7 ENOB) |
 
-Sources: II.1.1 (MCP3421 and prior art); II.1.3 (budgets); `NOTES.md` (survey table, prior-design rows). The design aims at DC precision and resolution, not bandwidth (II.1.1). MCP3421 parity is not claimed: the on-chip reference and 10 ppm INL are out of reach on a first chip (II.1.1).
+Sources: II.1.1 (MCP3421 and prior art); II.1.3 (budgets); `NOTES.md` (survey table, prior-design rows); SPEC §1 (targets). The "tier-0 model" numbers are the intrinsic floor of the Python model: they exclude reference noise, board noise, digital coupling and PEX (V.4). The design aims at DC precision and resolution, not bandwidth (II.1.1). MCP3421 parity is not claimed: the on-chip reference and 10 ppm INL are out of reach on a first chip (II.1.1). The current rows are not comparable as totals: the MCP3421's 145 µA covers the whole chip, while this design's 200 µA is an analog-only budget and its digital macro alone is estimated at ≈ 0.95 mA.
 
-**What is new on TT.**
-- **Order 2.** Every earlier analog ΣΔ on sky130 TT is 1st order (II.1.1; NOTES).
-- **Incremental operation** with exact reconstruction from the two accumulators, so each conversion is independent and N trades rate for resolution (I.5; II.2.1).
-- **On-chip decimator** inside the analog tile, hardened as a separate LibreLane macro; no earlier TT ΣΔ has one (II.1.1; III.6).
+**What is new on TT.** The prior-art statements below come from a keyword survey of titles and descriptions over 29 shuttles up to ttsky26c (index.tinytapeout.com, 2026-11-07; NOTES §1). A project with an unusual name could be missing.
+- **Order 2.** The three analog ΣΔ modulators found on TT sky130 (Paul Thomas, tilesos, shimomi) are all 1st order (II.1.1; NOTES).
+- **Incremental operation** with an exact reconstruction formula from the two accumulators; the residual quantisation error falls as 1/N² (≈ 33 µV at N 1024, ≈ 2 µV at N 4096, I.5.4). Each conversion is independent and N trades rate for resolution (I.5; II.2.1).
+- **Decimating accumulators in the analog tile.** To our knowledge from that survey, this is the first analog ΣΔ modulator on TT sky130 with its decimating accumulators (2nd-order CoI) in the same analog tile, hardened as a separate LibreLane macro (III.6). The final scaling and the chop demodulation run in firmware (SPEC §3.7; I.5.3). Digital-only decimators exist on TT: TTSKY26A-ADC-8BIT has an on-chip sinc1 counter, and tt09-decimation_filter and tt09-delta-sigma-decimation-filter are standalone filter projects (NOTES §1).
 - **Chopping:** system chopping (input polarity swap between the two sub-conversions of a pair) and optional OTA1 chopping, always paired with system chop (II.2.8; D18).
 - **CM-rejecting input switching** by top-plate shorting (II.2.10; D12).
 
-**Verification approach.** A gated flow from system to block to top (IV.1): a Python model (tier 0), behavioural SPICE (tier 1), transistor-level blocks in the loop (tier 2) and, later, PEX (tier 3). Every gate row takes its limit from SPEC, prints ACCEPT/REJECT, fails on missing data, and has a broken copy that must REJECT (III.0; IV.3). Blocks run at all PVT corners plus Monte Carlo (D2). The authoritative OTA1 check is an in-loop INL gate with the transistor OTA (gate B, D48; III.1.8). The digital macro has an independent bench with its own reference model, mutation testing and formal properties (III.6.3). A read-only reviewer checks every design change (IV.8). False passes found on the way are logged as lessons (IV.4).
+**Verification approach.** A gated flow from system to block to top (IV.1): a Python model (tier 0), behavioural SPICE (tier 1), transistor-level blocks in the loop (tier 2) and, later, PEX (tier 3). Every gate row takes its limit from SPEC, prints ACCEPT/REJECT, fails on missing data, and is meant to have a broken copy that must REJECT (III.0; IV.3). The plan is all PVT corners plus Monte Carlo for every block (D2); that is the plan, not the current coverage. The authoritative OTA1 check is an in-loop INL gate with the transistor OTA (gate B, D48; III.1.8). The digital macro has an independent bench with its own reference model, mutation testing and formal properties (III.6.3). A read-only design review is required for every design change (IV.8); the C3 final review is still open. False passes found on the way are logged as lessons (IV.4).
+
+Coverage to date (2026-11-15):
+- C1 gate B: boost at 4 corners, of which only fs/125 and ss/−40 are on the current WO-52 netlist, both at solver level O1 only; precision at 4 corners at O1, with O2 on 2 of 6 parts at ss/−40 (III.1.8, III.1.8a).
+- C6: DC, loop and start-up-from-rest rows at 5 corners (III.5).
+- C3: function rows at 9 PVT corners (III.3).
+- Monte Carlo: only C3 T3 (offset). C1 tb8 offset MC and C6 MC have not been run.
+
+Broken copies that are weak or absent:
+- C1 precision `srknee` rejects at only 3 % over the gate (III.1.8a).
+- C6 `early` and `hy1` are expected to ACCEPT under D89 (V.3 item 4).
+- C3 T8 copies cannot be judged until a base revision passes T8 (III.3).
+- C3 T5 has no physical copy that REJECTs; it is accepted by margin by construction, with checker copies only (D81).
 
 **Status per block (2026-11-15; details in V.1).**
 
 | Block | State | Open |
 |---|---|---|
-| C1 OTA1 + CMFB | transistor schematic, sink L 8; boost gate B passes (fs/125 3.14 ppm vs 5) | precision gate B ss/−40: O1 1.706 ppm vs 1.333, O2 parts 0.142 / 0.160 ppm; verdict PENDING (WO-76); tb7/op-AC rerun PENDING (WO-77) |
+| C1 OTA1 + CMFB | transistor schematic, sink L 8 (WO-52 netlist). Boost gate B (≤ 5 ppm) on this netlist was run only at fs/125 (3.14 ppm) and ss/−40 (0.71 ppm), both at solver level O1; tt/27 and ss/125 exist only on older netlists (WO-31) | boost fs/125 needs O2 under D43c (3.14 ppm is less than 3× under 5 ppm), not scheduled; precision gate B ss/−40: O1 1.706 ppm vs 1.333, O2 on two parts 0.142 / 0.160 ppm (unfiled interim data); a ≈ 10× O1→O2 step does not meet D43c as written, so the verdict stays PENDING until a further solver point confirms it (WO-76); tb7/op-AC rerun PENDING (WO-77) |
 | C2 OTA2 | not started | inputs gathered (III.2) |
-| C3 comparator | rev f; T2/T3/T5 pass | T8 precharge-edge cap (2.206 V vs 2.2 V at ff/−40 with kp2); rev g PENDING (WO-88) |
+| C3 comparator | rev f. T2: the single-shot rows pass; the rev f cyc rows were not run. T3: the count and \|μ\| + 3σ limbs pass (42.7–45.1 mV ≤ 60 mV), the `plaus` limb REJECTs because the sensitivity decks were not run. T5: accepted by margin by construction (D81) | T8 precharge-edge cap: rev f 2.251 V at ff/−40 against 2.2 V (2.206 V with the kp2 candidate); rev g and the cyc rows PENDING (WO-88) |
 | C4 switches / phases / level shifters | rev b; bench numerics fixed | gate pools PENDING (WO-79, WO-85); ff/100 20 pA row open |
 | C6 bias | architecture (c); DC rows pass at 5 corners | transient rows under D89 PENDING (WO-87) |
-| C9 digital | RTL with D85/D88; benches pass; pre-D85 PnR timing-clean at 12 corners (slew waived, D86) | final PnR PENDING; formal at real widths open |
+| C9 digital | RTL with D85/D88. WO-75 bench (D85) passes; WO-83 bench (D88) 106 of 107 jobs so far. PnR on the pre-D85 RTL meets setup and hold at 12 corners, with max slew waived at the stand-in corner (D86); DRV is not 0, LVS was not extracted and 2 floating nets are open, so WO-73 calls it "not a signoff candidate" | final PnR PENDING; formal at real widths open |
 | C5, C7, C8, C10, top level, PEX | inside C1/C4 or not started | — |
 
 **Top risks and open items** (V.3; V.4):
-1. The C1 precision INL verdict rests on the O2 combine at ss/−40 (WO-76).
+1. The C1 precision INL verdict at ss/−40 is PENDING: O1 fails (1.706 ppm), two O2 parts read 0.142 / 0.160 ppm, but a ≈ 10× O1→O2 step does not meet the D43c convergence rule, so a further solver point is needed (WO-76; III.1.8a). Every O1-only INL in the book (boost gate B, precision tt/27, ss/125 and fs/125) carries the same solver uncertainty.
 2. C3 T8 overshoot at the precharge edge is above the 2.2 V cap at ff/−40 (WO-86, WO-88).
-3. Fast-mode current: ≈ 180 µA nominal by reasoning, against the 200 µA budget, before OTA2 exists (V.2).
+3. Fast-mode current: ≈ 180 µA nominal by reasoning, against the 172 µA SPEC basis. Scaling the accepted 189 µA worst case by the same ratio gives ≈ 198 µA, about 1 % under the 200 µA budget, before OTA2 exists (V.2).
 4. OTA2 must swing ≈ 1.41 V differential at A ≥ 75 dB (III.2).
-5. Virtual-ground leakage forces a temperature derating of the slowest mode (D82); the 20 pA ff/100 row is open.
-6. No PEX and no analog layout yet; every margin is schematic-level.
-7. C9 counter properties are formally proven only at reduced widths (WO-75, WO-83).
+5. Area closure: C9 28,500 µm² (40 %) + MIM ≈ 9,000 µm² (12 %) + C6 ≤ 7,000 µm² (≤ 10 %) ≈ 62 % of the 72,071 µm² tile before OTA1, OTA2, the comparator, switches, guard rings and routing; the earlier estimate put the tile 66–89 % full (V.4).
+6. Digital-to-analog coupling: a 48 MHz digital macro shares the tile with a µV-level front end; not simulated (V.4).
+7. Sys-off CMRR margin is only 1.1–1.5 dB over 60 dB, from the model with allocations (V.4).
+8. Virtual-ground leakage forces a temperature derating of the slowest mode (D82); the 20 pA ff/100 row is open.
+9. No PEX and no analog layout yet; every margin is schematic-level.
+10. C9 counter properties are formally proven only at reduced widths (WO-75, WO-83).
+
+**Device stress limits.** The 1.98 V sustained, 2.2 V for < 1 ns and 4.95 V junction limits, and the C3 source-to-bulk 2.37–2.39 V, are project stress rules (D80, D83, D90), not PDK ratings. The SkyWater device-details page gives a model-validity range of 0–1.95 V for Vds and Vgs of nfet/pfet_01v8 and +0.3 to −1.95 V for nfet Vbs (https://skywater-pdk.readthedocs.io/en/main/rules/device-details.html); these project limits lie outside that range (III.3).
 
 **Area and power budget.**
 
@@ -89,9 +107,9 @@ Sources: II.1.1 (MCP3421 and prior art); II.1.3 (budgets); `NOTES.md` (survey ta
 | Analog current budget | ≤ 200 µA in every mode (design budget) | SPEC | II.1.3; D46 |
 | OTA1 current (netlist) | base 60.1–61.6 µA; boost 121.8–123.9 µA | SIM | III.1.9; WO-28 |
 | C6 own current | 4.34–4.96 µA (≤ 6 µA row) | SIM | III.5; WO-80 |
-| Comparator | 0.50–0.76 µA dynamic, on VDPWR (outside the 200 µA analog budget) | SIM (rev a) | III.3; WO-44 |
-| Fast-mode system total | ≈ 180 µA nominal (REASONED) against 172 µA SPEC estimate | needs C2 | V.2 |
-| C9 power | 1.705 mW at default switching activity (LibreLane estimate, 1.8 V domain) | PnR estimate | WO-72; WO-73 |
+| Comparator | 0.50–0.76 µA dynamic, on VDPWR (outside the 200 µA analog budget) | SIM (rev a; not re-measured on rev f) | III.3; WO-44 |
+| Fast-mode system total | ≈ 180 µA nominal (REASONED, not simulated) against the 172 µA SPEC estimate; the accepted 189 µA worst case scales to ≈ 198 µA, about 1 % under 200 µA | needs C2 | V.2 |
+| C9 power | 1.705 mW at default switching activity (LibreLane estimate, 1.8 V domain), ≈ 0.95 mA at 1.8 V | PnR estimate on pre-D85 RTL | WO-72; WO-73 |
 
 **What silicon would measure.** The SPEC rows give the measurement list (II.1.3; SPEC §3.0): noise versus N and fs with a shorted input; INL against a precision DC source with the ratiometric reference; offset and gain error with system chop on and off; CMRR with chop on and off; supply current per mode and boost setting; the trim range and the "lowest passing code + 2" calibration rule (D73); start-up through the VAPWR-good hold (D85); order-1 mode as characterisation only (II.2.9; D21); fast-mode INL at N 64 / 256 / 1024 (II.1.3); and the 125 °C derating of the 0.25 MHz mode (D82). Two practical limits apply: the TT demo board has no precision source or ADC, so a low-noise source and reference must be brought in (NOTES, PCB section), and at 4 MHz / N 64 the host must read ≥ 0.36 Mword/s, which MicroPython cannot do (V.4). The model sets an intrinsic floor only; the one measured TT analog ADC came in ≈ 0.6 b below simulation (V.4).
 
@@ -533,9 +551,10 @@ The feasibility verdict was "partially delulu": the architecture fits TT well, b
 These findings led to an external, ratiometric reference (D17, D24) and to chopping (D18).
 
 **Prior art on TT** (CTX §4; ROAD §2):
-- Every earlier analog ΣΔ on sky130 TT is 1st order.
-- None has on-chip decimation, and none has measured silicon.
-- Paul Thomas's ttsky26c design is 1st-order CT, single-ended, at 50 MHz, simulated at ≈ 40 dB (fast) / ≈ 57 dB SNDR (precision).
+- Scope: a keyword survey of titles and descriptions over 29 shuttles up to ttsky26c (index.tinytapeout.com, 2026-11-07; NOTES §1). A project with an unusual name could be missing.
+- The three analog ΣΔ modulators found on sky130 TT are 1st order: Paul Thomas (ttsky26c, CT), tilesos dual ADC (ttsky26c, SC) and shimomi (ttsky26a, "first-order 1-bit continuous-time DSM" converting a PTAT voltage; its README).
+- None of these analog modulators has its decimator on chip, and none has measured silicon. Digital decimators do exist on TT: TTSKY26A-ADC-8BIT has an on-chip sinc1 counter, and tt09-decimation_filter and tt09-delta-sigma-decimation-filter are standalone filter projects (NOTES §1). On this chip the decimator is the two CoI accumulators; the final scaling and chop demodulation run in firmware (SPEC §3.7).
+- Paul Thomas's ttsky26c design is 1st-order CT, single-ended, at 50 MHz, simulated at ≈ 40 dB (fast, ≈ 1 MHz band) / ≈ 57 dB SNDR (precision, ≈ 100 kHz band). SNDR over a band is a different metric from this design's µV rms at DC.
 - Wulff's tt06 SAR is the only measured analog ADC among the references: ≈ 7 ENOB measured against 7.63 simulated.
 
 This design aims at resolution and DC precision, not bandwidth (ROAD §2).
@@ -545,7 +564,7 @@ This design aims at resolution and DC precision, not bandwidth (ROAD §2).
 | Constraint | Value | Source |
 |---|---|---|
 | Process | sky130A, TT analog template `tt_analog_2x2_3v3.def`, `uses_3v3` | SPEC §3.9 |
-| Tile | 2×2, ≈ 334 × 225 µm ≈ 75,000 µm² (SPEC); template DIEAREA measured 319.24 × 225.76 µm = 72,071 µm² | SPEC §1; HARD §2 |
+| Tile | 2×2, ≈ 334 × 225 µm ≈ 75,000 µm² (SPEC); DIEAREA of the TT analog template `tt_analog_2x2_3v3.def` as measured in HARD §2: 319.24 × 225.76 µm = 72,071 µm². Paul Thomas's ttsky-sigma-delta frame uses a 334.88 µm width. The TT tools version of the measured template is not recorded; re-check against the template at C7 (Appendix E) | SPEC §1; HARD §2 |
 | Supplies | VAPWR 3.3 V analog, VDPWR 1.8 V digital, each ±10 % at the corners | SPEC §1, §6 |
 | Metal | met5 forbidden; power stripes on met4 | SPEC §3.9 |
 | Analog pins | via `tt_asw_3v3`: < 500 Ω, < 5 pF, ≤ 4 mA | CTX §5 |
@@ -1060,26 +1079,26 @@ On the WO-28 netlist (WO-28 run 2):
 | WO-32 (TG clamp) | 2.171 | — | — | — | srknee 17.37: REJECTED | WO-32 |
 | WO-52 (sink L 8) | **3.14** (under the 3.33 share) | 0.71 | — | — | — | RESUME 2026-11-14 (WO-52 reruns) |
 
-All recorded boost gate B runs pass the 5 ppm gate. Sink L 8 raised fs/125 from 2.17 to 3.14 ppm (RESUME 2026-11-14).
+Every recorded boost gate B run passes the 5 ppm gate, but coverage on the current netlist is partial. On the WO-52 netlist (sink L 8) only fs/125 (3.14 ppm) and ss/−40 (0.71 ppm) were run, both at solver level O1; the tt/27 and ss/125 values exist only on older netlists (WO-31). Sink L 8 raised fs/125 from 2.17 to 3.14 ppm (RESUME 2026-11-14). D43c applies the O1/O2 ladder to every gated INL with less than 3× margin, i.e. INL above gate/3 = 1.667 ppm in boost. 3.14 ppm is therefore owed an O2 run at fs/125, which is not scheduled (V.2). WO-31 skipped O2 at 2.17 ppm on a "below gate/2" argument, which fell below the D43c standard.
 
 ### III.1.8a Precision gate B at 2 MHz (WO-63, WO-76)
 
-The 2 MHz precision gate B (≤ 1.333 ppm; D48(1), SPEC row 94) had never been run before WO-63. Setup (WO-63): the WO-52 transistor OTA1 (sink L 8) in the tier-1 deck, OTA2 behavioural at its precision point (13.5 V/µs, GBW 10 MHz, β2 0.497), fs 2 MHz, boost 0, N 1024, 21 points in 6 parts, solver level O1. O2 is required when O1 ≥ gate/2 = 0.667 ppm (D48 rule as applied in WO-63). The broken copy `srknee` scales all six bias ports by 0.6234, i.e. a base SR of 0.8 × the 10.3 V/µs floor.
+The 2 MHz precision gate B (≤ 1.333 ppm; D48(1), SPEC row 94) had never been run before WO-63. Setup (WO-63): the WO-52 transistor OTA1 (sink L 8) in the tier-1 deck, OTA2 behavioural at its precision point (13.5 V/µs, GBW 10 MHz, β2 0.497), fs 2 MHz, boost 0, N 1024, 21 points in 6 parts, solver level O1. The convergence rule is D43c: every gated INL with less than 3× margin (here INL above gate/3 = 0.444 ppm) needs the O0→O1→O2 ladder, and an O1/O2 pair is accepted only if |O2 − O1| ≤ max(10 % · INL, 0.1 · (gate − INL)), with the verdict taken on INL(O2) · (1 + |Δ|/INL). WO-63 applied a "gate/2" trigger instead; that trigger is not in D48 or SPEC and is weaker than D43c. The broken copy `srknee` scales all six bias ports by 0.6234, i.e. a base SR of 0.8 × the 10.3 V/µs floor.
 
 | Corner | O1 combined INL (ppm) | Verdict | Note | Source |
 |---|---|---|---|---|
-| tt/27/3.3 | 0.692 | ACCEPT | ≥ gate/2: O2 needed, not yet scheduled | WO-63 |
+| tt/27/3.3 | 0.692 | ACCEPT at O1 | above gate/3: O2 needed under D43c, not yet scheduled | WO-63 |
 | ss/−40/3.0 | **1.706** | **REJECT at O1** | jagged, pattern-dependent residual; O2 PENDING | WO-63; WO-76 |
-| ss/125/3.0 | 0.698 | ACCEPT | ≥ gate/2: O2 needed, not yet scheduled | WO-63 |
+| ss/125/3.0 | 0.698 | ACCEPT at O1 | above gate/3: O2 needed under D43c, not yet scheduled | WO-63 |
 | fs/125/3.0 | 0.967 | ACCEPT | O2 PENDING (WO-76) | WO-63 |
 | fs/125 `srknee` (must REJECT) | 1.375 | REJECTED | only 3 % over the gate; only part 0 rejects on its own | WO-63 |
 
 **Diagnosis so far (WO-76).** Every combine is healthy (endpoint spread ≤ 0.017 ppm). The residual shapes differ:
 - tt/27, ss/125 and fs/125 show a smooth odd "S", the signature of a GBW/settling nonlinearity, plus ≤ 0.3 ppm of jitter.
 - ss/−40 is jagged: neighbouring points jump by up to 1.3 ppm, which points to a step-history (bit-pattern) dependent error, not a static A(v) (WO-76 §1).
-- Static gain is ruled out (A0 is highest at ss/−40, 85.9 dB), as is slew alone (SR 13.2–13.5 V/µs at every corner) and CMFB (best f_cm and PM_cm at ss/−40). The first hypothesis was integrate-phase phase margin: 49.9° at ss/−40, fp2/GBW 1.02, the lowest of all corners (WO-76 §3).
+- Static gain is ruled out (A0 is highest at ss/−40, 85.9 dB) and so is the CMFB (best f_cm and PM_cm at ss/−40). Slew alone is judged unlikely, not ruled out: SR is 13.2–13.5 V/µs at every corner, yet only ss/−40 fails (WO-76 §3). The first hypothesis was integrate-phase phase margin: 49.9° at ss/−40, fp2/GBW 1.02, the lowest of all corners (WO-76 §3).
 
-**Bias sweep: the error moves, it is not fixed.** Per-part O1 INL at ss/−40 with all OTA1 bias ports scaled (diagnostic decks only; coordinator note 2026-11-15; RESUME 2026-11-14 22:55 and 23:40):
+**Bias sweep: the error moves, it is not fixed.** Per-part O1 INL at ss/−40 with all OTA1 bias ports scaled. These are unfiled interim data: diagnostic decks only, taken from the coordinator note of 2026-11-15 and RESUME 2026-11-14 22:55 and 23:40, not from `results/wo76/README.md`:
 
 | Part | nominal | bias × 0.8 | bias × 1.3 |
 |---|---|---|---|
@@ -1092,12 +1111,18 @@ The 2 MHz precision gate B (≤ 1.333 ppm; D48(1), SPEC row 94) had never been r
 
 Both directions lower p2 and p4, but × 0.8 raises p0 from 1.330 to 1.830 ppm. The coordinator's reading: the error shifts between parts, which points away from a simple PM or SR cause and toward a pattern-dependent term, possibly numerical at O1; bias options are not supported by these data (RESUME 2026-11-14 23:40).
 
-**O2 parts.** At ss/−40, O2 gives p0 **0.142 ppm** (O1 1.330) and p2 **0.160 ppm** (O1 1.706) (RESUME 2026-11-15 00:45 and 01:40; coordinator note 2026-11-15). That is a strong sign that the ss/−40 O1 failure is a numerical artefact of the O1 solver settings. The other O2 parts and the fs/125 O2 parts are still running (`WO-76-f00f9bf/out/logs_o2`). **The gate verdict is PENDING the 6-part O2 combine**; D48 requires O2 here because O1 ≥ gate/2, and O2 is then the converged result. A `--tight` O2 deck (reltol 1e-6, vntol 1e-8) aborted with "timestep too small", past the solver floor (WO-76 §2).
+**O2 parts.** At ss/−40, O2 gives p0 **0.142 ppm** (O1 1.330) and p2 **0.160 ppm** (O1 1.706) (RESUME 2026-11-15 00:45 and 01:40; coordinator note 2026-11-15; unfiled interim data). That is a strong sign that the ss/−40 O1 failure is a numerical artefact of the O1 solver settings, but it is not yet a converged result:
+- D43c accepts an O1/O2 pair only if |O2 − O1| ≤ max(10 % · INL, 0.1 · (gate − INL)). A step from 1.706 to 0.160 ppm (≈ 10×) fails that test, and the D43c verdict formula INL(O2) · (1 + |Δ|/INL) gives ≈ 1.7 ppm.
+- WO-76 §2's own rule (`--tight` against O2, same test) is unmet: the `--tight` O2 deck (reltol 1e-6, vntol 1e-8) aborted with "timestep too small", past the solver floor, and the O1 `--tight` deck timed out.
+- The ladder never tightens vntol (1e-6 V ≈ 0.25 ppm of the span), and the O2 values of 0.14–0.16 ppm sit below that.
+- Counter-evidence for the O1 values being well formed: the O1 endpoints agree to 0.005 ppm across parts.
 
-**Gate rule gap.** tt/27 (0.692) and ss/125 (0.698) are also ≥ gate/2, so the same rule asks for O2 there; those runs are not in the WO-76 job list (WO-63). Listed in V.2.
+O2 becomes the result only if a further tightening confirms it (D43c; WO-76 §2). No amendment to D43c is made; a third solver point is to be scheduled, and until then the C1 precision verdict stays **PENDING**. The other O2 parts and the fs/125 O2 parts are still running (`WO-76-f00f9bf/out/logs_o2`). The same solver uncertainty applies to every O1-only INL in this book: boost gate B, precision tt/27, ss/125 and fs/125, and the earlier s5 rows.
+
+**Gate rule gap.** tt/27 (0.692) and ss/125 (0.698) are above gate/3 (0.444 ppm), so D43c asks for O2 there; those runs are not in the WO-76 job list (WO-63). Listed in V.2.
 
 **Gate B mechanics.**
-- N 1024, 21 input points, split into 6 parts.
+- N 1024, 21 input points, split into 6 parts. Convergence follows D43c; the precision verdict is **PENDING** (above).
 - `combine()` asserts a complete part set, the same endpoints in every part, and $\hat u$ agreement ≤ 0.05 ppm at shared points. The gate value is the max per-part endpoint INL (WO-25).
 - Broken-copy rule (WO-29): when every part is healthy and above the gate, the copy reports REJECTED even if its endpoints disagree. A slew-limited copy carries memory between conversions, so its endpoints are sequence-dependent.
 
@@ -1123,8 +1148,9 @@ Both directions lower p2 and p4, but × 0.8 raises p0 from 1.330 to 1.830 ppm. T
 
 ### III.1.10 Open items for C1
 
-- Precision gate B verdict: the 6-part O2 combine at ss/−40 and the fs/125 O2 parts. **PENDING** (WO-76).
-- O2 runs at tt/27 and ss/125, which the gate rule asks for (O1 ≥ gate/2). No WO yet.
+- Precision gate B verdict: the 6-part O2 combine at ss/−40, the fs/125 O2 parts, and a further solver point to confirm O2 under D43c. **PENDING** (WO-76).
+- O2 runs at tt/27 and ss/125, which D43c asks for (O1 above gate/3 = 0.444 ppm). No WO yet.
+- Boost gate B on the WO-52 netlist: O2 at fs/125 (3.14 ppm is above gate/3 = 1.667 ppm), and tt/27 and ss/125 on this netlist. No WO yet.
 - A stronger precision broken copy: `srknee` rejects by only 3 % (WO-63; WO-76 §4).
 - tb7 noise on the sink-L 8 netlist and the op/AC mutants. **PENDING** (WO-77 rerun).
 - MC of the 1:8 ratios and the replica is open (C1 §1.1 layout intent).
@@ -1139,7 +1165,7 @@ C2 has no design note yet. Inputs gathered so far:
 |---|---|---|
 | Spec rows | base loaded GBW ≥ 10 MHz into ≈ 0.7 pF (15 MHz target), SR ≥ 13.5 V/µs; boost GBW ≥ 22.5 MHz, SR ≥ 27 V/µs; β2 ≥ 0.497 (Cp_vg2 ≤ 0.262 pF per side); worst loop step ≈ 1.12 V diff | SPEC OTA2 row; D41 |
 | Realistic x2 peak | ≈ 1.41 V diff for any comparator offset 0 < \|Vos\| ≤ 90 mV (not 1.21 V), at the edge of the 1.4 V A ≥ 75 dB range | C3 §3.1b; WO-51 |
-| Comparator CM kickback | ≈ 41–45 mV per fire edge on x2; OTA2 output headroom must absorb it | C3 §3.4, §3.4b; WO-44 |
+| Comparator CM kickback | 38.96–47.41 mV per fire edge on x2 on rev f (38.92–46.82 mV with kp2); OTA2 output headroom must absorb it | C3 §3.4, §3.4b; WO-86 |
 | Order-1 duty | per-cycle reset of Cint2 (`rst2_o1`), gated by the comparator's decision-done signal, ≥ 15 ns; x2 = (Cs2/Cint2)·x1 = c2·x1 follower | C4 §2; D76 |
 | Offset | ≤ 9 mV 3σ; 52.7 µV input-referred at N 4096 without sys chop (cancels with it) | SPEC OTA offset row |
 | Leak / Cs2 interface | Cs2 plates shorted in OTA2 integrate; CM kick ≤ 10 mV | CL-2 |
@@ -1187,7 +1213,7 @@ C2 has no design note yet. Inputs gathered so far:
 
 **The rev c memory fault (C3 §4b; WO-56).** The cascode nodes ap/an had no precharge. They charged only through K1/K2 toward VDPWR − VT,HV, ending in subthreshold. After a ±0.3 V decision, one node was left low, and the next strobe favoured the previous decision. The small cycles that followed read the wrong sign, which showed up as t_dec ≈ 500 / 250 ns. Rev d precharges ap/an and makes the tail HV, so tl, ap and an touch only HV devices.
 
-**The 1.8 V stress rule and the T8 bench (D80, D83, D87, D90).** The T8 row checks that no 1.8 V device in the comparator sees more than its rating. The row was refined four times, each by a user decision, because the original wording was stricter than the physics (STATE-2026-11-14 §2, lesson 4):
+**The 1.8 V stress rule and the T8 bench (D80, D83, D87, D90).** The T8 row checks that no 1.8 V device in the comparator sees more than its rating. The row was refined four times, each by a user decision, because the original wording was stricter than the physics (STATE-2026-11-14 §2, lesson 4). All of these limits (1.98 V sustained, 2.2 V for < 1 ns, the 4.95 V junction limit, and the rev d source-to-bulk 2.37–2.39 V) are **project stress rules (D80, D83, D90), not PDK ratings**. The SkyWater device-details page gives a model-validity range of 0–1.95 V for Vds and Vgs of nfet/pfet_01v8 and +0.3 to −1.95 V for nfet Vbs (https://skywater-pdk.readthedocs.io/en/main/rules/device-details.html); the project limits lie outside that range, so passing them does not show operation within the models' validated range.
 
 | Step | Rule | Why | Source |
 |---|---|---|---|
@@ -1200,7 +1226,7 @@ C2 has no design note yet. Inputs gathered so far:
 
 **The +0.344 mV result (WO-86).** S stays at 1.980344 V to the µV with a 10× stiffer switch, with reltol 1e-6 and with a fixed 0.01 Ω feed. A 2.00 V pin gives 2.000343 V. So the excess is a fixed +0.344 mV above whatever the pin is, not a bench drop and not solver noise. Doubling the keeper (kp2) cuts it to 0.150 mV (× 0.44), which behaves like a steady injection of tens of nA into a supply-held node through the pull-up resistance. The injecting device is not named yet: the WO-86 probe failed on vector names, and WO-88 fixed the probe (save `[id]` only) and re-launched it (**PENDING**). The candidate is the HV nodes ap/an, kicked to 2.29–2.39 V by x2, leaking through K1/K2 into dp/dn and M3/M4 (WO-84, inference). nb2/ob2 sit above vdd by less (≈ 10 µV), but D counted any excess > 1.98 V, hence 144 ns. Because the stress equals the supply itself plus 0.3 mV, the user set the 1 mV tolerance (D90). Under D90 the sustained limb and the duration threshold move to 1.981 V; the re-judged rows are **PENDING** (WO-88).
 
-**The precharge-edge cap (WO-86, WO-88).** The peak P is on M4 gb, node op, at the strobe **falling** (precharge) edge. The losing node (on) is pulled from 0 to vdd by R1 in about 0.2 ns. Through the Cgd of M5 and M3 (gate on, drain op), that edge couples the held-high op upward, and only the keeper pulls it back (WO-88 item 3). That is why kp2 lowers P:
+**The precharge-edge cap (WO-86, WO-88).** The peak P is on M4 gb, node op, at the strobe **falling** (precharge) edge. The losing node (on) is pulled from 0 to vdd by R1 in about 0.2 ns. Through the Cgd of M5 and M3 (gate on, drain op), that edge couples the held-high op upward. R0 (pfet_01v8 1.0/0.15, drain op, gate clk, source vdd; size RSO in `sizes_draft.py`) also restores op during precharge and is 2.4× wider than the keeper. R0 and R1 share the clk gate, so while R1 pulls on up, R0 is still turning on, and the already-on keeper is the main return path for op during the edge; once R0 is fully on, it restores op too (`netlist.py`; WO-88 item 3). That explains why kp2 lowers P. It also means a narrower R0/R1 slows the aggressor but weakens op's restore path, so the net effect of the rev g candidates is not obvious. This mechanism is an interim reading (WO-88); the probe that would confirm it is **PENDING**.
 
 | Variant | P tt/27 | P ff/−40 | Against 2.2 V | Source |
 |---|---|---|---|---|
@@ -1308,7 +1334,7 @@ Numerical rules: gear, reltol 1e-5, tmax 1 ps.
 | WO-79 | 28 of 89 WO-70 jobs still aborted (inj at 20 ns on `vinn#branch`, settle, ramp) | an ideal source tied straight to pF of device capacitance: its branch current C·dV/dt is numerical noise at the 1e-22 s steps after a breakpoint and cannot meet abstol, so the step collapses; adding a source R moves the abort to the next ideal source on the node | `soften()`: a series R on every grounded independent source (10 Ω signals, 1 Ω vdd/vdl); `C4TB_TIGHT=1` copies show the results do not move with tighter tolerances |
 | WO-85 | tim decks then aborted on HV body-junction nodes (`nfet_g5v0d10v5#dbody`) | the 1 Ω in series with an undecoupled vdd/vdl leaves only device capacitance on the supply node (sub-ps time constant); crowbar current moves it every edge. Gear does not help; ideal supplies run clean | tim decks keep ideal supplies (`supplies=False`), as in WO-70; tim therefore sees no supply bounce. A bond-R + decap supply model is an option for later |
 
-**Leakage and D82.** WO-70 measured C1's own vg-node devices on the same node: 81.2 pA at ff/125, about 90 % of the 90 pA row, with Sg adding 68.5 pA, so ≈ 150 pA per node. Shrinking Sg (W 4) or a T-switch cannot close that. D82 / CL-34 derates instead: 0.25 MHz N 1024 is rated to ≤ 100 °C, and at 125 °C the 0.25 MHz mode is limited to N ≤ 256; faster modes are unaffected because drift scales with 1/fs. The new `rating` row checks drift = I_tot·N_rated/(0.25 MHz · 2.01 pF) ≤ 0.2 V, with broken copies `noderate` (N 1024 at 125 °C, expected ≈ 0.31 V) and `sgx6` (WO-79). Expected from the WO-70 numbers: ff/125 ≈ 0.076 V and ff/100 N 1024 0.048 V pass, but the **20 pA ff/100 row (N 4096) fails at 23.4 pA** (0.19 V of drift against 0.2 V). That row is still open and goes to the user after the rerun confirms it (WO-79; wo/INDEX).
+**Leakage and D82.** WO-70 measured C1's own vg-node devices on the same node: 81.2 pA at ff/125, about 90 % of the 90 pA row, with Sg adding 68.5 pA, so ≈ 150 pA per node. Shrinking Sg (W 4) or a T-switch cannot close that. D82 / CL-34 derates instead: 0.25 MHz N 1024 is rated to ≤ 100 °C, and at 125 °C the 0.25 MHz mode is limited to N ≤ 256; faster modes are unaffected because drift scales with 1/fs. The new `rating` row checks drift = I_tot·N_rated/(0.25 MHz · 2.01 pF) ≤ 0.2 V, with broken copies `noderate` (N 1024 at 125 °C, expected ≈ 0.31 V) and `sgx6` (WO-79). Expected from the WO-70 numbers: ff/125 ≈ 0.076 V and ff/100 N 1024 0.048 V pass, but the **20 pA ff/100 row (N 4096) fails at 23.4 pA**. The two numbers do not contradict each other: 23.4 pA gives 0.19 V of drift, under the 0.2 V criterion, because at N 4096 with 2.01 pF the 0.2 V criterion allows about 24.5 pA. The 20 pA row therefore carries margin below the drift criterion; its origin is to be traced (Appendix E). That row is still open and goes to the user after the rerun confirms it (WO-79; wo/INDEX).
 
 **Pools.** The non-tim rows run in `WO-79-139a29d/run/pool2` (relaunched under the global cap after the 2026-11-14 overload) and the tim rows in WO-85 (54 jobs; the WO-79 tim rows are void). Both are **PENDING**; WO-85 job 1 (tim ss/−40 2 MHz) timed out at 5400 s under the overload and must be rerun (RESUME 2026-11-14 18:05, 18:45).
 
@@ -1592,14 +1618,14 @@ Two bugs were found and fixed (WO-50 §3; RESUME 2026-11-13):
 - The IIC container cannot mount `/home/mempool/regr` (RESUME, final note).
 
 **The 2026-11-14 overload and the global cap** (RESUME 2026-11-14 18:05, 18:45; coordinator note 2026-11-15). About 15 of the project's own pools ran at once, each sizing itself to the load independently. Load reached 44–53 on 6 cores and memory 15/15 GB when a 10.6 GB yosys-abc PDR (WO-83 F18 at real widths) ran beside them, and ssh hung. Several decks timed out and must be rerun (WO-76 diagnostics, WO-77 jobs 3–5, WO-85 job 1), and the real-width formal runs gave no result. The user decided:
-- lpool has a **global cap of GMAX = 5 slots** shared by all pools, implemented with flock slot locks in `/home/mempool/regr/tt/.lpool_slots` (commit 2f2e0a0). Tested: a cap of 2 gave at most 2 concurrent jobs, and a broken cap of 9 gave 3. Frozen copies must take lpool from the repo or tt-sd to pick up the cap; older pools drained uncapped.
+- lpool has a **global cap of GMAX = 5 slots** shared by all pools, implemented with flock slot locks in `/home/mempool/regr/tt/.lpool_slots` (commit 2f2e0a0). Tested: a cap of 2 gave at most 2 concurrent jobs. The broken copy (cap 9) gave only 3 concurrent jobs because the box load limited it, so that test was non-discriminating: it could not have failed. Frozen copies must take lpool from the repo or tt-sd to pick up the cap; older pools drained uncapped.
 - Heavy formal or PDR runs go alone, under a memory limit (`ulimit -v`).
 
 Lessons: per-pool load sizing does not bound the total when many pools start together; long decks need timeouts sized for a loaded box (30,000–40,000 s for C1 gate B parts); a timed-out deck is a missing result, neither a pass nor a fail, and no decision is taken until the data exists (RESUME 2026-11-14 20:45).
 
 ## IV.8 Review gates
 
-**Reviewer.** `sd-adc-design-reviewer` (read-only) reviews every design change: a design note before the netlist, and again after results land (CLAUDE.md working rules; GUIDE §5 item 6). Reviews on record:
+**Reviewer.** A review by `sd-adc-design-reviewer` (read-only) is required for every design change: a design note before the netlist, and again after results land (CLAUDE.md working rules; GUIDE §5 item 6). The C3 final review is still open. Reviews on record:
 
 | Stage | Reviews |
 |---|---|
@@ -1626,14 +1652,14 @@ These are the `work/v1-design/REVIEW-*.md` files.
 | Stage / block | Status | Last evidence |
 |---|---|---|
 | S0–S7 | closed; SPEC v1 frozen 2026-11-09 (D50); post-freeze change log now runs to CL-39 | D50; SPEC change log |
-| C1 OTA1 + CMFB | sink L 8 netlist (D75). Boost gate B passes: fs/125 3.14 ppm, ss/−40 0.71 ppm against 5 ppm. Precision gate B (2 MHz, ≤ 1.333 ppm): tt/27 0.692, ss/125 0.698 and fs/125 0.967 ppm pass at O1; ss/−40 fails at O1 (1.706 ppm). The first two O2 parts at ss/−40 read 0.142 and 0.160 ppm. **Verdict PENDING** the 6-part O2 combine (WO-76). tb7 noise and op/AC mutant benches are fixed; rerun **PENDING** (WO-77) | RESUME 2026-11-14 (WO-52 reruns); WO-63; WO-76; WO-77 |
+| C1 OTA1 + CMFB | sink L 8 netlist (D75). Boost gate B on this netlist: fs/125 3.14 ppm and ss/−40 0.71 ppm against 5 ppm, both at O1 only; fs/125 needs O2 under D43c (not scheduled); tt/27 and ss/125 only on older netlists (WO-31). Precision gate B (2 MHz, ≤ 1.333 ppm): tt/27 0.692, ss/125 0.698 and fs/125 0.967 ppm pass at O1; ss/−40 fails at O1 (1.706 ppm). The first two O2 parts at ss/−40 read 0.142 and 0.160 ppm (unfiled interim data); the ≈ 10× O1→O2 step does not meet D43c, so **verdict PENDING** the 6-part O2 combine and a further solver point (WO-76). tb7 noise and op/AC mutant benches are fixed; rerun **PENDING** (WO-77) | RESUME 2026-11-14 (WO-52 reruns); WO-63; WO-76; WO-77 |
 | C2 OTA2 | not started | III.2 |
-| C3 comparator | rev f (op/on keeper) on the D87 bench basis. T2, T3 and T5 pass on rev f (T3 \|μ\| + 3σ 42.7–45.1 mV ≤ 60 mV). T8 still fails: the sustained excess (+0.344 mV over the pin) is now inside the D90 tolerance (≤ 1.981 V), but the re-judged run is **PENDING**; the precharge-edge peak is 2.224 V (tt/27) and 2.251 V (ff/−40) against the 2.2 V cap (2.179 / 2.206 V with the 2× keeper kp2). Rev g candidates **PENDING** (WO-88) | WO-86; WO-88; D90 |
+| C3 comparator | rev f (op/on keeper) on the D87 bench basis. T2: the single-shot rows pass; the rev f cyc rows were not run (WO-88). T3: the count and \|μ\| + 3σ limbs pass (42.7–45.1 mV ≤ 60 mV); the `plaus` limb REJECTs because the sensitivity decks were not run. T5: accepted by margin by construction (D81). T8 still fails: the sustained excess (+0.344 mV over the pin) is now inside the D90 tolerance (≤ 1.981 V), but the re-judged run is **PENDING**; the precharge-edge peak is 2.224 V (tt/27) and 2.251 V (ff/−40) against the 2.2 V cap (2.179 / 2.206 V with the 2× keeper kp2). Rev g candidates **PENDING** (WO-88) | WO-86; WO-88; D90 |
 | C4 switches / generator | rev b. Every WO-54/WO-70 error was traced to bench numerics and fixed (WO-70, WO-79, WO-85); D82 rating rows added. Gate pools **PENDING** (WO-79 `pool2` for the non-tim rows, WO-85 for the tim rows). The ff/100 20 pA row read 23.4 pA in WO-70: **open** | WO-70; WO-79; WO-85 |
 | C5 choppers | inside C1 / C4 | III.7 |
 | C6 bias | architecture (c), R2/R1 2.45, R1 144.8 µm. All DC, loop and start-up-from-rest rows pass at the 5 corners (TC −2.56/+0.08 % worst, I0 1.0677 µA at tt/27, own current 4.34–4.96 µA, trim cover 1.410). The bias_ok start-up row was redefined (D89, CL-38); transient rerun **PENDING** (WO-87, 42 jobs) | WO-80; WO-87 |
 | C7 / C8 / C10 | not started (rules and spec rows only) | III.7 |
-| C9 digital | RTL baa0706 (D72, D74, D77, D79, D85, D88): 259 FF, 1077 cells (generic count). WO-75 bench on D85: every row passes, mutants all killed except the known equivalent M64. WO-83 bench on D88: 106 of 107 regression jobs EXIT=0 so far; formal proofs only at small counter widths. PnR on the pre-D85 RTL (WO-73) meets setup and hold at 12 corners with DRC and antenna clean; max slew is waived at the ss_100C_1v40 stand-in (D86). Final PnR on the D85/D88 RTL **PENDING** | WO-75; WO-83; WO-73; D86; coordinator note 2026-11-15 |
+| C9 digital | RTL baa0706 (D72, D74, D77, D79, D85, D88): 259 FF, 1077 cells (generic count). WO-75 bench on D85: every row passes, mutants all killed except the known equivalent M64. WO-83 bench on D88: 106 of 107 regression jobs EXIT=0 so far; formal proofs only at small counter widths. PnR on the pre-D85 RTL (WO-73) meets setup and hold at 12 corners with DRC and antenna clean; max slew is waived at the ss_100C_1v40 stand-in (D86). DRV is not 0, LVS was not extracted and 2 floating nets are open, so WO-73 calls it "not a signoff candidate". Final PnR on the D85/D88 RTL **PENDING** | WO-75; WO-83; WO-73; D86; coordinator note 2026-11-15 |
 | Stage V | not started | GUIDE §2 |
 
 ## V.2 Values still pending a run
@@ -1642,7 +1668,9 @@ These are the `work/v1-design/REVIEW-*.md` files.
 |---|---|---|
 | C1 precision gate B, ss/−40: 6-part O2 combine (O1 1.706 ppm; O2 so far p0 0.142, p2 0.160 ppm) | WO-76 `out/logs_o2` | WO-76; coordinator note 2026-11-15 |
 | C1 precision gate B, fs/125 at O2 | WO-76 `out/logs_o2` | WO-76 |
-| C1 precision gate B at O2 for tt/27 (O1 0.692) and ss/125 (O1 0.698). The D48 rule asks for O2 whenever O1 ≥ gate/2 (0.667 ppm); these two corners are not in the WO-76 job list | no WO yet | WO-63 |
+| C1 precision gate B at O2 for tt/27 (O1 0.692) and ss/125 (O1 0.698). D43c asks for O2 whenever a gated INL has less than 3× margin (O1 above gate/3 = 0.444 ppm); these two corners are not in the WO-76 job list | no WO yet | WO-63; D43c |
+| C1 precision gate B: a third solver point to confirm O2 at ss/−40 (the ≈ 10× O1→O2 step does not meet D43c; no amendment to D43c) | to be scheduled | D43c; REVIEW-BOOK-2026-11-15 Q3 |
+| C1 boost gate B on the WO-52 netlist: O2 at fs/125 (O1 3.14 ppm, above gate/3 = 1.667 ppm), and tt/27 and ss/125, which exist only on older netlists (WO-31) | no WO yet | RESUME 2026-11-14; WO-31; D43c |
 | C1 tb7: thermal v_vg ≤ 390 µV and the tier-0 direct path with sink L 8, all PVT; mrg and msink copies must REJECT; op/AC mutants per deck | WO-77 rerun; jobs 3–5 timed out under the overload and must be rerun | WO-77; RESUME 2026-11-14 18:45 |
 | C1 tb8 / tb8b MC, tb10 stress, tb12 boost toggle, tb13 vg switches | not found in the results read | C1 §4 |
 | C3 rev g: precharge-edge cap candidates (R0/R1 0.5/0.15, 1.0/0.3, 1.0/0.5 with kp2; kp3 as info), the rev f cyc rows that were never run, and the leak-path probe | WO-88 pool A and `runI` | WO-88 |
@@ -1655,13 +1683,13 @@ These are the `work/v1-design/REVIEW-*.md` files.
 | C9 F18 / F19 at the real 16/8 widths | rerun alone with `ulimit -v` ≈ 8 GB | WO-83; RESUME 2026-11-14 18:45 |
 | C9 WO-83 regression: the last of 107 jobs | WO-83 pool | coordinator note 2026-11-15 |
 | C9 final PnR (D85/D88 RTL, slew margin 40 %, `bias_ok` in `pin_order.cfg`), LVS re-extraction, the 2 unnamed floating nets, then the gate-level / SDF sim | next C9 PnR WO | D86; WO-73; STATE-2026-11-14 §6 |
-| System current in fast mode with real blocks | needs C2 and C6 numbers. OTA1 alone draws 121.8–123.9 µA in boost on the WO-28 netlist. Reviewer estimate (REASONED, not simulated): OTA1 ≈ 122 + OTA2 ≈ 51 + bias ≈ 6 µA ≈ 180 µA nominal, against the 172 µA SPEC estimate and the 200 µA budget | WO-28; SPEC §1; WO-62 reviewer |
+| System current in fast mode with real blocks | needs C2 and C6 numbers. OTA1 alone draws 121.8–123.9 µA in boost on the WO-28 netlist. Reviewer estimate (REASONED, not simulated): OTA1 ≈ 122 + OTA2 ≈ 51 + bias ≈ 6 µA ≈ 180 µA nominal, against the 172 µA SPEC estimate and the 200 µA budget. Scaling the accepted 189 µA worst case by 180/172 gives ≈ 198 µA, about 1 % under the budget | WO-28; SPEC §1; WO-62 reviewer |
 | Reset residue r ≤ 1e-4 in 2 cycles at 4 MHz boost and 0.25 MHz | C1/C2 integration (needs C2) | C4 §11; D46a |
 | System noise / INL with PEX parameters (V9) | Stage V | SPEC §3.0 noise row |
 
 ## V.3 Open decisions and items
 
-1. **C1 precision gate B.** If the 6-part O2 combine passes, the D48 rule takes O2 as the converged result and no design change follows; this is reported to the user as the finding (RESUME 2026-11-15 00:45). If it fails, options go to the user with data. Bias scaling is not supported by the data so far: it moves the error between parts instead of removing it (RESUME 2026-11-14 23:40).
+1. **C1 precision gate B.** A passing 6-part O2 combine is not enough on its own: the ≈ 10× O1→O2 step does not meet D43c as written, so O2 becomes the result only if a further tightening confirms it (D43c; WO-76 §2). D43c is not amended; a third solver point is to be scheduled, and the verdict stays PENDING until then (coordinator answer to REVIEW-BOOK-2026-11-15 Q3). If it then passes, no design change follows (RESUME 2026-11-15 00:45). If it fails, options go to the user with data. Bias scaling is not supported by the data so far: it moves the error between parts instead of removing it (RESUME 2026-11-14 23:40).
 2. **C1 precision broken copy.** `srknee` rejects at 1.375 ppm, only 3 % over the 1.333 ppm gate, and only part 0 rejects on its own. It is a weak discriminator (WO-63; WO-76 §4).
 3. **C3 T8 precharge-edge cap.** Choose a rev g candidate from the WO-88 sweep, then run the full C3 set; name the leak path that lifts op/on (WO-88).
 4. **C6 broken copies `early` and `hy1`.** Under D89 they are expected to ACCEPT. Retire them to INFO, or keep a separate hysteresis row with a noise-injected bias_ok bench (WO-87 §1). User's call.
@@ -1880,6 +1908,8 @@ These are the `work/v1-design/REVIEW-*.md` files.
 | CL-38 | bias reference start-up row | from the final bias_ok rise, settle to ±1 % within 4.1 ms (0.25 × the 2^16-cycle hold at 4 MHz); earlier pulses reported only | D89 |
 | CL-39 | every 1.8 V stress row | sustained level judged ≤ 1.981 V (1 mV tolerance), also the duration-limb threshold; checker at ~1.985 V must REJECT | D90 |
 
+The stress limits in CL-33, CL-35 and CL-39 are project stress rules, not PDK ratings. They lie outside the SkyWater model-validity range (nfet/pfet_01v8 Vds and Vgs 0–1.95 V, nfet Vbs +0.3 to −1.95 V; III.3).
+
 ## D. Symbol table
 
 | Symbol | Meaning | Value (where fixed) | Source |
@@ -1919,7 +1949,7 @@ These are the `work/v1-design/REVIEW-*.md` files.
 ## E. Gaps in this book's sourcing
 
 These values are marked PENDING or "not found" above because no source read for this book (as of 2026-11-15) contained them:
-- **C1:** the precision gate B O2 combines at ss/−40 and fs/125 (WO-76), and O2 at tt/27 and ss/125, which the D48 rule asks for but no WO runs yet; the WO-77 tb7 and op/AC mutant rerun; tb8/8b/10/12/13 results. The WO-76 per-part O1/O2 numbers quoted here for parts not in `results/wo76/README.md` come from the coordinator's note of 2026-11-15 and RESUME, not from a results file.
+- **C1:** the precision gate B O2 combines at ss/−40 and fs/125 (WO-76), and O2 at tt/27 and ss/125, which D43c asks for (O1 above gate/3) but no WO runs yet; a third solver point for the precision verdict; boost O2 at fs/125 and boost tt/27 and ss/125 on the WO-52 netlist; the WO-77 tb7 and op/AC mutant rerun; tb8/8b/10/12/13 results. The WO-76 per-part O1/O2 numbers quoted here for parts not in `results/wo76/README.md` come from the coordinator's note of 2026-11-15 and RESUME, not from a results file.
 - **C3:** rev g (WO-88), the leak-path probe, T8 re-judged at D90, and T3 on rev f + kp2.
 - **C4:** the gate verdicts from the WO-79 `pool2` and WO-85 pools; the ff/100 20 pA row.
 - **C6:** the WO-87 transient rows under D89.
@@ -1932,9 +1962,13 @@ The book does not estimate them.
 **Conflicts and stale text found in the sources** (the newer decision is used in the book):
 - SPEC.md:18 and SPEC.md:25 give different labels for the 0.71 µV figure: it is the WO-04 ota+sys model value (D22), while kT/C-only at Cs 0.5 pF and 15 SPS is 0.556 µV (`s3_budget.md:31`). SPEC was not edited.
 - `results/wo52/README.md` calls the 390 µV noise row "SPEC CL-30"; the SPEC change log has it as CL-31 (CL-30 is the comparator offset row). The book uses CL-31.
-- WO-89 names `design/c9_digital/flow/HARDENING.md`; the file is `design/c9_digital/HARDENING.md`. Its WO-log section ends at WO-72: WO-73 and the D86 slew waiver (which D86 says is "recorded in HARDENING.md with the net list") are not there yet. The book takes WO-73 and D86 from `results/wo73/README.md` and DECISIONS.md.
+- WO-89 names `design/c9_digital/flow/HARDENING.md`; the file is `design/c9_digital/HARDENING.md`. Its WO-log section ends at WO-72: WO-73 and the D86 slew waiver (which D86 says is "recorded in HARDENING.md with the net list") are not there yet. This is an open conflict: D86 says the waiver is recorded in HARDENING.md, and HARDENING.md does not contain it. HARDENING.md was not edited for this book. The book takes WO-73 and D86 from `results/wo73/README.md` and DECISIONS.md.
 - `STATE-2026-11-14.md` lists SPEC as "CL-1…CL-36" and DECISIONS as "D1–D86"; SPEC and DECISIONS now run to CL-39 and D90.
 - C6 rstb hold: WO-55 proposed 128 fs cycles, D78 proposed 256 cycles (64 µs) after bias_ok; D85 / CL-36 / CL-37 replaced both with the 2^16-cycle VAPWR-good hold plus a 256-cycle bias run, and D89 / CL-38 gates the settle at 0.25 × the 2^16-cycle hold (4.1 ms at 4 MHz).
 - The WO-86 T3 table labels its rev f numbers "abs(mu)+3s" 45.07 / 42.74 mV, while STATE-2026-11-14 quotes 44.9 mV for rev e; WO-86 gives 49.59 / 49.26 mV for rev e. The book uses WO-86.
 - C9 cell counts use different bases: generic yosys (1068 → 1077 after D88, CL-37) versus LibreLane sky130 synthesis (860 in WO-58B). Only the generic count is quoted for the current RTL.
 - `c9_seq.v` line 29 still calls the bias bit a sticky done flag; after D88 it clears on a low sample until release (WO-83 open item; RTL comment not edited by verification).
+- **O2 trigger: gate/2 versus D43c.** WO-63 (and WO-31 before it) used a "gate/2" O2 trigger that is not in D48 or SPEC. D43c applies the O1/O2 ladder to every gated INL with less than 3× margin (gate/3: 0.444 ppm in precision, 1.667 ppm in boost). The book uses D43c. Under D43c the ss/−40 step from O1 1.706 to O2 0.160 ppm fails the convergence test; D43c is not amended and a third solver point is to be scheduled (coordinator answer Q3).
+- **C4 20 pA row.** The 20 pA ff/100 limit sits below the 24.5 pA that the 0.2 V criterion allows (N 4096, 2.01 pF); origin to be traced (coordinator answer Q1).
+- **Tile width.** HARD §2 measures 319.24 × 225.76 µm from the DIEAREA of `tt_analog_2x2_3v3.def` (TT tools version not recorded); the ttsky-sigma-delta frame (Paul Thomas) uses 334.88 µm and SPEC says about 334 µm. The book uses 319.24 µm; re-check against the template at C7.
+- **Stress limits versus PDK.** The project stress rules (D80, D83, D90) are not PDK ratings and lie outside the SkyWater model-validity range; see III.3.
