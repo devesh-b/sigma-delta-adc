@@ -210,7 +210,7 @@ def _ivec(n, term):
 def _isave(fn):
     def f(*a, **k):
         text, meta = fn(*a, **k)
-        vec = " ".join(_ivec(n, tm) for n in IDEV for tm in ("d", "s", "b"))
+        vec = " ".join(_ivec(n, "d") for n in IDEV)   # WO-88 smoke: [is]/[ib] are 0-long in tran (write aborts)
         out = []
         for ln in text.splitlines():
             if ln.startswith("tran ") and not out[-1].startswith("save all"):
