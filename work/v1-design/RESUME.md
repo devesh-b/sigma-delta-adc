@@ -976,3 +976,9 @@ Next steps:
     - fs/125 0.01: the final rise happens at VDD 1.08 V with I 0.02 (bias_ok high long before the bias is valid).
   - These are covered at system level by D85 (rst_n only after VAPWR is up), D88 (restart on drop) and the 2^16 hold. The agent's own threshold (pulse > 32 µs) points to option (a), a circuit fix.
   - **User decision, once POOL_DONE exists:** rises gate (a) circuit default-low on q, or (b) redefine the row relying on D85/D88.
+- **00:45 IST, WO-76.** **O2 ss/−40 p0 = 0.142 ppm, against 1.330 at O1.** Strong sign that the jagged ss/−40 error is an O1 numerical artefact. One part only, so not yet conclusive.
+  - Pool A (single slot, pre-cap) stopped by PID: run.sh and its lpool. Its p1 O2 job continues.
+  - O2 ss/−40 p2–p5 and fs/125 p0–p5 relaunched under the capped lpool, timeout 40000: `out/logs_o2`, `O2_DONE`.
+  - Next: combine `c1_nom_O2` and the fs/125 O2 parts.
+  - If O2 passes, the gate rule says O2 is the converged result (D48), so no design change is needed. Report this to the user as the finding.
+- C3 pools are all done. WO-86 dispatched (fresh agent).
