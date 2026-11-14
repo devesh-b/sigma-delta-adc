@@ -969,3 +969,10 @@ Next steps:
   - That points away from a simple PM/SR cause and toward a pattern-dependent term, possibly numerical at O1.
   - **Key next data:** the O2 parts in pool A (`out/logs`, single slot, still draining).
   - Option A (bias) and option B as written are not supported. Do not present bias options to the user on these data.
+- **00:10 IST 2026-11-15, WO-80 interim summary.** The pool is not done (58/77), and the summary reads MISMATCH 16; the 125 °C 1e-06 rows still show SIMFAIL, probably not yet run.
+  - **bias_ok pulse widths:**
+    - fast ramp: early pulses 0.1–1.0 µs at VDD ~1.01 V with ~0 current; ff/−40 has an extra 4.2 µs pulse at full VDD;
+    - **slow ramp sf/−40 0.01: a 104 µs pulse at VDD 1.02 V with I ≈ 0**, which is longer than the 64 µs C9 filter;
+    - fs/125 0.01: the final rise happens at VDD 1.08 V with I 0.02 (bias_ok high long before the bias is valid).
+  - These are covered at system level by D85 (rst_n only after VAPWR is up), D88 (restart on drop) and the 2^16 hold. The agent's own threshold (pulse > 32 µs) points to option (a), a circuit fix.
+  - **User decision, once POOL_DONE exists:** rises gate (a) circuit default-low on q, or (b) redefine the row relying on D85/D88.
