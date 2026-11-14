@@ -38,16 +38,62 @@ def _split(text):
     return "\n".join(out) + "\n"
 
 
-def _wrap(split=False, reltol=None):
+def _supply(text, sup, order, vd, ron):
+    """sup 'sw': 10 ohm feed for the power-up ramp (numerics, the ideal-pin abort at the ramp corner), then a switch
+    of ron in parallel closes 100 ns after the ramp ends (a: 600 ns, b: 300 ns): from then on vdd is a stiff pin.
+    sup 'ideal': VDDS straight on vdd (no feed R), ramp as a 32-point raised cosine (no slope corner)."""
+    import math
+    L = text.splitlines()
+    i = next(j for j, x in enumerate(L) if x.startswith("VDDS "))
+    if sup == "sw":
+        ton = 600e-9 if order == "a" else 300e-9
+        L[i + 1] = "RVDD vdds vdd 10"
+        L.insert(i + 2, f"VSWC swc 0 PWL(0 0 {ton:.4e} 0 {ton + 10e-9:.4e} 1)\nSVDD vdds vdd swc 0 swst\n"
+                        f".model swst sw vt=0.5 vh=0.2 ron={ron:g} roff=1e12")
+    elif sup == "ideal":
+        t0, t1 = (400e-9, 500e-9) if order == "a" else (100e-9, 200e-9)
+        pts = [(0.0, 0.0)] + [(t0 + (t1 - t0) * n / 32, vd * 0.5 * (1 - math.cos(math.pi * n / 32))) for n in range(33)]
+        L[i] = "VDDS vdd 0 PWL(" + " ".join(f"{t:.6e} {v:.9f}" for t, v in pts) + ")"
+        L[i + 1] = "* RVDD removed (ideal pin)"
+    return "\n".join(L) + "\n"
+
+
+def _wrap(split=False, reltol=None, sup=None, ron=1e-3):
     def f(*a, **k):
         text, meta = st_deck(*a, **k)
+        if sup:
+            text = _supply(text, sup, a[2], meta["vdd"], ron)
+            meta["rv"] = f"{sup}:{ron:g}"
         if split:
             text = _split(text)
         if reltol:
             text = text.replace("reltol=1e-5", f"reltol={reltol:g}")
-        meta["probe"] = dict(split=split, reltol=reltol)
+        meta["probe"] = dict(split=split, reltol=reltol, sup=sup, ron=ron)
         return text, meta
     return f
+
+
+def deck_list2():
+    """Second set (after st_r001_split aborted at the 400 ns ramp corner, 'v.xc.viob2pb#branch')."""
+    T, B = ("tt", 27, "a"), ("ff", -40, "b")
+    st, k = {"T8": "pass"}, dict(sub=False)
+    D = {
+        "st_sw_split": (_wrap(True, sup="sw"), T, dict(k), st),
+        "st_sw": (_wrap(sup="sw"), T, dict(k), st),
+        "st_kp2_sw": (_wrap(sup="sw"), T, dict(k, mut="kp2"), st),
+        "st_ideal": (_wrap(sup="ideal"), T, dict(k), st),
+        "st_sw_ron01m": (_wrap(sup="sw", ron=1e-4), T, dict(k), st),                       # tighter: 10x stiffer
+        "st_sw_rt6": (_wrap(sup="sw", reltol=1e-6), T, dict(k), st),                     # tighter: reltol 1e-6
+        "st_brk_noclamp_sw": (_wrap(sup="sw"), T, dict(k, mut="noclamp"), {"T8": "reject"}),
+        "st_brk_vdd200_sw": (_wrap(sup="sw"), T, dict(k, vd=2.0), {"T8": "reject"}),
+        "st_kp2_ff-40_b_sw": (_wrap(sup="sw"), B, dict(k, mut="kp2"), st),
+        "st_ff-40_b_sw": (_wrap(sup="sw"), B, dict(k), st),
+    }
+    for base in ("st_sw", "st_kp2_sw"):
+        for nm, kw in (("sus195", dict(sus_lim=1.95)), ("cap20", dict(cap=2.0)), ("dur01", dict(dur_max=0.1e-9))):
+            fn, a, kk, _ = D[base]
+            D[f"st_chk_{nm}_{base[3:]}"] = (fn, a, kk, {"T8": "reject"}, dict(judge_from=base, **kw))
+    return D
 
 
 def deck_list():
@@ -76,8 +122,8 @@ def deck_list():
     return D
 
 
-def gen(out):
-    c3_tb.deck_list = deck_list
+def gen(out, dl=None):
+    c3_tb.deck_list = dl or deck_list
     c3_tb.gen(out)
     jf = os.path.join(os.path.abspath(out), "jobs.txt")
     me = os.path.abspath(__file__)
@@ -127,7 +173,7 @@ def ipost(d):
     # node residuals vs vdd (Sb3 gb = nb2 - vss; op/on M4 gb)
     for nd in ("nb2", "ob2", "op", "on", "ap", "an", "dp", "dn"):
         x = w.get(f"xc.{nd}")
-        if x is None:
+        if x is None or not ss.any():
             continue
         e = x - vdd
         exc = np.maximum(0.0, vdd - vs) if m["sub"] else 0.0
@@ -146,4 +192,4 @@ def ipost(d):
 
 
 if __name__ == "__main__":
-    {"gen": gen, "ipost": ipost}[sys.argv[1]](sys.argv[2])
+    {"gen": gen, "gen2": lambda o: gen(o, deck_list2), "ipost": ipost}[sys.argv[1]](sys.argv[2])
