@@ -902,3 +902,4 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - D83 (overshoot rule), D84 (C9 slew margin run), D85 (C9 VAPWR counter) logged.
 - WO-74 (76fe624): RTL bias_ok + 2^16 counter (PW_BITS/BIAS_BITS params) and SPEC CL-34/35/36. Lint/synth were not run (ssh was locked); the agent was resumed to finish. Golden v3.2 needs an update for the new slot-0 timing (bias_ok, hold) → C9 bench WO after lint.
 - WO-74 done: lint/synth clean, FF 231 → 259, cells 966 → 1068. WO-75 (C9 bench for D85) dispatched; final PnR after it, with the WO-73 flow settings.
+- WO-73 (9def89a, f58d6eb): slew margin 40 % → ss_1v40 slew 43 → 32 pins (worst 1.728 ns); setup +2.961 ns; all else clean; LVS not extracted. D86 (user): waive slew at the ss_1v40 stand-in, carry 40 % into the final D85 PnR (pin_order needs bias_ok). The 2 floating nets are still unnamed (RSZ-0020).
