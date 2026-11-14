@@ -246,7 +246,7 @@ def _slew_follow(events, tstop, fs, locked, dt=1e-9):
 
 
 def st_deck(corner, temp, order, mut="", stim="slew", jlim=VJ18_MAX, vd=V_ST, edge="c4", xlo=X2_LO, xhi=X2_HI,
-            rvdd=False):
+            rvdd=False, rv=10.0, sub=True):
     """stim: 'slew' (gate) x2 at the OTA2 slew rate through R_X2/C_X2, moving only in phiI, strobe on the 4 MHz
     phase plan (phiS); 'async' (info) same slew but x2 also moves while the strobe is high; 'fast' (info) the WO-48
     stimulus (4.1 V in 20 ns through 10 ohm, free-running 100 ns strobe).
@@ -288,7 +288,7 @@ def st_deck(corner, temp, order, mut="", stim="slew", jlim=VJ18_MAX, vd=V_ST, ed
         clk = f"VCP cp 0 {_pwl([p for p in ck if p[0] <= tstop])}"
         rx, cx = str(RX2[fs]), C_X2
     L = _hdr(f"C3 stress {corner}/{temp} order {order} mut {mut} stim {stim}", corner, temp, mut) + [
-        f"VDDS vdds 0 {_pwl(vdp)}", "RVDD vdds vdd 10", "CDD vdd 0 2p",
+        f"VDDS vdds 0 {_pwl(vdp)}", f"RVDD vdds vdd {rv:g}", "CDD vdd 0 2p",
         clk, "Bclk clkr 0 V=v(vdd)*v(cp)", "RCLK clkr clk 10",
         f"VXP sxp 0 {_pwl(xp)}", f"RXP sxp x2p {rx}", f"VXN sxn 0 {_pwl(xn)}", f"RXN sxn x2n {rx}"] + (
         [f"CXP x2p 0 {cx}", f"CXN x2n 0 {cx}"] if cx else []) + [
@@ -314,7 +314,8 @@ def st_deck(corner, temp, order, mut="", stim="slew", jlim=VJ18_MAX, vd=V_ST, ed
     L += ["meas tran tempr find v(tmp) at=1n", "let tend = vecmax(time)"]
     L += _echo(names + ["tempr", "tend"]) + [".endc", ".end"]
     meta = dict(fam="st", corner=corner, temp=temp, vdd=vd, order=order, mut=mut, stim=stim, devs=devs, tstop=tstop,
-                jlim=jlim, edge=edge, xlo=xlo, xhi=xhi, rvdd=rvdd, pairs=pairs)
+                jlim=jlim, edge=edge, xlo=xlo, xhi=xhi, rvdd=rvdd, rv=rv, sub=sub and not rvdd,
+                pairs=pairs)
     return "\n".join(L) + "\n", meta
 
 
@@ -383,7 +384,8 @@ def st_post(d):
         # small ... vrdd#branch", the WO-79 root cause), and its drop is not counted: every 1.8 V oxide pair is judged
         # on |V| - max(0, vdd(t) - V_set). rvdd=True (info) judges the raw |V|. P cross-check uses the raw peak (Pr).
         vw = w["xc.vdd" if "xc.vdd" in w else "vdd"]
-        exc = None if m.get("rvdd") else np.maximum(0.0, vw - m["vdd"])
+        # WO-84: sub=False (stiff feed, rv small) judges the raw |V| as well.
+        exc = None if (m.get("rvdd") or not m.get("sub", True)) else np.maximum(0.0, vw - m["vdd"])
         for key, _, a, c, cls in m["pairs"]:
             if cls != "18":
                 continue

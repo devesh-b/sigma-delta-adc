@@ -57,7 +57,7 @@ TDEC_SPOT_SS40 = 1.120e-9          # WO-44 spot t_dec at 1 mV, ss/-40/1.62 V (T2
 #   nopa   : rev d without the ap/an precharge P1/P2                -> T5 info (WO-65)
 #   noclamp: rev d SR latch (no stack-node clamp)                  -> T8 info: shows the WO-68 fix
 #   nokeep : rev e (no op/on keeper)                               -> T8 REJECT under D87 (op/on sustained > VDPWR)
-MUTS = ("starve", "qswap", "nobuf", "nolatch", "in18", "nocas", "revc", "nohvc", "nopa", "noclamp", "nokeep")
+MUTS = ("starve", "qswap", "nobuf", "nolatch", "in18", "nocas", "revc", "nohvc", "nopa", "noclamp", "nokeep", "kp2")
 
 
 def comp_subckt(mut=""):

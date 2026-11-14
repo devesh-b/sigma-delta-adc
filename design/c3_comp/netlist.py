@@ -24,6 +24,8 @@ PORTS = ("inp", "inn", "clk", "q", "qb", "vdd", "vss")
 def devices(sizes=SIZES, mut=""):
     """Device list: (name, model, d, g, s, b, params) with subckt-local node names."""
     s = {k: dict(v) for k, v in sizes.items()}
+    if "kp2" in mut:      # WO-84 item 4 candidate (rev g?): op/on keeper 2x W, 0.84/0.15
+        s["KP"] = dict(W=0.84, L=0.15, m=1)
     if "starve" in mut:   # 64x less W/L than the HV tail
         s["TAIL"] = dict(W=1.25, L=2.0, m=1)
     pair = NF if "in18" in mut else HVN
