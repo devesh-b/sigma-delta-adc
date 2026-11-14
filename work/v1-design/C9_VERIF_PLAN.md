@@ -641,3 +641,32 @@ Claim under test: pin behaviour cycle-exact unchanged vs e450ae2. Frozen run `re
 - Sim: agree, lint, sby formal + per-property base, fcov seeds 1-3 (full suite), C9_FULL 4 shards + other,
   d_fs01 / a_rst01 seeds 4-6 (CL-15 change at the latch edge, D70 release latency), GL, 68 mutants
   (M46 / M58 re-anchored on the fs_c constants), R-01 4-20, X-01 1-2.
+
+## 14. WO-75: D85 / CL-36 VAPWR-good hold (bias_ok + hold counters, RTL df9bded, 2026-11-14)
+
+**Arbiter decision: option (a).** Golden v3.2 stays unchanged and remains the arbiter for everything from slot 0 on.
+Reason: CL-36 adds only a prefix before slot 0 (rst_analog = 1, no slot, cfg latched at every hold tick); slot-0
+internals, frame contents and the first-pair `invalid` rule are unchanged, so no golden vector changes meaning. A v3.3
+would only re-encode a counter that Ref A models directly from CL-36, at the cost of a 2^16-tick offset in every vector.
+- Bench top `tb/hdl/c9_tb.v` (verification-owned, same pins as the sim wrapper incl. `bias_ok`) passes
+  `PW_BITS`/`BIAS_BITS` (env `C9_PW_BITS`/`C9_BIAS_BITS`, default 4/2) to `sd_adc_c9`; Ref A gets the same values.
+- Ref A (`ref_a.py`) models the hold from CL-36 only: bias_ok 2-FF synchronised (pin at edge j acts at edge j+2);
+  first fs tick still `div` clk after the synchronised release (rst_lat check kept); hold ticks run the divider
+  (fs_clk toggles), latch shadow into active, keep rst_analog = 1; pw = ticks since release, b = consecutive high
+  samples cleared on a low sample until it reaches 2^B (then sticky, per "J = the tick at which (b) completes");
+  slot 0 = first tick whose pre-edge state has both done = tick max(2^PW, J) + 1. `pw_bits=None` = no hold
+  (golden agreement runs are untouched). Bus is now also checked during the hold.
+- Independent observer in the TB: DUT fs_clk rises since release and the rise index of the first rst_analog fall
+  (slot-0 tick + 2), compared with `exp_slot0()` computed from the test's own bias schedule.
+
+| ID | Test | Hunts |
+|---|---|---|
+| H-01 | d_hold01_len (bench params; once at 16/8 via `wo42_job.sh real`) | hold length 2^PW + 1, no slot/rst_analog fall earlier |
+| H-02 | d_hold02_bias_late | bias late (J > 2^PW), low at P-1 / P, low after b done (sticky J), short run, never high (no slot), reset mid-hold restarts both counts |
+| H-03 | d_hold03_glitch | 1-3 clk low pulses 0-4 clk before tick edges (sync depth), 8 releases, strict Ref A |
+| H-04 | d_hold04_cfg_sticky | cfg early in the hold and in the last periods applies at slot 0 (pins), first pair invalid and pair 1 valid (DUT tags), hold sticky (bias low 3 slots, toggling 3 slots) |
+| F18 | formal/c9_props.sv (chparam 3/2; `fmlreal` = 16/8) | rst_analog = 1 and bit_valid = 0 until the 3rd fs rise after a black-box monitor sees both counts done |
+
+Mutants (must REJECT): M65 pw_ctr one bit short, M66 b_ctr not cleared on a low sample, M67 bias_ok unsynchronised,
+M67b one FF only, M68 hold not sticky (b clears after done), M69 bias ignored, M70 no hold. GL: yosys generic netlist
+with `chparam` 4/2 (the real 16/8 counter widths are covered only in RTL sim H-01 real and F18 real).

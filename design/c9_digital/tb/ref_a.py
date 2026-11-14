@@ -64,7 +64,9 @@ class Sync:
 
 
 class RefA:
-    def __init__(self, mut=None, rst_lat="d70", cfg0=None, rd_lag=0):
+    def __init__(self, mut=None, rst_lat="d70", cfg0=None, rd_lag=0, pw_bits=None, bias_bits=None):
+        # D85 / CL-36 VAPWR-good hold (WO-75). None = no hold (golden v3.2 semantics, agreement runs).
+        self.pw_bits, self.bias_bits = pw_bits, bias_bits
         self.rd_lag = rd_lag      # clk from the synchronised rd rise to the clear (CL-12 allows a later clear)
         assert mut is None or mut in MUTANTS, mut
         self.mut = mut
@@ -108,6 +110,11 @@ class RefA:
         self.frames = []                   # every hold load, in order
         self.in_rst = True
         self.rd_pend = False
+        self.ss_bias = Sync()
+        self.holding = False               # CL-36: between the first fs tick and slot 0
+        self.pw = self.b = 0               # fs ticks since release / consecutive synchronised bias_ok-high ticks
+        self.hold_ticks = 0                # fs ticks seen in the hold (slot 0 = tick hold_ticks + 1)
+        self.slot0_tick = None
 
     def lat(self):
         """Release latency in edges after e0 (rel_cnt units)."""
@@ -123,7 +130,7 @@ class RefA:
         return N_OF[self.cfg["n_code"]]
 
     def bitclk(self):
-        return 1 if (self.started and self.cnt < self.div // 2) else 0
+        return 1 if ((self.started or self.holding) and self.cnt < self.div // 2) else 0
 
     def ctl(self):
         """Analog-side control levels (port contract, all active high) after the last edge."""
@@ -131,7 +138,7 @@ class RefA:
             f = self.cfg
             return dict(rst_analog=1, acc_clear=0, sys_swap=0, ota_chop_phase=0, y_force=0, bit_valid=0,
                         raw_pin=0, tag_chop=0, cfg_latch=0, short=f["short"], order=f["order"],
-                        boost=f["boost"], trim=f["trim"], fs_clk=0, dac_y=self.y)
+                        boost=f["boost"], trim=f["trim"], fs_clk=self.bitclk(), dac_y=self.y)
         c, N, f = self.c, self.N, self.cfg
         bv = 1 if 2 <= c <= N + 1 else 0
         ota = ((c - 2) & 1) if (c >= 2 and f["ota_en"]) else 0
@@ -166,7 +173,7 @@ class RefA:
         return self.slot, self.c, self.cnt
 
     # ------------------------------------------------------------------ one clk edge
-    def step(self, rst_n=1, ui=0, comp=0, force_ld=None, start_now=False):
+    def step(self, rst_n=1, ui=0, comp=0, force_ld=None, start_now=False, bias=1):
         """ui = ui_in byte. comp = comparator level (1 = +1). force_ld = golden-agreement backdoor: act as if
         the synchronised cfg_ld edge fires at this edge with shift register = force_ld (same code path)."""
         self.edge += 1
@@ -188,6 +195,7 @@ class RefA:
         _, dat_lvl = self.ss_dat.step(cdat)
         ld_rise, _ = self.ss_ld.step(cld)
         rd_rise, _ = self.ss_rd.step(rd)
+        _, b_lvl = self.ss_bias.step(bias & 1)   # CL-36: bias_ok 2-FF synchronised
         self.a2, self.a1 = self.a1, addr
         self.d2, self.d1 = self.d1, dbg
         self.bus = bus_next
@@ -210,7 +218,15 @@ class RefA:
 
         # ---- fs divider / sequencer
         if not self.started:
-            if start_now or (self.rst_lat is not None and self.rel_cnt >= self.lat()):
+            if self.pw_bits is not None:
+                if not self.holding:
+                    if start_now or (self.rst_lat is not None and self.rel_cnt >= self.lat()):
+                        self._hold_tick(pre_shadow, b_lvl)
+                elif self.cnt == self.div - 1:
+                    self._hold_tick(pre_shadow, b_lvl)
+                else:
+                    self.cnt += 1
+            elif start_now or (self.rst_lat is not None and self.rel_cnt >= self.lat()):
                 self._start_edge(first=True, pre_shadow=pre_shadow)
             self._rd(rd_rise, load=False)
             return
@@ -261,6 +277,31 @@ class RefA:
             else:
                 self.y = self.comp_q
         self._rd(rd_rise, load=load)
+
+    def _hold_tick(self, pre_shadow, b_lvl):
+        """CL-36: one fs tick of the VAPWR-good hold. Slot 0 (boot tick) is the first tick whose pre-edge state has
+        both counts done: tick max(2^PW, J) + 1.  Hold ticks latch shadow into active (cfg writes in the hold apply
+        at slot 0) and keep rst_analog = 1.  b clears on a low sample until it is done; done counts are sticky (the
+        "J = the tick at which (b) completes" wording of CL-36; AMB logged)."""
+        pw_done = self.pw >= (1 << self.pw_bits)
+        b_done = self.b >= (1 << self.bias_bits)
+        self.holding = True
+        self.hold_ticks += 1
+        if pw_done and b_done:
+            self.slot0_tick = self.hold_ticks
+            self.holding = False
+            self._start_edge(first=True, pre_shadow=pre_shadow)
+            return
+        if not pw_done:
+            self.pw += 1
+        if not b_done:
+            self.b = self.b + 1 if b_lvl else 0
+        self.pre_latch_active = self.active
+        self.active = eff(pre_shadow)
+        self.active_raw = pre_shadow & 0x1FFF
+        self.div = DIV.get(self.cfg["fs_div"], 24)
+        self.cnt = 0
+        self.events.append("hold_tick")
 
     def _start_edge(self, first, pre_shadow):
         self.slot += 1

@@ -14,7 +14,8 @@ import sys
 ALL_TESTS = ["s01_reset_idle", "s02_reset_pair_golden", "d_dec01_golden_vectors", "d_dec03_streams",
              "a_seq01_trace_ctl", "d_cfg05_sequences", "d_cfg02_shift", "a_cfg01_edge_sweep", "a_frm02_rd_race",
              "d_frm04_overrun", "d_fs01_div_codes", "a_rst01_async_mid", "d_bus03_debug", "d_inv02_each_field",
-             "d_bus02_latency", "r01_random"]
+             "d_bus02_latency", "r01_random", "d_hold01_len", "d_hold02_bias_late", "d_hold03_glitch",
+             "d_hold04_cfg_sticky"]
 DEC, SEQ, CFG = "c9_dec.v", "c9_seq.v", "c9_cfg.v"
 CORE, BUS, DIV, TOP = "c9_core.v", "c9_rdbus.v", "c9_fsdiv.v", "tt_um_sd_adc_c9.v"
 GOLD = ["s02_reset_pair_golden", "d_dec01_golden_vectors", "d_dec03_streams"]
@@ -156,8 +157,20 @@ M = {
              (DIV, "tc_fs   <= fs_c;", "tc_fs <= fs_p; fs_p <= fs_c;"),
              (DIV, "tc_half <= half_c;", "tc_half <= hp; hp <= half_c;")],
             ["d_fs01_div_codes"]),   # constants 1 clk staler: equivalent (stale value only meets dc 0,1)
+    # WO-75 D85 / CL-36 hold counters (anchored on df9bded c9_seq.v / c9_core.v)
+    "M65": ([(SEQ, "wire pwr_ok = pw_ctr[PW_BITS] & b_ctr[BIAS_BITS];", "wire pwr_ok = pw_ctr[PW_BITS-1] & b_ctr[BIAS_BITS];"),
+             (SEQ, "if (!pw_ctr[PW_BITS])   pw_ctr", "if (!pw_ctr[PW_BITS-1]) pw_ctr")], ["d_hold01_len"]),   # pw_ctr one bit short
+    "M66": ([(SEQ, "b_ctr + 1'b1 : {(BIAS_BITS+1){1'b0}};", "b_ctr + 1'b1 : b_ctr;")], ["d_hold02_bias_late"]),  # no clear on low
+    "M67": ([(CORE, ".bias_ok_s(sbias[1])", ".bias_ok_s(bias_ok)")], ["d_hold03_glitch"]),              # unsynchronised
+    "M67b": ([(CORE, ".bias_ok_s(sbias[1])", ".bias_ok_s(sbias[0])")], ["d_hold03_glitch"]),            # 1 FF only
+    "M68": ([(SEQ, "if (!b_ctr[BIAS_BITS])  b_ctr  <= bias_ok_s ? b_ctr + 1'b1 : {(BIAS_BITS+1){1'b0}};",
+              "b_ctr <= bias_ok_s ? (b_ctr[BIAS_BITS] ? b_ctr : b_ctr + 1'b1) : {(BIAS_BITS+1){1'b0}};")],
+             ["d_hold04_cfg_sticky"]),                                                              # hold not sticky
+    "M69": ([(SEQ, "wire pwr_ok = pw_ctr[PW_BITS] & b_ctr[BIAS_BITS];", "wire pwr_ok = pw_ctr[PW_BITS];")],
+            ["d_hold02_bias_late"]),                                                                # bias ignored
+    "M70": ([(SEQ, "boot       <= ~pwr_ok;", "boot       <= 1'b0;")], ["d_hold01_len"]),               # no hold at all
 }
-FORMAL = ["M07", "M07b", "M19", "M20", "M21", "M22", "M24", "M30", "M31", "M35", "M36", "M37", "M45",
+FORMAL = ["M65", "M66", "M68", "M69", "M70", "M07", "M07b", "M19", "M20", "M21", "M22", "M24", "M30", "M31", "M35", "M36", "M37", "M45",
           "M03", "M10", "M15", "M16", "M53", "M58", "M60", "M61"]
 
 

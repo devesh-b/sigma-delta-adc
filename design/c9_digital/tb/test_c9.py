@@ -30,6 +30,9 @@ from ref_a import DIV, N_OF, RESET_CFG, RefA, eff, fields
 
 FULL = os.environ.get("C9_FULL", "0") == "1"
 SEED = int(os.environ.get("C9_SEED", "1"))
+HOLD_PW = int(os.environ.get("C9_PW_BITS", "4"))      # WO-75: CL-36 hold built into the bench top (run_cocotb)
+HOLD_B = int(os.environ.get("C9_BIAS_BITS", "2"))
+HOLD_TICKS = (1 << HOLD_PW) + 1                      # slot-0 tick with bias_ok high throughout (CL-36)
 CTL = ("rst_analog", "sys_swap", "ota_chop_phase", "short", "order", "boost", "trim", "y_force", "bit_valid",
        "fs_clk")
 OPT = ("dac_y", "acc_clear", "cfg_latch", "tag_chop")
@@ -68,7 +71,10 @@ class TB:
             if h is not None:
                 self.ports[name] = h
         self.missing = [n for n in list(CTL) + ["comp"] if n not in self.ports]
-        self.ref = RefA(rst_lat="d70", rd_lag=int(os.environ.get("C9_RD_LAG", "1")))
+        self.ref = RefA(rst_lat="d70", rd_lag=int(os.environ.get("C9_RD_LAG", "1")), pw_bits=HOLD_PW, bias_bits=HOLD_B)
+        self.bias, self.a_bias = 1, 1   # bias_ok pin (CL-36), driven with rst_n
+        self.fs_rises = 0               # DUT fs_clk rises since the last release (independent of Ref A)
+        self.ra_fall_rise = None        # fs_clk rise index at which rst_analog first fell after release
         self.ui, self.rst_n, self.comp = 0, 0, 0
         self.a_ui, self.a_rst_n = 0, 0       # values actually on the DUT pins at the next rising edge
         self.yb = {}                 # absolute slot -> golden bits for the comparator BFM
@@ -127,6 +133,7 @@ class TB:
         d.ui_in.value = 0
         d.rst_n.value = 0
         self._drive_comp(0)
+        d.bias_ok.value = 1
         cocotb.start_soon(self._loop())
         await self.clks(3)
 
@@ -158,18 +165,18 @@ class TB:
             # release latency (CL-19, CL-27 / D70): Ref A starts slot 0 itself at e(1 + div); the DUT fs bit
             # clock must first rise on exactly that edge (no bench alignment)
             start_now = False
-            if self.a_rst_n and not r.started and out.get("fs_clk") == 1:
+            if self.a_rst_n and not r.started and not r.holding and out.get("fs_clk") == 1:
                 lat = (r.rel_cnt + 1) if not r.in_rst else 0
                 self.lat_hist.append(lat)
                 if lat != r.lat():
                     self.fail(f"release-to-slot latency {lat} != {r.lat()} (D70; history {self.lat_hist})")
                     start_now = True
                 self.chk("rst_lat")
-            if self.a_rst_n and not r.started and not start_now and r.rel_cnt > 192 + 6:
+            if self.a_rst_n and not r.started and not r.holding and not start_now and r.rel_cnt > 192 + 6:
                 self.fail("no fs bit clock rise after rst_n release")
                 start_now = True
             self.cov.pre(self)
-            r.step(self.a_rst_n, self.a_ui, self.comp, start_now=start_now)
+            r.step(self.a_rst_n, self.a_ui, self.comp, start_now=start_now, bias=self.a_bias)
             self.cov.post(self)
             if "ld" in r.events:
                 self.last_ld = self.edges
@@ -187,7 +194,7 @@ class TB:
             bus = None if None in (uo, uio) else (uo << 8) | uio
             if self.settle > 0:
                 self.settle -= 1
-            elif bus is not None and len(self.hist) >= 4 and r.started:
+            elif bus is not None and len(self.hist) >= 4 and (r.started or r.holding):   # WO-75: bus checked in the hold too
                 hl = list(self.hist)[-4:][::-1]
                 if self.bus_lag is None:
                     m = [lag for lag in range(4) if hl[lag] == bus]
@@ -202,6 +209,16 @@ class TB:
                     self.bus_lag = None
                 self.chk("bus")
             self.last = dict(out, bus=bus)
+            # ---- WO-75 independent hold observer: fs_clk rises since release, rise index of the first rst_analog fall
+            if not self.a_rst_n:
+                self.fs_rises, self.ra_fall_rise, self._pfs = 0, None, 0
+            else:
+                fsv = out.get("fs_clk")
+                if fsv == 1 and not getattr(self, "_pfs", 0):
+                    self.fs_rises += 1
+                self._pfs = fsv
+                if self.ra_fall_rise is None and out.get("rst_analog") == 0:
+                    self.ra_fall_rise = self.fs_rises
             if "load" in r.events:
                 self.loads_seen += 1
                 if self.host_auto and self.rst_n:      # WO-42 TB-7: no host read queued once a reset is requested
@@ -216,8 +233,10 @@ class TB:
                 except StopIteration:
                     self.tasks.remove(t)
             d.ui_in.value = self.ui
+            d.bias_ok.value = self.bias
             d.rst_n.value = self.rst_n
             self.a_ui, self.a_rst_n = self.ui, self.rst_n
+            self.a_bias = self.bias
             self.tick.set()
             self.tick.clear()
 
@@ -265,7 +284,11 @@ class TB:
         self.rst_n = 0
         await self.clks(n)
         self.rst_n = 1
-        await self.until(lambda: self.ref.started, 60, "slot 0 start")
+        await self.until(lambda: self.ref.started, self.hold_clks(), "slot 0 start")
+
+    def hold_clks(self, extra_ticks=0):
+        """Watchdog for release -> slot 0 (CL-36), worst divider 192."""
+        return ((1 << HOLD_PW) + (1 << HOLD_B) + extra_ticks + 8) * 192 + 64
 
     def slot_clks(self):
         return (self.ref.N + 2) * self.ref.div
@@ -399,7 +422,7 @@ async def s01_reset_idle(dut):
     tb.dut._log.info(f"bus while rst_n low (SPEC silent, logged only): {in_rst}")
     k0 = dict(tb.last)
     tb.rst_n = 1
-    await tb.until(lambda: tb.ref.started, 60, "slot 0 start")
+    await tb.until(lambda: tb.ref.started, tb.hold_clks(), "slot 0 start")
     for a, exp in ((0, 0), (1, 0), (2, 0), (3, 0), (4, 0x0100), (5, 0x0800), (6, 0), (7, 0)):
         tb.set_ui(0x07, a)
         await tb.clks(5)
@@ -1180,3 +1203,181 @@ async def c07_addr(dut):
     tb.set_ui(0x87, 0)
     await tb.clks(10)
     tb.report(need=("addr", "bus"))
+
+
+# ====================================================================== WO-75: D85 / CL-36 VAPWR-good hold
+def exp_slot0(lvl, max_ticks):
+    """Spec-side slot-0 tick (CL-36): tick t samples lvl(t) (synchronised bias_ok); pw = ticks since release;
+    b = consecutive high samples, cleared on a low sample until it reaches 2^B (J = completion tick, sticky);
+    slot 0 = first tick whose pre-edge state has pw >= 2^PW and b >= 2^B, i.e. max(2^PW, J) + 1."""
+    P, Bn, b = 1 << HOLD_PW, 1 << HOLD_B, 0
+    for t in range(1, max_ticks + 1):
+        if t - 1 >= P and b >= Bn:
+            return t
+        if b < Bn:
+            b = b + 1 if lvl(t) else 0
+    return None
+
+
+async def hold_run(tb, lvl, max_ticks, stop_tick=None, during=None):
+    """Reset, release, drive bias_ok per fs tick (level for tick t set right after the DUT's fs_clk rise t-1,
+    >= 10 clk from any tick edge, so the 2-FF sync is never in question).  Returns the DUT fs-rise index of
+    the first rst_analog fall (slot 0 + 2) or None.  `during(k)` is called at every DUT fs rise k."""
+    tb.tasks = []
+    tb.set_ui(0xFF, 0)
+    tb.bias = lvl(1)
+    tb.rst_n = 0
+    await tb.clks(10)
+    tb.rst_n = 1
+    last = 0
+    for _ in range((max_ticks + 4) * 200):
+        await tb.tick.wait()
+        if tb.fs_rises != last:
+            last = tb.fs_rises
+            tb.bias = lvl(last + 1)
+            if during:
+                during(last)
+        if tb.ra_fall_rise is not None or (stop_tick and last >= stop_tick) or last > max_ticks:
+            break
+    return tb.ra_fall_rise
+
+
+def hold_chk(tb, got, lvl, what, max_ticks):
+    e = exp_slot0(lvl, max_ticks)
+    exp = None if e is None else e + 2
+    if got != exp:
+        tb.fail(f"{what}: rst_analog first fell at fs rise {got}, CL-36 expects {exp} (slot 0 tick {e})")
+    if e is not None and tb.ref.slot0_tick != e:
+        tb.fail(f"{what}: Ref A slot-0 tick {tb.ref.slot0_tick} != spec {e} (TB model error)")
+    tb.chk("hold_len")
+    tb.dut._log.info(f"{what}: slot-0 tick {e}, rst_analog fall at rise {got}")
+
+
+@cocotb.test(timeout_time=2, timeout_unit="sec")
+async def d_hold01_len(dut):
+    """CL-36 (a): bias_ok high from before release -> slot 0 at tick 2^PW + 1; rst_analog = 1 and no slot before.
+    Run once at the real D85 parameters (C9_PW_BITS=16 C9_BIAS_BITS=8)."""
+    tb = await mk(dut, host=False)
+    P = 1 << HOLD_PW
+    got = await hold_run(tb, lambda t: 1, P + 8)
+    hold_chk(tb, got, lambda t: 1, f"bias high, PW {HOLD_PW} B {HOLD_B}", P + 8)
+    await tb.clks(200)
+    tb.report(need=("hold_len", "rst_lat", "rst_analog", "bus"))
+
+
+@cocotb.test(timeout_time=20, timeout_unit="sec")
+async def d_hold02_bias_late(dut):
+    """CL-36 (b): bias_ok low then high late, one low sample just before pw done, low after b done (sticky J),
+    never high (no slot), reset re-asserted mid-hold (both counts restart)."""
+    tb = await mk(dut, host=False)
+    P, Bn = 1 << HOLD_PW, 1 << HOLD_B
+    cases = [("late", lambda t: 1 if t > P + 3 else 0),
+             ("low_at_P-1", lambda t: 0 if t == P - 1 else 1),
+             ("low_at_P", lambda t: 0 if t == P else 1),
+             ("low_after_bdone", lambda t: 0 if t in (Bn + 2, P + 1) else 1),
+             ("short_run", lambda t: 0 if t == Bn else 1),
+             ("one_short", lambda t: 1 if (t % (Bn + 1)) else 0) if P > 2 * Bn else ("one_short", lambda t: 1)]
+    for name, lv_ in cases:
+        got = await hold_run(tb, lv_, 2 * P + 4 * Bn)
+        hold_chk(tb, got, lv_, name, 2 * P + 4 * Bn)
+    # never high: no slot for 2 * 2^PW + 2^B ticks
+    got = await hold_run(tb, lambda t: 0, 2 * P + Bn)
+    if got is not None:
+        tb.fail(f"bias_ok never high but rst_analog fell at fs rise {got}")
+    tb.chk("hold_len")
+    # reset mid-hold, then a clean release: counts restart from 0
+    await hold_run(tb, lambda t: 1, P, stop_tick=P - 1)
+    got = await hold_run(tb, lambda t: 1, P + 8)
+    hold_chk(tb, got, lambda t: 1, "after mid-hold reset", P + 8)
+    tb.report(need=("hold_len", "rst_lat", "bus"))
+
+
+@cocotb.test(timeout_time=20, timeout_unit="sec")
+async def d_hold03_glitch(dut):
+    """CL-36 glitching bias_ok: 1-3 clk low pulses placed 0-4 clk before a tick edge (2-FF sync boundary) and
+    random; the count restarts on a low sample.  Strict Ref A (2-FF sync) + independent slot-0 tick check."""
+    tb = await mk(dut, host=False)
+    rng = random.Random(SEED)
+    r = tb.ref
+
+    def g_glitch(p_edge, p_any):
+        lo = 0
+        while True:
+            if lo > 0:
+                lo -= 1
+                tb.bias = 0
+            else:
+                tb.bias = 1
+                d = (r.div - 1 - r.cnt) if (r.holding or not r.started) else 99
+                if (d <= 4 and rng.random() < p_edge) or rng.random() < p_any:
+                    lo = rng.randrange(1, 4)
+            yield
+
+    for i in range(8):
+        tb.tasks = []
+        tb.set_ui(0xFF, 0)
+        tb.rst_n = 0
+        await tb.clks(5)
+        tb.tasks.append(g_glitch(0.12 + 0.03 * i, 0.002))
+        tb.rst_n = 1
+        ok = await tb.until(lambda: r.started, tb.hold_clks(40 * (1 << HOLD_B)), "slot 0 start (glitch)")
+        tb.tasks = []
+        tb.bias = 1
+        await tb.until(lambda: tb.ra_fall_rise is not None, 4 * 192, "rst_analog fall")
+        if ok and tb.ra_fall_rise != r.slot0_tick + 2:
+            tb.fail(f"glitch run {i}: DUT rst_analog fall at rise {tb.ra_fall_rise}, Ref A slot 0 tick {r.slot0_tick}")
+        tb.chk("hold_len")
+        tb.dut._log.info(f"glitch run {i}: slot 0 at tick {r.slot0_tick} (2^PW+1 = {(1 << HOLD_PW) + 1})")
+    tb.report(need=("hold_len", "rst_analog", "bus"))
+
+
+FAST = (0 << 12) | (0 << 10) | (0 << 7) | (1 << 6) | (1 << 5) | (1 << 3) | 0b010   # N 64, /12, sys, ota, boost, trim 2
+
+
+@cocotb.test(timeout_time=20, timeout_unit="sec")
+async def d_hold04_cfg_sticky(dut):
+    """CL-36: cfg written early in the hold and again in the last hold period apply at slot 0; first pair after
+    release invalid, next pair valid; hold sticky (bias_ok low / toggling after slot 0 does not stop slots)."""
+    tb = await mk(dut, host=True)
+    r = tb.ref
+    P = 1 << HOLD_PW
+    w2 = (FAST & ~7) | 0b101
+
+    def during(k):
+        if k == 2:
+            tb.tasks.append(tb.g_cfg_write(FAST))
+        if k == max(P - 8, 4):          # ~96 clk at /12 before the slot-0 tick: ld lands in the last periods
+            tb.tasks.append(tb.g_cfg_write(w2))
+    await hold_run(tb, lambda t: 1, P + 8, during=during)
+    await tb.until(lambda: r.started, 400, "slot 0")
+    await tb.to_slot(0, 3)
+    k = tb.last
+    for name, exp in (("trim", 5), ("boost", 1), ("order", 0), ("short", 0)):
+        if k.get(name) != exp:
+            tb.fail(f"slot 0 {name}={k.get(name)} != {exp} (cfg written in the hold, CL-36)")
+        tb.chk("hold_cfg")
+    # sticky: drop bias_ok for 3 slots, then toggle it every 7 clk for 3 slots; slots keep running
+    s_a = r.slot
+    nbv, pbv = 0, 0
+    for i in range(6 * 66 * 12):
+        tb.bias = 0 if i < 3 * 66 * 12 else (i // 7) & 1
+        await tb.clks(1)
+        bv = tb.last.get("bit_valid")
+        nbv += 1 if (bv == 1 and pbv == 0) else 0
+        pbv = bv
+    tb.bias = 1
+    if r.slot - s_a < 5 or nbv < 5:
+        tb.fail(f"hold not sticky: {r.slot - s_a} Ref A slots, {nbv} DUT bit_valid rises in 6 slot lengths")
+    tb.chk("hold_sticky")
+    await tb.clks(200)
+    inv = {}
+    for x in tb.reads:
+        w = x["words"][4]
+        if w is not None:
+            inv[x["ref"]["slot"]] = ((w >> 8) & 1, (w >> 12) & 3)
+    tb.dut._log.info(f"(invalid, n_code) per slot from DUT tags: {inv}")
+    for s, exp in ((0, 1), (1, 1), (2, 0), (3, 0)):
+        if s not in inv or inv[s][0] != exp or inv[s][1] != 0:
+            tb.fail(f"slot {s} tag (invalid, n_code) {inv.get(s)} != ({exp}, 0)")
+        tb.chk("hold_inv")
+    tb.report(need=("hold_cfg", "hold_sticky", "hold_inv", "host_frame", "bus"))

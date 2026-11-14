@@ -1,5 +1,5 @@
 """cocotb 2.x runner for the C9 bench.  Env: SIM (icarus|verilator), C9_TOP, C9_RTL, TESTS (regex),
-C9_SEED, C9_FULL, C9_COMP, C9_OUT, C9_BUILD_ARGS (extra build flags, e.g. --coverage), C9_RUNDIR (sim cwd).  Exit 1 on any failure, on zero tests, or on a missing results file."""
+C9_SEED, C9_FULL, C9_PW_BITS, C9_BIAS_BITS (WO-75 hold length, default 4/2), C9_COMP, C9_OUT, C9_BUILD_ARGS (extra build flags, e.g. --coverage), C9_RUNDIR (sim cwd).  Exit 1 on any failure, on zero tests, or on a missing results file."""
 import glob
 import os
 import sys
@@ -9,17 +9,21 @@ from cocotb_tools.runner import get_results, get_runner
 
 here = os.path.dirname(os.path.abspath(__file__))
 rtl = os.environ.get("C9_RTL", os.path.join(here, "..", "rtl"))
-top = os.environ.get("C9_TOP", "tt_um_sd_adc_c9")
+top = os.environ.get("C9_TOP", "c9_tb")   # WO-75: parameterised bench top (tb/hdl/c9_tb.v); GL uses tt_um_sd_adc_c9
 sim = os.environ.get("SIM", "icarus")
 out = os.environ.get("C9_OUT", os.path.join(here, "out"))
 srcs = sorted(glob.glob(os.path.join(rtl, "*.v")))
 if not srcs:
     print(f"no RTL in {rtl}")
     sys.exit(2)
+if top == "c9_tb":
+    srcs.append(os.path.join(here, "hdl", "c9_tb.v"))
 bd = os.path.join(out, f"build_{sim}")
 r = get_runner(sim)
 kw = dict(timescale=("1ns", "1ps")) if sim == "icarus" else {}
 ba = os.environ.get("C9_BUILD_ARGS", "").split()
+if top == "c9_tb":   # CL-36 hold length for the bench (Ref A reads the same env, test_c9.HOLD_*)
+    kw["parameters"] = dict(PW_BITS=int(os.environ.get("C9_PW_BITS", "4")), BIAS_BITS=int(os.environ.get("C9_BIAS_BITS", "2")))
 if ba:
     kw["build_args"] = ba
 r.build(sources=srcs, hdl_toplevel=top, build_dir=bd, always=True, **kw)

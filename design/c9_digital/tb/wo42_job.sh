@@ -8,6 +8,8 @@
 #   test NAME SEED [TO]  one cocotb test (icarus), fcov collector in ../wo42/test_NAME_sSEED/fcov (WO-49B)
 #   suite STEP     run.sh STEP (agree|lint|formal|cocotb|all), out ../wo42/suite_STEP (WO-49B)
 #   fml MID            per-property PDR (mut_formal.sh); MID base|M07|M07b|M19|...
+#   real               d_hold01_len at PW_BITS 16 / BIAS_BITS 8 (WO-75)
+#   fmlreal            F18 alone, PDR, real D85 widths (no chparam) (WO-75)
 #   merge              fcov merge of every ../wo42/**/fcov
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd); K=$1; shift
@@ -24,6 +26,10 @@ case $K in
   test)  echo "TEST $1 s$2 $(run "$R/test_$1_s$2" C9_SEED=$2 TESTS="$1\$" timeout ${3:-7200})";;
   suite) mkdir -p "$R/suite_$1"; env C9_OUT="$R/suite_$1" ./run.sh "$1" > "$R/suite_$1/run.log" 2>&1; echo "SUITE $1 $(grep -E "^== |RUN RESULT" "$R/suite_$1/run.log" | tr "\n" " ")";;
   fml)   "$HERE/mut_formal.sh" "$1";;
+  real)  echo "REAL hold01 $(run "$R/real_hold01" C9_PW_BITS=16 C9_BIAS_BITS=8 TESTS='d_hold01_len$' timeout 3600)";;   # WO-75: 2^16 hold at D85 values
+  fmlreal) F=$R/fml_real; rm -rf "$F"; mkdir -p "$F"; awk '/cover *\(/ {next} /assert *\(/ && /\/\/ F[0-9]+ / && index($0, "// F18 ") == 0 {next} {print}' "$HERE/formal/c9_props.sv" | sed -e "s/1 << 3, MB = 1 << 2/1 << 16, MB = 1 << 8/" -e "s/reg \[4:0\] m_pw/reg [16:0] m_pw/" > "$F/c9_props.sv"
+         { printf "[options]\nmode prove\nmulticlock off\n\n[engines]\nabc pdr\n\n[script]\nread_verilog -DFORMAL c9_cfg.v c9_core.v c9_dec.v c9_fsdiv.v c9_rdbus.v c9_seq.v tt_um_sd_adc_c9.v\nread_verilog -formal c9_props.sv\nprep -top c9_formal\n\n[files]\nc9_props.sv\n"; for v in "$HERE"/../rtl/*.v; do echo "$v"; done; } > "$F/p.sby"
+         (cd "$F" && timeout 5400 sby -f p.sby > sby.log 2>&1); echo "FMLREAL F18 $(grep -oE "DONE \((PASS|FAIL)" "$F/sby.log" || echo ERR)";;
   merge) python3 "$HERE/fcov.py" merge "$R";;
   *)     echo "unknown job $K"; exit 2;;
 esac

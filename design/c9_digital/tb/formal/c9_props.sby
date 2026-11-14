@@ -19,6 +19,7 @@ cover: smtbmc yices
 [script]
 read_verilog -DFORMAL c9_cfg.v c9_core.v c9_dec.v c9_fsdiv.v c9_rdbus.v c9_seq.v tt_um_sd_adc_c9.v
 read_verilog -formal c9_props.sv
+chparam -set PW_BITS 3 -set BIAS_BITS 2 sd_adc_c9 c9_seq
 prep -top c9_formal
 
 [files]
