@@ -924,3 +924,10 @@ Next steps:
 - Collect the WO-76 to WO-80 reports.
 - C1 gate B options go to the user. This is likely a precision-bias or current decision; check it against the fast-mode budget.
 - After WO-75: the final C9 PnR WO.
+
+## 2026-11-14 18:05 IST: sandbox overload
+- **What happened:** the sandbox overloaded and ssh hung. Load reached 44–53, and memory was 15/15 GB because of a 10.6 GB yosys-abc PDR (WO-83 F18 at the real widths), which then ended by itself. About 15 of our pools were running in parallel.
+- **User decisions:**
+  - (1) Global lpool cap, GMAX 5. Implemented with flock slot locks in `/home/mempool/regr/tt/.lpool_slots`. Tested: cap 2 → max 2 concurrent; broken cap 9 → 3. Commit 2f2e0a0, deployed to `tt-sd/scripts`.
+  - (2) Stop the WO-79 tim jobs. The WO-79 lpool parent was killed by PID. Its 33 remaining non-tim jobs were relaunched under the cap in `WO-79-139a29d/run/pool2`. WO-85 reruns tim.
+- **Rule for new WOs:** heavy formal/PDR runs go alone with a memory limit (`ulimit -v`). Frozen copies must take lpool from the repo or tt-sd, so they pick up the cap. Old pools drain uncapped.
