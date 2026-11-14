@@ -956,3 +956,16 @@ Next steps:
   - Both directions improve, so the response is non-monotonic; dx0.8 helps more. That is consistent with the PM/fp2 hypothesis but not conclusive.
   - Launched the remaining dx0.8 parts (p0, p1, p3, p5) for a full 6-part combine: `out/logs_r2`, `R2_DONE`.
   - **Next:** combine dx0.8 (`c1b_gateb.py out/gb/c1_dx08 --mode prec --combine 6 --copy nom`) together with the O2 pool A results. Then a fresh Opus agent writes the options with data: PM sizing (C) vs bias. Do not pick from per-part numbers.
+- **23:40 IST, WO-76 more parts.**
+
+  | part | nom | dx0.8 | dx1.3 |
+  |---|---|---|---|
+  | p0 | 1.330 | **1.830** | |
+  | p1 | 1.263 | 1.349 | |
+  | p2 | 1.706 | 1.281 | 1.494 |
+  | p4 | 1.671 | 1.226 | 1.421 |
+
+  - **Bias scaling does not fix it, it moves it.** The jagged, history-dependent error shifts between parts.
+  - That points away from a simple PM/SR cause and toward a pattern-dependent term, possibly numerical at O1.
+  - **Key next data:** the O2 parts in pool A (`out/logs`, single slot, still draining).
+  - Option A (bias) and option B as written are not supported. Do not present bias options to the user on these data.
