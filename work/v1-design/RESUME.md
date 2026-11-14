@@ -983,3 +983,12 @@ Next steps:
   - If O2 passes, the gate rule says O2 is the converged result (D48), so no design change is needed. Report this to the user as the finding.
 - C3 pools are all done. WO-86 dispatched (fresh agent).
 - **01:40 IST.** WO-76: O2 ss/−40 p2 = 0.160 ppm, against 1.706 at O1. That is the second part to confirm the O1 artefact (p0 0.142 vs 1.330). The other O2 parts are queued under the cap.
+- **2026-11-15, DESIGN_BOOK.md updated for the Chipalooza proposal.**
+  - WO-89 (c1fa950) added the update and a new Proposal summary.
+  - REVIEW-BOOK-2026-11-15 (19ab8ed) found 1 critical, 12 major, 9 minor and 4 style items. WO-90 (bd32c0a) fixed them all.
+  - The coordinator spot-checked III.6.4 and the V.4 area row: both are consistent with WO-73.
+  - **Open follow-ups the book now lists:**
+    - C1 boost gate B O2 at fs/125 (D43c), plus tt/27 and ss/125 on the WO-52 netlist;
+    - C1 precision: a third solver point before O2 is taken as the result (no D43c amendment);
+    - the origin of the 20 pA row;
+    - the HARDENING.md D86 entry is missing.
