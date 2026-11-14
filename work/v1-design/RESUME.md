@@ -1,5 +1,7 @@
 # RESUME: where to pick up (updated 2026-11-08)
 
+> **Current state snapshot: `work/v1-design/STATE-2026-11-14.md` (rules, decision lessons, block status, live pools + pickup). Read it first.**
+
 Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 
 ## State at last update
