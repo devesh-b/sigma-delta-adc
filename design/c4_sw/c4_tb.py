@@ -132,7 +132,7 @@ def gen_block(mut):
     return [N.gen(gm), N.inst()]
 
 
-def soften(L):
+def soften(L, supplies=True):
     """WO-79: source impedance on every grounded independent V source of a transient deck (signals 10 ohm, supplies
     vdd / vdl 1 ohm, i.e. bond + package R); sources already behind drv() (node *_s) are left alone.
     Root cause of the WO-54 / WO-70 aborts: an ideal source tied straight to pF of device / Cs capacitance has a
@@ -145,7 +145,8 @@ def soften(L):
     out = []
     for ln in L:
         p = ln.split(None, 3)
-        if len(p) == 4 and p[0][0] in "Vv" and p[2] == "0" and not p[1].endswith("_s") and "\n" not in ln:
+        if (len(p) == 4 and p[0][0] in "Vv" and p[2] == "0" and not p[1].endswith("_s") and "\n" not in ln
+                and (supplies or p[1] not in ("vdd", "vdl"))):
             r = 1 if p[1] in ("vdd", "vdl") else 10
             out += [f"{p[0]} {p[1]}_z 0 {p[3]}", f"Rz_{p[1]} {p[1]}_z {p[1]} {r}"]
         else:
@@ -206,7 +207,10 @@ def deck_tim(corner, fsk, mut, csv):
     for n in ("yin", "swin", "shin", "chin", "rsin", "ordin"):   # WO-79: bare sources on LS inputs (vord#branch)
         L += drv(n)
     L += dec_line() + gen_block(mut) + loads()
-    L = soften(L)
+    # WO-85: supplies stay ideal in tim. 1 ohm on vdd / vdl with no decoupling (only device C on the node) aborted every
+    # tim deck on an HV body-junction node (xil.x2#dbody 44.7 ns); ideal supplies run clean, method=gear does not fix it
+    # (results/wo85). Signal sources keep their 10 ohm. Tolerances unchanged.
+    L = soften(L, supplies=False)
     tstop = T0 + 4 * T
     tmax = 50e-12 if FSS[fsk] >= 2e6 else 100e-12
     L.append(f".tran {tmax:.3g} {tstop:.6e} 0 {tmax:.3g}")
