@@ -52,6 +52,16 @@ V18_MAX, VHV_MAX = 1.98, 5.5      # D40 / HV gate oxide (never loosened); V18_MA
 # BSIM4 cards of nfet_01v8 carry bvs = 11.7 V (sky130_fd_pr__nfet_01v8__tt*.pm3.spice). Limit = 5.5 V rating - 10 %.
 VJ18_MAX = 4.95
 JN_PAIRS = ("sb", "db")
+# D83 / CL-35 (WO-78): the 1.98 V limit on 1.8 V oxide pairs (gs, dg, gb) and Vds applies SUSTAINED, i.e. longer
+# than 1 ns; short switching overshoot is allowed up to 2.2 V for < 1 ns. Per pair, from the raw waveform:
+#   P = peak |V| (native time points; must equal the ngspice vecmax), limb "cap": P <= V18_CAP
+#   D = longest continuous time with |V| > V18_MAX (edges linearly interpolated), limb "dur": D < T18_DUR
+#   S = sustained level = max over t of min |V| over [t, t + T18_SUS] (5 ps grid), limb "sus": S <= V18_MAX
+# S > V18_MAX iff some excursion above V18_MAX lasts >= T18_SUS, so with T18_SUS = T18_DUR "sus" and "dur" are the
+# same physical rule seen two ways; the checker copies (chk_sus195, chk_cap20, chk_dur01) move one judge parameter each, so each
+# limb is shown live on its own; st_brk_noclamp (rev d latch, 2.32 V for 105 ns) is the design broken copy. Junctions (D80, single peak vs VJ18_MAX) and HV pairs (single peak vs 5.5 V) unchanged.
+V18_CAP, T18_SUS, T18_DUR = 2.2, 1e-9, 1e-9
+POST_DT = 5e-12
 SR_X2 = 27e6                      # V/s, OTA2 boost slew (SPEC OTA2 row), applied per side (conservative: diff SR)
 # T5 asymmetry (WO-51 item 3): gate = per-side R +-5 % (OTA2 closed-loop gm mismatch), C +-1 % (MIM + routing);
 # the +-10 % R/C of WO-48 stays as an info copy.
@@ -266,7 +276,7 @@ def st_deck(corner, temp, order, mut="", stim="slew", jlim=VJ18_MAX):
         "Btmp tmp 0 V=temper", ".control", f"tran 10p {_f(tstop)} 0 5p"]
     port = dict(inp="x2p", inn="x2n", clk="clk", q="q", qb="qb", vdd="vdd", vss="0")
     nd = lambda n: "0" if port.get(n) == "0" else f"v({port[n]})" if n in port else f"v(xc.{n})"
-    names, devs = [], {}
+    names, devs, pairs, nodes = [], {}, [], set()
     for (n, model, d, g_, s, b, _) in devices(mut=mut if mut in MUTS else ""):
         devs[n] = model
         for pr, (a, c) in (("dg", (d, g_)), ("gs", (g_, s)), ("ds", (d, s)), ("gb", (g_, b)), ("db", (d, b)),
@@ -276,11 +286,90 @@ def st_deck(corner, temp, order, mut="", stim="slew", jlim=VJ18_MAX):
             v = f"st_{n.lower()}_{pr}"
             L.append(f"let {v} = vecmax(abs({nd(a)}-{nd(c)}))")
             names.append(v)
+            cls = "hv" if "g5v0" in model else ("jn" if pr in JN_PAIRS else "18")
+            pairs.append([v, n, nd(a), nd(c), cls])
+            nodes |= {x for x in (nd(a), nd(c)) if x != "0"}
+    # D83 (WO-78): node waveforms for the sustained / overshoot post-processing (st_post), deleted after use
+    L += ["set filetype=binary", "write st.raw " + " ".join(sorted(nodes))]
     L += ["meas tran tempr find v(tmp) at=1n", "let tend = vecmax(time)"]
     L += _echo(names + ["tempr", "tend"]) + [".endc", ".end"]
     meta = dict(fam="st", corner=corner, temp=temp, vdd=vd, order=order, mut=mut, stim=stim, devs=devs, tstop=tstop,
-                jlim=jlim)
+                jlim=jlim, pairs=pairs)
     return "\n".join(L) + "\n", meta
+
+
+def _read_raw(path):
+    """ngspice binary raw (real, one plot) -> {lower-case name without v(): array}."""
+    import numpy as np
+    blob = open(path, "rb").read()
+    k = blob.index(b"Binary:\n")
+    hdr = blob[:k].decode(errors="replace").splitlines()
+    nv = int(next(x for x in hdr if x.startswith("No. Variables:")).split(":")[1])
+    np_ = int(next(x for x in hdr if x.startswith("No. Points:")).split(":")[1])
+    assert any(x.startswith("Flags:") and "real" in x for x in hdr), "raw not real"
+    i0 = next(i for i, x in enumerate(hdr) if x.startswith("Variables:")) + 1
+    names = [hdr[i0 + j].split()[1].lower() for j in range(nv)]
+    a = np.frombuffer(blob, dtype="<f8", offset=k + 8, count=nv * np_).reshape(np_, nv)
+    norm = lambda s: s[2:-1] if s.startswith("v(") and s.endswith(")") else s
+    return {norm(nm): a[:, j] for j, nm in enumerate(names)}
+
+
+def _sus_level(t, x, win, dt=POST_DT):
+    """max over t of min x over [t, t + win], on a uniform dt grid (sparse-table sliding min)."""
+    import numpy as np
+    tu = np.arange(t[0], t[-1], dt)
+    u = np.interp(tu, t, x)
+    k = int(round(win / dt)) + 1
+    if len(u) < k:
+        return float("nan")
+    m, p = u, 1
+    while 2 * p <= k:
+        m = np.minimum(m[:-p], m[p:])
+        p *= 2
+    n = len(u) - k + 1
+    return float(np.max(np.minimum(m[:n], m[k - p:k - p + n])))
+
+
+def _longest_above(t, x, lim):
+    """longest continuous time with x > lim, run edges linearly interpolated (native points)."""
+    import numpy as np
+    ab = x > lim
+    if not ab.any():
+        return 0.0
+    d = np.diff(np.concatenate(([0], ab.astype(np.int8), [0])))
+    st, en = np.nonzero(d == 1)[0], np.nonzero(d == -1)[0] - 1
+    best = 0.0
+    for i, j in zip(st, en):
+        t0 = t[i] if i == 0 else t[i - 1] + (lim - x[i - 1]) / (x[i] - x[i - 1]) * (t[i] - t[i - 1])
+        t1 = t[j] if j == len(x) - 1 else t[j] + (x[j] - lim) / (x[j] - x[j + 1]) * (t[j + 1] - t[j])
+        best = max(best, t1 - t0)
+    return float(best)
+
+
+def st_post(d):
+    """D83 post-processing of one st deck dir: appends RES <pair>_P/_S/_D (1.8 V oxide-class pairs) and post_done to
+    deck.log, then deletes st.raw (no raw data kept). P is from the native points and is cross-checked against the
+    ngspice vecmax in eval_st (proves the raw read and the pair mapping)."""
+    import numpy as np
+    m = json.load(open(os.path.join(d, "meta.json")))
+    rp = os.path.join(d, "st.raw")
+    out = []
+    try:
+        w = _read_raw(rp)
+        t = w["time"]
+        node = lambda e: np.zeros_like(t) if e == "0" else w[e[2:-1].lower()]
+        for key, _, a, c, cls in m["pairs"]:
+            if cls != "18":
+                continue
+            x = np.abs(node(a) - node(c))
+            out += [f"RES {key}_P {x.max():.6g}", f"RES {key}_S {_sus_level(t, x, T18_SUS):.6g}",
+                    f"RES {key}_D {_longest_above(t, x, V18_MAX):.6g}"]
+        out.append(f"RES post_npts {len(t)}")
+        out.append("RES post_done 1")
+    finally:
+        if os.path.exists(rp):
+            os.remove(rp)
+    open(os.path.join(d, "deck.log"), "a").write("\n".join(out) + "\n")
 
 
 # ---------------------------------------------------------------- sens / pdk (T3 dominant device, WO-51 item 1)
@@ -401,7 +490,12 @@ def deck_list():
     D["st_chk_jn20"] = (st_deck, ("tt", 27, "a"), {"jlim": 2.0}, {"T8": "reject"})   # D80 junction limb is live
     D["st_nocas_tt27_a"] = (st_deck, ("tt", 27, "a"), {"mut": "nocas"}, {"T8": "info"})   # rev b, gate stimulus
     D["st_revc_tt27_a"] = (st_deck, ("tt", 27, "a"), {"mut": "revc"}, {"T8": "info"})     # rev c (WO-51)
-    D["st_noclamp_tt27_a"] = (st_deck, ("tt", 27, "a"), {"mut": "noclamp"}, {"T8": "info"})  # rev d latch (WO-68)
+    # D83 (WO-78): rev d latch = design broken copy of the sustained rule (sq/sb at -0.345 V, Vds 2.32 V for 105 ns)
+    D["st_brk_noclamp"] = (st_deck, ("tt", 27, "a"), {"mut": "noclamp"}, {"T8": "reject"})
+    # D81 checker copies of the D83 limbs: st_tt27_a data, one judge parameter moved each
+    D["st_chk_sus195"] = (st_deck, ("tt", 27, "a"), {}, {"T8": "reject"}, dict(sus_lim=1.95, judge_from="st_tt27_a"))
+    D["st_chk_cap20"] = (st_deck, ("tt", 27, "a"), {}, {"T8": "reject"}, dict(cap=2.0, judge_from="st_tt27_a"))
+    D["st_chk_dur01"] = (st_deck, ("tt", 27, "a"), {}, {"T8": "reject"}, dict(dur_max=0.1e-9, judge_from="st_tt27_a"))
     for c, t, v in (SS40, ("tt", 27, 1.80)):              # rev c function, with the ap/an probe (WO-56 diagnosis)
         D[f"cyc_info_revc_{nm(c, t, v)}"] = (cyc_deck, (c, t, v, 1.5, 4e6), {"mut": "revc"},
                                              {"T2": "info", "T7": "info"})
@@ -444,8 +538,12 @@ def gen(out):
         json.dump(meta, open(os.path.join(d, "meta.json"), "w"), indent=1)
         if os.path.exists(os.path.join(d, "deck.log")):
             os.remove(os.path.join(d, "deck.log"))
+        if meta.get("judge_from"):          # checker copy judged on another deck's results: no run of its own
+            continue
         to = {"one": 1800, "st": 7200, "mc": 14400, "cyc": 21600, "sens": 3600, "pdk": 1800}[meta["fam"]]
-        jobs.append(f"cd {d} && timeout {to} ngspice -b deck.sp > deck.log 2>&1")
+        post = (f"; {sys.executable} {os.path.abspath(__file__)} post {d} >> {d}/post.log 2>&1"
+                if meta["fam"] == "st" else "")
+        jobs.append(f"cd {d} && timeout {to} ngspice -b deck.sp > deck.log 2>&1{post}")
     open(os.path.join(out, "jobs.txt"), "w").write("\n".join(jobs) + "\n")
     print(f"{len(jobs)} decks -> {out}/jobs.txt")
 
@@ -533,37 +631,65 @@ def eval_one(r, m):
 def eval_st(r, m):
     # D80: "18" = 1.8 V oxide pairs (gs, dg, gb) + ds vs V18_MAX; "jn" = 1.8 V junctions (sb, db) vs jlim;
     # "hv" = every pair of the HV devices vs VHV_MAX (unchanged)
-    worst = {"18": (0.0, ""), "jn": (0.0, ""), "hv": (0.0, "")}
-    miss = 0
-    for n, model in m["devs"].items():
-        for k, v in r.items():
-            if k.startswith(f"st_{n.lower()}_"):
-                cls = "hv" if "g5v0" in model else ("jn" if k.rsplit("_", 1)[1] in JN_PAIRS else "18")
-                if v is None:
-                    miss += 1
-                elif v > worst[cls][0]:
-                    worst[cls] = (v, k)
-    jlim = m.get("jlim", VJ18_MAX)
-    n_exp = sum(1 for x in open(m["deck"]) if x.startswith("let st_")) if "deck" in m else None
-    n_got = sum(1 for k in r if k.startswith("st_") and r[k] is not None)
-    lim = {"18": V18_MAX, "jn": jlim, "hv": VHV_MAX}
-    over = [c for c in lim if worst[c][0] > lim[c]]
-    ok = miss == 0 and n_got == n_exp and n_got > 0 and not over
-    return {"T8": [ok, [f"n={n_got}/{n_exp}"] + [f"over:{c}" for c in over]]}, dict(
-        max18ox=worst["18"], max18jn=worst["jn"], jlim=jlim, maxhv=worst["hv"])
+    # D83 (WO-78): "18" judged as sus (S <= V18_MAX), cap (P <= cap), dur (D < dur_max), see st_post.
+    # Judge-only overrides (D81 checker copies): jlim, cap, sus_lim (sustained level limit), dur_max.
+    jlim, cap = m.get("jlim", VJ18_MAX), m.get("cap", V18_CAP)
+    sus_lim, dur_max = m.get("sus_lim", V18_MAX), m.get("dur_max", T18_DUR)
+    worst = {c: (0.0, "") for c in ("pk18", "S", "P", "D", "jn", "hv")}
+    miss, bad_pk, dev = 0, [], {}
+    for key, n, _, _, cls in m["pairs"]:
+        v = r.get(key)
+        if v is None:
+            miss += 1
+            continue
+        if cls != "18":
+            worst[cls] = max(worst[cls], (v, key))
+            continue
+        worst["pk18"] = max(worst["pk18"], (v, key))
+        x = {q: r.get(f"{key}_{q}") for q in ("P", "S", "D")}
+        if None in x.values():
+            miss += 1
+            continue
+        if abs(x["P"] - v) > 1e-4:       # raw read / pair mapping must reproduce ngspice's own vecmax
+            bad_pk.append(key)
+        for q in ("P", "S", "D"):
+            worst[q] = max(worst[q], (x[q], key))
+            dv = dev.setdefault(n, {"S": (0.0, ""), "P": (0.0, ""), "D": (0.0, "")})
+            dv[q] = max(dv[q], (round(x[q], 6), key.rsplit("_", 1)[1]))
+    n_exp = len(m["pairs"])
+    n_got = sum(1 for k, *_ in m["pairs"] if r.get(k) is not None)
+    over = []
+    if worst["S"][0] > sus_lim:
+        over.append("over:sus")
+    if worst["P"][0] > cap:
+        over.append("over:cap")
+    if worst["D"][0] >= dur_max:
+        over.append("over:dur")
+    if worst["jn"][0] > jlim:
+        over.append("over:jn")
+    if worst["hv"][0] > VHV_MAX:
+        over.append("over:hv")
+    post = r.get("post_done") == 1.0
+    ok = miss == 0 and n_got == n_exp and n_got > 0 and post and not bad_pk and not over
+    why = [f"n={n_got}/{n_exp}"] + ([] if post else ["no_post"]) + ([f"pk_mismatch:{bad_pk[:3]}"] if bad_pk else [])
+    f = lambda w: (round(w[0], 4), w[1])
+    return {"T8": [ok, why + over]}, dict(
+        S18=f(worst["S"]), P18=f(worst["P"]), D18_ns=(round(worst["D"][0] * 1e9, 3), worst["D"][1]),
+        max18jn=f(worst["jn"]), maxhv=f(worst["hv"]), jlim=jlim, cap=cap, sus_lim=sus_lim, dur_ns=dur_max * 1e9,
+        npts=r.get("post_npts"), dev=dev)
 
 
 def collect(out):
     out = os.path.abspath(out)
     res, lines, off = {}, [], 0
-    mc, aux = {}, {}
+    mc, aux, devtab = {}, {}, []
     for k in sorted(os.listdir(out)):
         mp = os.path.join(out, k, "meta.json")
         if not os.path.exists(mp):
             continue
         m = json.load(open(mp))
         m["deck"] = os.path.join(out, k, "deck.sp")
-        r = _res(os.path.join(out, k, "deck.log"))
+        r = _res(os.path.join(out, m.get("judge_from", k), "deck.log"))
         if m["fam"] == "mc":
             trips = [r.get(f"mid{i}") for i in range(m["n"])]
             mc.setdefault(m["group"], []).append((k, trips, r.get("done") == 1.0, m))
@@ -573,6 +699,10 @@ def collect(out):
             continue
         bad = _sanity(r, m)
         rows, info = {"cyc": eval_cyc, "one": eval_one, "st": eval_st}[m["fam"]](r, m)
+        dev = info.pop("dev", None)
+        if dev is not None:
+            devtab.append(f"{k}: " + " ".join(f"{n}:S{v['S'][0]:.3f}/P{v['P'][0]:.3f}/D{v['D'][0] * 1e9:.2f}ns"
+                                             for n, v in sorted(dev.items())))
         verd = {}
         for row, exp in m["expect"].items():
             ok = rows[row][0] and not bad
@@ -581,6 +711,8 @@ def collect(out):
                 off += 1
         res[k] = dict(verdict=verd, expect=m["expect"], sanity=bad, detail={x: rows[x][1][:4] for x in rows},
                       info=info)
+        if dev is not None:
+            res[k]["dev"] = dev
         lines.append(f"{k:18s} " + " ".join(f"{x}={v}({m['expect'][x][0]})" for x, v in verd.items()) +
                      f" sanity={bad or 'ok'} info={info}" +
                      ("" if all(rows[x][0] for x in verd) else f" why={ {x: rows[x][1][:3] for x in verd} }"))
@@ -639,10 +771,13 @@ def collect(out):
                  " vs 5 mV rms: ~10x margin; .noise is a poor proxy for a regenerative comparator.")
     lines.append(f"SUMMARY {'ACCEPT' if off == 0 else 'REJECT'} ({off} deck rows off expectation)")
     json.dump(res, open(os.path.join(out, "c3_tb.json"), "w"), indent=1, default=str)
+    open(os.path.join(out, "t8_devices.txt"), "w").write(
+        "T8 per device (D83): worst over the 1.8 V oxide pairs of S sustained level / P peak / D longest time > 1.98 V\n"
+        + "\n".join(devtab) + "\n")
     open(os.path.join(out, "summary.txt"), "w").write("\n".join(lines) + "\n")
     print("\n".join(lines))
     sys.exit(1 if off else 0)
 
 
 if __name__ == "__main__":
-    {"gen": gen, "collect": collect}[sys.argv[1]](sys.argv[2])
+    {"gen": gen, "collect": collect, "post": st_post}[sys.argv[1]](sys.argv[2])
