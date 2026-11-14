@@ -30,6 +30,7 @@ SIZES = dict(
     SP=dict(W=1.0, L=0.15, m=1),   # NAND SR latch PMOS
     SC=dict(W=0.42, L=0.15, m=1),  # NAND stack-node clamp, gate = complement of the set input (WO-68, rev e)
     KP=dict(W=0.42, L=0.15, m=1),  # op/on keeper PMOS to vdd, gate = ob1/nb1 (WO-81 rev f, D87): minimum device
+    RSO=dict(W=1.0, L=0.15, m=1),  # op/on precharge R0/R1 (rev f: = RS); WO-88 candidates via mut rso*
     O1N=dict(W=0.5, L=0.15, m=1),  # output buffer stage 1 (REVIEW-C3a item 7: drive the routed q net)
     O1P=dict(W=1.0, L=0.15, m=1),
     O2N=dict(W=2.0, L=0.15, m=1),  # output buffer stage 2
@@ -57,7 +58,7 @@ TDEC_SPOT_SS40 = 1.120e-9          # WO-44 spot t_dec at 1 mV, ss/-40/1.62 V (T2
 #   nopa   : rev d without the ap/an precharge P1/P2                -> T5 info (WO-65)
 #   noclamp: rev d SR latch (no stack-node clamp)                  -> T8 info: shows the WO-68 fix
 #   nokeep : rev e (no op/on keeper)                               -> T8 REJECT under D87 (op/on sustained > VDPWR)
-MUTS = ("starve", "qswap", "nobuf", "nolatch", "in18", "nocas", "revc", "nohvc", "nopa", "noclamp", "nokeep", "kp2")
+MUTS = ("starve", "qswap", "nobuf", "nolatch", "in18", "nocas", "revc", "nohvc", "nopa", "noclamp", "nokeep", "kp2", "kp2_rsoW05", "kp2_rsoL03", "kp2_rsoL05", "kp3")
 
 
 def comp_subckt(mut=""):

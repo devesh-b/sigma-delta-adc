@@ -13,6 +13,7 @@ import json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import c3_tb  # noqa: E402
 from c3_tb import st_deck, one_deck, cyc_deck, SS40  # noqa: E402
+_DL0 = c3_tb.deck_list   # the c3_tb list (gen() rebinds c3_tb.deck_list)
 
 
 def _split(text):
@@ -269,8 +270,8 @@ def dpost(d):
     print("\n".join(L))
 
 
-def gen3(out):
-    gen(out, deck_list3)
+def gen3(out, dl=None):
+    gen(out, dl or deck_list3)
     jf = os.path.join(os.path.abspath(out), "jobs.txt")
     me = os.path.abspath(__file__)
     J = []
@@ -282,5 +283,50 @@ def gen3(out):
     open(jf, "w").write("\n".join(J))
 
 
+def deck_list5():
+    """WO-88 pool A: cap candidates on top of kp2 (st on the stiff switched pin at tt/27 a and ff/-40 b, T5/T2band at
+    ss/-40 and fs/125), kp3 info, the rev f cyc rows never run (WO-86 item 1) and the device-current probe."""
+    T, B, st, k = ("tt", 27, "a"), ("ff", -40, "b"), {"T8": "pass"}, dict(sub=False)
+    D = {}
+    for c in ("kp2_rsoW05", "kp2_rsoL03", "kp2_rsoL05", "kp3"):
+        D[f"st_{c}_sw"] = (_wrap(sup="sw"), T, dict(k, mut=c), st)
+        D[f"st_{c}_ff-40_b_sw"] = (_wrap(sup="sw"), B, dict(k, mut=c), st)
+        D[f"one_{c}_ss-40_162"] = (one_deck, (*SS40, 1.5, 4e6), dict(mut=c), {"T5": "pass", "T2band": "pass"})
+        D[f"one_{c}_fs+125_198"] = (one_deck, ("fs", 125, 1.98, 1.5, 4e6), dict(mut=c), {"T5": "pass"})
+    D.update({f"{n}_revf": v for n, v in _DL0().items() if n.startswith("cyc_") and "info" not in n})
+    D["st_sw_icur"] = (_isave(_wrap(sup="sw")), T, dict(k), {"T8": "pass"})
+    return D
+
+
+def deck_list4():
+    """WO-88 full C3 set on the current default netlist: every one/cyc/mc/sens/pdk deck of c3_tb, and the T8 rows on
+    the D90 basis (stiff switched pin) with the D83/D90 checker copies judged against a passing base."""
+    T, A, B, st, k = ("tt", 27, "a"), ("ff", -40, "a"), ("ff", -40, "b"), {"T8": "pass"}, dict(sub=False)
+    D = {n: v for n, v in _DL0().items() if not n.startswith("st_")}
+    D.update({
+        "st_tt27_a_sw": (_wrap(sup="sw"), T, dict(k), st),
+        "st_tt27_b_sw": (_wrap(sup="sw"), ("tt", 27, "b"), dict(k), st),
+        "st_ff-40_a_sw": (_wrap(sup="sw"), A, dict(k), st),
+        "st_ff-40_b_sw": (_wrap(sup="sw"), B, dict(k), st),
+        "st_ff125_b_sw": (_wrap(sup="sw"), ("ff", 125, "b"), dict(k), st),
+        "st_brk_noclamp_sw": (_wrap(sup="sw"), T, dict(k, mut="noclamp"), {"T8": "reject"}),
+        "st_brk_vdd200_sw": (_wrap(sup="sw"), T, dict(k, vd=2.0), {"T8": "reject"}),
+        "st_chk_sus1985_sw": (_wrap(sup="sw"), T, dict(k, vd=1.985), {"T8": "reject"}),   # D90: S ~1.985 V
+        "st_brk_in18_sw": (_wrap(sup="sw"), T, dict(k, mut="in18"), {"T8": "reject"}),
+        "st_revf_ff-40_b_sw": (_wrap(sup="sw"), B, dict(k, mut="revf"), {"T8": "info"}),
+        "st_info_edge01_tt27_a_sw": (_wrap(sup="sw"), T, dict(k, edge="ideal"), {"T8": "info"}),
+    })
+    for nm, kw in (("sus195", dict(sus_lim=1.95)), ("cap20", dict(cap=2.0)), ("dur01", dict(dur_max=0.1e-9)),
+                   ("jn20", dict(jlim=2.0))):
+        fn, a, kk, _ = D["st_tt27_a_sw"]
+        D[f"st_chk_{nm}_sw"] = (fn, a, kk, {"T8": "reject"}, dict(judge_from="st_tt27_a_sw", **kw))
+    return D
+
+
+def gen5(out, dl):
+    gen3(out, dl)      # gen + the dpost hook on any _icur deck
+
+
 if __name__ == "__main__":
-    {"gen": gen, "gen2": lambda o: gen(o, deck_list2), "gen3": gen3, "ipost": ipost, "dpost": dpost}[sys.argv[1]](sys.argv[2])
+    {"gen": gen, "gen2": lambda o: gen(o, deck_list2), "gen3": gen3, "gen4": lambda o: gen5(o, deck_list4),
+     "gen5": lambda o: gen5(o, deck_list5), "ipost": ipost, "dpost": dpost}[sys.argv[1]](sys.argv[2])

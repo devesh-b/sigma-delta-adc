@@ -61,6 +61,11 @@ JN_PAIRS = ("sb", "db")
 # same physical rule seen two ways; the checker copies (chk_sus195, chk_cap20, chk_dur01) move one judge parameter each, so each
 # limb is shown live on its own; st_brk_noclamp (rev d latch, 2.32 V for 105 ns) is the design broken copy. Junctions (D80, single peak vs VJ18_MAX) and HV pairs (single peak vs 5.5 V) unchanged.
 V18_CAP, T18_SUS, T18_DUR = 2.2, 1e-9, 1e-9
+# D90 (WO-88): stated 1 mV numerical/leakage tolerance on the sustained limb and on the duration-limb threshold:
+# judged S <= 1.981 V, D = longest time with |V| > 1.981 V. Basis: stiff switched pin (st_*_sw); the op/on and
+# nb2/ob2 excess is a fixed +0.15..0.34 mV above the pin (WO-86). Checker copy st_chk_sus1985 (1.985 V pin) must REJECT.
+V18_TOL = 1e-3
+V18_SUS = V18_MAX + V18_TOL
 # D87 (WO-81) T8 bench basis.
 # (a) Supply: ideal V_ST at the vdd pin (0 V source, no 10 ohm feed: its drop is not device stress); limit stays 1.98 V.
 # (b) Strobe edge: C4 phiC 10-90 % rise / fall per corner, from the WO-70 C4 tim decks (/home/mempool/regr/tt/
@@ -391,7 +396,7 @@ def st_post(d):
                 continue
             xr = np.abs(node(a) - node(c))
             x = xr - exc if exc is not None else xr
-            dur, t_d = _longest_above(t, x, V18_MAX)
+            dur, t_d = _longest_above(t, x, V18_SUS)
             out += [f"RES {key}_Pr {xr.max():.7g}", f"RES {key}_P {x.max():.7g}", f"RES {key}_S {_sus_level(t, x, T18_SUS):.7g}", f"RES {key}_D {dur:.6g}",
                     f"RES {key}_tP {t[int(np.argmax(x))]:.6g}", f"RES {key}_tD {t_d:.6g}"]
         out.append(f"RES post_vddmax {w['xc.vdd' if 'xc.vdd' in w else 'vdd'].max():.7g}")
@@ -672,7 +677,7 @@ def eval_st(r, m):
     # D83 (WO-78): "18" judged as sus (S <= V18_MAX), cap (P <= cap), dur (D < dur_max), see st_post.
     # Judge-only overrides (D81 checker copies): jlim, cap, sus_lim (sustained level limit), dur_max.
     jlim, cap = m.get("jlim", VJ18_MAX), m.get("cap", V18_CAP)
-    sus_lim, dur_max = m.get("sus_lim", V18_MAX), m.get("dur_max", T18_DUR)
+    sus_lim, dur_max = m.get("sus_lim", V18_SUS), m.get("dur_max", T18_DUR)
     worst = {c: (0.0, "") for c in ("pk18", "S", "P", "D", "jn", "hv")}
     miss, bad_pk, dev = 0, [], {}
     for key, n, _, _, cls in m["pairs"]:
@@ -748,13 +753,13 @@ def collect(out):
             verd[row] = "ACCEPT" if ok else "REJECT"
             if exp != "info" and (exp == "pass") != ok:
                 off += 1
-        res[k] = dict(verdict=verd, expect=m["expect"], sanity=bad, detail={x: rows[x][1][:4] for x in rows},
+        res[k] = dict(verdict=verd, expect=m["expect"], sanity=bad, detail={x: rows[x][1] for x in rows},
                       info=info)
         if dev is not None:
             res[k]["dev"] = dev
         lines.append(f"{k:18s} " + " ".join(f"{x}={v}({m['expect'][x][0]})" for x, v in verd.items()) +
                      f" sanity={bad or 'ok'} info={info}" +
-                     ("" if all(rows[x][0] for x in verd) else f" why={ {x: rows[x][1][:3] for x in verd} }"))
+                     ("" if all(rows[x][0] for x in verd) else f" why={ {x: rows[x][1] for x in verd} }"))
     # dominant device (WO-51 item 1): sensitivity d(trip)/d(VT) x PDK sigma(dVT) per device, plus the HV injection
     sig_est, contrib = float("nan"), {}
     if "sens" in aux and "pdk" in aux:

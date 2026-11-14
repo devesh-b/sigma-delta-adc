@@ -26,6 +26,11 @@ def devices(sizes=SIZES, mut=""):
     s = {k: dict(v) for k, v in sizes.items()}
     if "kp2" in mut:      # WO-84 item 4 candidate (rev g?): op/on keeper 2x W, 0.84/0.15
         s["KP"] = dict(W=0.84, L=0.15, m=1)
+    if "kp3" in mut:      # WO-88 info: 3x keeper
+        s["KP"] = dict(W=1.26, L=0.15, m=1)
+    for tag, sz in (("rsoW05", (0.5, 0.15)), ("rsoL03", (1.0, 0.3)), ("rsoL05", (1.0, 0.5))):
+        if tag in mut:    # WO-88 cap candidates: slower op/on precharge (R0/R1 only; dp/dn R2/R3 unchanged)
+            s["RSO"] = dict(W=sz[0], L=sz[1], m=1)
     if "starve" in mut:   # 64x less W/L than the HV tail
         s["TAIL"] = dict(W=1.25, L=2.0, m=1)
     pair = NF if "in18" in mut else HVN
@@ -60,7 +65,7 @@ def devices(sizes=SIZES, mut=""):
          ("M5", PF, "op", "on", "vdd", "vdd", s["LP"]),
          ("M6", PF, "on", "op", "vdd", "vdd", s["LP"])]
     for i, n in enumerate(("op", "on", "dp", "dn")):
-        D.append((f"R{i}", PF, n, "clk", "vdd", "vdd", s["RS"]))
+        D.append((f"R{i}", PF, n, "clk", "vdd", "vdd", s["RSO" if i < 2 else "RS"]))
 
     def inv(tag, out, inp, kn, kp):
         return [(f"{tag}n", NF, out, inp, "vss", "vss", s[kn]), (f"{tag}p", PF, out, inp, "vdd", "vdd", s[kp])]
