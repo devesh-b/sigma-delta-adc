@@ -335,15 +335,16 @@ def _longest_above(t, x, lim):
     import numpy as np
     ab = x > lim
     if not ab.any():
-        return 0.0
+        return 0.0, 0.0
     d = np.diff(np.concatenate(([0], ab.astype(np.int8), [0])))
     st, en = np.nonzero(d == 1)[0], np.nonzero(d == -1)[0] - 1
-    best = 0.0
+    best, tb = 0.0, 0.0
     for i, j in zip(st, en):
         t0 = t[i] if i == 0 else t[i - 1] + (lim - x[i - 1]) / (x[i] - x[i - 1]) * (t[i] - t[i - 1])
         t1 = t[j] if j == len(x) - 1 else t[j] + (x[j] - lim) / (x[j] - x[j + 1]) * (t[j + 1] - t[j])
-        best = max(best, t1 - t0)
-    return float(best)
+        if t1 - t0 > best:
+            best, tb = t1 - t0, t0
+    return float(best), float(tb)
 
 
 def st_post(d):
@@ -362,8 +363,10 @@ def st_post(d):
             if cls != "18":
                 continue
             x = np.abs(node(a) - node(c))
-            out += [f"RES {key}_P {x.max():.6g}", f"RES {key}_S {_sus_level(t, x, T18_SUS):.6g}",
-                    f"RES {key}_D {_longest_above(t, x, V18_MAX):.6g}"]
+            dur, t_d = _longest_above(t, x, V18_MAX)
+            out += [f"RES {key}_P {x.max():.7g}", f"RES {key}_S {_sus_level(t, x, T18_SUS):.7g}", f"RES {key}_D {dur:.6g}",
+                    f"RES {key}_tP {t[int(np.argmax(x))]:.6g}", f"RES {key}_tD {t_d:.6g}"]
+        out.append(f"RES post_vddmax {w['xc.vdd' if 'xc.vdd' in w else 'vdd'].max():.7g}")
         out.append(f"RES post_npts {len(t)}")
         out.append("RES post_done 1")
     finally:
@@ -655,7 +658,7 @@ def eval_st(r, m):
         for q in ("P", "S", "D"):
             worst[q] = max(worst[q], (x[q], key))
             dv = dev.setdefault(n, {"S": (0.0, ""), "P": (0.0, ""), "D": (0.0, "")})
-            dv[q] = max(dv[q], (round(x[q], 6), key.rsplit("_", 1)[1]))
+            dv[q] = max(dv[q], (x[q], key.rsplit("_", 1)[1]))
     n_exp = len(m["pairs"])
     n_got = sum(1 for k, *_ in m["pairs"] if r.get(k) is not None)
     over = []
@@ -674,7 +677,8 @@ def eval_st(r, m):
     why = [f"n={n_got}/{n_exp}"] + ([] if post else ["no_post"]) + ([f"pk_mismatch:{bad_pk[:3]}"] if bad_pk else [])
     f = lambda w: (round(w[0], 4), w[1])
     return {"T8": [ok, why + over]}, dict(
-        S18=f(worst["S"]), P18=f(worst["P"]), D18_ns=(round(worst["D"][0] * 1e9, 3), worst["D"][1]),
+        S18=(round(worst["S"][0], 6), worst["S"][1]), P18=f(worst["P"]) + (r.get(worst["P"][1] + "_tP"),),
+        D18_ns=(round(worst["D"][0] * 1e9, 3), worst["D"][1], r.get(worst["D"][1] + "_tD")), vddmax=r.get("post_vddmax"),
         max18jn=f(worst["jn"]), maxhv=f(worst["hv"]), jlim=jlim, cap=cap, sus_lim=sus_lim, dur_ns=dur_max * 1e9,
         npts=r.get("post_npts"), dev=dev)
 
@@ -701,7 +705,7 @@ def collect(out):
         rows, info = {"cyc": eval_cyc, "one": eval_one, "st": eval_st}[m["fam"]](r, m)
         dev = info.pop("dev", None)
         if dev is not None:
-            devtab.append(f"{k}: " + " ".join(f"{n}:S{v['S'][0]:.3f}/P{v['P'][0]:.3f}/D{v['D'][0] * 1e9:.2f}ns"
+            devtab.append(f"{k}: " + " ".join(f"{n}:S{v['S'][0]:.5f}/P{v['P'][0]:.3f}/D{v['D'][0] * 1e9:.2f}ns"
                                              for n, v in sorted(dev.items())))
         verd = {}
         for row, exp in m["expect"].items():
