@@ -1276,6 +1276,8 @@ async def d_hold02_bias_late(dut):
              ("low_at_P", lambda t: 0 if t == P else 1),
              ("low_after_bdone", lambda t: 0 if t in (Bn + 2, P + 1) else 1),
              ("short_run", lambda t: 0 if t == Bn else 1),
+             ("break_late", lambda t: 0 if (t <= P - 2 or t == P - 2 + Bn) else 1),   # J > 2^PW after a clear (M66)
+             ("two_breaks", lambda t: 0 if (t <= P or t in (P + 2, P + Bn + 1)) else 1),
              ("one_short", lambda t: 1 if (t % (Bn + 1)) else 0) if P > 2 * Bn else ("one_short", lambda t: 1)]
     for name, lv_ in cases:
         got = await hold_run(tb, lv_, 2 * P + 4 * Bn)
@@ -1318,7 +1320,7 @@ async def d_hold03_glitch(dut):
         tb.set_ui(0xFF, 0)
         tb.rst_n = 0
         await tb.clks(5)
-        tb.tasks.append(g_glitch(0.12 + 0.03 * i, 0.002))
+        tb.tasks.append(g_glitch(0.3 + 0.05 * i, 0.002))
         tb.rst_n = 1
         ok = await tb.until(lambda: r.started, tb.hold_clks(40 * (1 << HOLD_B)), "slot 0 start (glitch)")
         tb.tasks = []
