@@ -48,7 +48,7 @@ module c9_seq #(
             if (fs_tick) begin
                 boot       <= ~pwr_ok;                  // D85: stay in boot (rst_analog = 1, no slot) until VAPWR-good
                 if (!pw_ctr[PW_BITS])   pw_ctr <= pw_ctr + 1'b1;
-                if (!b_ctr[BIAS_BITS])  b_ctr  <= bias_ok_s ? b_ctr + 1'b1 : {(BIAS_BITS+1){1'b0}};
+                if (!pwr_ok)            b_ctr  <= !bias_ok_s ? {(BIAS_BITS+1){1'b0}} : (b_ctr[BIAS_BITS] ? b_ctr : b_ctr + 1'b1);   // D88: a low sample restarts the run until release; saturates at done
                 c          <= c_n;
                 slot_ctr   <= ctr_n;
                 if (latch) inv_pair <= boot | cfg_change;       // first pair after rst, or after a change
