@@ -937,3 +937,11 @@ Next steps:
     - WO-77 jobs 3–5 (ngspice subprocess timeouts of 600/1500 s);
     - WO-85 job 1 (tim ss_m40 2M timed out at 5400 s).
   - **C3:** pools WO-78, WO-81-600c547 and WO-84-d651488 are DONE; WO-81-fe9e787 and WO-84-7e83397 are still running. When they finish, start a fresh C3 agent to collect, name the injection path, and give the kp2 verdict.
+- **20:45 IST, WO-76 (C1 gate B diagnosis).** Every diagnostic deck finished so far timed out because of the overload (rc 124, no data):
+  - pool C: O1 tight;
+  - pool B: dx0.8 p2;
+  - pool A jobs 1–3: nom_T, dx1.3 p2.
+
+  So there is no diagnostic result yet. Pool A has 12 jobs still queued (the O2 parts), and B job 2 / A job 4 are running. They are pre-cap pools.
+
+  **Plan:** let A/B drain now that the load is about 8. Then, under the capped lpool, rerun the failed dx0.8, dx1.3 and tight decks with deck timeouts of 30000 s or more. This is the C1 critical path; do not decide anything on WO-76 until the data exists.
