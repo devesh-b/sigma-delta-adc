@@ -190,8 +190,12 @@ def deck(kind, corner, temp, vdd, mut="none", tr=1e-6, ratio=4.6, out="o.csv", i
         uic = " uic" if (kind == "dci" or TRANFIX in ("uic", "gmin")) else ""
         an = f".tran {tmax:.3g} {tstop:.6g} 0 {tmax:.3g}{uic}"
         L.append(".option method=gear rshunt=1e12 itl4=200")   # WO-55 smoke: ff/125 aborted at t = 10 ns without
-        if kind == "tran" and TRANFIX == "gmin":
-            L.append(".option gmin=1e-12")
+        if kind == "tran":
+            # WO-80 root cause of the 125 C SIMFAIL/timeouts: the deck-wide gmin 1e-15 (1000x below the ngspice default)
+            # leaves the near-zero-bias matrix at VAPWR ~50 mV / 125 C ill-conditioned (timestep too small on vsm#branch
+            # at 11 ns or 20 us, or > 5400 s runs). abstol 1e-12 alone, trap, or reltol 1e-4 do not fix it; gmin 1e-12 +
+            # abstol 1e-12 does (exp/: s1, f2, t3 all complete, t3 254 s). Error: ~1e-12 S x 3 V = 3 pA per node vs 1 uA.
+            L.append(".option gmin=1e-12 abstol=1e-12")
         vecs = ["i(vsm)", "v(ok)", "v(vdd)", "v(vg)", "v(tsu)", "v(a)", "v(b)", "v(o1)"]
         if hint_run:
             vecs = ["i(vsm)"] + [f"v({n})" for n in nn]
@@ -293,8 +297,20 @@ def tran_eval(d, idc, tr, mut="none"):
     while kf > 0 and hi[kf - 1]:
         kf -= 1
     rises = sum(1 for k in range(1, len(t)) if hi[k] and not hi[k - 1])
+    # WO-80: every bias_ok high pulse (rise time after ramp end, width, VDD and I/Idc at the rise). Non-final pulses
+    # are the glitch-highs the C9 256-cycle counter must reject: covered when width < H_HOLD.
+    pulses, k0 = [], None
+    for k in range(len(t) + 1):
+        h = k < len(t) and hi[k]
+        if h and k0 is None:
+            k0 = k
+        elif not h and k0 is not None:
+            pulses.append(dict(rise_us=(t[k0] - tend) * 1e6, width_us=(t[k - 1] - t[k0]) * 1e6, vdd=vd[k0],
+                               i_frac=I[k0] / idc, final=k == len(t)))
+            k0 = None
+    pre = [p for p in pulses if not p["final"]]
     win = [k for k in range(len(t)) if t[k] >= tend + TSET]
-    dev = max((abs(I[k] / idc - 1) for k in win), default=1.0)   # WO-55 window, reported only
+    dev = max((abs(I[k] / idc - 1) for k in win), default=1.0)   # WO-55 window (ramp end + 10 us), reported only
     t90 = next((t[k] for k in range(len(t)) if I[k] >= 0.9 * idc), None)
     t1 = None                                         # last entry into the +-1 % band
     for k in range(len(t) - 1, -1, -1):
@@ -324,7 +340,9 @@ def tran_eval(d, idc, tr, mut="none"):
                 t1pct_after_ramp_us=None if t1 is None else (t1 - tend) * 1e6,
                 tok_after_ramp_us=None if tok is None else (tok - tend) * 1e6,
                 settle_after_ok_us=None if (t1 is None or tok is None) else (t1 - tok) * 1e6,
-                vdd_at_ok=vd[kf] if kf < len(t) else None, I_at_ok_frac=iok, ok_rises=rises,
+                vdd_at_ok=vd[kf] if kf < len(t) else None, I_at_ok_frac=iok, ok_rises=rises, ok_pulses=pulses,
+                pre_pulse_max_us=max((p["width_us"] for p in pre), default=0.0),
+                pre_pulse_covered=all(p["width_us"] * 1e-6 < H_HOLD for p in pre),
                 i_max_frac=max(I) / idc, ok_end=ok[-1], vg_end=d["v(vg)"][-1], tsu_end=d["v(tsu)"][-1],
                 va_end=d["v(a)"][-1], vb_end=d["v(b)"][-1], o1_end=d["v(o1)"][-1],
                 verdict="ACCEPT" if started else "REJECT")
@@ -527,7 +545,10 @@ def summary(out):
                  + " | dV(B-A) mV at I/Igood " + " ".join(f"{k}:{v['dv_mV']:+.3f}(va {v['va']:.3f})"
                                                        for k, v in r.get("dv_profile", {}).items()))
         else:
-            s = (f"idc {r.get('idc_uA', 0):.4f} iend {r.get('iend_uA', 0):.4f} uA dev {r.get('dev_win_pct', 0):.3f} % "
+            pl = " ".join(f"[{p['rise_us']:.1f}us w{p['width_us']:.1f} V{p['vdd']:.2f} I{p['i_frac']:.2f}"
+                          f"{' F' if p['final'] else ''}]" for p in r.get("ok_pulses", []))
+            s = (f"idc {r.get('idc_uA', 0):.4f} iend {r.get('iend_uA', 0):.4f} uA dev10us(info) {r.get('dev_win_pct', 0):.3f} % "
+                 f"pulses {pl} pre-covered {r.get('pre_pulse_covered')} "
                  f"t90 {fmt(r.get('t90_after_ramp_us'))} t1% {fmt(r.get('t1pct_after_ramp_us'))} tok "
                  f"{fmt(r.get('tok_after_ramp_us'))} us settle-after-ok {fmt(r.get('settle_after_ok_us'))} us "
                  f"VDD@ok {fmt(r.get('vdd_at_ok'))} I@ok {fmt(r.get('I_at_ok_frac'))} rises {r.get('ok_rises')} "
