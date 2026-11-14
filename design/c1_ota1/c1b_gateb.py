@@ -137,6 +137,8 @@ def cfg(a):
     bias = NL.bias_currents(bst)
     if a.copy != "nom":
         bias = {k: v * scales[a.copy] for k, v in bias.items()}   # M2: all six ports, not the tail alone
+    if getattr(a, "bias_scale", 1.0) != 1.0:
+        bias = {k: v * a.bias_scale for k, v in bias.items()}   # WO-76 diagnostic only
     u = TB.u_points(a.m, 0.9)
     if a.part:
         i, k = map(int, a.part.split("/"))
@@ -159,6 +161,10 @@ def main():
     ap.add_argument("--deck-timeout", type=int, default=7000)
     ap.add_argument("--combine", type=int, default=0, help="combine K part jsons of this copy/opt/n in OUT, then exit")
     ap.add_argument("--mode", default="boost", choices=tuple(MODES), help="boost: 4 MHz, 5 ppm; prec: base bias, 2 MHz, 1.333 ppm (WO-63)")
+    # WO-76 diagnostics (not design changes): --tight = after the --opt ladder, reltol/10, vntol/100, abstol/100, tmax/2;
+    # --bias-scale = all six bias ports x S (diagnostic deck only; tag suffix _dx<S>).
+    ap.add_argument("--tight", action="store_true", help="WO-76: reltol/10, vntol/100, abstol/100, tmax/2 on top of --opt (tag _T)")
+    ap.add_argument("--bias-scale", type=float, default=1.0, help="WO-76 diagnostic: all six bias ports x S (tag _dx<S>)")
     a = ap.parse_args()
     _, _, gate, pfx, _, scales = MODES[a.mode]
     if a.copy != "nom" and a.copy not in scales:
@@ -180,9 +186,14 @@ def main():
         sys.exit(0 if r["pass_gate"] else 1)
     os.makedirs(a.out, exist_ok=True)
     P.SPICE_OPTIONS_TIER1.update(P.option_ladder(a.opt))
+    if a.tight:
+        o_ = P.SPICE_OPTIONS_TIER1
+        o_.update(reltol=o_["reltol"] / 10, vntol=o_["vntol"] / 100, abstol=o_["abstol"] / 100, tmax_ns=o_["tmax_ns"] / 2)
+        print("tight options:", {k: o_[k] for k in ("reltol", "vntol", "abstol", "tmax_ns", "chgtol")})
     TB.DECK_TIMEOUT_S = a.deck_timeout
     c, corner = cfg(a)
     tag = f"{pfx}_{a.copy}_{a.opt}_N{a.n}" + (f"_p{a.part.replace('/', 'o')}" if a.part else "")
+    tag += ("_T" if a.tight else "") + (f"_dx{a.bias_scale:g}" if a.bias_scale != 1.0 else "")
     if a.mode == "prec":
         print(f"prec mode: base bias, fs 2 MHz, OTA2 13.5 V/us / 10 MHz, gate {gate} ppm; base SR "
               f"{S.I_TAIL * (scales.get(a.copy, 1.0)) / 1.4e-12 / 1e6:.2f} V/us at 1.4 pF (copy {a.copy})")
