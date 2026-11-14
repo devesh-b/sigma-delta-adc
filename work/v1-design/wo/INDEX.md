@@ -95,3 +95,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-79 C4d triage + inj abort + D82 (Opus): dispatched 2026-11-14
 - WO-80 C6e MISMATCH 18 + R1 144.8 verify (Opus): dispatched 2026-11-14
 - WO-75 resumed after network drop (pool done, collecting)
+- WO-77 handed off (0328c57): tb7 noise deck nodeset from op, mutants split per deck; pool /home/mempool/regr/tt/WO-77-87a05a2/out/logs/POOL_DONE, pickup in results/wo77/README.md (coordinator collects)
