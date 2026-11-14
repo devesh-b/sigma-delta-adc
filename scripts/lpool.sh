@@ -16,6 +16,13 @@
 # per job and oversubscribes the 6 cores.
 # Notes: our jobs are counted from this script's own children (no pgrep, so no self-match).
 # load1 lags by about a minute, which is why there is a short settle sleep after each launch.
+#
+# Global cap (user decision 2026-11-14): every lpool instance shares GMAX slots (default 5),
+# held as flock locks on files in SLOTDIR (default /home/mempool/regr/tt/.lpool_slots). The
+# main shell takes a free slot lock, the job subshell inherits the descriptor, and the parent
+# closes its copy, so the lock is released only when the job (and its children) exit. Several
+# pools running at once therefore never exceed GMAX jobs in total. The per-pool load rule
+# still applies on top of the cap.
 
 JOBFILE=${1:?usage: lpool.sh JOBFILE [LOGDIR]}
 LOGDIR=${2:-$(dirname "$JOBFILE")/pool_logs}
@@ -23,7 +30,9 @@ NPROC=$(env -u OMP_NUM_THREADS nproc)   # GNU nproc honours OMP_NUM_THREADS; ign
 MAXJOBS=${MAXJOBS:-$NPROC}
 MARGIN=${MARGIN:-0.5}
 POLL=${POLL:-20}
-mkdir -p "$LOGDIR"
+GMAX=${GMAX:-5}
+SLOTDIR=${SLOTDIR:-/home/mempool/regr/tt/.lpool_slots}
+mkdir -p "$LOGDIR" "$SLOTDIR"
 export OMP_NUM_THREADS=1
 [ -f .spiceinit ] || printf 'set num_threads=1\n' > .spiceinit
 
@@ -51,18 +60,31 @@ compute_slots() {
   [ "$NSLOT" -gt "$MAXJOBS" ] && NSLOT=$MAXJOBS
 }
 
+SLOTFD=
+GSLOT=
+acquire_gslot() {   # take one free global slot lock; return 1 if all GMAX are held
+  local s fd
+  for ((s=0; s<GMAX; s++)); do
+    exec {fd}>"$SLOTDIR/slot$s"
+    if flock -n "$fd"; then SLOTFD=$fd; GSLOT=$s; return 0; fi
+    exec {fd}>&-
+  done
+  return 1
+}
+
 i=0
 for j in "${JOBS[@]}"; do
   i=$((i+1))
   while :; do
     count_running; compute_slots
-    [ "$NRUN" -lt "$NSLOT" ] && break
+    if [ "$NRUN" -lt "$NSLOT" ] && acquire_gslot; then break; fi
     sleep "$POLL"
   done
   ( nice -n 10 bash -c "$j" > "$LOGDIR/job_$i.log" 2>&1; echo "EXIT=$?" >> "$LOGDIR/job_$i.log" ) &
   PIDS+=("$!")
+  exec {SLOTFD}>&-   # the job keeps the inherited lock; ours is closed
   count_running
-  echo "launch $i $(date +%T) running=$NRUN slots=$NSLOT load=$(cut -d' ' -f1 /proc/loadavg) :: $j" >> "$LOGDIR/pool.status"
+  echo "launch $i $(date +%T) running=$NRUN slots=$NSLOT gslot=$GSLOT/$GMAX load=$(cut -d' ' -f1 /proc/loadavg) :: $j" >> "$LOGDIR/pool.status"
   sleep 30   # let load1 catch up before the next decision
 done
 wait
