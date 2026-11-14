@@ -945,3 +945,4 @@ Next steps:
   So there is no diagnostic result yet. Pool A has 12 jobs still queued (the O2 parts), and B job 2 / A job 4 are running. They are pre-cap pools.
 
   **Plan:** let A/B drain now that the load is about 8. Then, under the capped lpool, rerun the failed dx0.8, dx1.3 and tight decks with deck timeouts of 30000 s or more. This is the C1 critical path; do not decide anything on WO-76 until the data exists.
+- **21:40 IST.** WO-76 dx0.8/dx1.3 p2/p4 relaunched under capped lpool, timeout 40000 s: `WO-76-f00f9bf/out/logs_r`, marker `out/R_DONE`, results in `out/gb/c1_dx08` and `c1_dx13`. Pool A (O2) is still draining.
