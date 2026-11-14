@@ -45,9 +45,9 @@ ss/-40 parts p2 and p4 (each REJECTs on its own). Every combine is healthy (no p
 | c3 fs/125/3.0 nom | 0.967 | 0.968 / 0.763 | ACCEPT (>= gate/2, O2 needed) |
 | c3 fs/125/3.0 srknee (must REJECT) | 1.375 | 1.374 / 1.203 | REJECTED (good), margin only 3 % over the gate |
 
-Per-part srknee INL p0..p5: 1.375, 1.180, 1.135, 0.044 (p3: points -0.54, 0, 0.54 sit on zero crossings of its residual), 1.15, 1.18, 1.37 ppm;
+Per-part srknee INL p0..p5: 1.375, 1.180, 1.135, 0.044 (p3: points -0.54, 0, 0.54 sit on zero crossings of its residual), 1.153, 1.179 ppm;
 only p0 and the combine reject. Gate rule: O1 >= gate/2 (0.667) needs O2 at tt (0.692), ss/125 (0.698) and fs/125 too;
-WO-76 runs O2 at ss/-40 and fs/125 only. only the combine rejects. Per-point residuals and the WO-76 follow-up: `results/wo76/README.md`.
+WO-76 runs O2 at ss/-40 and fs/125 only. Per-point residuals and the WO-76 follow-up: `results/wo76/README.md`.
 
 ## Pickup
 ```
