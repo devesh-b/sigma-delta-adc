@@ -32,7 +32,9 @@ Bench commits 9f4bab2 (bench) and the job-file commit after it. Frozen copy `/ho
 - d_hold05_d88 s1: PASS. d_hold02_bias_late s1: PASS. Both run at 4/2.
 - Formal PDR at 3/2: F18 PASS (14 s), F19 PASS (19 s).
 
-## Full regression (pool, 124 jobs): launched 2026-11-14 15:30 at load 10; results pending
+## Full regression (pool, 124 jobs): launched 2026-11-14 15:30; results pending
+At 17:30 the load was 44-53 (pools from WO-76, WO-77 and WO-80), so lpool had started only job 1 (fmlw 16/8 F18,
+4 h timeout). The pool keeps running unattended, and finishing it is expected to take many hours.
 Job file `design/c9_digital/tb/wo83_jobs.txt`:
 - fmlw 16/8, F18 and F19 (4 h timeout each);
 - real d_hold01_len and real d_hold05_d88 (16/8);
