@@ -31,6 +31,8 @@ Under the single-peak rule they fail by construction (checker rule, fixed by D83
 3. Expected from WO-68 probe2 (to be confirmed by the pool): R1/M6/R3 Vds 2.025–2.033 V for 61–75 ns, i.e. on/dn
    at −47…−56 mV after the x2 = −0.5 V step pulls tl to −0.52 V. Sustained 45–55 mV over ⇒ **design/stimulus issue** (Q3).
 
+**Full st_tt27_a (pool job 1, partial collect in `$F/partial`):** S = 2.0460 V on M3/M4 gb, Bo1/Bn1 (nodes op/on), above 1.98 V for 126 ns; P 2.280 V at 2494 ns; 12 pairs > 2.2 V. op/on sit ≈ 66 mV above VDPWR for a whole strobe phase: after the strobe edge no device pulls them down when the pair is off (x2 at −0.5 V). **This is a real sustained violation (design issue), the main one; the µV supply rise (1.98194 V) is secondary.** M5/M6 Vds 2.025 V for 61 ns confirmed (reason 3). Checker copies currently all show `over:sus, over:cap` (trivially REJECT, see caveat).
+
 ## Item 4: rev f — not run (budget). Smallest single-change candidates for the coordinator to choose:
 - for (2): slower precharge edge (R0–R3 / P1–P2 smaller W) or a realistic strobe edge from C4 (bench change, Q2);
 - for (3): clamp of tl to vss (NMOS diode) so the −0.5 V x2 step cannot pull the 1.8 V stack below ground.
