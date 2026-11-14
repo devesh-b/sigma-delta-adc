@@ -109,3 +109,9 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-80 final summary MISMATCH 16; D89 (redefine bias_ok row); WO-87 C6f dispatched 2026-11-15
 - WO-86 handed off (7d9e174, 67e104b): rev f vs rev e collected; +0.344 mV fixed above pin; kp2 cap still 2.2062 at ff/-40; no base passes. D90 (1 mV tolerance). WO-88 C3k dispatched 2026-11-15
 - WO-88 handed off (2a923df, bfc8611, accb2bc): D90 in c3_tb (V18_SUS 1.981), sus1985 copy, CL-39; cap mechanism = on pulled by R1 lifts op via Cgd; candidates RSO 0.5/0.15, 1.0/0.3, 1.0/0.5 + kp3 in runA (/home/mempool/regr/tt/WO-88-2a923df/runA, 33 jobs) + rev f cyc rows; leak probe /home/mempool/regr/tt/WO-88-bfc8611/runI/st_sw_icur. Next: fresh agent per results/wo88/README pickup 1-7 (pick candidate -> rev g -> pool B full set)
+- WO-87 handed off (4086317, 41aa132, 023d39d). D89 gate: settle ±1 % ≤ 4.1 ms after the final rise; `rises==1` and `I@ok>=50%` removed. 125 °C fast ramp: gmin 1e-11 (1 µs ramps only). oldhint retired to INFO, replaced by zhint/zhintnk. CL-38. Pool `/home/mempool/regr/tt/WO-87-41aa132/out/pool` (42 jobs).
+  - **Coordinator rulings:**
+    - (1) Removing `I@ok>=50%` matches D89 (the fs/125 2 %-current final rise is a case D89 covers). Confirmed.
+    - (2) The broken copy `early` is retired to INFO: under D89 plus D88 its fault is harmless.
+    - (3) `hy1` stays a must-REJECT. A follow-up adds a deterministic ripple/noise stimulus on VAPWR near the bias_ok threshold. Losing hysteresis makes bias_ok chatter, and under D88 every drop restarts the 256-cycle count, so release could be delayed without bound. That is a real failure mode the noiseless bench cannot see.
+    - (4) WO-87-exp2 is a leftover experiment pool; let it finish.
