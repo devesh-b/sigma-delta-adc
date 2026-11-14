@@ -191,5 +191,96 @@ def ipost(d):
     print("\n".join(L))
 
 
+
+# WO-86 (C3j) set 3: device terminal currents (no ammeters: an ideal source on vdd aborts at the ramp corner).
+IDEV = {  # instance -> PDK inner model (the m-line inside the PDK subckt)
+    **{n: "nfet_01v8" for n in ("M3", "M4", "Bn2n", "Bo2n", "Bo1n", "Bn1n", "Sb3", "Sq3")},
+    **{n: "pfet_01v8" for n in ("M5", "M6", "R0", "R1", "R2", "R3", "KPo", "KPn", "Bn2p", "Bo2p", "Bo1p", "Bn1p",
+                                "Sb1", "Sq1")},
+    **{n: "nfet_g5v0d10v5" for n in ("M1", "M2", "K1", "K2")},
+    **{n: "pfet_g5v0d10v5" for n in ("P1", "P2")},
+}
+
+
+def _ivec(n, term):
+    return f"@m.xc.x{n.lower()}.msky130_fd_pr__{IDEV[n]}[i{term}]"
+
+
+def _isave(fn):
+    def f(*a, **k):
+        text, meta = fn(*a, **k)
+        vec = " ".join(_ivec(n, tm) for n in IDEV for tm in ("d", "s", "b"))
+        out = []
+        for ln in text.splitlines():
+            if ln.startswith("tran ") and not out[-1].startswith("save all"):
+                out.append("save all " + vec)
+            if ln.startswith("write st.raw"):
+                ln += " " + vec
+            out.append(ln)
+        meta["probe"] = dict(meta.get("probe", {}), isave=True)
+        return "\n".join(out) + "\n", meta
+    return f
+
+
+def deck_list3():
+    T = ("tt", 27, "a")
+    return {"st_sw_icur": (_isave(_wrap(sup="sw")), T, dict(sub=False), {"T8": "pass"}),
+            "st_kp2_sw_icur": (_isave(_wrap(sup="sw")), T, dict(sub=False, mut="kp2"), {"T8": "pass"})}
+
+
+def dpost(d):
+    """Longest run with node > vdd (t > 600 ns) for op/on/nb2/ob2/dp/dn/ap/an; mean excess and the mean drain /
+    source / bulk current of every saved device over that run (ngspice sign: + = into the terminal)."""
+    import numpy as np
+    w = c3_tb._read_raw(os.path.join(d, "st.raw"))
+    t, vdd = w["time"], w["vdd"]
+    ss = t > 600e-9
+    dtw = np.gradient(t)
+    avg = lambda x, k: float((x[k] * dtw[k]).sum() / dtw[k].sum())
+    term = {"d": 1, "g": 2, "s": 3, "b": 4}
+    deck = open(os.path.join(d, "deck.sp")).read().splitlines()
+    pins = {ln.split()[0][1:]: ln.split()[1:5] for ln in deck if ln.startswith("X") and ln.split()[0][1:] in IDEV}
+    L = [f"npts={len(t)} vdd max {vdd[ss].max():.7f}"]
+    for nd in ("op", "on", "nb2", "ob2", "dp", "dn", "ap", "an"):
+        x = w.get(f"xc.{nd}")
+        if x is None:
+            continue
+        e = x - vdd
+        runs = sorted(((b - a, a, b) for a, b in _runs(t, ss & (e > 0)) if b > a), reverse=True)
+        if not runs:
+            L.append(f"{nd}: never above vdd after 600 ns (max {e[ss].max() * 1e6:.2f} uV)")
+            continue
+        _, a, b = runs[0]
+        k = (t >= a) & (t <= b)
+        L.append(f"{nd}: longest above vdd {(b - a) * 1e9:.1f} ns ({a * 1e9:.1f}-{b * 1e9:.1f}), excess mean "
+                 f"{avg(e, k) * 1e6:.2f} uV max {e[k].max() * 1e6:.2f} uV; V(clk) mean {avg(w['clk'], k):.3f}; "
+                 f"x2p/x2n {avg(w['x2p'], k):.3f}/{avg(w['x2n'], k):.3f}; ap/an {avg(w['xc.ap'], k):.4f}/"
+                 f"{avg(w['xc.an'], k):.4f}; dp/dn {avg(w['xc.dp'], k):.5f}/{avg(w['xc.dn'], k):.5f}")
+        rows = []
+        for n, p in pins.items():
+            for tm in ("d", "s", "b"):
+                if p[term[tm] - 1] == nd:
+                    v = w.get(_ivec(n, tm).lower())
+                    if v is not None:
+                        rows.append((avg(v, k), f"{n}.{tm}"))
+        L.append("   into-terminal mean currents on this node (nA; - = device pushes current into the node): "
+                 + ", ".join(f"{nm} {c * 1e9:.3f}" for c, nm in sorted(rows)))
+    open(os.path.join(d, "dpost.txt"), "w").write("\n".join(L) + "\n")
+    print("\n".join(L))
+
+
+def gen3(out):
+    gen(out, deck_list3)
+    jf = os.path.join(os.path.abspath(out), "jobs.txt")
+    me = os.path.abspath(__file__)
+    J = []
+    for ln in open(jf).read().split("\n"):
+        if "_icur" in ln and "ngspice" in ln:
+            d = ln.split()[1]
+            ln = ln.replace(f"; {sys.executable}", f"; {sys.executable} {me} dpost {d} > {d}/dpost.log 2>&1; {sys.executable}", 1)
+        J.append(ln)
+    open(jf, "w").write("\n".join(J))
+
+
 if __name__ == "__main__":
-    {"gen": gen, "gen2": lambda o: gen(o, deck_list2), "ipost": ipost}[sys.argv[1]](sys.argv[2])
+    {"gen": gen, "gen2": lambda o: gen(o, deck_list2), "gen3": gen3, "ipost": ipost, "dpost": dpost}[sys.argv[1]](sys.argv[2])
