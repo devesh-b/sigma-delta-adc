@@ -982,3 +982,4 @@ Next steps:
   - Next: combine `c1_nom_O2` and the fs/125 O2 parts.
   - If O2 passes, the gate rule says O2 is the converged result (D48), so no design change is needed. Report this to the user as the finding.
 - C3 pools are all done. WO-86 dispatched (fresh agent).
+- **01:40 IST.** WO-76: O2 ss/−40 p2 = 0.160 ppm, against 1.706 at O1. That is the second part to confirm the O1 artefact (p0 0.142 vs 1.330). The other O2 parts are queued under the cap.
