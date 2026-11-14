@@ -1,6 +1,9 @@
 // C9 fs_tick sequencer: slot counter c (slot = N+2 fs cycles), frame_ctr, reset window, chop,
 // forced y[0] / retime flop, analog control outputs (all active high). All updates on fs_tick.
-module c9_seq (
+module c9_seq #(
+    parameter PW_BITS   = 16,   // D85: rstb held until 2^PW_BITS fs cycles after the synchronised rst_n release
+    parameter BIAS_BITS = 8     // D85: and bias_ok high for 2^BIAS_BITS consecutive fs cycles
+) (
     input  wire        clk,
     input  wire        rst_n,
     input  wire        fs_tick,
@@ -9,6 +12,7 @@ module c9_seq (
     input  wire        sys_en_n,
     input  wire        ota_en_n,
     input  wire        cfg_change,
+    input  wire        bias_ok_s,    // C6 bias_ok, already synchronised (2 FF), active high
     output wire        latch,        // this fs_tick starts an even slot (pair boundary)
     output wire        load,         // this fs_tick ends a slot (hold load), not the boot tick
     output reg         boot,         // waiting for the first slot after rst
@@ -22,6 +26,10 @@ module c9_seq (
     output reg         acc_clear,    // c == 1: the edge that ends it clears the accumulators
     output reg         y_dac         // the retimed DAC flop = decimator input = raw bit
 );
+    // D85 VAPWR-good counters (fs_tick domain). Bit PW_BITS / BIAS_BITS is the sticky done flag (counter freezes).
+    reg [PW_BITS:0]   pw_ctr;
+    reg [BIAS_BITS:0] b_ctr;
+    wire pwr_ok = pw_ctr[PW_BITS] & b_ctr[BIAS_BITS];
     reg [12:0] c;
     wire [12:0] c_last = (13'd64 << {n_code, 1'b0}) + 13'd1;   // N + 1
     wire       slot_start = boot | (c == c_last);
@@ -34,10 +42,13 @@ module c9_seq (
         if (!rst_n) begin
             c <= 13'd0; boot <= 1'b1; inv_pair <= 1'b1; slot_ctr <= 8'd0;
             rst_analog <= 1'b1; sys_swap <= 1'b0; ota_chop <= 1'b0; y_force <= 1'b0;
+            pw_ctr <= {(PW_BITS+1){1'b0}}; b_ctr <= {(BIAS_BITS+1){1'b0}};
             bit_valid <= 1'b0; acc_clear <= 1'b0; y_dac <= 1'b0;
         end else begin
             if (fs_tick) begin
-                boot       <= 1'b0;
+                boot       <= ~pwr_ok;                  // D85: stay in boot (rst_analog = 1, no slot) until VAPWR-good
+                if (!pw_ctr[PW_BITS])   pw_ctr <= pw_ctr + 1'b1;
+                if (!b_ctr[BIAS_BITS])  b_ctr  <= bias_ok_s ? b_ctr + 1'b1 : {(BIAS_BITS+1){1'b0}};
                 c          <= c_n;
                 slot_ctr   <= ctr_n;
                 if (latch) inv_pair <= boot | cfg_change;       // first pair after rst, or after a change

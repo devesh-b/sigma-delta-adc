@@ -11,6 +11,7 @@ module tt_um_sd_adc_c9 (
     input  wire       rst_n,
     // analog interface (not TT pins)
     input  wire       comp_in,
+    input  wire       bias_ok,
     output wire       fs_clk,
     output wire       rst_analog,
     output wire       sys_swap,
@@ -25,7 +26,7 @@ module tt_um_sd_adc_c9 (
 );
     wire _unused = &{1'b0, ena, uio_in};
     assign uio_oe = 8'hFF;
-    sd_adc_c9 u_core (.clk(clk), .rst_n(rst_n), .ui_in(ui_in), .comp_in(comp_in), .uo_out(uo_out),
+    sd_adc_c9 u_core (.clk(clk), .rst_n(rst_n), .ui_in(ui_in), .comp_in(comp_in), .bias_ok(bias_ok), .uo_out(uo_out),
                     .uio_out(uio_out), .fs_clk(fs_clk), .rst_analog(rst_analog), .sys_swap(sys_swap),
                     .ota_chop_phase(ota_chop_phase), .short_o(short_o), .order_o(order_o), .boost_o(boost_o),
                     .trim_o(trim_o), .y_force(y_force), .bit_valid(bit_valid), .y_dac(y_dac));

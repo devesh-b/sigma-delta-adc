@@ -1,10 +1,14 @@
 // C9 digital macro core (one clock domain, clk = 48 MHz). Macro top (D72): no tt_um_ prefix; tt_um_sd_adc_c9 is a sim-only wrapper.
 /* verilator lint_off DECLFILENAME */  // file keeps its c9_core.v name (tb/ file lists); module is sd_adc_c9
-module sd_adc_c9 (
+module sd_adc_c9 #(
+    parameter PW_BITS   = 16,
+    parameter BIAS_BITS = 8
+) (
     input  wire       clk,
     input  wire       rst_n,
     input  wire [7:0] ui_in,
     input  wire       comp_in,       // comparator output, captured into the DAC flop on fs_tick (D74)
+    input  wire       bias_ok,       // C6 bias good, active high, asynchronous (D85)
     output wire [7:0] uo_out,
     output wire [7:0] uio_out,
     // analog control, all active high
@@ -27,14 +31,15 @@ module sd_adc_c9 (
         else        begin r1 <= 1'b1; rs <= r1;   end
     end
     // input synchronisers (2 FF) for cfg_*, rd
-    reg [1:0] sck, sdat, sld, srd;
+    reg [1:0] sck, sdat, sld, srd, sbias;
     reg       rd_p;
     always @(posedge clk or negedge rs) begin
-        if (!rs) begin sck <= 2'd0; sdat <= 2'd0; sld <= 2'd0; srd <= 2'd0; rd_p <= 1'b0; end
+        if (!rs) begin sck <= 2'd0; sdat <= 2'd0; sld <= 2'd0; srd <= 2'd0; sbias <= 2'd0; rd_p <= 1'b0; end
         else begin
             sck <= {sck[0], ui_in[4]}; sdat <= {sdat[0], ui_in[5]};
             sld <= {sld[0], ui_in[6]}; srd  <= {srd[0],  ui_in[3]};
             rd_p <= srd[1];
+            sbias <= {sbias[0], bias_ok};
         end
     end
     wire rd_rise = srd[1] & ~rd_p;
@@ -55,8 +60,8 @@ module sd_adc_c9 (
                   .latch(latch), .act(act), .change(cfg_change), .sys_en_n(sys_en_n), .ota_en_n(ota_en_n),
                   .cfg_pending(cfg_pending));
 
-    c9_seq u_seq (.clk(clk), .rst_n(rs), .fs_tick(fs_tick), .comp_in(comp_in),
-                  .n_code(act[11:10]), .sys_en_n(sys_en_n), .ota_en_n(ota_en_n), .cfg_change(cfg_change),
+    c9_seq #(.PW_BITS(PW_BITS), .BIAS_BITS(BIAS_BITS)) u_seq (.clk(clk), .rst_n(rs), .fs_tick(fs_tick), .comp_in(comp_in),
+                  .n_code(act[11:10]), .sys_en_n(sys_en_n), .ota_en_n(ota_en_n), .cfg_change(cfg_change), .bias_ok_s(sbias[1]),
                   .latch(latch), .load(load), .boot(boot), .inv_pair(inv_pair), .slot_ctr(slot_ctr),
                   .rst_analog(rst_analog), .sys_swap(sys_swap), .ota_chop(ota_chop_phase), .y_force(y_force),
                   .bit_valid(bit_valid), .acc_clear(acc_clear), .y_dac(y));
