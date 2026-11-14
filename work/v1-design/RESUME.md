@@ -946,3 +946,13 @@ Next steps:
 
   **Plan:** let A/B drain now that the load is about 8. Then, under the capped lpool, rerun the failed dx0.8, dx1.3 and tight decks with deck timeouts of 30000 s or more. This is the C1 critical path; do not decide anything on WO-76 until the data exists.
 - **21:40 IST.** WO-76 dx0.8/dx1.3 p2/p4 relaunched under capped lpool, timeout 40000 s: `WO-76-f00f9bf/out/logs_r`, marker `out/R_DONE`, results in `out/gb/c1_dx08` and `c1_dx13`. Pool A (O2) is still draining.
+- **22:55 IST, WO-76 rerun results (ss/−40, O1, N 1024, per part).** Runtime ~1200 s per part at load 8.
+
+  | part | nom | dx0.8 | dx1.3 |
+  |---|---|---|---|
+  | p2 | 1.706 | 1.281 | 1.494 |
+  | p4 | 1.671 | 1.226 | pending |
+
+  - Both directions improve, so the response is non-monotonic; dx0.8 helps more. That is consistent with the PM/fp2 hypothesis but not conclusive.
+  - Launched the remaining dx0.8 parts (p0, p1, p3, p5) for a full 6-part combine: `out/logs_r2`, `R2_DONE`.
+  - **Next:** combine dx0.8 (`c1b_gateb.py out/gb/c1_dx08 --mode prec --combine 6 --copy nom`) together with the O2 pool A results. Then a fresh Opus agent writes the options with data: PM sizing (C) vs bias. Do not pick from per-part numbers.
