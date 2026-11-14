@@ -77,6 +77,13 @@ N_HY = 4                       # WO-64: hysteresis units into q while ok high (W
 TSET, LIM_SU = 10e-6, 0.01     # (WO-55 window, superseded) / +-1 % band
 H_HOLD = 256 / 4e6             # D78: C9 rstb hold after the final bias_ok rise, 256 fs cycles at 4 MHz = 64 us
 T_CNT = 2 ** 16 / 4e6          # WO-64 VAPWR-good = C9 count: 2^16 fs cycles (16.4 ms) after rst_n release (ramp start)
+# D89 (WO-87): start-up row = settle (+-1 %) after the FINAL bias_ok rise <= LIM_D89. The hold that must cover it is
+# the C9 VAPWR-good count, 2^16 fs cycles after rst_n (16.4 ms at the fastest fs, 4 MHz; slower fs = longer hold).
+# 25 % of it (4.1 ms) leaves 4x for fs/count uncertainty and model error; the WO-80 worst (sf/-40 10 ms) is 1.68 ms
+# (41 % of the limit). Earlier bias_ok pulses are reported only (D88 restarts the C9 bias run on any drop).
+LIM_D89 = 0.25 * T_CNT
+EARLY_K = 16                   # early broken copy: Mk x16 (WO-55); earlyx: Mk x1000 (flag clear at ~zero current)
+SLOW_TAU = 1.2e-3              # slow broken copy: master-leg gate RC (1 G x 1.2 pF); 1 % at ~4.6 tau = 5.5 ms > LIM_D89
 VPRE = 0.05                    # tran: VAPWR before the ramp (V); below every device threshold
 WIN_MIN = 20e-6               # at least this much simulated time after rstb release
 HINT_AGREE = 0.005             # dct first point vs transient-from-0 current
@@ -125,8 +132,8 @@ def deck(kind, corner, temp, vdd, mut="none", tr=1e-6, ratio=4.6, out="o.csv", i
     lk = ["lk0"] + [f"l{i}" for i in range(1, NLK)] + ["tsu"]
     nn += lk[1:-1]
     L += ["Vlk vdd lk0 0"] + [x(f"lk{i}", lk[i + 1], "0", lk[i], "vdd", P5, UW, UL) for i in range(NLK)]
-    L.append(x("mk", "tsu", "vn", "0", "0", N5, MK_W * (16 if mut == "early" else 1), MK_L))
-    if mut == "early":                       # broken copy: bias_ok straight from the leaker flag, released early
+    L.append(x("mk", "tsu", "vn", "0", "0", N5, MK_W * {"early": EARLY_K, "earlyx": 1000}.get(mut, 1), MK_L))
+    if mut in ("early", "earlyx"):                     # broken copy: bias_ok straight from the leaker flag, released early
         nn.append("okx")                     # ok = NOT tsu (as in WO-50): okx = NOT tsu, sua = NOT okx
         L += [x("i0p", "okx", "tsu", "vdd", "vdd", P5, 1, 1), x("i0n", "okx", "tsu", "0", "0", N5, 1, 1),
               x("i1p", "sua", "okx", "vdd", "vdd", P5, 1, 1), x("i1n", "sua", "okx", "0", "0", N5, 1, 1)]
@@ -140,17 +147,23 @@ def deck(kind, corner, temp, vdd, mut="none", tr=1e-6, ratio=4.6, out="o.csv", i
               x("i1p", "sua", "q", "vdd", "vdd", P5, UW, UL), x("i1n", "sua", "q", "0", "0", N5, 1, 1)]
     L += [x("i2p", "ok", "sua", "vdd", "vdd", P5, 1, 1), x("i2n", "ok", "sua", "0", "0", N5, 1, 1)]
     # kick into o1 while ok is low (not in the loop-break deck)
-    if mut != "nosu" and kind != "loop":
+    if mut not in ("nosu", "zhintnk") and kind != "loop":
         kn = ["kq"] + [f"k{i}" for i in range(1, NKK)] + ["o1"]
         nn += kn[:-1]
         L += [x("mkw", "kq", "ok", "vdd", "vdd", P5, 1, 1)] + [x(f"kc{i}", kn[i + 1], "0", kn[i], "vdd", P5, UW, UL)
                                                               for i in range(NKK)]
     # master leg (code 100) into the NMOS diode VN
-    L += [x("mm", "mo", "vg", "vdd", "vdd", P5, UW, UL, G0 + CODE_RESET), "Vsm mo vn 0",
+    if mut == "slow":                        # WO-87 broken copy for D89: the measured leg settles with tau SLOW_TAU
+        nn.append("vgm")
+        L += [f"Rgm vg vgm 1e9", f"Cgm vgm vdd {SLOW_TAU / 1e9:g}"]
+    L += [x("mm", "mo", "vgm" if mut == "slow" else "vg", "vdd", "vdd", P5, UW, UL, G0 + CODE_RESET), "Vsm mo vn 0",
           x("mn", "vn", "vn", "0", "0", N5, MN_W, MN_L)]
     if init in ("0", "v"):                   # dci: .ic every node = 0 / = VDD (with uic)
         val = 0.0 if init == "0" else vdd            # pnp emitters capped at 0.8 V (3 V on a pnp is not a state)
         L.append(".ic " + " ".join(f"v({n})={(min(val, 0.8) if n in ('a', 'b', 'c') else val):g}" for n in nn))
+    elif kind == "dct" and mut in ("zhint", "zhintnk"):  # WO-87: nodeset on the zero-current state (core off)
+        z = dict(a=0, b=0, c=0, vg=vdd, o1=0, n1=0, t=vdd, vn=0, mo=0, tsu=vdd, ok=0, sua=vdd, q=0, tc=vdd, n2=0, hy=vdd)
+        L.append(".nodeset " + " ".join(f"v({k})={v:g}" for k, v in z.items() if k in nn))
     elif kind == "dct" and hint and mut != "oldhint":   # WO-64: nodeset from the transient-from-0 state (physical)
         L.append(".nodeset " + " ".join(f"v({k})={v:.6g}" for k, v in hint.items() if k in nn))
     elif kind in ("dct", "dcv", "op"):       # static hint (WO-55; oldhint broken copy); result checked for physics
@@ -315,7 +328,8 @@ def tran_eval(d, idc, tr, mut="none"):
     t1 = None                                         # last entry into the +-1 % band
     for k in range(len(t) - 1, -1, -1):
         if abs(I[k] / idc - 1) > LIM_SU:
-            t1 = t[k + 1] if k + 1 < len(t) else None
+            # WO-87: still outside the band at the last sample = never settled (was None = "settled", a blind spot)
+            t1 = t[k + 1] if k + 1 < len(t) else math.inf
             break
     tok = t[kf] if kf < len(t) else None
     iok = I[kf] / idc if kf < len(t) else None
@@ -331,9 +345,15 @@ def tran_eval(d, idc, tr, mut="none"):
     settled = t1 is None or (rel is not None and t1 <= rel)
     longwin = rel is not None and t[-1] - rel >= WIN_MIN
     okw = bool(rwin) and all(ok[k] > 0.9 * vd[k] for k in rwin)
-    started = (rdev <= LIM_SU and settled and longwin and okw and iok is not None and iok >= IOK_MIN
-               and idc >= IDC_MIN and rises == 1)
-    return dict(rel_after_ramp_us=None if rel is None else (rel - tend) * 1e6, dev_rel_pct=100 * rdev,
+    # D89 (WO-87): the "one rise" and "I >= 50 % at the final rise" terms of the D78 row are replaced by the settle
+    # from the final rise <= LIM_D89 (both still reported). Every other term is unchanged.
+    sao = None if (tok is None or t1 is None) else max(t1 - tok, 0.0)
+    d89 = tok is not None and t1 is not math.inf and (sao is None or sao <= LIM_D89)
+    started = (rdev <= LIM_SU and settled and longwin and okw and d89 and idc >= IDC_MIN)
+    if t1 is math.inf:
+        t1 = None
+    return dict(d89_ok=d89, settle_after_final_ms=None if sao in (None, math.inf) else sao * 1e3,
+                lim_d89_ms=LIM_D89 * 1e3,rel_after_ramp_us=None if rel is None else (rel - tend) * 1e6, dev_rel_pct=100 * rdev,
                 settled_before_rel=settled, win_after_rel_us=None if rel is None else (t[-1] - rel) * 1e6,
                 margin_hold=None if (t1 is None or tok is None) else H_HOLD / max(t1 - tok, 1e-12),idc_uA=idc * 1e6, iend_uA=I[-1] * 1e6, end_err_pct=100 * (I[-1] / idc - 1), dev_win_pct=100 * dev,
                 t90_after_ramp_us=None if t90 is None else (t90 - tend) * 1e6,
@@ -366,7 +386,7 @@ def run(out, kind, corner, temp, vdd, mut="none", tr=1e-6):
     if kind == "dct":
         # WO-64: the sweep starts at -40 C; its nodeset comes from a 300 us transient from all-0 at -40 C (physical state)
         hb = base + "_hint"
-        hd = sim(deck("hint", corner, -40, vdd, "none" if mut == "oldhint" else mut, ratio=ratio, out=hb + ".csv",
+        hd = sim(deck("hint", corner, -40, vdd, "none" if mut in ("oldhint", "zhint", "zhintnk") else mut, ratio=ratio, out=hb + ".csv",
                       r1=r1), hb)
         hint = None if hd is None else {k[2:-1]: v[-1] for k, v in hd.items() if k.startswith("v(")}
         i_hint = None if hd is None else hd["i(vsm)"][-1]
@@ -379,7 +399,7 @@ def run(out, kind, corner, temp, vdd, mut="none", tr=1e-6):
             j27 = T.index(min(T, key=lambda v: abs(v - 27)))
             tr_res, tr_ok = trim_eval(d, mut)
             tc_ok = max(dmax, -dmin) <= LIM_TC
-            thr = [d["i(vlk)"][j] / (R_K * d["i(vsm)"][j]) for j in range(len(T))]
+            thr = [d["i(vlk)"][j] / (R_K * max(abs(d["i(vsm)"][j]), 1e-15)) for j in range(len(T))]
             vr1 = [1e3 * (b - c) for b, c in zip(d["v(b)"], d["v(c)"])]
             okmin = min(o / vdd for o in d["v(ok)"])
             ph = phys(d, vdd)
@@ -497,10 +517,12 @@ def jobs(out, jobfile):
     L += [f"{py} tran {c} {t} 3.0 nosu {tr:g}" for c, t in (("ss", -40), ("ff", 125)) for tr in TRS]
     L += [f"{py} tran {c} {t} 3.0 early 1e-06" for c, t in (("ss", -40), ("ff", 125))]
     L += [f"{py} tran tt 27 3.3 hy1 1e-06", f"{py} tran sf -40 3.0 hy1 1e-06", f"{py} tran tt 27 3.3 hold0 1e-06",
-          f"{py} tran tt 27 3.3 nocnt 0.01", f"{py} tran ss -40 3.0 nocnt 0.01"]
+          f"{py} tran tt 27 3.3 nocnt 0.01", f"{py} tran ss -40 3.0 nocnt 0.01", f"{py} tran tt 27 3.3 slow 0.01",
+          f"{py} tran sf -40 3.0 slow 0.01", f"{py} tran ss -40 3.0 earlyx 1e-06", f"{py} tran ff 125 3.0 earlyx 1e-06"]
     L += [f"{py} dci {c} {t} 3.0" for c in CORNERS for t in TEMPS] + [f"{py} dci ss -40 3.0 nosu"]
     L += [f"{py} dct {c} 27 {v}" for c, v in DCT]
-    L += [f"{py} dct tt 27 3.3 ptat", f"{py} dct tt 27 3.3 trim_open", f"{py} dct sf 27 3.0 oldhint", f"{py} dcv tt 27 3.3",
+    L += [f"{py} dct tt 27 3.3 ptat", f"{py} dct tt 27 3.3 trim_open", f"{py} dct sf 27 3.0 oldhint", f"{py} dct sf 27 3.0 zhint", f"{py} dct sf 27 3.0 zhintnk",
+          f"{py} dct ff 27 3.6 zhint", f"{py} dct ss 27 3.0 zhint", f"{py} dcv tt 27 3.3",
           f"{py} dcv ss -40 3.0", f"{py} dcv ff 125 3.6"]
     L += [f"{py} loop {c} {t} 3.0" for c in CORNERS for t in TEMPS]
     L += [f"{py} loop sf 27 3.0 noskew", f"{py} loop ff 125 3.0 noskew"]
@@ -509,7 +531,8 @@ def jobs(out, jobfile):
 
 
 EXPECT = {"none": "ACCEPT", "nosu": "REJECT", "ptat": "REJECT", "trim_open": "REJECT", "early": "REJECT",
-          "noskew": "REJECT", "hy1": "REJECT", "hold0": "REJECT", "nocnt": "REJECT", "oldhint": "REJECT"}
+          "noskew": "REJECT", "hy1": "REJECT", "hold0": "REJECT", "nocnt": "REJECT", "oldhint": "INFO",   # WO-87: retired (lands on the physical point; zhint/zhintnk replace it)
+          "slow": "REJECT", "earlyx": "REJECT", "zhint": "ACCEPT", "zhintnk": "REJECT"}
 
 
 def summary(out):
@@ -519,7 +542,7 @@ def summary(out):
     bad = 0
     for r in R:
         exp = "INFO" if r["kind"] == "dcv" else EXPECT.get(r["mut"], "ACCEPT")
-        good = r["verdict"] == exp
+        good = exp == "INFO" or r["verdict"] == exp
         bad += not good
         if r["kind"] == "dct":
             s = (f"I27 {r.get('i27_uA', 0):.4f} uA TC {r.get('tc_min_pct', 0):+.2f}/{r.get('tc_max_pct', 0):+.2f} % "
@@ -554,7 +577,8 @@ def summary(out):
                  f"VDD@ok {fmt(r.get('vdd_at_ok'))} I@ok {fmt(r.get('I_at_ok_frac'))} rises {r.get('ok_rises')} "
                  f"Imax {fmt(r.get('i_max_frac'))} op_phys {r.get('op_phys')} rel {fmt(r.get('rel_after_ramp_us'))} us "
                  f"dev@rel {r.get('dev_rel_pct', 0):.3f} % settled {r.get('settled_before_rel')} "
-                 f"win {fmt(r.get('win_after_rel_us'))} us hold/settle {fmt(r.get('margin_hold'))}")
+                 f"win {fmt(r.get('win_after_rel_us'))} us hold/settle {fmt(r.get('margin_hold'))} "
+                 f"D89 settle-after-final {fmt(r.get('settle_after_final_ms'))} ms <= {fmt(r.get('lim_d89_ms'))} {r.get('d89_ok')}")
         print(f"{r['tag']:<36} {r['verdict']:<7} (expect {exp}) {'OK' if good else 'MISMATCH'} :: {s}")
     tr = [r for r in R if r["kind"] == "tran" and r["mut"] == "none" and r["verdict"] == "ACCEPT"]
     if tr:
