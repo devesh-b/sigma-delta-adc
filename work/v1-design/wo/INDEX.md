@@ -102,3 +102,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-75 done (2e0a43c..196f122): golden v3.2 kept via defparam bench, d_hold01-04 PASS, mutants 76/77 killed (M64 equiv), F18 proven small widths, suite/C9_FULL/R-01/GL quick PASS; open: X-01 + Verilator (defparam of parameter rejected), F18 real widths. AMB-30/31 -> D88. WO-82 C9u (D88 RTL+CL-37) dispatched
 - WO-82 done (baa0706): D88 RTL one line, 259 FF, 1077 cells, CL-37. WO-83 C9v bench for D88 dispatched
 - WO-81 handed off (fe9e787, 600c547, 0bf4d4c): rev f keeper pfet 0.42/0.15; st_tt27_a S 1.980284 (subtracted basis), P 2.2206 on real edge, Sb3 143.8 ns; pools pending. WO-84 C3i (residuals, stiff-supply basis check) dispatched
+- WO-79 rerun: tim jobs 1-4 abort at HV dbody/sbody (6.25e-23 timestep). WO-85 C4e (tim abort fix + collect) dispatched
