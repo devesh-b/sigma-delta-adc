@@ -82,3 +82,6 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-71 C9 CTS sink clustering <= 10 (single change): dispatched 2026-11-13
 - WO-71 done (fe8b8bf, 401fb33): CTS clustering 8, fanout 0
 - WO-72 C9 post-GRT design repair (single change): dispatched 2026-11-13
+- WO-72 done (8898159): post-GRT repair no effect
+- WO-73 C9 slew margin PnR run (D84): dispatched 2026-11-14
+- WO-74 C9 VAPWR counter RTL (D85) + SPEC CL for D82/D83/D85: dispatched 2026-11-14

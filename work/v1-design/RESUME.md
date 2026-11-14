@@ -881,3 +881,22 @@ Read this, then `CONTEXT.md`, then `work/v1-design/AGENTS.md` (ledger).
 - WO-54 C4 pool finished, but ~40 jobs errored with 'incomplete or empty netlist' (tb bug), so there is no design verdict. → WO-70 (fresh agent). Box load ~11.
 - WO-69: heuristic diodes off → setup/hold met at 12 corners (ss_1v40 +2.702 ns, Fmax 55.2 MHz), fanout 46 → 10 (clock leaves), slew 256 → 43 (ss_1v40 only), cap 0, physical clean, area 15,276 µm² (util 0.668). WO-71 CTS clustering dispatched; next after it: post-GRT repair.
 - WO-71: CTS_SINK_CLUSTERING_SIZE 8 → fanout 0 at 12 corners; setup +2.777, hold +0.108, cap 0, physical clean; slew 43/11 at ss_1v40 still open (the checker only warns). WO-72 (post-GRT repair) dispatched.
+- 2026-11-13/14 results:
+  - **WO-70 C4** (01fc505, 1ffe255): the "empty netlist" errors were masked "timestep too small" aborts.
+    - Testbench fixes are in (Ron/Roff, integrator reset, driven inputs, gear, case-insensitive error capture).
+    - inj still aborts at 20 ns (vinn#branch).
+    - Pool running in WO-70-01fc505.
+    - D78 leakage: C1 share 81 pA + Sg 68.5 pA ≈ 150 pA → D82 (user): derate the slowest mode.
+  - **WO-72 C9** (8898159, 90abe0c): post-GRT repair had no effect (repaired 0; the resizer's estimate shows no violators). Slew is still 43/11 at ss_1v40. Next candidate: GRT_DESIGN_REPAIR_MAX_SLEW_PCT 30, after measuring the estimated slew. 2 floating nets are unexplained.
+  - **WO-68 C3 rev e** (764fd1c, e9f9c1d):
+    - Latch stack node floats to −0.345 V → clamp NMOS added; Sq3/Sb3 Vds 2.32 → 2.047 V.
+    - Remaining T8 fails are fast-edge overshoots of 2.02–2.06 V against the 1.98 limit → user decision.
+    - Full rerun in WO-68-764fd1c (66 decks).
+  - **WO-64 C6** (c271782):
+    - I0/TC: the tune grid never bracketed zero TC; new two-stage tune, R1 165 µm.
+    - The sf/27 result was a solver artefact.
+    - 125 °C SIMFAIL: testbench, fixed with a 50 mV pre-bias.
+    - D78 rows implemented: hold 64 µs, hysteresis 4.
+    - VAPWR-good: a C9 count of 2^16 fs cycles (16.4 ms) after rst_n → user decision (RTL change).
+    - Pool running in WO-64-e450ae2w.
+- D83 (overshoot rule), D84 (C9 slew margin run), D85 (C9 VAPWR counter) logged.
