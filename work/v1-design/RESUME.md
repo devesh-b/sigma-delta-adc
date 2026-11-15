@@ -992,3 +992,9 @@ Next steps:
     - C1 precision: a third solver point before O2 is taken as the result (no D43c amendment);
     - the origin of the 20 pA row;
     - the HARDENING.md D86 entry is missing.
+- **05:55 IST, after the sandbox recovered from another hang.**
+  - WO-76 ss/−40 precision **O2 combined 0.165 ppm ACCEPT** (parts 0.120–0.165, healthy, spread 0.001). fs/125 O2 p0/p1 0.472/0.463 (O1 0.967).
+  - D43c still needs a third solver point. WO-91 is dispatched for that, plus the fs/125 combine, tt/ss125 O2, boost on the WO-52 netlist and a stronger broken copy.
+  - WO-88 runA is 15/17 OK. WO-92 is dispatched for rev g and the full C3 set.
+  - WO-87 C6 pool `pool_run` is at 39/42.
+  - The C4 pools are failure-heavy: WO-79 pool2 5 OK / 18 failed, WO-85 26 OK / 11 failed. Triage once they are done.
