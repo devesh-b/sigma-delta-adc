@@ -36,9 +36,13 @@ SCALES = {"sr95": SR95_SCALE, "srknee": SRKNEE_SCALE}
 # ALL six ports scaled so the base SR at the SPEC basis (I_tail / 1.4 pF) is 0.8 x the 10.3 V/us base floor = 8.24 V/us.
 GATE_PREC = 1.333
 SRKNEE_PREC_SCALE = 0.8 * 10.3e6 * 1.4e-12 / S.I_TAIL
+# WO-91 item 5 (WO-76 s4 a): deeper slew copy srdeep, base SR 0.6 x the 10.3 V/us floor = 6.18 V/us at 1.4 pF, all six ports.
+# srknee rejected by only 3 %; a broken copy counts as strong only if its INL >= 1.5 x gate (BROKEN_MARGIN).
+SRDEEP_PREC_SCALE = 0.6 * 10.3e6 * 1.4e-12 / S.I_TAIL
+BROKEN_MARGIN = 1.5
 MODES = {   # mode: (fs, boost, gate, tag prefix, OTA2 / OTA1-behavioural macromodel point, broken-copy scales)
     "boost": (4e6, True, GATE, "gb", dict(gbw=27e6, gbw2=22.5e6, sr2=27e6, fp2_mult2=3.0), SCALES),
-    "prec": (2e6, False, GATE_PREC, "gbp", dict(gbw=10e6, gbw2=10e6, sr2=13.5e6, fp2_mult2=3.0), {"srknee": SRKNEE_PREC_SCALE}),
+    "prec": (2e6, False, GATE_PREC, "gbp", dict(gbw=10e6, gbw2=10e6, sr2=13.5e6, fp2_mult2=3.0), {"srknee": SRKNEE_PREC_SCALE, "srdeep": SRDEEP_PREC_SCALE}),
 }
 AUDIT_TYPES = {"X", "I"}   # the audit inventories behavioural parts only: allow exactly the netlisted-OTA element types
 AUDIT_TOKENS = (".lib", ".include", "subckt", "sky130", "nfet", "pfet")
@@ -155,7 +159,7 @@ def main():
     ap.add_argument("--opt", default="O1")
     ap.add_argument("--n", type=int, default=1024)
     ap.add_argument("--m", type=int, default=21)
-    ap.add_argument("--copy", default="nom", choices=("nom", "sr95", "srknee"))
+    ap.add_argument("--copy", default="nom", choices=("nom", "sr95", "srknee", "srdeep"))
     ap.add_argument("--corner", type=int, default=3)   # CORNERS9[3] = fs/125/3.0
     ap.add_argument("--part", default=None)
     ap.add_argument("--deck-timeout", type=int, default=7000)
@@ -165,6 +169,14 @@ def main():
     # --bias-scale = all six bias ports x S (diagnostic deck only; tag suffix _dx<S>).
     ap.add_argument("--tight", action="store_true", help="WO-76: reltol/10, vntol/100, abstol/100, tmax/2 on top of --opt (tag _T)")
     ap.add_argument("--bias-scale", type=float, default=1.0, help="WO-76 diagnostic: all six bias ports x S (tag _dx<S>)")
+    # WO-91 item 1: third D43c solver point, one axis at a time on top of --opt (the WO-76 --tight set, reltol 1e-6 with
+    # vntol 1e-8, aborts on timestep-too-small). --vntol-div D: vntol / D (O2 keeps 1e-6 V ~ 0.24 ppm of the 4.096 V diff
+    # span, i.e. the same size as the effect judged; D 10 -> 1e-7 V ~ 0.024 ppm, so the Newton voltage criterion is 10x
+    # below the 0.1 ppm resolution the gate needs). --tmax-div D: tmax / D (finer max step in the settling edges).
+    # --method trap|gear: integration method (ladder default gear). Tags _V<D>, _S<D>, _M<method>.
+    ap.add_argument("--vntol-div", type=float, default=1.0, help="WO-91: vntol / D on top of --opt (tag _V<D>)")
+    ap.add_argument("--tmax-div", type=float, default=1.0, help="WO-91: tmax / D on top of --opt (tag _S<D>)")
+    ap.add_argument("--method", default=None, choices=(None, "trap", "gear"), help="WO-91: integration method (tag _M<m>)")
     a = ap.parse_args()
     _, _, gate, pfx, _, scales = MODES[a.mode]
     if a.copy != "nom" and a.copy not in scales:
@@ -181,11 +193,17 @@ def main():
         if a.copy != "nom":
             v = "REJECTED (good)" if r["healthy"] and r["inl_ep_ppm"] > gate else ("PASSED (check is blind)" if r["healthy"] else "INVALID")
             print("broken copy", v)
+            print(f"broken copy strength {r['inl_ep_ppm'] / gate:.2f} x gate (strong if >= {BROKEN_MARGIN}):",
+                  "STRONG" if r["healthy"] and r["inl_ep_ppm"] >= BROKEN_MARGIN * gate else "WEAK")
             sys.exit(0 if v.startswith("REJ") else 1)
         print("VERDICT", "ACCEPT" if r["pass_gate"] else "REJECT")
         sys.exit(0 if r["pass_gate"] else 1)
     os.makedirs(a.out, exist_ok=True)
-    P.SPICE_OPTIONS_TIER1.update(P.option_ladder(a.opt))
+    P.SPICE_OPTIONS_TIER1.update(P.option_ladder(a.opt, a.method))
+    if a.vntol_div != 1.0 or a.tmax_div != 1.0 or a.method:
+        o_ = P.SPICE_OPTIONS_TIER1
+        o_.update(vntol=o_["vntol"] / a.vntol_div, tmax_ns=o_["tmax_ns"] / a.tmax_div)
+        print("WO-91 third-point options:", {k: o_[k] for k in ("method", "reltol", "vntol", "abstol", "tmax_ns", "chgtol", "trtol")})
     if a.tight:
         o_ = P.SPICE_OPTIONS_TIER1
         o_.update(reltol=o_["reltol"] / 10, vntol=o_["vntol"] / 100, abstol=o_["abstol"] / 100, tmax_ns=o_["tmax_ns"] / 2)
@@ -194,6 +212,8 @@ def main():
     c, corner = cfg(a)
     tag = f"{pfx}_{a.copy}_{a.opt}_N{a.n}" + (f"_p{a.part.replace('/', 'o')}" if a.part else "")
     tag += ("_T" if a.tight else "") + (f"_dx{a.bias_scale:g}" if a.bias_scale != 1.0 else "")
+    tag += (f"_V{a.vntol_div:g}" if a.vntol_div != 1.0 else "") + (f"_S{a.tmax_div:g}" if a.tmax_div != 1.0 else "") + \
+        (f"_M{a.method}" if a.method else "")
     if a.mode == "prec":
         print(f"prec mode: base bias, fs 2 MHz, OTA2 13.5 V/us / 10 MHz, gate {gate} ppm; base SR "
               f"{S.I_TAIL * (scales.get(a.copy, 1.0)) / 1.4e-12 / 1e6:.2f} V/us at 1.4 pF (copy {a.copy})")
