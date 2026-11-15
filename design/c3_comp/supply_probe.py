@@ -229,6 +229,16 @@ def deck_list3():
             "st_kp2_sw_icur": (_isave(_wrap(sup="sw")), T, dict(sub=False, mut="kp2"), {"T8": "pass"})}
 
 
+def _iget(w, n, tm):
+    """WO-92: the WO-88 probe found no device vector by exact name (raw naming differs from the display name), so
+    match on the instance path and the terminal tag instead; None if absent."""
+    v = w.get(_ivec(n, tm).lower())
+    if v is not None:
+        return v
+    hit = [k for k in w if f"xc.x{n.lower()}.msky130_fd_pr__" in k and f"[i{tm}]" in k]
+    return w[hit[0]] if len(hit) == 1 else None
+
+
 def dpost(d):
     """Longest run with node > vdd (t > 600 ns) for op/on/nb2/ob2/dp/dn/ap/an; mean excess and the mean drain /
     source / bulk current of every saved device over that run (ngspice sign: + = into the terminal)."""
@@ -242,6 +252,7 @@ def dpost(d):
     deck = open(os.path.join(d, "deck.sp")).read().splitlines()
     pins = {ln.split()[0][1:]: ln.split()[1:5] for ln in deck if ln.startswith("X") and ln.split()[0][1:] in IDEV}
     L = [f"npts={len(t)} vdd max {vdd[ss].max():.7f}"]
+    L.append("current vectors in raw: " + (", ".join(k for k in w if "[i" in k or k.startswith("i(")) or "NONE"))
     for nd in ("op", "on", "nb2", "ob2", "dp", "dn", "ap", "an"):
         x = w.get(f"xc.{nd}")
         if x is None:
@@ -261,7 +272,7 @@ def dpost(d):
         for n, p in pins.items():
             for tm in ("d", "s", "b"):
                 if p[term[tm] - 1] == nd:
-                    v = w.get(_ivec(n, tm).lower())
+                    v = _iget(w, n, tm)
                     if v is not None:
                         rows.append((avg(v, k), f"{n}.{tm}"))
         L.append("   into-terminal mean currents on this node (nA; - = device pushes current into the node): "
@@ -315,6 +326,7 @@ def deck_list4():
         "st_brk_in18_sw": (_wrap(sup="sw"), T, dict(k, mut="in18"), {"T8": "reject"}),
         "st_revf_ff-40_b_sw": (_wrap(sup="sw"), B, dict(k, mut="revf"), {"T8": "info"}),
         "st_info_edge01_tt27_a_sw": (_wrap(sup="sw"), T, dict(k, edge="ideal"), {"T8": "info"}),
+        "st_sw_icur": (_isave(_wrap(sup="sw")), T, dict(k), {"T8": "info"}),   # WO-92: leak-path probe rerun (rev g)
     })
     for nm, kw in (("sus195", dict(sus_lim=1.95)), ("cap20", dict(cap=2.0)), ("dur01", dict(dur_max=0.1e-9)),
                    ("jn20", dict(jlim=2.0))):

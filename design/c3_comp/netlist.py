@@ -31,6 +31,9 @@ def devices(sizes=SIZES, mut=""):
     for tag, sz in (("rsoW05", (0.5, 0.15)), ("rsoL03", (1.0, 0.3)), ("rsoL05", (1.0, 0.5))):
         if tag in mut:    # WO-88 cap candidates: slower op/on precharge (R0/R1 only; dp/dn R2/R3 unchanged)
             s["RSO"] = dict(W=sz[0], L=sz[1], m=1)
+    if "revf" in mut:     # WO-92 info: rev f (minimum keeper, op/on precharge = RS)
+        s["KP"] = dict(W=0.42, L=0.15, m=1)
+        s["RSO"] = dict(s["RS"])
     if "starve" in mut:   # 64x less W/L than the HV tail
         s["TAIL"] = dict(W=1.25, L=2.0, m=1)
     pair = NF if "in18" in mut else HVN
