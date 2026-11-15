@@ -1,5 +1,7 @@
 # WO-88 (C3k): D90, leak-path probe, precharge-edge cap candidates (IN PROGRESS, pickup below)
 
+> **Superseded by WO-92 (2026-11-15):** rev g = kp2_rsoL03 chosen (commit 1323676); pickup is in `../wo92/README.md`. Pool A is still running its rev f cyc rows.
+
 Status 2026-11-15 01:25 IST: the code and SPEC items are done. The runs are in flight; the sandbox load is about 8 on
 6 cores, so lpool gives 1 slot and the decks run one at a time. Items 2, 3, 4 and 6 are waiting on data. Nothing
 below is a verdict yet.
