@@ -38,15 +38,17 @@ set AX [expr {$GX+4.5}]
 puts "FP GUARD ring east leg x $GX..[expr {$GX+1}], south leg y $GY..[expr {$GY+1}]; C9 east edge $C9X2; analog column from x $AX ([expr {$AX-$C9X2}] um from C9, WO-96: 10 um)"
 # D93: MIM arrays stacked over circuits (capm met3/met4 over li/met1 circuits, met2 shield plane under the MIM).
 # Circuit slots must not overlap; MIM slots (prefix MIM_) overlay circuit slots and are excluded from the sum.
+# D98 (WO-107): with C9 at 175 the bottom row (y < 62, below the guard ring south leg) keeps its WO-100 east end
+# (AX + 9.5 = 203.5), so C6 keeps 5,930 um2; OTA1 starts at AX + 11.5. OTA2 and C3 take the full 15 um gain.
 set SLOTS [list \
     [list C9_macro      4.0  72.0 $C9X2 222.0 [expr {$C9W*150}] [expr {$C9W*150}]] \
-    [list OTA1          $AX   3.0 303.0 112.0  9100 13100] \
+    [list OTA1          [expr {$AX+11.5}] 3.0 303.0 112.0  9100 13100] \
     [list OTA2          $AX 114.0 303.0 182.0  5350  7450] \
     [list C3_comp       $AX 184.0 303.0 222.0  1500  3000] \
     [list SW_in_ref     3.0   3.0  39.0  62.0  1000  2000] \
     [list C4_phase_LS  41.0   3.0 101.0  62.0  3400  4600] \
-    [list C6_bias     103.0   3.0 [expr {$GX-1.0}] 62.0  5800  7000] \
-    [list MIM_S1_over_OTA1_rot90 $AX 3.0 303.0 112.0 0 0] \
+    [list C6_bias     103.0   3.0 [expr {$AX+9.5}] 62.0  5800  7000] \
+    [list MIM_S1_over_OTA1_rot90 [expr {$AX+11.5}] 3.0 303.0 112.0 0 0] \
     [list MIM_S2_over_OTA2 $AX 114.0 303.0 182.0 0 0] \
 ]
 set tile [expr {319.24*225.76}]
