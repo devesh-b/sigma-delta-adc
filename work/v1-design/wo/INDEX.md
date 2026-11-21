@@ -127,3 +127,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-108 part 2 (8b211bd, 2a65c16): cz_bus8 bench, independent; exhaustive 2^17 + corners + random (331,177 checks). Real RTL ACCEPT, control ACCEPT, 4 mutants REJECT. Open: integration timing (bsel vs the registered C9 bus), X on bsel. Part 3 (BIAS_EXT) still running
 - WO-108 parts 1+3 (5735005): cz_bus8 RTL; c6_cz.py BIAS_EXT wrapper (TG port select, ext replica K 4.67, ext-present detect for bias_ok), 27 jobs generated at /home/mempool/regr/tt/WO-108-5735005, held for design review
 - WO-108 review-1 fixes (5b91dfa): bias_sel LS, ext-on isolation runs + noiso copy, absolute limb all corners, K 5 @ 5.35 µA, schmitt detect, R corners, nosu, pad C/leak; 61-job pool /home/mempool/regr/tt/WO-108-5b91dfa/out/cz/pool (high), collect: python design/cz/c6_cz.py summary out/cz
+- WO-105b (new): fix top_bench reltol lint + t_rel before bias settle; relaunch gates pool

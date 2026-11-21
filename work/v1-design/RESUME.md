@@ -1070,3 +1070,15 @@ Next steps:
 - High: WO-106 gl (1/5 ok), WO-98 rerun (4/24 ok), WO-105 gates (0/10), WO-104 C6 (0/26), WO-103 C4 MOS caps run (2/27 ok).
 - Low: WO-105 t1, WO-105 corners, WO-95 smoke (N 16; restarts from 0).
 - Agents WO-107 / WO-104 / WO-103 still rate-limited; resume via SendMessage when their pools report.
+
+## 2026-11-22 02:30: pool triage
+- WO-106 gl (C9 175x150 GL/SDF): 5/5 EXIT=0, POOL_DONE. Verdicts still to read.
+- WO-98 rerun: jobs 5-14 failed with "ngspice not found". The cause was my relaunch_20261121b.sh, which did not source env.sh. Failed logs moved to *.noenv. Relaunched with env.sh at 02:26 (PRIO=high SKIPDONE=1).
+- WO-105 gates: a_nom REJECT after 2.5 h, for two bench defects:
+  - the reltol-echo lint is always false;
+  - t_rel 20 us comes before bias settle (bias_ok re-rose at 20.66 us, ib range 137 %).
+  The conversions themselves are fine (u_hat 0.500066 and -0.299978). The pool is stopped (pgids 409031, 796321). Fix is in WO-105b (new agent). The t1 and corners pools keep running.
+- WO-108 pool: 4 jobs failed with zero-size array (bench window). The WO-108 agent was resumed to fix and relaunch.
+- WO-104 jobs 1-2: c6_final diag output missing. That is the WO-104 agent's to triage when it is resumed.
+- WO-103 C4: 7/27 ok, running. WO-95 smoke and WO-105 t1 are running (low).
+- Lesson: relaunch scripts must source each WO's env.sh, or check that each job line sets PATH.
