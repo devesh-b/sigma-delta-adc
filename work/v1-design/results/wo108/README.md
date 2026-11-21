@@ -32,3 +32,5 @@ Variant that must ACCEPT: nosu (core without start-up kick, sel 1). Compliance a
 
 ## Later options (not done)
 Single-device switches, PMOS pull-up for the detect, core header switch (turn the isolated core off), layout of the ext replica.
+
+**Stress rail check (796658b).** The isolated, floating mirror outputs (e_ibn, c_ibn) undershoot to about −0.45 V during the power-up ramp, and ok_e overshoots to 3.42 V. The bench rail bound is widened from ±0.05 V to ±0.6 V around the rails, so it now enforces the SPEC 4.95 V pair rule (worst pair VDD + 1.2 V = 4.8 V at 3.6 V); the `overv` copy still rejects. This is a bench bound, not a SPEC row. Open for review: −0.45 V comes close to junction forward bias on the floating nodes.

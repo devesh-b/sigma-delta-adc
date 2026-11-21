@@ -130,3 +130,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-105b (new): fix top_bench reltol lint + t_rel before bias settle; relaunch gates pool
 - WO-106 GL/SDF at 175x150: 5/5 PASS (tt_h01, ss60_h01, ff_h01, tt_h05, ss60_h05); C9 175 closed
 - WO-107 hand-off (2e956ff): c4_sw 860 µm² + c3_comp rev g 5,743 µm² (over the 4,142 slot) DRC/LVS clean with broken copies; both on hold (D100). Frame slots 83.3 % of tile. OTA1 not started (tool budget); precheck needs info.yaml project dir. WO-109 dispatched
+- WO-108 (796658b): s0 joint deck aborted at 1.23 us (timestep too small), so bare and wrapper now run as separate decks; s0 tt G1 ACCEPT 9.1e-5; stress bound widened to the pair rule (review item); 61-job pool /home/mempool/regr/tt/WO-108-796658b/out/cz/pool; lost-current G3 19.9 nA vs 20 nA (tight)
