@@ -120,3 +120,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-97 (6b474df, 3609206): C9 final PnR clean (DRC/LVS/antenna 0), setup/hold met at 12 corners, stand-in slew waived again (D92); GL/SDF sims queued in WO-97-6b474df/pool; macro GDS/LEF/pins handed to WO-96
 - WO-99 handed off (69c59b9, 2b7a281): C6 final + mirrors/boost/trim, c5c7 refs (string on VREF+), sr2 reset; top fixes: vscm short, Ck2 polarity in xschem, WO-95 r2 short bug; OTA generators lack boost bank port (boost mode later). Pool WO-99-69c59b9 queued. WO-102 (xschem update) + WO-103 (C4 MOS caps) dispatched
 - WO-99 handed off (8df28c5): C6 final not accepted (cold port check, trim step 6.1 %, boost toggle), C5/C7 DC pass (vscm limit ruled 10 mV), sr2 residue ~0 (nosr2 copy missing); ivbnc/ivbpc come from OTA1, fixed via WO-102 follow-up. WO-104 dispatched
+- WO-101 (7646108, 9068469): 165x150 fails stand-in setup (-0.095 ns), reverted to 190x150; D94 keeps 190x150
