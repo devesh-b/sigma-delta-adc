@@ -32,8 +32,9 @@
   "TIMING_VIOLATION_CORNERS": ["*"],
 
   "FP_SIZING": "absolute",
-  "DIE_AREA": [0, 0, 190, 150],
-  "PL_TARGET_DENSITY_PCT": 60,
+  "DIE_AREA": [0, 0, 165, 150],
+  "PL_TARGET_DENSITY_PCT": 75,
+  "// WO-101": "D93 die shrink: DIE_AREA [0,0,190,150] -> [0,0,165,150] (height kept; width = WO-100 plan of about 165 um). Core becomes 5.52..159.48 x 10.88..138.72 (PDK margins unchanged), about 19,680 um2 vs 22,876; with the WO-97 stdcell area 16,895 um2 the final utilisation is about 0.86. PL_TARGET_DENSITY_PCT 60 -> 75 is the consequence, not a second lever: OpenROAD gpl needs -density at or above the floorplan utilisation (IFP-0104 effective utilization 0.583 at 190 wide, about 0.68 at 165 wide), so 60 cannot place. 75 sits between that floor and the LibreLane dynamic default util+10 (steps/openroad.py:1620-1628). Run A in WO-101 checks 165 wide with 60 to show the failure.",
   "IO_PIN_ORDER_CFG": "dir::pin_order.cfg",
 
   "PDN_MULTILAYER": false,
