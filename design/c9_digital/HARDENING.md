@@ -127,3 +127,20 @@ macro (uio_oe = 0xFF via tie cells); `ena`, `uio_in` unused.
 ## WO-72 (8898159): RUN_POST_GRT_DESIGN_REPAIR true, no effect
 - Post-GRT repair_design (slew margin 10 %) changed 0 cells. All metrics are identical to WO-71; slew is 43/11 at ss_1v40, worst 1.72 ns.
 - Estimated parasitics show 0 slew violators at ss_1v40. The overrun appears only with RCX SPEF. Next (unrun): GRT_DESIGN_REPAIR_MAX_SLEW_PCT 30. Details: work/v1-design/results/wo72/README.md.
+
+## D86 waiver record: max slew at ss_100C_1v40 only (WO-97, run 6b474df pnr1)
+- Approval: user, 2026-11-14, DECISIONS.md D86 (from WO-73). Scope: max-slew checks at the `ss_100C_1v40` stand-in corner (D72,
+  pessimistic proxy for 125 C / 1.62 V) only. Not waived: slew at any other corner, max cap, max fanout, setup, hold.
+- Why it is acceptable (the D86 basis): only the 1.40 V stand-in shows it; the real ss_100C_1v60 corner and all other corners have 0
+  slew violations. The flow checker (Checker.MaxSlewViolations) only warns, so the waiver is this record, not a config change.
+- Net list in the WO-97 final run (`56-openroad-stapostpnr/max_ss_100C_1v40/checks.rpt`): 43 pins at max RC, 11 at nom RC, 0 at min RC.
+  All four driving nets come from `sky130_fd_sc_hd__buf_1` fanout buffers that post-GPL repair inserted:
+  | net | driver | input net | worst slew (limit 1.5 ns) |
+  |---|---|---|---|
+  | net56 | fanout56 | _0275_ | 1.634 ns |
+  | net66 | fanout66 | _0368_ | 1.555 ns |
+  | net122 | fanout122 | u_bus.d2 | 1.509 ns |
+  | net124 | fanout124 | u_bus.a2[0] | 1.501 ns |
+- Caveat: at these pins the cells run past the 1.5 ns max_transition of the liberty. STA there extrapolates, so the ss_1v40 setup
+  number (+0.753 ns at max RC) has extra model uncertainty. At WO-73 the setup margin under D86 was +2.96 ns. With the D85/D88 RTL it is
+  +0.75 ns, so the user should re-confirm D86 on this margin (WO-97 README).
