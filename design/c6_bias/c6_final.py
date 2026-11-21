@@ -290,6 +290,38 @@ def run(out, corner, temp, vdd, mut="none"):
     return r
 
 
+DIAG_NODES = "vn vnc vns vn2 vp vg tsu q ok ibtpm boost_b boost_h".split()
+
+
+def diag(out, corner, temp, vdd, mut="none"):
+    """WO-104 toggle diagnosis: boost on at 30 us, off at 60 us, probes held, code 100; internal nodes saved."""
+    temp, vdd = float(temp), float(vdd)
+    tag = f"c6d_{corner}_{temp:g}_{vdd:g}_{mut}"
+    base = os.path.join(out, tag)
+    txt = deck(corner, temp, vdd, mut, base + ".txt")
+    txt = re.sub(r"^Vbst .*$", f"Vbst boost 0 PWL({pwl(steps([(30 * U, 1.8), (60 * U, 0)], 0))})", txt, flags=re.M)
+    txt = re.sub(r"^Vt(\d) (trim\d) 0 PWL.*$", lambda m: f"Vt{m[1]} {m[2]} 0 {1.8 * ((4 >> int(m[1])) & 1):g}", txt, flags=re.M)
+    txt = re.sub(r"^Vpr_(\w+) (pr_\w+) 0 PWL.*$", lambda m: f"Vpr_{m[1]} {m[2]} 0 {1.0 if m[1] == 'ibn' else 2.0}", txt,
+                 flags=re.M)
+    vecs = "i(vmtp) i(vmn) i(vdd) i(vpr_ibtp) i(vpr_ibn) " + " ".join(f"v(xc6.{n})" for n in DIAG_NODES)
+    txt = re.sub(r"^tran .*$", "tran 20n 90u 0 20n", txt, flags=re.M)
+    txt = re.sub(r"^wrdata .*$", f"wrdata {base}.txt {vecs}", txt, flags=re.M)
+    open(base + ".cir", "w").write(txt)
+    p = subprocess.run(["ngspice", "-b", base + ".cir"], capture_output=True, text=True, timeout=5400)
+    open(base + ".log", "w").write(p.stdout[-6000:] + p.stderr[-4000:])
+    import numpy as np
+    d = np.loadtxt(base + ".txt", skiprows=1)
+    t = d[:, 0]
+    names = ["ibtp", "ibn", "ivdd", "pr_ibtp", "pr_ibn"] + DIAG_NODES
+    sign = [1, 1, -1, -1, 1] + [1] * len(DIAG_NODES)
+    lines = []
+    for x in (25, 29.9, 30.2, 30.5, 31, 32, 34, 38, 45, 55, 59.9, 60.2, 60.5, 61, 62, 64, 68, 75, 89):
+        i = int(np.argmin(abs(t - x * U)))
+        lines.append(f"{x:5g} " + " ".join(f"{n}={sign[k] * d[i, 1 + k]:.5g}"
+                                            for k, n in enumerate(names)))
+    open(base + ".sum", "w").write("\n".join(lines) + "\n")
+
+
 def summary(out):
     rows = [json.load(open(os.path.join(out, f))) for f in sorted(os.listdir(out)) if f.startswith("c6f_") and f.endswith(".json")]
     print("| run | start | port | compl (min margin V) | toggle (worst) | trim (cover, max step) | own core / total uA | verdict |")
@@ -325,5 +357,7 @@ if __name__ == "__main__":
         jobs(*a[1:4])
     elif a[0] == "run":
         print(json.dumps(run(*a[1:]).get("verdict")))
+    elif a[0] == "diag":
+        diag(*a[1:])
     elif a[0] == "summary":
         summary(a[1])
