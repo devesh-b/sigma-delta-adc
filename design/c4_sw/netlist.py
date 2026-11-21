@@ -33,6 +33,7 @@ mut is a '+'-joined token list (broken copies used by c4_tb.py):
   rawchop   chopper not latched (C9 edge passes straight)       nodet     detector removed (pwrok tied high)
   hvfold    fold-chopper clocks from 3.3 V inverters (no hv2lv)  plainls   lsbuflv2hv_1 without SLEEP_B
   o1early   rst2_o1 not gated by the comparator decision (starts with se, overlaps the strobe)
+  mim       delay caps as rev-b ideal C (MIM reference, WO-103)   nocap  first cs-chain delay cap removed (WO-103)
 Order 1 (WO-53 passed, coordinator 2026-11-13): comparator always on x2, int2 as follower with rst2_o1 = order 1 AND
 se AND dec (inputs `order` high = order 2, `dec` = C3 decision-done NAND(q, qb), 1.8 V). Nets kh / kl / k0 / r2 are
 the Ck2 DAC, Ck2 rest and int2 reset (C2 switch) gates.
@@ -68,6 +69,16 @@ K_G, C_G = 4, 55e-15     # gap chain (spot 70 fF; the gated nets add ~ one stage
 K_E, C_E = 2, 100e-15    # early -> late chain (spot 40 fF gave 0.70 ns at ff/-40)
 K_S, C_S = 2, 40e-15     # strobe delay after se (C3: fire ~ 1 ns after the se rising edge)
 DET = dict(p=(0.42, 20.0), n=(2.0, 0.5))   # VDPWR detector: PMOS load W/L, NMOS sense W/L
+# Delay caps (WO-103, D93): MOS caps instead of the rev-b MIM caps (C_G / C_E / C_S above stay as the MIM reference,
+# mut token `mim`). Each delay node gets a complementary HV pair, gate on the node: NMOS with S/D/B at vss plus PMOS
+# with S/D/B at vdd. NMOS is inverted for v > Vtn, PMOS for v < VDD - |Vtp|; since Vtn + |Vtp| < VDD at every corner,
+# at least one device is in inversion over the whole 0..VDD swing (no depletion hole), and the pair is near
+# symmetric for rise and fall. The residual C(V) non-linearity is in the transistor model and is accounted for by
+# sizing at tt from the simulated chain delay (results/wo103/size103.py), then checked at corners in tim.
+# Thick-oxide g5v0d10v5 devices: the node swings to VAPWR (3.6 V at ff), beyond the 1.8 V oxide rating.
+# (W, L) um per device, both devices of a pair the same size.
+DCAP = dict(g=(3.0, 2.0), e=(6.0, 2.0), s=(2.0, 2.0))
+CAP_MIM_DENS = 2.0e-15    # sky130 capm F/um^2, for the area comparison only
 
 PH = ("ie", "il", "se", "sl", "pas", "swp", "sho", "dh", "dl", "kh", "kl", "k0", "r2")
 GATED = dict(pas=("sl", "selp"), swp=("sl", "sels"), sho=("sl", "shorth"), dh=("il", "yh"), dl=("il", "yb"),
@@ -120,11 +131,21 @@ def ls_dn(nm, a, y):
     return f"X{nm} {a} vdl vss vss vdd vdd {y} sky130_fd_sc_hvl__lsbufhv2lv_1"
 
 
-def chain(pfx, a, y, k, cap):
+def dcap(nm, node, dev):
+    """WO-103 MOS delay cap on node: HV NMOS (S/D/B vss) + HV PMOS (S/D/B vdd), gate on node, (W, L) = dev each."""
+    w, l = dev
+    return [mos(nm + "n", "vss", node, "vss", "vss", HVN, w, l), mos(nm + "p", "vdd", node, "vdd", "vdd", HVP, w, l)]
+
+
+def chain(pfx, a, y, k, cap, dev=None, skip=None):
+    """k inverters a -> y, a delay cap on every stage output: ideal C = cap (MIM reference) if dev is None, else
+    the MOS pair dev. skip: stage index whose cap is left out (broken copy `nocap`)."""
     out, prev = [], a
     for i in range(k):
         nxt = y if i == k - 1 else f"{pfx}{i}"
-        out += [inv(f"{pfx}i{i}", prev, nxt), f"C{pfx}{i} {nxt} vss {cap:g}"]
+        out.append(inv(f"{pfx}i{i}", prev, nxt))
+        if i != skip:
+            out += [f"C{pfx}{i} {nxt} vss {cap:g}"] if dev is None else dcap(f"C{pfx}{i}", nxt, dev)
         prev = nxt
     return out
 
@@ -137,6 +158,8 @@ def gen(mut=None, name="c4_gen"):
     t = toks(mut)
     kg = K_G * (4 if "gbig" in t else 1)
     fin = 1 if "edge1" in t else 8
+    dg, de, ds = (None, None, None) if "mim" in t else (DCAP["g"], DCAP["e"], DCAP["s"])
+    sk = 0 if "nocap" in t else None    # broken copy: first cap of the sl gap chain (sl off -> ie on) removed
     L = [f"* C4 phase generator (design/c4_sw/netlist.py, mut={mut}) - generated, do not edit", f".subckt {name} {PORTS}"]
     # VDPWR-present detector (D76): dn high while VDPWR is missing -> pwrok low
     if "nodet" in t:
@@ -158,14 +181,14 @@ def gen(mut=None, name="c4_gen"):
         sfb, ifb = "vdd", "vdd"
     else:
         sfb, ifb = "sfb", "ifb"
-        L += [inv("sli", "sl", "slb")] + chain("cs", "slb", "sfb", kg, C_G)
-        L += [inv("ili", "il", "ilb")] + chain("ci", "ilb", "ifb", kg, C_G)
+        L += [inv("sli", "sl", "slb")] + chain("cs", "slb", "sfb", kg, C_G, dg, sk)
+        L += [inv("ili", "il", "ilb")] + chain("ci", "ilb", "ifb", kg, C_G, dg)
     L += [nand("a1", "fsg", sfb, "a1"), inv("ie", "a1", "ie"), nand("a2", "fsbg", ifb, "a2"), inv("se", "a2", "se")]
     if "noearly" in t:
         L += [nand("il", "a1", "vdd", "il"), nand("sl", "a2", "vdd", "sl")]
     else:
-        L += chain("e1", "a1", "a1e", K_E, C_E) + [nand("il", "a1", "a1e", "il")]
-        L += chain("e2", "a2", "a2e", K_E, C_E) + [nand("sl", "a2", "a2e", "sl")]
+        L += chain("e1", "a1", "a1e", K_E, C_E, de) + [nand("il", "a1", "a1e", "il")]
+        L += chain("e2", "a2", "a2e", K_E, C_E, de) + [nand("sl", "a2", "a2e", "sl")]
     # controls (3.3 V): pass = NOT swap AND NOT short, swap = swap AND NOT short, short
     L += [inv("swb", "swaph", "swapb"), inv("yb", "yh", "yb"),
           nor("selp", "swaph", "shorth", "selp"), nor("sels", "swapb", "shorth", "sels")]
@@ -199,7 +222,7 @@ def gen(mut=None, name="c4_gen"):
     else:
         L += [ls_dn("lfp", "chp", "chlp"), ls_dn("lfn", "chn", "chln")]
     # comparator strobe (D74): from the se rising edge (wrongstrobe: from ie), down to 1.8 V
-    L += chain("st", "ie" if "wrongstrobe" in t else "se", "phch", K_S, C_S) + [ls_dn("lst", "phch", "phc")]
+    L += chain("st", "ie" if "wrongstrobe" in t else "se", "phch", K_S, C_S, ds) + [ls_dn("lst", "phch", "phc")]
     # islands / output clamp: isl = rst OR NOT pwrok
     L += [inv("rb", "rsth", "rstbh"), nand("gisl", "rstbh", "pwrok", "isli"),
           inv("is1", "isli", "is1", 2), inv("is2", "is1", "isl", 4), inv("rs1", "isli", "rstb", 4)]
