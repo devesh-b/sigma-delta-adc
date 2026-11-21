@@ -1019,3 +1019,11 @@ Next steps:
   - hy1 ×2 ACCEPT: needs a ripple bench, per the ruling.
   - earlyx ×2 SIMFAIL: sim fix needed.
   - **zhintnk ACCEPT (expected REJECT): the hint-agreement check could not be shown to fail.**
+- **12:25 IST, 2026-11-21: slot starvation on the critical path.** WO-91 (C1 completeness) was holding 3 of 5 slots with 39–40k s jobs.
+  - WO-91 p1 was demoted to low priority (session killed and relaunched with SKIPDONE). Its S2 backup job was killed; V10 had already confirmed O2.
+  - **WO-91 p2–p4 are paused** (sessions plus timeout process groups killed, logs without an EXIT line set aside as `.killed`).
+  - **Resume later, low priority:** `cd /home/mempool/regr/tt/WO-91-1419218 && PRIO=low SKIPDONE=1 setsid nohup bash run_p{2,3,4}.sh &`.
+  - Note: GNU `timeout` makes its own process group, so kill both the session and the timeout pgids.
+- WO-96 (f25358d…c7886bf): floorplan scripted. Only `mim_s2` is clean; `c6_res` has rpm DRC errors; the `c4_sw` extraction stops. The area does not close, so D93.
+- WO-95 (b4b44f4, f698d26, 4aac997): top bench built, smoke queued.
+- WO-98 (692f8b5, 72f2f79): OTA2 subckt `design/c2_ota2/ota2.spice`; tt/27 opac passes every row. OTA2 offset risk: 8.6 mV 3σ against the 9 mV limit.
