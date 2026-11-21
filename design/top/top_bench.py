@@ -50,6 +50,7 @@ U_OFF5 = 5e-6 / VREF        # SPEC offset 5 uV, in u (u = Vdiff / VREF)
 GAIN_TOL = 0.005            # SPEC gain 0.5 %
 INL_BUDGET = 20e-6 * 2      # SPEC all-block INL 20 ppm of FSR (FSR = 2 in u)
 INL_GATE = 1.333            # ppm, precision gate B number (SPEC row 94), used for (c)
+RES_LIM = 1e-3              # WO-105 gate (f): slot-0 residue |x1|, |x2| <= 1e-3 VREF (~2 mV diff) after the per-conversion reset (bench choice)
 # C6 tune (WO-64, used unchanged by WO-80 / WO-87: out/tune.json): R2/R1 2.45, R1 144.8 um
 C6_RATIO, C6_R1 = 2.45, 144.8
 BROKEN = dict(a="nosu", bc="dacswap", c="ota2dead", d="noswap", e="noreset")
@@ -275,12 +276,15 @@ def run(a, us, tag, **kw):
         te = t0 + n * T - 5e-9
         x2 = (np.interp(te, t, cols["o2p"]) - np.interp(te, t, cols["o2n"])) / VREF
         x1 = (np.interp(te, t, cols["o1p"]) - np.interp(te, t, cols["o1n"])) / VREF
+        ts = t0 + 0.4 * T   # WO-105 (f): slot 0, sampling half, after the reset release and before the first integration
+        x1s = (np.interp(ts, t, cols["o1p"]) - np.interp(ts, t, cols["o1n"])) / VREF
+        x2s = (np.interp(ts, t, cols["o2p"]) - np.interp(ts, t, cols["o2n"])) / VREF
         cm = lambda p_, n_, tt: 0.5 * (np.interp(tt, t, cols[p_]) + np.interp(tt, t, cols[n_]))
         uh = TB.reconstruct(y, x2, n, P.C1, P.C2, P.K)
         ub = TB.reconstruct(y, 0.0, n, P.C1, P.C2, P.K)
         yi, x2i = TB.ideal_loop(meta["u"][m], n, P.C1, P.C2, P.K)
         ug = TB.reconstruct(yi, 0.0, n, P.C1, P.C2, P.K)
-        convs.append(dict(u=meta["u"][m], u_hat=float(uh), code_bits=float(ub), code_gold=float(ug), x1n=float(x1), x2n=float(x2),
+        convs.append(dict(u=meta["u"][m], u_hat=float(uh), code_bits=float(ub), code_gold=float(ug), x1n=float(x1), x2n=float(x2), x1s=float(x1s), x2s=float(x2s),
                           ones=float(np.mean(y > 0)), ocm1=float(cm("o1p", "o1n", t0)), ocm2=float(cm("o2p", "o2n", t0)),
                           bits_differ_gold=int(np.sum(y != yi))))
     res["convs"] = convs
@@ -339,6 +343,8 @@ def main():
     ap.add_argument("--ota2-sub", default=None, help="D91: WO-98 OTA2 subckt file (ota1 port order); default = OTA1 cell")
     ap.add_argument("--ota2-name", default="ota2"); ap.add_argument("--ota2-shared", action="store_true", help="OTA2 on OTA1's bias nets")
     ap.add_argument("--deck-timeout", type=int, default=250000)
+    ap.add_argument("--uset", default=None, help="WO-105: bc u points, comma list (default u_points(m, 0.9))")
+    ap.add_argument("--no-dummy", dest="dummy", action="store_false", help="WO-105: bc without the discarded first conversion (gate a covers it)")
     a = ap.parse_args()
     a.ota2_id = ("ota2-" + os.path.basename(a.ota2_sub).split(".")[0]) if a.ota2_sub else "ota2-ota1cell"
     tag = f"g{a.gate}_{a.copy}_{a.ota2_id}_{a.corner}{a.temp:g}_N{a.n}_{a.opt}"
@@ -357,9 +363,10 @@ def main():
                    second_conv_ok=len(c) > 1 and abs(c[1]["u_hat"] - c[1]["u"]) <= fn_tol(c[1]["u"]))
         verdict(a, all(chk.values()), res, dict(checks=chk))
     if a.gate == "bc":      # DC function at m points (b) and endpoint INL (c) from the same conversions; dummy first
-        u = TB.u_points(a.m, 0.9)
-        res, _ = run(a, (u[0],) + tuple(u), tag)
-        c = (res.get("convs") or [])[1:]
+        u = tuple(float(x) for x in a.uset.split(",")) if a.uset else tuple(TB.u_points(a.m, 0.9))
+        tag += ("_u" + "_".join(f"{x:g}" for x in u)) if a.uset else ""
+        res, _ = run(a, ((u[0],) if a.dummy else ()) + u, tag)
+        c = (res.get("convs") or [])[1 if a.dummy else 0:]
         extra = {}
         if c:
             uin = np.array([x["u"] for x in c]); uh = np.array([x["u_hat"] for x in c])
@@ -369,7 +376,9 @@ def main():
             fg = [abs(x["code_bits"] - x["code_gold"]) <= fn_tol(x["u"]) + 2 * nb for x in c]
             extra = dict(inl_ep_ppm=g["inl_ep_ppm"], inl=g, b_function=fb, b_vs_golden=fg, inl_gate_ppm=INL_GATE,
                          pass_b=all(fb) and all(fg), pass_c=g["inl_ep_ppm"] <= INL_GATE)
-            ok = extra["pass_b"] and extra["pass_c"]
+            # D95: INL (c) is gated per block (gate B); at N < 1024 it is reported only
+            extra["inl_gated"] = a.n >= 1024 and not a.uset
+            ok = extra["pass_b"] and (extra["pass_c"] or not extra["inl_gated"])
         else:
             ok = False
         verdict(a, ok, res, extra)
@@ -394,7 +403,14 @@ def main():
             r1, r2 = c[2]["u_hat"] - c[0]["u_hat"], c[5]["u_hat"] - c[3]["u_hat"]
             extra = dict(recov_pos_ppm=r1 / 2 * 1e6, recov_neg_ppm=r2 / 2 * 1e6, over_pos=c[1]["u_hat"], over_neg=c[4]["u_hat"],
                          x_after=[(x["x1n"], x["x2n"]) for x in c])
-            ok = abs(r1) <= 2e-6 and abs(r2) <= 2e-6 and c[1]["u_hat"] >= 0.95 and c[4]["u_hat"] <= -0.95
+            # WO-105 gate (f) from the same run: stage-1 / stage-2 residue at slot 0 of every conversion after the dummy,
+            # and every non-overload conversion within the function tolerance (the reset must make each one independent)
+            res_max = max(max(abs(x["x1s"]), abs(x["x2s"])) for x in c)
+            fn_ok = all(abs(x["u_hat"] - x["u"]) <= fn_tol(x["u"]) for x in c if abs(x["u"]) < 1)
+            extra.update(res_slot0_max=res_max, res_lim=RES_LIM, res_slot0=[(x["x1s"], x["x2s"]) for x in c], f_function_ok=fn_ok,
+                         pass_e=abs(r1) <= 2e-6 and abs(r2) <= 2e-6 and c[1]["u_hat"] >= 0.95 and c[4]["u_hat"] <= -0.95,
+                         pass_f=res_max <= RES_LIM and fn_ok)
+            ok = extra["pass_e"] and extra["pass_f"]
         verdict(a, ok, res, extra)
 
 
