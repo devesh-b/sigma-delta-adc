@@ -124,7 +124,7 @@ def build(a, us, swaps=None, vos=None, t_rel=None):
          f".options method={o['method']} reltol={o['reltol']:g} chgtol={o['chgtol']:g} vntol={o['vntol']:g} "
          f"abstol={o['abstol']:g} trtol={o['trtol']:g}",
          f".lib {LIB} {a.corner}", f".include {HVL}", f".temp {a.temp:g}",
-         ".model SWL SW(Vt=0.5 Vh=0.0 Ron=10 Roff=1e12)"]
+         ".model SWL SW(Vt=0.5 Vh=0.0 Ron=200 Roff=1e12)"]
     # blocks
     L.append(NL.build("ota1", cmfb="sc", fs=fs, boost=False))
     if a.ota2_sub:   # D91: WO-98 OTA2 subckt (same port order as ota1), swapped in by path
@@ -172,13 +172,14 @@ def build(a, us, swaps=None, vos=None, t_rel=None):
             rs += [(t, 1.0), (t + 1e-10, 0.0)]
         fr += [(t + 0.75 * T, 1.0), (t + 0.75 * T + 1e-10, 0.0)]
     L += [f"Vrss rss 0 PWL({pwl(rs)})", f"Vfrs frs 0 PWL({pwl(fr)})",
-          "Bbok bok 0 V = u(V(ok)-1.5)",
-          f"Brst rst 0 V = {VDL}*max(V(rss),1-V(bok))",
+          # smoothed logic (lesson 2: a u() step on a gate-cap node aborted the smoke at 0.52 us, "timestep too small" on by#branch)
+          "Bbok bok 0 V = 0.5*(1+tanh((V(ok)-1.5)/0.05))",
+          f"Brst rsti 0 V = {VDL}*max(V(rss),1-V(bok))", "Rrst rsti rst 1k",
           "Bfrc frc 0 V = max(V(frs),1-V(bok))",
-          f"Bdec dec 0 V = {VDL}*(1-u(V(q)-0.9)*u(V(qb)-0.9))",
-          "Bcmpv cmpv 0 V = V(frc)+(1-V(frc))*(2*u(V(q)-0.9)-1)",
-          f"Vcap cap 0 PULSE(0 1 {T / 2 - 2.5e-9:.6e} 0.2n 0.2n 1.5n {T:.6e})",
-          "Slat cmpv yq cap 0 SWL", "Chold yq 0 1p", f"By y 0 V = {VDL}*u(V(yq))"]
+          f"Bdec deci 0 V = {VDL}*(1-0.25*(1+tanh((V(q)-0.9)/0.05))*(1+tanh((V(qb)-0.9)/0.05)))", "Rdec deci dec 1k",
+          "Bcmpv cmpv 0 V = V(frc)+(1-V(frc))*tanh((V(q)-0.9)/0.05)",
+          f"Vcap cap 0 PULSE(0 1 {T / 2 - 8e-9:.6e} 0.5n 0.5n 5n {T:.6e})",
+          "Slat cmpv yq cap 0 SWL", "Chold yq 0 1p", f"By yi 0 V = {0.5 * VDL}*(1+tanh(V(yq)/0.05))", "Ry yi y 1k"]
     sws = swaps or [0] * len(us)
     if "noswap" in toks:
         sws = [0] * len(us)
@@ -288,12 +289,15 @@ def run(a, us, tag, **kw):
     rises = np.where(np.diff(ok.astype(int)) == 1)[0]
     drops = np.where(np.diff(ok.astype(int)) == -1)[0]
     ib = -cols["ib"]   # current into the sink mirror drain node (Vm from port to mirror drain): sign-normalised below
-    ib = ib if np.median(ib[t > meta["t_rel"]]) > 0 else -ib
+    ib = ib if (np.any(t > meta["t_rel"]) and np.median(ib[t > meta["t_rel"]]) > 0) else -ib
+    if not np.any(t > meta["t0"][0]):
+        res["problems"].append("run ended before the first conversion")
+        return res, cols
     ifin = float(np.median(ib[t > meta["t0"][0]]))
     rel = meta["t_rel"]
     res["startup"] = dict(ok_rises_us=[float(t[i] * 1e6) for i in rises[:6]], ok_drops_us=[float(t[i] * 1e6) for i in drops[:6]],
                           ok_at_rel=bool(np.interp(rel, t, cols["ok"]) > 1.5), ib_final=ifin, ib_design=meta["ports"]["b1_ibtp"],
-                          ib_at_rel_err=float(np.interp(rel, t, ib) / ifin - 1), ib_range_after_rel=float((ib[t > rel].max() - ib[t > rel].min()) / ifin))
+                          ib_at_rel_err=float(np.interp(rel, t, ib) / ifin - 1), ib_range_after_rel=float((ib[t > rel].max() - ib[t > rel].min()) / ifin) if np.any(t > rel) else float("nan"))
     within = np.abs(ib / ifin - 1) <= 0.01
     last_out = np.where(~within)[0]
     res["startup"]["t_settle_1pct_us"] = float(t[last_out[-1] + 1] * 1e6) if len(last_out) and last_out[-1] + 1 < len(t) else float("nan")
