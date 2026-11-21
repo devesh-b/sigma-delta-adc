@@ -1,0 +1,40 @@
+* WO-100 reference netlist for mim_s1 (stage-1 caps: Cs1 0.5 pF = 2 units, Cint1 4 pF = 16 units per side;
+* unit 0.25 pF = cap_mim_m3_1 11 x 11 um). Terminal order (top, bottom) as mim_s2_ref.spice.
+.subckt mim_s1 cs1p_t cs1p_b cs1n_t cs1n_b ci1p_t ci1p_b ci1n_t ci1n_b
+XA1 cs1p_t cs1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XA2 cs1p_t cs1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XA3 cs1n_t cs1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XA4 cs1n_t cs1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB1 ci1p_t ci1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB2 ci1p_t ci1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB3 ci1p_t ci1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB4 ci1p_t ci1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB5 ci1p_t ci1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB6 ci1p_t ci1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB7 ci1p_t ci1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB8 ci1p_t ci1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB9 ci1p_t ci1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB10 ci1p_t ci1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB11 ci1p_t ci1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB12 ci1p_t ci1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB13 ci1p_t ci1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB14 ci1p_t ci1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB15 ci1p_t ci1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB16 ci1p_t ci1p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB17 ci1n_t ci1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB18 ci1n_t ci1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB19 ci1n_t ci1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB20 ci1n_t ci1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB21 ci1n_t ci1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB22 ci1n_t ci1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB23 ci1n_t ci1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB24 ci1n_t ci1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB25 ci1n_t ci1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB26 ci1n_t ci1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB27 ci1n_t ci1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB28 ci1n_t ci1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB29 ci1n_t ci1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB30 ci1n_t ci1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB31 ci1n_t ci1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB32 ci1n_t ci1n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+.ends
