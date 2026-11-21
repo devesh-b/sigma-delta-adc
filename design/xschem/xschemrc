@@ -1,0 +1,10 @@
+# WO-94 xschemrc: sky130A PDK symbols (IIC-OSIC-TOOLS, PDK_ROOT/PDK from the container env) + this design.
+# Generated schematics live in sch/ (or $WO94_SCH for the broken copies). Batch netlist:
+#   xschem -q -x -r -n -s --rcfile design/xschem/xschemrc -o OUT -N cell.spice sch/cell.sch
+source $env(PDK_ROOT)/$env(PDK)/libs.tech/xschem/xschemrc
+if {[info exists env(WO94_SCH)]} {
+  append XSCHEM_LIBRARY_PATH :$env(WO94_SCH)
+} else {
+  append XSCHEM_LIBRARY_PATH :[file dirname [file normalize [info script]]]/sch
+}
+set top_is_subckt 1

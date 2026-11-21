@@ -1,0 +1,60 @@
+v {xschem version=3.4.5 file_version=1.2}
+G {}
+K {type=subcircuit
+format="@name @pinlist @symname"
+template="name=x1"
+}
+V {}
+S {}
+E {}
+B 4 -60 0 60 180 {}
+T {@symname} 0 -28 0 0 0.3 0.3 {hcenter=true}
+T {@name} 0 184 0 0 0.2 0.2 {hcenter=true}
+B 5 -82.5 17.5 -77.5 22.5 {name=ua0 dir=inout}
+L 4 -80 20 -60 20 {}
+T {ua0} -55 14 0 0 0.2 0.2 {}
+B 5 -82.5 37.5 -77.5 42.5 {name=ua1 dir=inout}
+L 4 -80 40 -60 40 {}
+T {ua1} -55 34 0 0 0.2 0.2 {}
+B 5 -82.5 57.5 -77.5 62.5 {name=ua2 dir=inout}
+L 4 -80 60 -60 60 {}
+T {ua2} -55 54 0 0 0.2 0.2 {}
+B 5 -82.5 77.5 -77.5 82.5 {name=ua3 dir=inout}
+L 4 -80 80 -60 80 {}
+T {ua3} -55 74 0 0 0.2 0.2 {}
+B 5 -82.5 97.5 -77.5 102.5 {name=VAPWR dir=inout}
+L 4 -80 100 -60 100 {}
+T {VAPWR} -55 94 0 0 0.2 0.2 {}
+B 5 -82.5 117.5 -77.5 122.5 {name=VDPWR dir=inout}
+L 4 -80 120 -60 120 {}
+T {VDPWR} -55 114 0 0 0.2 0.2 {}
+B 5 -82.5 137.5 -77.5 142.5 {name=VGND dir=inout}
+L 4 -80 140 -60 140 {}
+T {VGND} -55 134 0 0 0.2 0.2 {}
+B 5 -82.5 157.5 -77.5 162.5 {name=fs dir=inout}
+L 4 -80 160 -60 160 {}
+T {fs} -55 154 0 0 0.2 0.2 {}
+B 5 77.5 17.5 82.5 22.5 {name=y dir=inout}
+L 4 80 20 60 20 {}
+T {y} 55 14 0 1 0.2 0.2 {}
+B 5 77.5 37.5 82.5 42.5 {name=swap dir=inout}
+L 4 80 40 60 40 {}
+T {swap} 55 34 0 1 0.2 0.2 {}
+B 5 77.5 57.5 82.5 62.5 {name=short dir=inout}
+L 4 80 60 60 60 {}
+T {short} 55 54 0 1 0.2 0.2 {}
+B 5 77.5 77.5 82.5 82.5 {name=chop dir=inout}
+L 4 80 80 60 80 {}
+T {chop} 55 74 0 1 0.2 0.2 {}
+B 5 77.5 97.5 82.5 102.5 {name=rst_analog dir=inout}
+L 4 80 100 60 100 {}
+T {rst_analog} 55 94 0 1 0.2 0.2 {}
+B 5 77.5 117.5 82.5 122.5 {name=order dir=inout}
+L 4 80 120 60 120 {}
+T {order} 55 114 0 1 0.2 0.2 {}
+B 5 77.5 137.5 82.5 142.5 {name=comp_out dir=inout}
+L 4 80 140 60 140 {}
+T {comp_out} 55 134 0 1 0.2 0.2 {}
+B 5 77.5 157.5 82.5 162.5 {name=bias_ok dir=inout}
+L 4 80 160 60 160 {}
+T {bias_ok} 55 154 0 1 0.2 0.2 {}

@@ -1,0 +1,11 @@
+cell        elems  good      broken_copy            broken    result
+ota1        76     MATCH     mtr:W=4                MISMATCH  ACCEPT
+ota2        76     MATCH     mtr:W=4                MISMATCH  ACCEPT
+c3_comp     43     MATCH     M1:W=4.5               MISMATCH  ACCEPT
+c4_gen      152    MATCH     mdp:W=0.5              MISMATCH  ACCEPT
+c6_bias     48     MATCH     m1:mult=16             MISMATCH  ACCEPT
+mim_cs      1      MATCH     c:MF=3                 MISMATCH  ACCEPT
+mim_cint1   1      MATCH     c:MF=15                MISMATCH  ACCEPT
+mim_cint2   1      MATCH     c:MF=5                 MISMATCH  ACCEPT
+mim_ck2     1      MATCH     c:W=12                 MISMATCH  ACCEPT
+sd_mod_top  57     MATCH     sinpn:W=11             MISMATCH  ACCEPT
