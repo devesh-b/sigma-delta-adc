@@ -1,0 +1,20 @@
+* WO-96 reference netlist for mim_s2 (stage-2 caps, SPEC 3.4: Cs2 0.5 pF, Cint2 1 pF, Ck2 0.25 pF per side; unit 0.25 pF
+* = cap_mim_m3_1 11 x 11 um). Terminal order (top, bottom) per the extracted cap_mim_m3_1 (c0 = met4/capm side).
+.subckt mim_s2 cs2p_t cs2p_b cs2n_t cs2n_b ci2p_t ci2p_b ci2n_t ci2n_b ck2p_t ck2p_b ck2n_t ck2n_b dmy
+XA1 cs2p_t cs2p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XA2 cs2p_t cs2p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XA3 cs2n_t cs2n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XA4 cs2n_t cs2n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB1 ci2p_t ci2p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB2 ci2p_t ci2p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB3 ci2p_t ci2p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB4 ci2p_t ci2p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB5 ci2n_t ci2n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB6 ci2n_t ci2n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB7 ci2n_t ci2n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XB8 ci2n_t ci2n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XK1 ck2p_t ck2p_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XK2 ck2n_t ck2n_b sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XD1 dmy dmy sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+XD2 dmy dmy sky130_fd_pr__cap_mim_m3_1 w=11 l=11
+.ends

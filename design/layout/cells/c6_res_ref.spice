@@ -1,0 +1,7 @@
+* WO-96 reference for c6_res: the three core resistors of C6 (c6_spot.py Xr1 / Xr2a / Xr2b), 0p69 xhrpoly,
+* lengths per results/wo80 (R1 144.8 um, R2/R1 2.45). Body = substrate. Unwired (block wiring comes with the C6 cell).
+.subckt c6_res
+XR1 r1a r1b vsub sky130_fd_pr__res_xhigh_po_0p69 w=0.69 l=144.8
+XR2a r2a r2b vsub sky130_fd_pr__res_xhigh_po_0p69 w=0.69 l=354.76
+XR2b r3a r3b vsub sky130_fd_pr__res_xhigh_po_0p69 w=0.69 l=354.76
+.ends
