@@ -15,3 +15,10 @@ run ref_good mutants/ref_good.v
 run mut_swap mutants/mut_swap.v
 run mut_bsel0 mutants/mut_bsel0.v
 rm -f /tmp/czb8_$$.*
+# RTL-derived mutants (copies of the real RTL, sed-edited); fail loudly if the edit did not change the file
+mkdir -p mutants_gen
+sed 's/bus\[15:8\] : bus\[7:0\]/bus[7:0] : bus[15:8]/' "$RTL" > mutants_gen/rtl_swap.v
+sed 's/= bsel ?/= 1'"'"'b0 ?/' "$RTL" > mutants_gen/rtl_bsel0.v
+for m in swap bsel0; do cmp -s "$RTL" mutants_gen/rtl_$m.v && echo "rtl_$m: MUTATION-NOT-APPLIED"; done
+run rtl_swap mutants_gen/rtl_swap.v
+run rtl_bsel0 mutants_gen/rtl_bsel0.v
