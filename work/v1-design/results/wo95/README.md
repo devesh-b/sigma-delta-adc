@@ -3,7 +3,13 @@
 Status 2026-11-21: the bench has been built and the runs are queued on the sandbox. **No gate results yet.** A generate-only check passed (474-line deck, 355 X instances, `out/smoke/gen_check.cir`); ngspice has not run it yet. All five global lpool slots were taken by WO-91, WO-77 and WO-97, so the smoke run had not started when this was written. The numbers below get filled in from `out/*/run.txt` and `*.json`.
 
 Frozen copy: `/home/mempool/regr/tt/WO-95-b4b44f4` (design/top/top_bench.py at b4b44f4; the orchestrator script from f698d26 is copied in).
-OTA2 used in every result: **`ota2-ota1cell`** (the OTA1 cell with its own bench mirrors). D91 (a 9/16-scaled cell on shared bias nets) plugs in through `--ota2-sub <WO-98 file> --ota2-name <subckt> --ota2-shared`. The OTA2 used is part of each tag and of the json field `ota2`.
+OTA2: the smoke uses `ota2-ota1cell`. **The gate and corner pools use the D91 OTA2** (`design/c2_ota2/ota2.spice` 692f8b5/72f2f79, copied in as `d91.spice`, tags `ota2-d91`, bias nets shared with OTA1, `--ota2-shared`). In shared mode `ota2dead` gives OTA2 its own ×0.1 mirrors.
+WO-99 review fixes (10b1e38, deployed in the frozen copy):
+- `r2` shorts stage 2 only, with the SR2 TG 8/24, and OTA2 isl is on `r2_t`.
+- OTA1 output short on isl/rstb.
+- The D12 shorts are plate-to-plate (no CM node), and the input-short node `vcmin` = VREF/2 = 1.024 V (already correct).
+- Switch the stand-ins (ideal vicm/vocm, bench mirrors) to `c5c7_ref.py` / `c6_final.py` once their pool verdicts land.
+12:21: all 5 global slots are still held, so the smoke has not started.
 
 ## Deck (`design/top/top_bench.py`)
 - **Transistor level:**
