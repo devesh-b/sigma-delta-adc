@@ -1064,3 +1064,9 @@ Next steps:
   - **Resumed with SendMessage:** WO-95 (smoke diagnosis), WO-98 (triage the fails), WO-100 (layout), WO-102 (xschem), WO-97 (collect GL).
   - **To resume later** (held to save usage): WO-99 (collect its pool), WO-101 (C9 shrink), WO-103 (MOS caps).
   - **Still paused:** WO-91 p2–p4.
+
+## 2026-11-21 23:20 — second reboot (box up 20:05), pools relaunched
+- All tt pools were killed by the 20:05 reboot. Relaunched with `work/v1-design/relaunch_20261121b.sh` (SKIPDONE=1; logs without EXIT moved to `*.killed2`).
+- High: WO-106 gl (1/5 ok), WO-98 rerun (4/24 ok), WO-105 gates (0/10), WO-104 C6 (0/26), WO-103 C4 MOS caps run (2/27 ok).
+- Low: WO-105 t1, WO-105 corners, WO-95 smoke (N 16; restarts from 0).
+- Agents WO-107 / WO-104 / WO-103 still rate-limited; resume via SendMessage when their pools report.
