@@ -998,3 +998,24 @@ Next steps:
   - WO-88 runA is 15/17 OK. WO-92 is dispatched for rev g and the full C3 set.
   - WO-87 C6 pool `pool_run` is at 39/42.
   - The C4 pools are failure-heavy: WO-79 pool2 5 OK / 18 failed, WO-85 26 OK / 11 failed. Triage once they are done.
+
+## 2026-11-21: sandbox reboot, relaunch, results
+- **Access.** The sandbox had been rebooted and was unreachable on the LAN. The user gave the WAN route `mempool@49.207.248.15 -p 22181`; its host keys match mempool.lan exactly, and it is used with `-o HostName=49.207.248.15 -p 22181 -o HostKeyAlias=mempool.lan`.
+- **lpool v3** (299b90d), tested on the sandbox with broken copies:
+  - PRIO low at LOWSLOTS 1 → max 1 job; broken copy at 3 → 2 jobs.
+  - SKIPDONE skips EXIT=0 and running jobs and reruns EXIT≠0; broken copy (no skip) → all 4 jobs ran.
+  - POOL_DONE waits for the orphan job's EXIT line.
+- **Relaunch.** `relaunch_20261121.sh` deployed lpool v3 by mv to every frozen copy and to tt-sd, and set aside logs with no EXIT line.
+  - High priority: WO-87, WO-83 (jobs 2/3, the real-width PDR, DEFERRED), WO-85, WO-77, WO-76 o2, WO-91 p1.
+  - Low priority: WO-91 p2–p4, WO-92 runB.
+  - Held: WO-79 pool2 (needs triage). Dropped: WO-88 runA.
+- **C1 precision gate B (O2, N 1024).**
+  - **ss/−40: third solver point V10 (vntol 1e-7)** gives p0 0.143, p2 0.164, p4 0.165, against O2 0.142 / 0.160 / 0.164. Δ ≤ 0.004 ppm, well inside the D43c tolerance of 0.117. **O2 is confirmed: ss/−40 0.165 ppm ACCEPT. The O1 1.706 was a solver artefact.**
+  - fs/125: V10 p0 0.473 against O2 0.472, agrees. Combine pending.
+  - tt/27: O2 0.123–0.156 on 4 of 6 parts. ss/125: O2 0.508–0.739 on 4 of 6. The rest are running.
+  - srdeep broken copy: 564–1470 ppm, REJECT, STRONG.
+- **C6 WO-87: MISMATCH 7.**
+  - early ×2 ACCEPT: retire to INFO, per the ruling.
+  - hy1 ×2 ACCEPT: needs a ripple bench, per the ruling.
+  - earlyx ×2 SIMFAIL: sim fix needed.
+  - **zhintnk ACCEPT (expected REJECT): the hint-agreement check could not be shown to fail.**
