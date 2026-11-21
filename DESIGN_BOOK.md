@@ -28,6 +28,21 @@ This book explains the design from first principles to the current transistor-le
 
 ## Proposal summary
 
+**Update 2026-11-21.** These items supersede the matching 2026-11-15 rows below. The Chipalooza #4 proposal is in `PROPOSAL_CHIPALOOZA4.md`.
+- **C1 precision gate B: PASS.** ss/−40 O2 0.165 ppm, confirmed by a third solver point (V10). fs/125 V10 0.473 ppm. tt/27 0.12–0.16 ppm; ss/125 0.51–0.74 ppm (partial).
+- **C2 OTA2: designed.** It is a 9/16-scaled OTA1 cell (D91).
+  - Precision rows pass.
+  - Offset passes against the loop-based 15 mV limit (D97).
+  - Boost-mode swing at the 4 hot corners is open: 1.22–1.38 V against 1.41 V.
+- **C3 comparator:** rev g selected.
+- **C6 bias:** final sizing done (WO-99). Trim, boost-toggle and port-check fixes are in progress (WO-104).
+- **C9 digital: hardened at 175 × 150 µm** (D98, 26,250 µm²). Stand-in setup is +0.94 ns, and DRC, LVS and antenna are clean. Max slew is waived (D86/D92). Gate-level simulation passed 5/5 at 190 µm wide, and the 175 µm run is in progress.
+- **Schematics: xschem done.** 11/11 cells match the netlists, and each match has a size and a wiring broken copy. The top-level modulator schematic exists. Short top-level gates are running (D95).
+- **Layout:**
+  - DRC/LVS clean: MIM1, MIM2, C6 resistor.
+  - In progress: C4, comparator, OTAs, top assembly.
+  - MIM is stacked over circuits (D93).
+
 Status 2026-11-15. This section only summarises; every row points to the section of the book that holds the numbers and their sources. Values that are not final are marked PENDING.
 
 **What the design is.** A second-order, 1-bit, discrete-time incremental ΣΔ ADC for a 2×2 analog tile on sky130A Tiny Tapeout (II.1.2; II.2.1–II.2.3). The modulator is a fully differential switched-capacitor CIFB loop with c1 0.125, c2 0.5, k 0.5 (II.2.3), Cs 0.5 pF and Cint1 4 pF (II.2.5). The reference is external and ratiometric, VREF 2.048 V on ua2 with a Kelvin REF− on ua3 (II.1.2; II.2.4). Each conversion resets the loop and runs N = 64 / 256 / 1024 / 4096 cycles at fs 0.25–2 MHz (precision) or 4 MHz with bias boost (fast) (II.2.6; II.2.7). A cascade-of-integrators decimator, sequencer, configuration register and 16-bit read bus live in a hardened digital macro inside the analog tile (III.6).
