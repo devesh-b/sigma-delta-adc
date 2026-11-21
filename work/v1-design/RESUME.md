@@ -1027,3 +1027,22 @@ Next steps:
 - WO-96 (f25358d…c7886bf): floorplan scripted. Only `mim_s2` is clean; `c6_res` has rpm DRC errors; the `c4_sw` extraction stops. The area does not close, so D93.
 - WO-95 (b4b44f4, f698d26, 4aac997): top bench built, smoke queued.
 - WO-98 (692f8b5, 72f2f79): OTA2 subckt `design/c2_ota2/ota2.spice`; tt/27 opac passes every row. OTA2 offset risk: 8.6 mV 3σ against the 9 mV limit.
+- **12:25 IST: usage limit reached. Pickup:**
+  - **Slot holders, 12:22.** slot0 125998, slot1 125696, slot2 123826, slot3 4543, slot4 4468.
+    - PIDs 4468 and 4543 are from 11:36, probably WO-77 and WO-85. Identify each with `ps -o pid,etime,args -p <pid>` before killing anything.
+    - The WO-95 smoke is still waiting for a slot.
+  - **Agents in flight:**
+
+    | WO | Work | Note |
+    |---|---|---|
+    | WO-95 | top bench | orchestrator restarted, waits for the smoke |
+    | WO-98 | OTA2 bench pool | queued |
+    | WO-99 | pool | queued |
+    | WO-100 | layout | |
+    | WO-101 | C9 shrink | |
+    | WO-102 | xschem update | |
+    | WO-103 | C4 MOS caps | |
+
+  - **Paused, resume at low priority later:** WO-91 p2–p4.
+  - **Open:** the OTA boost bank port, so boost mode can be verified later.
+  - **Plan:** `TAPEOUT_10D.md`.
