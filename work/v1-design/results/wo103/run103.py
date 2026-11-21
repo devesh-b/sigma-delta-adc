@@ -25,9 +25,9 @@ import c4_tb as TB  # noqa: E402
 TB.GEN_MUTS = TB.GEN_MUTS + ("mim", "nocap")
 CHAINS = dict(g=(N.K_G, N.C_G), e=(N.K_E, N.C_E), s=(N.K_S, N.C_S))
 NCAP = dict(g=2 * N.K_G, e=2 * N.K_E, s=N.K_S)            # caps per chain kind in the generator (14 total)
-WS = (1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 10.0, 12.0)
+WS = (2.0, 3.0, 4.0, 6.0, 8.0, 10.0)
 L_C = 2.0
-SIZE_CORNERS = ("tt_27", "ss_m40", "ff_m40")
+SIZE_CORNERS = ("tt_27",)        # sizing at tt only (WO); corners are checked in tim
 CORN = TB.TIM_CORNERS
 FS2 = ("ff_m40", "ss_125")          # 4M aborted there in WO-85 (bench); 2M added as the fallback pair
 DT = ("g_min", "g50_max", "eb_min", "strobe_pre", "o1_pre", "r13_pre", "r13_post")
@@ -146,6 +146,9 @@ if __name__ == "__main__":
     elif a[0] == "jobs":
         jobs(a[1])
     elif a[0] == "run":
+        sz = os.path.join(a[4], "..", "size", "size.json")    # tt sizing result overrides the committed DCAP
+        if a[3] != "mim" and os.path.exists(sz):
+            N.DCAP.update({k: (p["w"], p["l"]) for k, p in json.load(open(sz))["pick"].items() if p["w"]})
         TB.run("tim", a[1], a[2], a[3], a[4])
     elif a[0] == "report":
         report(a[1])
