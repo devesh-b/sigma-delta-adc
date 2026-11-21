@@ -23,7 +23,16 @@
 # closes its copy, so the lock is released only when the job (and its children) exit. Several
 # pools running at once therefore never exceed GMAX jobs in total. The per-pool load rule
 # still applies on top of the cap.
-
+#
+# Priority (user request 2026-11-16: fast checks first, slow ones after):
+#   PRIO=high (default) tries the slots from the top (GMAX-1 .. 0).
+#   PRIO=low may only use slots 0 .. LOWSLOTS-1 (default 2), so at least GMAX-LOWSLOTS slots
+#   always stay free for high-priority (fast) pools.
+# Resume: SKIPDONE=1 skips job i when LOGDIR/job_i.log already ends with EXIT=0, or has no EXIT
+#   line yet (a job left running by a stopped pool). Jobs that ended with EXIT!=0 are rerun.
+#   Before POOL_DONE the pool waits until every skipped-but-running job has written its EXIT line.
+# Deploy by writing a new file and mv-ing it over the old one (new inode); a running bash keeps
+# reading its old copy, so in-place overwrite (scp/cp onto the same file) is unsafe.
 JOBFILE=${1:?usage: lpool.sh JOBFILE [LOGDIR]}
 LOGDIR=${2:-$(dirname "$JOBFILE")/pool_logs}
 NPROC=$(env -u OMP_NUM_THREADS nproc)   # GNU nproc honours OMP_NUM_THREADS; ignore it here
@@ -32,12 +41,15 @@ MARGIN=${MARGIN:-0.5}
 POLL=${POLL:-20}
 GMAX=${GMAX:-5}
 SLOTDIR=${SLOTDIR:-/home/mempool/regr/tt/.lpool_slots}
+PRIO=${PRIO:-high}
+LOWSLOTS=${LOWSLOTS:-2}
+SKIPDONE=${SKIPDONE:-0}
 mkdir -p "$LOGDIR" "$SLOTDIR"
 export OMP_NUM_THREADS=1
 [ -f .spiceinit ] || printf 'set num_threads=1\n' > .spiceinit
 
 mapfile -t JOBS < <(grep -v '^[[:space:]]*\(#\|$\)' "$JOBFILE")
-echo "lpool start $(date +%T) jobs=${#JOBS[@]} nproc=$NPROC max=$MAXJOBS" >> "$LOGDIR/pool.status"
+echo "lpool start $(date +%T) jobs=${#JOBS[@]} nproc=$NPROC max=$MAXJOBS prio=$PRIO skipdone=$SKIPDONE" >> "$LOGDIR/pool.status"
 
 # Our running jobs are tracked as an explicit PID list checked with kill -0, in the main shell.
 # (The old `jobs -rp` inside $(...) ran in a subshell and miscounted, so the pool over-launched;
@@ -62,9 +74,10 @@ compute_slots() {
 
 SLOTFD=
 GSLOT=
-acquire_gslot() {   # take one free global slot lock; return 1 if all GMAX are held
-  local s fd
-  for ((s=0; s<GMAX; s++)); do
+acquire_gslot() {   # take one free global slot lock allowed for our PRIO; return 1 if none
+  local s fd order
+  if [ "$PRIO" = low ]; then order=$(seq 0 $((LOWSLOTS-1))); else order=$(seq $((GMAX-1)) -1 0); fi
+  for s in $order; do
     exec {fd}>"$SLOTDIR/slot$s"
     if flock -n "$fd"; then SLOTFD=$fd; GSLOT=$s; return 0; fi
     exec {fd}>&-
@@ -72,9 +85,18 @@ acquire_gslot() {   # take one free global slot lock; return 1 if all GMAX are h
   return 1
 }
 
+SKIPPED=()
 i=0
 for j in "${JOBS[@]}"; do
   i=$((i+1))
+  if [ "$SKIPDONE" = 1 ] && [ -f "$LOGDIR/job_$i.log" ]; then
+    ex=$(grep -o '^EXIT=[0-9]*' "$LOGDIR/job_$i.log" | tail -1)
+    if [ "$ex" = "EXIT=0" ] || [ -z "$ex" ]; then
+      [ -z "$ex" ] && SKIPPED+=("$i")
+      echo "skip $i $(date +%T) (${ex:-running}) :: $j" >> "$LOGDIR/pool.status"
+      continue
+    fi
+  fi
   while :; do
     count_running; compute_slots
     if [ "$NRUN" -lt "$NSLOT" ] && acquire_gslot; then break; fi
@@ -88,5 +110,8 @@ for j in "${JOBS[@]}"; do
   sleep 30   # let load1 catch up before the next decision
 done
 wait
+for k in "${SKIPPED[@]}"; do   # jobs left running by a stopped pool: wait for their EXIT line
+  until grep -q '^EXIT=' "$LOGDIR/job_$k.log" 2>/dev/null; do sleep "$POLL"; done
+done
 echo "lpool done $(date +%T)" >> "$LOGDIR/pool.status"
 date > "$LOGDIR/POOL_DONE"
