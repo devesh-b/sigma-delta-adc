@@ -28,7 +28,7 @@ from revc_check import CORNERS9, LIB  # noqa: E402
 
 FS = {0: 2e6, 1: 4e6}
 LIM = dict(a0_db=75.0, av_db=75.0, span=1.41, gbw={0: 10e6, 1: 22.5e6}, sr={0: 13.5e6, 1: 27e6},
-           eps={0: 1.4e-3, 1: 6e-4}, cm=10e-3, vos3=9e-3, tog=4e-6, tog_tol=1e-3, coup1=1e-5, coup2=1.4e-4,
+           eps={0: 1.4e-3, 1: 6e-4}, cm=10e-3, vos3=15e-3, tog=4e-6, tog_tol=1e-3, coup1=1e-5, coup2=1.4e-4,
            margin=0.05, itot=200e-6)
 KICK_V = 47.4e-3                     # comparator kick per fire edge, top of 38.9-47.4 mV (C3 rev f/g)
 STEP2, STEP1 = 1.12, 0.49            # OTA2 worst step (SPEC), OTA1 worst step
@@ -397,7 +397,8 @@ def t_mc(c, t, v, b, mut, tag, out, seed, n):
         return dict(valid=False, why="missing samples", lint=lint[:6]), rows
     s3 = 3 * float(np.std(vos, ddof=1))
     mx = float(np.max(np.abs(vos)))
-    row(rows, "vos", max(s3, mx), LIM["vos3"], s3 <= LIM["vos3"] and mx <= LIM["vos3"], "V (max of 3 sigma, |sample|max)")
+    ms3 = abs(float(np.mean(vos))) + s3   # D97 / CL-40: |mu| + 3 sigma <= 15 mV and every sample <= 15 mV
+    row(rows, "vos", max(ms3, mx), LIM["vos3"], ms3 <= LIM["vos3"] and mx <= LIM["vos3"], "V (max of |mu|+3 sigma, |sample|max)")
     return dict(valid=True, lint=lint[:6], vos=vos.tolist(), sigma3=s3, absmax=mx, mean=float(np.mean(vos)),
                 hand_pair_3sigma=3 * S2.sig_vt("m_in") * math.sqrt(2) * pm), rows
 
@@ -423,6 +424,12 @@ def summary(out):
     for fn in sorted(os.listdir(out)):
         if fn.endswith(".json") and fn != "summary.json":
             R[fn[:-5]] = json.load(open(os.path.join(out, fn)))
+            r_ = R[fn[:-5]]
+            if r_["test"] == "mc" and r_["res"].get("vos"):   # re-judge stored samples at the current LIM (D97)
+                v_ = np.array(r_["res"]["vos"])
+                ms3_, mx_ = abs(v_.mean()) + 3 * v_.std(ddof=1), np.abs(v_).max()
+                r_["rows"]["vos"] = dict(val=float(max(ms3_, mx_)), lim=LIM["vos3"], unit="V",
+                                         verdict="ACCEPT" if ms3_ <= LIM["vos3"] and mx_ <= LIM["vos3"] else "REJECT")
     L, S_ = [], {}
     nom = {k: r for k, r in R.items() if not r.get("mut")}
     by = {}
@@ -461,9 +468,9 @@ def summary(out):
             S_[f"itot_b{b}"] = dict(worst=w[0], at=w[1], ota1=w[2], ota2=w[3])
     mc = [x for r in nom.values() if r["test"] == "mc" and r["ci"] == 0 for x in r["res"].get("vos", [])]
     if mc:
-        s3 = 3 * float(np.std(mc, ddof=1))
-        L.append(f"MC tt/27 pooled: n {len(mc)}, 3 sigma {s3 * 1e3:.2f} mV, |max| {max(map(abs, mc)) * 1e3:.2f} mV vs 9 mV -> "
-                 f"{'ACCEPT' if s3 <= 9e-3 and max(map(abs, mc)) <= 9e-3 else 'REJECT'}")
+        s3 = abs(float(np.mean(mc))) + 3 * float(np.std(mc, ddof=1))
+        L.append(f"MC tt/27 pooled: n {len(mc)}, |mu|+3 sigma {s3 * 1e3:.2f} mV, |max| {max(map(abs, mc)) * 1e3:.2f} mV vs {LIM['vos3'] * 1e3:g} mV (D97) -> "
+                 f"{'ACCEPT' if s3 <= LIM['vos3'] and max(map(abs, mc)) <= LIM['vos3'] else 'REJECT'}")
         S_["mc_tt_pooled"] = dict(n=len(mc), sigma3=s3)
     L.append(f"OTA2 gate-area sum (no bias legs): {S2.gate_area_um2():.0f} um2")
     txt = "\n".join(L)
