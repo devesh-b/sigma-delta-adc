@@ -64,6 +64,6 @@ foreach a $SLOTS { foreach b $SLOTS {
     lassign $a na ax1 ay1 ax2 ay2; lassign $b nb bx1 by1 bx2 by2
     if {$na < $nb && $ax2 > $bx1 && $bx2 > $ax1 && $ay2 > $by1 && $by2 > $ay1} { puts "FP OVERLAP $na $nb" }
 }}
-save $TOP
+writeall force
 puts "FP DONE"
 quit -noprompt
