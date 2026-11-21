@@ -14,10 +14,10 @@ proc strap {name x1 x2} {
     port use [expr {$name eq "VGND" ? "ground" : "power"}]
     port class bidirectional
 }
-# C9 macro: D94 keeps the WO-97 die, C9W x 150 um (env C9W, default 190; 165 shrink dropped), drawn as a slot outline until the
+# C9 macro: D98 (WO-106, 9650241) 175 x 150 um (env C9W, default 175; was 190 under D94), drawn as a slot outline until the
 # WO-101 GDS lands. The WO-96 LEF abstract is no longer placed: its OBS on nwell (sd_adc_c9.lef line 416) became
 # real nwell without taps, the source of the 2 nwell.4 errors. The real macro GDS is checked in cell c9_place.
-set C9W [expr {[info exists env(C9W)] ? $env(C9W) : 190.0}]
+set C9W [expr {[info exists env(C9W)] ? $env(C9W) : 175.0}]
 set C9X2 [expr {4.0 + $C9W}]
 # digital pair just east of the macro; analog pair on the east edge (unchanged)
 strap VDPWR [expr {$C9X2+1.5}] [expr {$C9X2+3.5}]
