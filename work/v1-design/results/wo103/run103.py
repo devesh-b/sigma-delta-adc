@@ -17,7 +17,7 @@ import re
 import subprocess
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", ".."))
 sys.path.insert(0, os.path.join(ROOT, "design", "c4_sw"))
 import netlist as N  # noqa: E402
 import c4_tb as TB  # noqa: E402
