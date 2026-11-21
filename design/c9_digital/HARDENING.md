@@ -144,3 +144,9 @@ macro (uio_oe = 0xFF via tie cells); `ena`, `uio_in` unused.
 - Caveat: at these pins the cells run past the 1.5 ns max_transition of the liberty. STA there extrapolates, so the ss_1v40 setup
   number (+0.753 ns at max RC) has extra model uncertainty. At WO-73 the setup margin under D86 was +2.96 ns. With the D85/D88 RTL it is
   +0.75 ns, so the user should re-confirm D86 on this margin (WO-97 README).
+
+## WO-101 (2026-11-21): D93 die shrink 165 x 150 tried, reverted
+- Run /home/mempool/regr/tt/WO-101-7646108 (pnrA = 165x150 at density 60; pnr1 = 165x150 at density 75). GPL-0302 raised both to 0.78, so the two runs came out identical.
+- Utilisation 0.857. Setup at ss_100C_1v40 max -0.095 ns, nom +0.078, min +0.222 (WO-97 had +0.753). ss_1v60 +7.07, tt +8.80, ff +9.28. Hold +0.108.
+  Slew: 11 at each ss_1v40 RC corner, worst 1.749 ns (WO-97 1.634). Cap, fanout, Magic/KLayout DRC, XOR, antenna: all 0. LVS matches uniquely.
+- Exit rule (setup < 0): config is back to 190x150, and the WO-97 GDS/LEF remain the hand-off. The D86 slew waiver is unchanged.
