@@ -28,7 +28,7 @@ proc legs {parent x0 nx} {
     return [list $xs [expr {($my1+$my2)/2}] [expr {($by1+$by2)/2}]]
 }
 proc irect {layer x1 y1 x2 y2} { box ${x1}i ${y1}i ${x2}i ${y2}i; paint $layer }
-proc ipin {name x y} { box [expr {$x-40}]i [expr {$y-40}]i [expr {$x+40}]i [expr {$y+40}]i; label $name FreeSans 0.3u -metal1; port make }
+proc ipin {name x y} { irect metal1 [expr {$x-40}] [expr {$y-40}] [expr {$x+40}] [expr {$y+40}]; box [expr {$x-40}]i [expr {$y-40}]i [expr {$x+40}]i [expr {$y+40}]i; label $name FreeSans 0.3u -metal1; port make }
 # series-join the legs of one instance; skip = index of a join to leave out (broken copy "open")
 proc series {parent x0 nx a b {skip -1}} {
     lassign [legs $parent $x0 $nx] xs yt yb

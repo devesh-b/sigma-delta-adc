@@ -1,6 +1,7 @@
 * WO-96 reference for c6_res: the three core resistors of C6 (c6_spot.py Xr1 / Xr2a / Xr2b), 0p69 xhrpoly,
+* WO-100: terminals are ports (a portless subckt let netgen merge the unconnected devices 3->1 on both sides).
 * lengths per results/wo80 (R1 144.8 um, R2/R1 2.45). Body = substrate. Unwired (block wiring comes with the C6 cell).
-.subckt c6_res
+.subckt c6_res r1a r1b r2a r2b r3a r3b
 XR1 r1a r1b vsub sky130_fd_pr__res_xhigh_po_0p69 l=144.8
 XR2a r2a r2b vsub sky130_fd_pr__res_xhigh_po_0p69 l=354.76
 XR2b r3a r3b vsub sky130_fd_pr__res_xhigh_po_0p69 l=354.76
