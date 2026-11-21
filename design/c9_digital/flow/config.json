@@ -32,7 +32,8 @@
   "TIMING_VIOLATION_CORNERS": ["*"],
 
   "FP_SIZING": "absolute",
-  "DIE_AREA": [0, 0, 190, 150],
+  "DIE_AREA": [0, 0, 175, 150],
+  "// WO-106": "D96 trial: die 190x150 -> 175x150, single change (pins, density 60, all else as WO-97). Kept only if ss_100C_1v40 setup >= 0 at every RC corner and DRC/LVS/antenna 0; else revert to 190x150. Results: work/v1-design/results/wo106/README.md.",
   "PL_TARGET_DENSITY_PCT": 60,
   "// WO-101": "D93 shrink tried and reverted (exit rule). 165x150 (commit 7646108) gave ss_100C_1v40 max setup -0.095 ns (WO-97 +0.753) and worst slew 1.749 ns; DRC/LVS/antenna stayed clean. GPL-0302 auto-raised the density target to 0.78 for both 60 and 75, so the 75 in 7646108 had no effect. Back to 190x150 / 60 = WO-97 config. Details: work/v1-design/results/wo101/README.md.",
   "IO_PIN_ORDER_CFG": "dir::pin_order.cfg",
