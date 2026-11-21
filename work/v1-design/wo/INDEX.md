@@ -118,3 +118,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
 - WO-93 done (8b22a3b): OTA1-cell as-is misses fast-mode current by 61.8 µA (+31 %), so D91 picks the 9/16 scale. WO-98 C2 dispatched 2026-11-21
 - WO-94 done (a9a416f): xschem cells for C1/OTA2/C3/C4/C6/MIM + top, 10/10 netgen match with broken copies; gaps: C6 final subckt + port mirrors/boost/trim, VICM/VOCM, Cint2 reset, top choices -> WO-99 dispatched
 - WO-97 (6b474df, 3609206): C9 final PnR clean (DRC/LVS/antenna 0), setup/hold met at 12 corners, stand-in slew waived again (D92); GL/SDF sims queued in WO-97-6b474df/pool; macro GDS/LEF/pins handed to WO-96
+- WO-99 handed off (69c59b9, 2b7a281): C6 final + mirrors/boost/trim, c5c7 refs (string on VREF+), sr2 reset; top fixes: vscm short, Ck2 polarity in xschem, WO-95 r2 short bug; OTA generators lack boost bank port (boost mode later). Pool WO-99-69c59b9 queued. WO-102 (xschem update) + WO-103 (C4 MOS caps) dispatched
