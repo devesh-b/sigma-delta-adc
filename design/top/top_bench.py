@@ -208,7 +208,10 @@ def build(a, us, swaps=None, vos=None, t_rel=None):
               f"Cpv2{s} vg2{s} 0 0.035p", f"Cxo1{s} o1{s} 0 0.02p", f"Cxo2{s} o2{s} 0 0.02p"]
     L += sw("stp1", "tp1p", "tp1n", "se", "stp") + sw("stp2", "tp2p", "tp2n", "se", "stp")
     L += sw("s2cm", "b2p", "b2n", "il", "s2cm") + sw("sk0", "bkp", "bkn", "k0", "sk0")
-    L += sw("so1", "o1p", "o1n", "r2", "s2cm") + sw("so2", "o2p", "o2n", "r2", "s2cm")
+    # WO-99 review (69c59b9): r2 shorts stage 2 only (SW sr2 TG 8/24); OTA1 output short on isl (= rst OR NOT pwrok), PMOS on rstb = NOT isl
+    wn2, wp2 = SW.get("sr2", (8.0, 24.0))
+    L += [mos("so1n", "o1p", "isl", "o1n", "0", HVN, *SW["s2cm"][:1], LSW), mos("so1p", "o1p", "rstb", "o1n", "vdd", HVP, SW["s2cm"][1], LSW)]
+    L += [mos("so2n", "o2p", "r2_t", "o2n", "0", HVN, wn2, LSW), mos("so2p", "o2p", "r2_c", "o2n", "vdd", HVP, wp2, LSW)]
     # optional bench offset at OTA1's input (chop-pair gate): vg1n -> OTA inp through a PWL source
     if vos:
         vp = steps([t - nrst * T + 0.1 * T for t in t0], vos, vos[0], T=T)
@@ -220,7 +223,7 @@ def build(a, us, swaps=None, vos=None, t_rel=None):
     tail = "chp chn chlp chln isl il_t il_c sl_t sl_c rstb ota1"
     L.append(f"Xota1 vdd 0 {i1} vg1p o1p o1n vicm vocm " + " ".join(f"b1_{p}" for p in ports) + f" {tail}")
     L.append("Xota2 vdd 0 vg2n vg2p o2p o2n vicm vocm " + " ".join(f"b{b2}_{p}" for p in ports)
-             + " " + tail.replace(" ota1", " " + (a.ota2_name if a.ota2_sub else "ota1")))
+             + " " + tail.replace(" isl ", " r2_t ").replace(" ota1", " " + (a.ota2_name if a.ota2_sub else "ota1")))
     L.append("Xc3 o2p o2n phc q qb vdl 0 c3_comp")
     L += ["Cq q 0 20f", "Cqb qb 0 20f", ".ic v(yq)=1"]
     L.append(f".tran 1n {tstop:.9e} 0 {tmax:.6e}")
