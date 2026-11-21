@@ -65,7 +65,7 @@ S1_EXTRA = [("fs", -40, 3.0), ("ff_ll", 125, 3.6), ("ss_hh", -40, 3.0)]
 MUT_CORNERS = [("tt", 27, 3.3), ("ff", 125, 3.6)]
 MUT_CORNERS_RUPQ = [("tt", 27, 3.3), ("ss_hh", -40, 3.0)]
 LIM = dict(g1=1e-3, track=0.02, ratio=0.03, boost=0.04, tt=0.03, absn=0.04, ok_lo=0.1, ok_hi=0.9, i_open=20e-9, g4=1e-3,
-           rail=0.05)
+           rail=0.6)   # worst pair = VDD + 2 x 0.6 = 4.8 V <= 4.95 V; floating mirror outputs undershoot to ~-0.45 V at power-up
 U = 1e-6
 STEPS = [(0, 0.0), (20, I_NOM * 1e6), (60, 2.5), (90, 10.0), (120, 1.0), (150, 20.0), (180, I_NOM * 1e6), (240, 10.0), (270, 0.0)]
 END = {I_NOM * 1e6: 60, 2.5: 90, 10.0: 120, 1.0: 150, 20.0: 180}     # window end (us) of each current
@@ -161,7 +161,7 @@ def stepwave(vals_us):
     return F.pwl(pts)
 
 
-def deck(kind, corner, temp, vdd, mut, csv):
+def deck(kind, corner, temp, vdd, mut, csv, only=None):
     base = kind[:2]
     L = [f"* c6_cz {kind} {corner} {temp} {vdd} {mut}", f".lib {B.LIB} {corner}", f".include {HVL}", f".temp {temp}",
          f".option gmin={1e-11 if temp > 100 else 1e-15} reltol=1e-5 abstol=1e-14 method={F.METHOD}"]
@@ -186,18 +186,24 @@ def deck(kind, corner, temp, vdd, mut, csv):
         L += ["Vdl vdl 0 1.8", "Vsel bias_sel 0 0"]
         L.append(f"Vbst boost 0 PWL({F.pwl(F.steps([(250 * U, 1.8)], 0))})")
         ext = EXT_ON.get(kind[2:]) if len(kind) > 2 else None
-        if ext is None:
-            L.append("Vext bias_ext 0 0")
-        else:
-            L += [f"Iext 0 bias_ext {ext * 1e-6:.6g}", "Cpad bias_ext 0 10p"]
-        L.append("Xb vdd 0 vdl boost trim0 trim1 trim2 bibtp bibn bibp bivbl0 bok c6_bias")
-        L.append("Xz vdd 0 vdl boost trim0 trim1 trim2 zibtp zibn zibp zivbl0 zok bias_ext bias_sel c6_cz")
-        for pre in ("b", "z"):
+        pres = ("b", "z") if only is None else (only,)
+        if "z" in pres:
+            if ext is None:
+                L.append("Vext bias_ext 0 0")
+            else:
+                L += [f"Iext 0 bias_ext {ext * 1e-6:.6g}", "Cpad bias_ext 0 10p"]
+        if "b" in pres:
+            L.append("Xb vdd 0 vdl boost trim0 trim1 trim2 bibtp bibn bibp bivbl0 bok c6_bias")
+        if "z" in pres:
+            L.append("Xz vdd 0 vdl boost trim0 trim1 trim2 zibtp zibn zibp zivbl0 zok bias_ext bias_sel c6_cz")
+        for pre in pres:
             L += ["V%smtp %sdtp %sibtp 0" % (pre, pre, pre), "V%smp %sdp %sibp 0" % (pre, pre, pre),
                   "V%smbl %sdbl %sivbl0 0" % (pre, pre, pre), "V%smn %sibn %sdn 0" % (pre, pre, pre)]
             L += load_lines(pre) if base == "s0" else fixed_lines(pre, vdd)
+        vb = "i(vbmtp) i(vbmp) i(vbmbl) i(vbmn) v(bok) v(bibtp)"
+        vz = "i(vzmtp) i(vzmp) i(vzmbl) i(vzmn) v(zok) v(zibtp) v(zibn) v(xz.vne) v(xz.esn) v(xz.e_ibn)"
         vecs = ("i(vbmtp) i(vbmp) i(vbmbl) i(vbmn) i(vzmtp) i(vzmp) i(vzmbl) i(vzmn) v(bok) v(zok) v(bibtp) v(zibtp) "
-                "v(zibn) v(xz.vne) v(xz.esn) v(xz.e_ibn)")
+                "v(zibn) v(xz.vne) v(xz.esn) v(xz.e_ibn)") if only is None else (vb if only == "b" else vz)
         tend = 270
     L += [".control", "set wr_singlescale", "set wr_vecnames", f"tran 20n {tend}u 0 20n", f"wrdata {csv} {vecs}", ".endc"]
     return "\n".join(L) + "\n" + netlist(mut) + ".end\n"
@@ -208,13 +214,27 @@ def run(out, kind, corner, temp, vdd, mut="none"):
     temp, vdd = float(temp), float(vdd)
     tag = f"cz_{kind}_{corner}_{temp:g}_{vdd:g}_{mut}"
     base = os.path.join(out, tag)
-    with open(base + ".cir", "w") as f:
-        f.write(deck(kind, corner, temp, vdd, mut, base + ".txt"))
-    p = subprocess.run(["ngspice", "-b", base + ".cir"], capture_output=True, text=True, timeout=5400)
-    open(base + ".log", "w").write(p.stdout[-6000:] + p.stderr[-4000:])
     r = dict(tag=tag, kind=kind, corner=corner, temp=temp, vdd=vdd, mut=mut)
+    # kinds s0*: bare and wrapper in ONE deck aborted the transient at ~1.23 us (timestep too small, OTA-diode loads, WO-108
+    # first pool); each is simulated alone and the wrapper columns are interpolated onto the bare time grid.
+    parts = ("b", "z") if kind[:2] == "s0" else (None,)
     try:
-        d = np.loadtxt(base + ".txt", skiprows=1)
+        arrs = []
+        for pt in parts:
+            sfx = f"_{pt}" if pt else ""
+            with open(base + sfx + ".cir", "w") as f:
+                f.write(deck(kind, corner, temp, vdd, mut, base + sfx + ".txt", only=pt))
+            p = subprocess.run(["ngspice", "-b", base + sfx + ".cir"], capture_output=True, text=True, timeout=5400)
+            open(base + sfx + ".log", "w").write(p.stdout[-6000:] + p.stderr[-4000:])
+            arrs.append(np.loadtxt(base + sfx + ".txt", skiprows=1))
+        if kind[:2] == "s0":
+            db, dz = arrs
+            tt_ = db[:, 0]
+            zi = [np.interp(tt_, dz[:, 0], dz[:, i]) for i in range(1, dz.shape[1])]
+            # layout of the combined deck: t, 4 bare i, 4 wrapper i, bok, zok, v(bibtp), v(zibtp), v(zibn), vne, esn, e_ibn
+            d = np.column_stack([tt_] + [db[:, i] for i in range(1, 5)] + zi[0:4] + [db[:, 5], zi[4], db[:, 6]] + zi[5:])
+        else:
+            d = arrs[0]
     except Exception as e:                     # noqa: BLE001
         r.update(verdict="REJECT", error=f"no data: {e}")
         json.dump(r, open(base + ".json", "w"), indent=1)
