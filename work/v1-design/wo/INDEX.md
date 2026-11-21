@@ -117,3 +117,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
     - (4) WO-87-exp2 is a leftover experiment pool; let it finish.
 - WO-93 done (8b22a3b): OTA1-cell as-is misses fast-mode current by 61.8 µA (+31 %), so D91 picks the 9/16 scale. WO-98 C2 dispatched 2026-11-21
 - WO-94 done (a9a416f): xschem cells for C1/OTA2/C3/C4/C6/MIM + top, 10/10 netgen match with broken copies; gaps: C6 final subckt + port mirrors/boost/trim, VICM/VOCM, Cint2 reset, top choices -> WO-99 dispatched
+- WO-97 (6b474df, 3609206): C9 final PnR clean (DRC/LVS/antenna 0), setup/hold met at 12 corners, stand-in slew waived again (D92); GL/SDF sims queued in WO-97-6b474df/pool; macro GDS/LEF/pins handed to WO-96
