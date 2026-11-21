@@ -121,3 +121,71 @@
   step 41 repaired 33 nets/5 bufs; slew 43->32 max ss_1v40 but worst still 1.728 (other sinks). Setup ss_1v40 +2.96. Floating 2 = RSZ-0020 step 32, unnamed.
   Trap: HEAD moved (WO-74 RTL bias_ok) -> archive the WO base commit + only the changed file; check git log base..HEAD before freezing.
   get_property on ports needs -object_type; use odb getITerms/getBTerms for net driver/load scans.
+
+## C9 WO-97 (2026-11-21): final PnR, D85/D88 RTL + bias_ok pin (6b474df)
+- Run /home/mempool/regr/tt/WO-97-6b474df/design/c9_digital/flow/runs/pnr1, EXIT=0. Setup ss_1v40 max +0.753 (was +2.96; new D85/D88 or-chain
+  depth), ss_1v60 +7.50, tt +8.78, ff +9.27; hold +0.079. Slew 43/11 ss_1v40 only (net56/66/122/124 buf_1 fanout, worst 1.634). Cap/fanout 0.
+  DRC/XOR/antenna 0, LVS "Circuits match uniquely" (lvs metrics present now). Util 0.739, 1.787 mW. Floating 2 = VPWR/VGND (confirmed by odb scan).
+- Bench clk is 20 ns vs SDC 20.833 -> ss_1v40 SDF sim would be ~-0.08 ns; use ss_1v60 for SDF.
+- Routed GL on icarus needs `-gspecify -ginterconnect` (else 3071 "Could not find net" SDF errors); TIMINGCHECK unsupported -> function only.
+  Routed netlist has PW/BIAS widths baked (16/8): small-width quick tests impossible on it.
+- lpool can sit queued when other pools hold all 5 global slots (WO-97 GL jobs queued at hand-off).
+- zsh: `S="ssh ..."; $S` does not word-split; use a function.
+- yosys gl_job.sh prints "GL cell instances: 0" (write_verilog without -noexpr) - counter is vacuous.
+
+## WO-96 layout (2026-11-21): floorplan + first cells
+- Final run /home/mempool/regr/tt/WO-96-e9fa31f (harness design/layout/scripts/run.sh). magic 8.3.685; PDK klayout deck sky130A_mr.drc vars: input report top_cell feol beol offgrid floating_met seal thr.
+- Magic: use `writeall force` (not save) when gencell/LEF children exist, else fresh-process gds write = "I/O error". `extract do local` needed for PDK subcells.
+  c4 (HV gencell FETs + hvl LS) extraction still stops after the LS cell: open.
+- MIM direct-draw (met3 plate, mimcap, mimcc, met4) DRC-clean when via3 (not on capm) is >= ~2 um from the capm edge (capm.2b_a fires at 1.1 um).
+- netgen sky130A_setup: l/w tolerance 1 %; MIM parallel units merged -> missing unit = property error only. Gate = "Netlists match" + no "Property errors".
+- xhigh_po_0p69 snake gencell (nx 4/10) fails rpm.1 (magic 15) / urpm.1a (klayout 4): open. Extracted l nonlinear in seg (secant ok to 0.08 %).
+- Floorplan: C9 mirrored (sideways) matches TT north pin order. Tile need 84-110 % before routing; OTA2 no slot; C6 slot short.
+- WO-97 LEF real path: WO-97-6b474df/design/c9_digital/flow/runs/pnr1/61-magic-writelef/sd_adc_c9.lef.
+- Slip: ran an empty `python3 -` locally once (no-op, it ran nothing). Never put python in local commands.
+- WO-97 GL/SDF: 5/5 PASS (d_hold01 tt/ss60/ff, d_hold05 tt/ss60), ~420 s / ~2500 s wall each; 8/3203 SDF interconnects unapplied (port ones, inferred).
+
+## WO-100 layout (2026-11-21): D93 floorplan + WO-96 blockers (run WO-100-a3e721f)
+- xhrpoly gencell: lone nx=1 0p69 fails rpm.1 (marker 0.69 wide) in both decks; snake 1 fails at bends; nx>=2 snake 0 guard 0
+  (legs at ~1.17 um pitch under one marker) = 0/0. C6 now legs joined in met1 series; netgen setup series {l add, w critical}.
+  Each leg adds 2 head contacts -> absolute R shifts vs one long device: C6 owner must re-sim the segmented netlist.
+- hvl .mag views are abstracts (GDS_FILE); extracting them core-dumps magic 8.3.685. `gds read sky130_fd_sc_hvl.gds` first -> OK.
+- WO-96 nwell.4 = LEF OBS nwell (sd_adc_c9.lef:416) painted as real nwell. Never DRC a LEF abstract; place the macro GDS.
+- netgen symmetric match prints "Netlists match with N symmetries"; gate on "Final result: Circuits match uniquely." + no
+  property/mismatch lines.
+- magic box values = internal units (200/um with sky130A magicrc); coordinates with suffix i.
+- Sandbox 2026-11-21: shared, load ~30, ~1 GB free: one magic/klayout at a time.
+
+## C9 WO-101 (2026-11-21): 165x150 shrink, reverted
+- /home/mempool/regr/tt/WO-101-7646108 runs pnrA (165, dens 60) + pnr1 (165, dens 75): identical. GPL-0302 is a WARNING that auto-raises
+  density to 0.78 (my inference "gpl fails below util" was WRONG; check before changing a 2nd knob). Util 0.857, ss_1v40 max setup -0.095
+  (same _1586_->_1432_ path), nom +0.078, min +0.222; ss_1v60 +7.07; hold +0.108; slew 11/11/11 worst 1.749; DRC/LVS/antenna 0; IR 1.05 mV.
+- Exit rule -> config back to 190x150/60 (commit 9068469). Width needed for ss_1v40 >= 0 lies between 165 and 190 (untested).
+- Waiting without loops: ssh 'tail --pid=PID -f /dev/null' with run_in_background.
+- Slip: ran `python3 -c 1` locally once (no-op). Never again.
+- Final WO-100 run WO-100-0814947: MIM1/MIM2/C6 DRC 0/0 + LVS PASS, broken copies fail. C4 LVS fails (hvl LS split rails
+  VPWR_uq0/VGND_uq0 need strapping). Magic `gds readonly true` needed for macro GDS (else implants regenerated -> 217 KL items).
+  Netgen portless reference subckt merges unconnected devices -> give refs ports; labels need parent paint underneath.
+  Open: magic 512 on c9_place vs "No errors found"; c9_orig KL control produced no report. D94: C9 stays 190x150.
+  Floorplan short 5,350 um2 (7.4 % tile) at high estimate. Comparator layout not started.
+
+## C9 WO-106 (2026-11-21): 175x150 KEPT (commit 9650241, run /home/mempool/regr/tt/WO-106-9650241/.../runs/pnr1)
+- ss_1v40 setup +0.937/+1.060/+1.207 (max/nom/min; better than 190's +0.753, read as noise), hold +0.110, slew 19/8 ss_1v40 worst 1.655,
+  DRC/XOR/antenna 0, LVS match, util 0.806, 1.774 mW. Fmax margin at ss_1v40 ~0.9 ns over the 20.833 ns SDC.
+- Trap: gl_routed.sh is only in results/wo97, not design/c9_digital/tb. Copy it into the frozen tb before running gl_jobs.
+- Trap: `cat f | ssh "cat > f && nohup ..."` left a 0-byte file. Use scp. A nohup over ssh holds the session open: add `</dev/null` to ssh and use setsid.
+
+## WO-107 layout (2026-11-21/22): route.tcl, C4 LVS clean, C3 rev g LVS clean (final run WO-107-ac7498c)
+- Gencell geometry (probe WO-107-probe): centre = bbox centre (= transform origin); S/D met1 strips +-(L/2+0.145); top gate
+  met1 at W/2+0.275 (nfet) / +0.32 (pfet); ring met1 column only with viagl/viagr 100 at L/2+0.715 LV, +0.825 HV n, +0.815 HV p.
+  LV gate-contact met1 alone = 0.067 um2 < met1.6 -> hier magic counts it per subcell; patch unused bottom contact.
+- route.tcl (via1 stub met2, met3 track per net per row, met4 spines) gave DRC/LVS clean first time, but ~2x area (C3 5,743 vs
+  4,142 slot). Not viable for OTA1 (~280 fingers): needs nf>1 interdigitated rows.
+- hvl lsbuflv2hv_1 / clkiso GDS have split VPWR/VGND rails (VPWR_uq0/VGND_uq0); strap at block level + netgen flatten class.
+- Magic `drc listall count total` includes subcells checked alone (c9_place 512 = 57 hd cells); use flat DRC (flatten X_flat).
+- KLayout sky130A_mr.drc: relative report= is resolved against the input GDS dir (WO-100 polluted the WO-97 run dir).
+- `git commit -- <paths>` does NOT add untracked files: git add new files first (lost one run to this).
+- git archive | ssh tar failed ("not a tar archive"); write the tar to the scratchpad, scp, untar.
+- `pgrep -f pattern` inside ssh matches its own bash -c; pick the PID with ps | grep "bash -c" | grep -v grep.
+- TT precheck needs info.yaml project dir (PrecheckFailure) - frame precheck still not run.
+- D98: C9 175x150 (WO-106 9650241); floorplan C9W default 175; D100: layout only after schematic verified (C3/C4 on hold).
