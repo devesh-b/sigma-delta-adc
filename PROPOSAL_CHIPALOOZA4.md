@@ -68,8 +68,8 @@ The block's own port list is the IP interface. The mapping to the Chipalooza slo
 | VIN+, VIN− | in | Differential input, sampled at fs (charge kicks at fs) | 2 dedicated analog pads |
 | VREF+ | in | External reference, 1.0–2.048 V (nominal 2.048 V) | 1 dedicated analog pad |
 | VREF− | in | Reference return (Kelvin to the sensor ground) | Tied to VSSA inside the slot (see note) |
-| BIAS_EXT | in | Optional bandgap-referenced current from the harness, selectable by a config bit in place of the internal C6 reference (proposed addition) | Harness current source 1 |
-| AMON[1:0] | out (test) | Buffered DC monitors: bias-reference voltage and CM reference, switch-selected (proposed addition) | 2 of the 4 shared analog lines |
+| BIAS_EXT | in | Bandgap-referenced current from the harness. When `bias_sel` = 1 it replaces the internal bias-reference master current, and all bias currents follow it ratiometrically. Fallback if the on-chip reference misbehaves on silicon | Harness current source 1 |
+| AMON[1:0] | out (test) | Buffered DC monitors: bias-reference voltage and CM reference, switch-selected (proposed, not yet designed) | 2 of the 4 shared analog lines |
 
 **Digital ports.**
 
@@ -78,6 +78,7 @@ The block's own port list is the IP interface. The mapping to the Chipalooza slo
 | clk | in | Digital clock (48 MHz nominal); fs = clk / divider | Control input |
 | rst_n | in | Asynchronous reset, synchronous release | Control input |
 | cfg_clk, cfg_dat, cfg_ld | in | Serial configuration write | 3 control inputs |
+| bias_sel | in | 0 = internal bias reference, 1 = BIAS_EXT. Static; change only while rst_n is low | Control input |
 | addr[2:0], bsel | in | Read word select (acc1 hi/lo, acc2 hi/lo, tag, status) and byte select | 4 control inputs |
 | rd | in | Frame acknowledge | Control input |
 | dbg | in | Debug bus select | Control input |
@@ -86,13 +87,13 @@ The block's own port list is the IP interface. The mapping to the Chipalooza slo
 | bias_ok | out (test) | Bias-good from the analog bias reference | Test output |
 | y_raw | out (test) | Raw modulator bitstream | Test output |
 
-That uses 12 of 24 control inputs and 12 of 12 test outputs.
+That uses 13 of 24 control inputs and 12 of 12 test outputs.
 
-**Native IP read port.** The block itself keeps its native 16-bit read port. The 8-bit byte-select mapping exists only to fit the 12 test outputs.
+**Byte-select read bus.** The digital macro keeps its native registered 16-bit read port. A small wrapper cell (`cz_bus8`) outputs bus[7:0] when bsel = 0 and bus[15:8] when bsel = 1. Each 16-bit word is read as two bytes, and a byte is valid one mux delay after bsel changes. In an SoC the 16-bit port can be used directly.
 
-**VREF− note.** The design has a Kelvin VREF− input. With three dedicated pads, the proposal ties VREF− to VSSA in the slot, so ground drop in the slot adds a small gain error. The alternatives need organiser approval:
-- VREF− on a shared analog line (DC only, but it carries the DAC charge kicks);
-- a fourth dedicated pad.
+**VREF− (request to the organisers).** The design has a Kelvin VREF− input. **Baseline:** with three dedicated pads, VREF− is tied to VSSA inside the slot. The block is designed to meet its specification in this configuration; ground drop in the slot appears as a small, calibratable gain error. **Request:** if the harness allows, we would like either of the following for a true Kelvin reference return. Either is optional, and the design does not depend on it:
+- a fourth dedicated pad for VREF−;
+- VREF− on one of the shared analog lines (DC only, but it carries the DAC charge kicks at fs).
 
 ## 4. Target specification
 
@@ -237,13 +238,13 @@ The Chipalooza schedule fits this state:
 - **Questions for the organisers** (chipalooza@opencircuitdesign.com or fossi-chat #chipalooza):
   - the slot area (this block needs about 72,000 µm² today);
   - whether a 48 MHz clock is available on a control input;
-  - VREF− as a fourth pad, or on a shared line;
+  - the VREF− request (4th pad or shared line; optional);
+  - the BIAS_EXT current value and range;
   - whether the 12 test outputs can be driven at frame rate.
-- **Proposed design changes for the Chipalooza version** (not yet in the TT design):
-  - byte-select read bus;
-  - BIAS_EXT select;
-  - AMON monitor taps.
-
-  These are options. Each needs a decision and a spec change-log entry.
+- **Chipalooza-variant changes (D99, WO-108; the TT design is unchanged):**
+  - applied: the byte-select read bus (`cz_bus8` wrapper) and BIAS_EXT with bias_sel (a wrapper around the bias reference);
+  - still an option: AMON monitor taps;
+  - VREF− is a request, not a dependency (baseline is tied to VSSA).
+- **BIAS_EXT current range:** the design assumes 1–20 µA (nominal 5 µA). Confirm with the harness.
 - **Same core on Tiny Tapeout (Dec 1):** you decide whether to mention it. It could give early silicon data before the Chipalooza tapeout.
 - **Overvoltage protection:** the rules ask for it on 1.8 V blocks that face the pad frame. Here only the 3.3 V analog front end faces pads, and the 1.8 V digital section talks to harness logic. Confirm this with the harness.
