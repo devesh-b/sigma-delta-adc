@@ -22,7 +22,7 @@ grep -o '\$[a-z_]*' $DECK | sort -u | tr '\n' ' ' > deckvars.txt
 CELLS="tt_um_sd_adc_fp c9_place mim_u250 mim_s2 mim_s2_drcbad mim_s2_short mim_s1 mim_s1_drcbad mim_s1_short c6_res c6_res_drcbad c6_res_open"; [ $PART = all ] || CELLS=""
 for c in $CELLS c4_sw c4_sw_drcbad c4_sw_nostrap c3_comp c3_comp_drcbad c3_comp_swap; do
   CELL=$c timeout 900 $M $L/scripts/verify.tcl > ver_$c.log 2>&1
-  grep DRCWHY ver_$c.log >> $S; echo "$(grep MAGICDRC ver_$c.log || echo "MAGICDRC $c MISSING")" >> $S
+  grep "DRCWHY\|DRCCELL" ver_$c.log >> $S; echo "$(grep MAGICDRC ver_$c.log || echo "MAGICDRC $c MISSING")" >> $S
   if [ -f $c.gds ]; then
     timeout 900 klayout -b -r $DECK -rd input=$c.gds -rd topcell=$c -rd report=$c.lyrdb -rd feol=true -rd beol=true -rd offgrid=true -rd floating_metal=false > kl_$c.log 2>&1
     echo "KLDRC $c items=$( [ -f $c.lyrdb ] && grep -c "<item>" $c.lyrdb || echo MISSING) $(grep -A1 "<item>" $c.lyrdb 2>/dev/null | grep -o "<category>[^<]*" | sort | uniq -c | tr "\n" " ")" >> $S
@@ -55,7 +55,7 @@ grep -v "^XB8" mim_s2_ref.spice > mim_s2_ref_bad.spice
 grep -v "^XB16 " mim_s1_ref.spice > mim_s1_ref_bad.spice
 sed 's/l=144.8$/l=159.3/' c6_res_ref.spice > c6_res_ref_bad.spice
 sed 's/w=5 l=0.5/w=6 l=0.5/' c4_sw_ref.spice > c4_sw_ref_bad.spice
-lvs() { timeout 900 netgen -batch lvs "$1.spice $1" "$2 $3" $SETUP lvs_$4.out > lvs_$4.log 2>&1
+lvs() { timeout 900 netgen -batch lvs "$1.spice $1" "$2 $3" ${5:-$SETUP} lvs_$4.out > lvs_$4.log 2>&1
   # WO-100: netgen prints "Netlists match with N symmetries" when symmetries are resolved; the verdict is the
   # "Final result" line, plus no property errors and no mismatch line anywhere (incl. subcircuits).
   if grep -q "^Final result: Circuits match uniquely\.$" lvs_$4.out && ! grep -q "Property errors\|Netlists do not match\|Top level cell failed" lvs_$4.out; then v=PASS; else v=FAIL; fi
@@ -71,9 +71,9 @@ lvs c6_res c6_res_ref.spice c6_res c6_res
 lvs c6_res c6_res_ref_bad.spice c6_res c6_res_vs_badref
 lvs c6_res_open c6_res_ref.spice c6_res c6_res_open
 fi
-lvs c4_sw c4_sw_ref.spice c4_sw c4_sw
-lvs c4_sw c4_sw_ref_bad.spice c4_sw c4_sw_vs_badref
-lvs c4_sw_nostrap c4_sw_ref.spice c4_sw c4_sw_nostrap
+lvs c4_sw c4_sw_ref.spice c4_sw c4_sw $L/cells/c4_setup.tcl
+lvs c4_sw c4_sw_ref_bad.spice c4_sw c4_sw_vs_badref $L/cells/c4_setup.tcl
+lvs c4_sw_nostrap c4_sw_ref.spice c4_sw c4_sw_nostrap $L/cells/c4_setup.tcl
 lvs c3_comp c3_comp_ref.spice c3_comp c3_comp
 lvs c3_comp c3_comp_ref_bad.spice c3_comp c3_comp_vs_badref
 lvs c3_comp_swap c3_comp_ref.spice c3_comp c3_comp_swap

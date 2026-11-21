@@ -48,6 +48,9 @@ proc rt::fet {name model w l d g s b side gap} {
     rt::term $b [expr {$cx - $sg*$rx}] $cy v
     set gy [expr {$cy + $w/2.0 + $go}]; set gx [expr {$cx + $sg*($rx + 0.45)}]
     rt::r metal1 [expr {min($cx,$gx)}] [expr {$gy - 0.115}] [expr {max($cx,$gx)}] [expr {$gy + 0.115}]
+    # unused bottom gate contact: met1 patch to the met1.6 minimum area (the gencell contact alone is 0.067 um2 at L 0.15)
+    set by [expr {$cy - $w/2.0 - $go}]
+    rt::r metal1 [expr {$cx-0.3}] [expr {$by-0.115}] [expr {$cx+0.3}] [expr {$by+0.115}]
     rt::term $g $gx $gy v
 }
 # lsbuflv2hv_1 (pins from its GDS: VPWR met1 rails y 3.445-3.815 / 4.325-4.695, VPB 3.955-4.185, VGND 0.255-0.625 /
