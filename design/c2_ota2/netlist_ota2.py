@@ -34,7 +34,7 @@ NL_TOKS = ("nc_short", "cm_open", "int_off", "cc_div4")
 
 def build(name="ota2", cmfb="sc", fs=4e6, mut=None, vt=None, chop=False):
     t = NL.toks(mut)
-    z = {k: dict(v) for k, v in S2.SIZES.items()}
+    z = {k: dict(v) for k, v in (NL.S.SIZES if "ota1cell" in t else S2.SIZES).items()}   # ota1cell: diagnostic, full OTA1 cell in the slot
     if "tail_half" in t:
         z["m_t"]["M"] //= 2
     mut1 = "+".join(sorted(x for x in t if x in NL_TOKS)) or None

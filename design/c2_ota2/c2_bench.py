@@ -35,13 +35,13 @@ STEP2, STEP1 = 1.12, 0.49            # OTA2 worst step (SPEC), OTA1 worst step
 OTHER_I = {0: 4.96e-6 + 4e-6 + 2.5e-6, 1: 4.96e-6 + 4e-6 + 5e-6}   # C6 (SIM) + V_ICM/V_OCM src + switches (HAND, wo93 4)
 BROKEN = {   # tag: (test, ci, b, mut, rows that must REJECT)
     "opac_tt_b0_nc_short": ("opac", 0, 0, "nc_short", ("a0", "av")),
-    "opac_tt_b0_vocm03": ("opac", 0, 0, "vocm03", ("span",)),
+    "opac_tt_b0_vocmm03": ("opac", 0, 0, "vocmm03", ("span",)),
     "opac_tt_b1_cl4": ("opac", 0, 1, "cl4", ("gbw",)),
     "opac_tt_b0_tail_half": ("opac", 0, 0, "tail_half", ("sr",)),
     "tran_tt_b0_tail_half": ("tran", 0, 0, "tail_half", ("eps",)),
     "tran_tt_b1_cm_open": ("tran", 0, 1, "cm_open", ("kick_cm",)),
     "tran_tt_b1_kb": ("tran", 0, 1, "kb", ("coup1", "coup2")),
-    "toggle_tt_b0_cbig": ("toggle", 0, 0, "cbig", ("tog",)),
+    "toggle_tt_b0_cbig3n": ("toggle", 0, 0, "cbig3n", ("tog",)),
     "mc_tt_b0_s9_pair3": ("mc", 0, 0, "pair3", ("vos",)),
 }
 PCH = "pfet_g5v0d10v5"
@@ -159,12 +159,12 @@ def ibranch(vals, src):
 # ---------------------------------------------------------------- opac
 def t_opac(c, t, v, b, mut, tag, out):
     mt = toks(mut)
-    m2 = "+".join(x for x in mt if x in N2.NL_TOKS + ("tail_half",)) or None
+    m2 = "+".join(x for x in mt if x in N2.NL_TOKS + ("tail_half", "ota1cell")) or None
     cl = (S2.C_L2 - S.C_CMFB_SENSE) * (4 if "cl4" in mt else 1)
     L = head(c, t, v, b, tag, clocks=False)
     L += [ota1_text(b, "dc"), N2.build("ota2", cmfb="dc", fs=FS[b], mut=m2)]
     L += [f"Vdd1_s vdd1_s 0 {v}", f"Vdd2_ac vdd2_ac 0 {v}", f"Vdd2_sw vdd2_sw 0 {v}",
-          f"Vocm2 vocm2 0 {S.V_OCM + (0.3 if 'vocm03' in mt else 0.0)}"]
+          f"Vocm2 vocm2 0 {S.V_OCM + (-0.3 if 'vocmm03' in mt else 0.0)}"]
     L += bias("s", b) + [inst(1, "s", "ota1", "vdd1_s")] + fb(1, "s", 0.5e-12, 4e-12, 0, 0.52e-12, "vicm", "vicm")
     for x in ("ac", "sw"):   # both OTA2 copies hang on system s's bias nets
         L.append(inst(2, x, "ota2", f"vdd2_{x}", vocm="vocm2").replace(f"ibtp_{x} ibn_{x} ibp_{x} ivbnc_{x} ivbpc_{x} ivbl0_{x}",
@@ -247,7 +247,7 @@ def pwl_steps(base, events, amp, tr=1e-9):
 def t_tran(c, t, v, b, mut, tag, out):
     mt = toks(mut)
     T, h, g, th = timing(b)
-    m2 = "+".join(x for x in mt if x in N2.NL_TOKS + ("tail_half",)) or None
+    m2 = "+".join(x for x in mt if x in N2.NL_TOKS + ("tail_half", "ota1cell")) or None
     vos3 = 3 * S2.sig_vt("m_in") * math.sqrt(2)
     systems = ["a", "b", "c"] + (["d"] if c == "tt" and t == 27 and not mut else [])
     k1 = (4, 8, 12)
@@ -256,6 +256,7 @@ def t_tran(c, t, v, b, mut, tag, out):
     kicks = range(16, 26)
     tstop = 27 * T
     L = head(c, t, v, b, tag)
+    L[3] = ".option gmin=1e-15 method=gear reltol=1e-5 abstol=1e-12 vntol=1e-8 chgtol=1e-16"   # WO-98 run 1: 1e-6 / 1e-9 aborted (timestep too small)
     L += [ota1_text(b, "sc", mut="mm3"), N2.build("ota2", cmfb="sc", fs=FS[b], mut=m2, vt={"min1": vos3})]
     for x in systems:
         act1 = x in ("a", "b", "d")
@@ -277,7 +278,7 @@ def t_tran(c, t, v, b, mut, tag, out):
             L.append("Ckb o2p_b ibn_b 1p")
     sv = " ".join(f"v(o1p_{x}) v(o1n_{x}) v(o2p_{x}) v(o2n_{x})" for x in systems)
     sv += " " + " ".join(f"v({p}_{x})" for x in ("a", "b") for p in ("ibtp", "ibn", "ibp", "ivbpc", "ivbnc"))
-    L += [".control", "set wr_singlescale", "set wr_vecnames", f"save {sv}", f"tran 0.5n {tstop:.9g} 0 1n",
+    L += [".control", "set wr_singlescale", "set wr_vecnames", f"save {sv}", f"tran 0.25n {tstop:.9g} 0 0.5n",
           f"wrdata {tag}_tr.csv {sv}", "quit", ".endc", ".end"]
     vals, lint = run("\n".join(L) + "\n", tag, out, 5400)
     rows = {}
@@ -287,6 +288,8 @@ def t_tran(c, t, v, b, mut, tag, out):
         return dict(valid=False, why=f"no data {e!r}", lint=lint[:6]), rows
     names = sv.split()
     tt_ = a[:, 0]
+    if tt_[-1] < 0.99 * tstop:
+        return dict(valid=False, why=f"tran stopped at {tt_[-1]:.4g} s", lint=lint[:6]), rows
     col = {n: a[:, 1 + i] for i, n in enumerate(names)}
     at = lambda n, ts: float(np.interp(ts, tt_, col[n]))
     vd = lambda k, x, ts: at(f"v(o{k}p_{x})", ts) - at(f"v(o{k}n_{x})", ts)
@@ -342,8 +345,8 @@ def t_toggle(c, t, v, b, mut, tag, out):
           f"Vbkb bkb 0 PWL(0 {v} {t1:.6g} {v} {t1 + tr:.6g} 0 {t2:.6g} 0 {t2 + tr:.6g} {v})"]
     L += [inst(1, "t", "ota1", "vdd1_t", extra=" bk bkb"), inst(2, "t", "ota2", "vdd2_t")]
     L += fb(1, "t", 0.5e-12, 4e-12, 0, 0.52e-12, "vicm", "vicm") + fb(2, "t", S2.CS2, S2.CINT2, S2.CK2, S2.C_EXT2, "vicm", "vicm")
-    if "cbig" in mt:
-        L.append("Cbig ibtp_t vdd1_t 300p")
+    if "cbig3n" in mt:
+        L.append("Cbig ibtp_t vdd1_t 3n")
     L += [".control", "set wr_singlescale", "set wr_vecnames", "tran 1n 12u 0 5n",
           f"wrdata {tag}_tg.csv i(vdd1_t) i(vdd2_t) v(o2p_t) v(o2n_t)", "quit", ".endc", ".end"]
     vals, lint = run("\n".join(L) + "\n", tag, out, 1800)
