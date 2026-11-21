@@ -60,6 +60,7 @@ SW = dict(
     skh=(4.0, 12.0),     # 10 Ck2 DAC to VREF+
     skl=(4.0, 0.0),      # 10 Ck2 DAC to VREF- (NMOS only)
     sk0=(4.0, 12.0),     # 11 Ck2 rest p<->n short, on sl (m6)
+    sr2=(8.0, 24.0),     # 12 int2 reset (WO-99): x2p <-> x2n output short on r2, with OTA2 isl on r2 (D74 order 1)
 )
 
 # Generator knobs (C4a spot values, revised per REVIEW-C4a M2: early->late ~1.5 ns at ff/-40)

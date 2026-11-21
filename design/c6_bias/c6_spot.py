@@ -45,7 +45,7 @@ UW, UL = 0.42, 20.0            # PMOS unit (all VG-gated legs)
 N_CORE, N_TAIL, N_M6 = 17, 8, 8
 G0, GT, CODE_RESET = 17, 19.8, 4
 NPNP = 8
-R1_L = 94.0                    # um of 0p69 xhrpoly; WO-64: default only, the tuned value comes from OUT/tune.json
+R1_L = 144.8                   # um of 0p69 xhrpoly; WO-99: default = the WO-64/80 tuned value (was 94); tune.json still wins
 I_TGT = 1.07e-6                # WO-64: master (code 100) current at tt/27/3.3 for the C1 port design currents
 LIM_I0 = 0.02                  # tt/27 I0 within +-2 % of I_TGT
 OWN_MAX = 6e-6                 # SPEC row 104
@@ -98,7 +98,7 @@ def x(name, d, g, s, b, dev, w, l, m=1):
     return f"X{name} {d} {g} {s} {b} {dev} w={w:g} l={l:g} m={m}"
 
 
-def deck(kind, corner, temp, vdd, mut="none", tr=1e-6, ratio=4.6, out="o.csv", init=None, r1=R1_L, hint=None):
+def deck(kind, corner, temp, vdd, mut="none", tr=1e-6, ratio=2.45, out="o.csv", init=None, r1=R1_L, hint=None):
     R1L = r1
     r2l = R1L * ratio
     if kind == "hint":                       # transient from all-0 at fixed VDD: physical state for the dct nodeset
