@@ -51,22 +51,33 @@ SINKS = ("ibtp", "ibp", "ivbl0")
 NW, NL, NCL = 2.0, 4.0, 1.0      # NMOS mirror unit (main W/L, cascode L)
 PW, PL = 2.0, 16.0               # PMOS VP / ibn unit
 N_DIODE, N_FEED, N_VP = 2, 1.0, 2
+# WO-104 item 1: ibn = uncascoded PMOS mirror, VSD(out) ~ 2 V vs VSG(VP diode) ~ 1.1 V -> CLM gain +0.3..+4.2 % over the
+# 9 corners (WO-99: ibn/ibtp ratio error, fs/-40 +4.2 %, ss/-40 +3.4 %, tt +2.4 %, sf/125 +0.3 %). Centre it: ibn units x 0.978.
+IBN_K = 0.978
+# WO-104 item 2: trim legs re-sized by L (W is 0.42 minimum) to equal-ratio weights b0 0.937, b1 1.926, b2 3.957 units
+# (s = 5.5 % per step, cover 1.40, code 100 unchanged). WO-99 effective weights at L 20: b0 1.03-1.07, b1 1.995, b2 3.96.
+TRIM_L = {0: 22.5, 1: 20.7, 2: 20.0}
 HVL = os.environ.get("PDK_ROOT", "/home/mempool/.ciel") + "/sky130A/libs.ref/sky130_fd_sc_hvl/spice/sky130_fd_sc_hvl.spice"
 LS, INV = "sky130_fd_sc_hvl__lsbuflv2hv_1", "sky130_fd_sc_hvl__inv_1"
 PORTS = "vdd vss vdl boost trim0 trim1 trim2 ibtp ibn ibp ivbl0 ok"
 PROBES = " pr_ibtp pr_ibn pr_ibp pr_ivbl0"
-MUTS = ("finger", "trim_open", "slowvn", "hog", "stack3", "nosu")
-TARGET = dict(finger="port", trim_open="trim", slowvn="toggle", hog="own", stack3="compl", nosu="start")
+MUTS = ("finger", "trim_open", "slowvn", "hog", "stack4", "nosu")
+TARGET = dict(finger="port", trim_open="trim", slowvn="toggle", hog="own", stack4="compl", nosu="start")
 CORNERS9 = [("tt", 27, 3.3)] + [(c, t, 3.6 if c == "ff" else 3.0) for c in ("ss", "ff", "sf", "fs") for t in (-40, 125)]
 MUT_CORNERS = [("tt", 27, 3.3), ("ss", -40, 3.0)]
+# v99 = WO-99 sizing (IBN_K 1, trim L 20) under the WO-104 bench: separates the bench fix from the two sizing changes.
 LIM = dict(tt=0.03, ratio=0.03, boost=0.04, compl=0.2, toggle=1e-3, t_tog=4e-6, step=0.06, cover=1.38, resid=0.03,
            own=B.OWN_MAX, start=0.01)
 U = 1e-6
+# WO-104 item 4: trap integration left a non-decaying point-to-point ringing (1.48 / 2.28 uA alternating each 20 ns
+# step, mean correct) on the port currents after every boost toggle -> the WO-99 toggle FAILs were bench artefacts.
+# Gear-2 damps it. gmin 1e-11 at 125 C (WO-87 precedent): WO-99 ff/125 aborted, timestep too small at 4.1 us.
+METHOD = os.environ.get("C6_METHOD", "gear")
 
 
-def units(port):
+def units(port, mut="none"):
     i = PORT_I[port]
-    return N_DIODE * i / I_TGT if port in SINKS else N_VP * i / (I_TGT * N_FEED / N_DIODE)
+    return N_DIODE * i / I_TGT if port in SINKS else (1.0 if mut == "v99" else IBN_K) * N_VP * i / (I_TGT * N_FEED / N_DIODE)
 
 
 def fingers(n, w):
@@ -103,7 +114,7 @@ def build(mut="none", probe=False):
     x, P5, N5 = B.x, B.P5, B.N5
     L = [f".subckt c6_bias {PORTS}{PROBES if probe else ''}",
          f"* WO-99 C6 final (R1 {R1} um, R2/R1 {RATIO}); mut {mut}; port units "
-         + " ".join(f"{p} {units(p):.3f}" for p in PORT_I)]
+         + " ".join(f"{p} {units(p, mut):.3f}" for p in PORT_I)]
     L += core_lines(mut)
     for s in ("boost", "trim0", "trim1", "trim2"):
         L += [f"Xls_{s} {s} vdl vss vss vdd vdd {s}_h {LS}", f"Xiv_{s} {s}_h vss vss vdd vdd {s}_b {INV}"]
@@ -111,17 +122,18 @@ def build(mut="none", probe=False):
     for bit, w in ((0, 1), (1, 2), (2, 4)):
         if mut == "trim_open" and bit == 0:
             continue
-        L += [x(f"mt{bit}", f"ts{bit}", "vg", "vdd", "vdd", P5, B.UW, B.UL, w),
+        L += [x(f"mt{bit}", f"ts{bit}", "vg", "vdd", "vdd", P5, B.UW, 20.0 if mut == "v99" else TRIM_L[bit], w),
               x(f"mw{bit}", "vnc", f"trim{bit}_b", f"ts{bit}", "vdd", P5, 1, 0.5)]
-    if mut == "stack3":
-        L += [x("mdx", "vnc", "vnc", "vnx", "vss", N5, NW, NCL), x("mdc1", "vnx", "vnx", "vn", "vss", N5, NW, NCL)]
+    if mut == "stack4":   # WO-104: two extra diodes (vnc two Vgs high); one (WO-99 stack3) left 0.615 V margin at tt
+        L += [x("mdx", "vnc", "vnc", "vnx", "vss", N5, NW, NCL), x("mdy", "vnx", "vnx", "vny", "vss", N5, NW, NCL),
+              x("mdc1", "vny", "vny", "vn", "vss", N5, NW, NCL)]
     else:
         L.append(x("mdc1", "vnc", "vnc", "vn", "vss", N5, NW, NCL))
     L += [x("mdm1", "vn", "vn", "vss", "vss", N5, NW, NL), x("msb", "vnc", "boost_b", "vns", "vss", N5, 2, 0.5),
           x("mdc2", "vns", "vnc", "vn2", "vss", N5, NW, NCL), x("mdm2", "vn2", "vn", "vss", "vss", N5, NW, NL)]
     copies = (("", ""), ("q", "pr_")) if probe else (("", ""),)
     for p in SINKS:
-        ws = fingers(units(p), NW)
+        ws = fingers(units(p, mut), NW)
         if mut == "finger" and p == "ibtp":
             ws = ws[1:]
         for tag, pre in copies:
@@ -131,7 +143,7 @@ def build(mut="none", probe=False):
     L += [x("mfm", "vfm", "vn", "vss", "vss", N5, NW, NL), x("mfc", "vp", "vnc", "vfm", "vss", N5, NW, NCL),
           x("mvp", "vp", "vp", "vdd", "vdd", P5, PW, PL, N_VP)]
     for tag, pre in copies:
-        for i, w in enumerate(fingers(units("ibn"), PW)):
+        for i, w in enumerate(fingers(units("ibn", mut), PW)):
             L.append(x(f"m{tag}ibn{i}", pre + "ibn", "vp", "vdd", "vdd", P5, w, PL))
     if mut == "slowvn":
         L.append("Cslow vn vss 400p")
@@ -178,7 +190,7 @@ def code_at():
 
 def deck(corner, temp, vdd, mut, csv):
     L = [f"* WO-99 c6_final bench {corner} {temp} {vdd} {mut}", f".lib {B.LIB} {corner}", f".include {HVL}",
-         f".temp {temp}", ".option gmin=1e-15 reltol=1e-5 abstol=1e-14"]
+         f".temp {temp}", f".option gmin={1e-11 if temp > 100 else 1e-15} reltol=1e-5 abstol=1e-14 method={METHOD}"]
     ramp = f"pwl(0 {B.VPRE} 10n {B.VPRE} 1.01u {vdd})"
     L += [f"Vdd vdd 0 {ramp}", f"Vdo vdo 0 {ramp}", "Vdl vdl 0 1.8"]
     L.append(f"Vbst boost 0 PWL({pwl(steps([(250 * U, 1.8), (360 * U, 0), (570 * U, 1.8)], 0))})")
@@ -277,13 +289,13 @@ def run(out, corner, temp, vdd, mut="none"):
                                 and res <= LIM["resid"]))
     # own current
     own_t = win(ivdd - col["ibn"] - prb["ibn"], 140 * U, 150 * U)
-    feed = (st["ibn"] + win(prb["ibn"], 140 * U, 150 * U)) / (2 * units("ibn") / N_VP)
+    feed = (st["ibn"] + win(prb["ibn"], 140 * U, 150 * U)) / (2 * units("ibn", mut) / N_VP)
     own_b = win(ivdd - col["ibn"] - prb["ibn"], 256 * U, 260 * U)
     g["own"] = dict(own_total=own_t, vp_feed=feed, own_core=own_t - feed, own_total_boost=own_b,
                     pass_=bool(own_t - feed <= LIM["own"]))
     r["gates"] = g
     r["verdict"] = "ACCEPT" if all(v["pass_"] for v in g.values()) else "REJECT"
-    if mut != "none":
+    if mut in TARGET:
         r["target"] = TARGET[mut]
         r["target_rejects"] = not g[TARGET[mut]]["pass_"]
     json.dump(r, open(base + ".json", "w"), indent=1)
@@ -319,6 +331,11 @@ def diag(out, corner, temp, vdd, mut="none"):
         i = int(np.argmin(abs(t - x * U)))
         lines.append(f"{x:5g} " + " ".join(f"{n}={sign[k] * d[i, 1 + k]:.5g}"
                                             for k, n in enumerate(names)))
+    for t0 in (30 * U, 60 * U):
+        m = (t >= t0 + 4 * U) & (t <= t0 + 10 * U)
+        fin = d[(t >= t0 + 8 * U) & (t <= t0 + 10 * U), 1].mean()
+        lines.append(f"toggle t0={t0 / U:g}us ibtp dev={np.max(np.abs(d[m, 1] / fin - 1)):.3e} "
+                     f"step-to-step max={np.max(np.abs(np.diff(d[m, 1]))) / fin:.3e}")
     open(base + ".sum", "w").write("\n".join(lines) + "\n")
 
 
@@ -332,7 +349,7 @@ def summary(out):
             continue
         g = r["gates"]
         f = lambda k: "ok" if g[k]["pass_"] else "FAIL"  # noqa: E731
-        v = r["verdict"] if r["mut"] == "none" else ("REJECTS target " + r["target"] if r["target_rejects"]
+        v = r["verdict"] if r["mut"] not in TARGET else ("REJECTS target " + r["target"] if r["target_rejects"]
                                                       else "DOES NOT REJECT " + r["target"])
         print(f"| {r['tag']} | {f('start')} | {f('port')} | {f('compl')} {g['compl']['min_margin']:.3f} | "
               f"{f('toggle')} {g['toggle']['worst']:.2e} | {f('trim')} {g['trim']['cover']:.3f}, "
@@ -343,8 +360,12 @@ def summary(out):
 def jobs(out, frozen, jobfile):
     env = (f". {frozen}/../../../tt-sd/.venv-sbx/bin/activate 2>/dev/null || . /home/mempool/tt-sd/.venv-sbx/bin/activate; "
            f"export PATH=$HOME/.nix-profile/bin:$PATH PDK_ROOT=/home/mempool/.ciel PDK=sky130A; cd {frozen}")
-    L = [f"{env}; nice python design/c6_bias/c6_final.py run {out} {c} {t} {v}" for c, t, v in CORNERS9]
+    L = [f"{env}; C6_METHOD=trap nice python design/c6_bias/c6_final.py diag {out} tt 27 3.3 trap",
+         f"{env}; nice python design/c6_bias/c6_final.py diag {out} tt 27 3.3"]
+    L += [f"{env}; nice python design/c6_bias/c6_final.py run {out} {c} {t} {v}" for c, t, v in CORNERS9]
     L += [f"{env}; nice python design/c6_bias/c6_final.py run {out} {c} {t} {v} {m}" for m in MUTS for c, t, v in MUT_CORNERS]
+    L += [f"{env}; nice python design/c6_bias/c6_final.py run {out} {c} {t} {v} v99" for c, t, v in
+          (("tt", 27, 3.3), ("ss", -40, 3.0), ("fs", -40, 3.0))]
     open(jobfile, "w").write("\n".join(L) + "\n")
 
 

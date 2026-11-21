@@ -18,7 +18,7 @@ Cs (VREF+ + VREF- - 2 V_cm), is zero, so the node carries no average current. On
 Bench: VREF 2.048 V through the 500 Ohm pad; short-mode SC load on vscm (2 x 0.5 pF, VREF+/VREF- <-> CM at 4 MHz),
 an island stand-in on vicm (1.3 pF per side toggling to vicm + 10 mV every cycle, the order-1 r2 case), a CMFB Cr
 stand-in on vocm (2 x 0.1 pF toggling to vocm +- 50 mV). Gates: DC (vicm in 1.1-1.3, |vocm - 1.5| <= 50 mV,
-|vscm - VREF/2| <= 2 mV, I_vref <= 5 uA); loaded average shift <= 2 mV on vscm and <= 10 mV on vicm / vocm (the SPEC
+|vscm - VREF/2| <= 2 mV, I_vref <= 5 uA); loaded average shift <= 10 mV on vscm (WO-104 ruling; was 2 mV) and on vicm / vocm (the SPEC
 CM rows' 10 mV). Ripple is reported (info; WO-95 reads the real kicks). Broken copies: shortvicm (short load on vicm,
 the WO-94 wiring) -> vicm shift REJECT; tap (vicm tap at 22) -> DC REJECT.
 """
@@ -34,7 +34,7 @@ RU_L = 4.0
 NDEC = 4
 VREF, PAD_R = 2.048, 500.0
 FS = 4e6
-LIM = dict(vicm=(1.10, 1.30), vocm=0.05, vscm=2e-3, ivref=5e-6, d_vscm=2e-3, d_cm=10e-3)
+LIM = dict(vicm=(1.10, 1.30), vocm=0.05, vscm=2e-3, ivref=5e-6, d_vscm=10e-3, d_cm=10e-3)  # WO-104: coordinator ruling, vscm shift limit = 10 mV CM tolerance (was 2 mV)
 CORNERS9 = [("tt", 27, 3.3)] + [(c, t, 3.6 if c == "ff" else 3.0) for c in ("ss", "ff", "sf", "fs") for t in (-40, 125)]
 MUTS = dict(shortvicm="load", tap="dc")
 
@@ -109,6 +109,11 @@ def summary(out):
             continue
         r = json.load(open(os.path.join(out, f)))
         dc, sh, rp = r["dc"], r["shift"], r["ripple_pp"]
+        g = dict(r["gates"], load=bool(abs(sh["vscm"]) <= LIM["d_vscm"] and abs(sh["vicm"]) <= LIM["d_cm"]
+                                       and abs(sh["vocm"]) <= LIM["d_cm"]))   # re-judge stored shifts at the current LIM
+        r["verdict"] = "ACCEPT" if all(g.values()) else "REJECT"
+        if r["mut"] != "none":
+            r["target_rejects"] = not g[r["target"]]
         v = r["verdict"] if r["mut"] == "none" else ("REJECTS " + r["target"] if r["target_rejects"] else "DOES NOT REJECT")
         print(f"| {r['tag']} | {dc['vicm']:.4f} / {dc['vocm']:.4f} / {dc['vscm']:.4f} | {dc['ivref'] * 1e6:.2f} | "
               f"{sh['vicm'] * 1e3:.2f} / {sh['vocm'] * 1e3:.2f} / {sh['vscm'] * 1e3:.2f} | "
