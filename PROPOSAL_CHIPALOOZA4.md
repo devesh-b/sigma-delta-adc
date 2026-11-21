@@ -245,6 +245,6 @@ The Chipalooza schedule fits this state:
   - applied: the byte-select read bus (`cz_bus8` wrapper) and BIAS_EXT with bias_sel (a wrapper around the bias reference);
   - still an option: AMON monitor taps;
   - VREF− is a request, not a dependency (baseline is tied to VSSA).
-- **BIAS_EXT current range:** the design assumes 1–20 µA (nominal 5 µA). Confirm with the harness.
+- **BIAS_EXT current range:** nominal 5.35 µA; the gated range is 2.5–10 µA (0.5× to 2× the OTA bias), with 1 µA and 20 µA reported as info. Confirm the value with the harness.
 - **Same core on Tiny Tapeout (Dec 1):** you decide whether to mention it. It could give early silicon data before the Chipalooza tapeout.
 - **Overvoltage protection:** the rules ask for it on 1.8 V blocks that face the pad frame. Here only the 3.3 V analog front end faces pads, and the 1.8 V digital section talks to harness logic. Confirm this with the harness.
