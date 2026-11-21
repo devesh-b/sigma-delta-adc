@@ -14,6 +14,16 @@ proc strap {name x1 x2} {
     port use [expr {$name eq "VGND" ? "ground" : "power"}]
     port class bidirectional
 }
+# C9 macro (WO-97 final LEF abstract; GDS swapped in at tile assembly). Mirrored (sideways) so its north pin order
+# (clk, rst_n, ui_in, uo_out, uio_out from west) matches the TT order (uio_out .. clk from west): no crossing channel.
+if {[info exists env(C9LEF)] && [file exists $env(C9LEF)]} {
+    lef read $env(C9LEF)
+    load $TOP
+    box 4um 72um 4um 72um
+    getcell sd_adc_c9
+    sideways
+    puts "FP C9 placed from $env(C9LEF) (mirrored)"
+} else { puts "FP C9 LEF MISSING" }
 # digital pair between the C9 macro and the analog column; analog pair on the east edge
 strap VDPWR 196.5 198.5
 strap VGND  200.5 202.5

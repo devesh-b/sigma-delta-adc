@@ -15,7 +15,7 @@ proc build {cell {broken none}} {
     box 75um 0um 75um 0um
     getcell sky130_fd_sc_hvl__lsbuflv2hv_clkiso_hlkg_3
     if {$broken eq "drc"} { rect metal1 -5.0 0 -4.95 3.0 }
-    save $cell
+    writeall force
 }
 build c4_sw
 build c4_sw_drcbad drc

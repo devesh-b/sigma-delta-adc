@@ -14,7 +14,7 @@ proc build {cell s1 s2 {broken none}} {
     box 100um 0um 100um 0um
     magic::gencell sky130::sky130_fd_pr__res_xhigh_po_0p69 R2b w 0.69 l $s2 nx $NX2 snake 1
     if {$broken eq "drc"} { rect metal1 -5.0 0 -4.95 3.0 }
-    save $cell
+    writeall force
 }
 proc ext_l {cell} {
     load $cell
@@ -37,8 +37,23 @@ set ls [ext_l c6_res_p1]
 puts "C6 PASS1 seg $s1 $s2 extracted l = $ls"
 set l1 [lindex $ls 0]; set l2 [lindex $ls end]
 set s1 [expr {round($s1*$T1/$l1/0.005)*0.005}]; set s2 [expr {round($s2*$T2/$l2/0.005)*0.005}]
+set p1 [list [expr {$T1/$NX1}] [lindex $ls 0]]; set p2 [list [expr {$T2/$NX2}] [lindex $ls end]]
+for {set it 2} {$it <= 4} {incr it} {
+    build c6_res_p$it $s1 $s2
+    set ls [ext_l c6_res_p$it]
+    set l1 [lindex $ls 0]; set l2 [lindex $ls end]
+    puts "C6 PASS$it seg $s1 $s2 extracted l = $ls err [format %.3f [expr {100*($l1-$T1)/$T1}]] [format %.3f [expr {100*($l2-$T2)/$T2}]] %"
+    if {abs($l1-$T1)/$T1 < 5e-4 && abs($l2-$T2)/$T2 < 5e-4} break
+    foreach v {1 2} {
+        set q [set p$v]; set s [set s$v]; set l [set l$v]; set T [set T$v]
+        set k [expr {abs($s-[lindex $q 0]) > 1e-6 ? ($l-[lindex $q 1])/($s-[lindex $q 0]) : $l/$s}]
+        set p$v [list $s $l]
+        set s$v [expr {round(($s + ($T-$l)/$k)/0.005)*0.005}]
+        if {abs($l-$T)/$T < 5e-4} {set s$v $s}
+    }
+}
 build c6_res $s1 $s2
 build c6_res_drcbad $s1 $s2 drc
-puts "C6 PASS2 seg $s1 $s2 extracted l = [ext_l c6_res]"
+puts "C6 FINAL seg $s1 $s2 extracted l = [ext_l c6_res]"
 puts "C6 BUILD DONE"
 quit -noprompt
