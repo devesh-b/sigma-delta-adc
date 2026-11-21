@@ -140,7 +140,7 @@ def build(a, us, swaps=None, vos=None, t_rel=None):
     iu = C6.I_TGT / (C6.G0 + C6.CODE_RESET)
     ports = NL.bias_currents(False)
     meta_ports = {}
-    for k in ((1,) if a.ota2_shared else (1, 2)):
+    for k in ((1,) if (a.ota2_shared and "ota2dead" not in toks) else (1, 2)):   # ota2dead: OTA2 on its own x0.1 mirrors
         sc = 0.1 if (k == 2 and "ota2dead" in toks) else 1.0
         for prt, i_ in ports.items():
             node = f"b{k}_{prt}"
@@ -216,7 +216,7 @@ def build(a, us, swaps=None, vos=None, t_rel=None):
         i1 = "vg1nx"
     else:
         i1 = "vg1n"
-    b2 = 1 if a.ota2_shared else 2   # D91: OTA2 shares OTA1's bias nets (WO-98 cell); OTA1-cell stand-in: own mirrors
+    b2 = 1 if (a.ota2_shared and "ota2dead" not in toks) else 2   # D91: OTA2 shares OTA1's bias nets (WO-98 cell); OTA1-cell stand-in: own mirrors
     tail = "chp chn chlp chln isl il_t il_c sl_t sl_c rstb ota1"
     L.append(f"Xota1 vdd 0 {i1} vg1p o1p o1n vicm vocm " + " ".join(f"b1_{p}" for p in ports) + f" {tail}")
     L.append("Xota2 vdd 0 vg2n vg2p o2p o2n vicm vocm " + " ".join(f"b{b2}_{p}" for p in ports)

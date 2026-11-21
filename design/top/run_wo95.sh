@@ -5,6 +5,7 @@
 # Markers: $F/out/SMOKE_OK | SMOKE_FAIL, $F/out/gates/pool/POOL_DONE, $F/out/corners/pool/POOL_DONE
 F=${1:?frozen dir}
 . "$F/env.sh"
+O2="--ota2-sub $F/design/c2_ota2/d91.spice --ota2-name ota2 --ota2-shared"   # D91 OTA2 (WO-98), tags ota2-d91
 B="python3 $F/design/top/top_bench.py"
 while [ ! -f "$F/out/smoke/pool/POOL_DONE" ]; do sleep 60; done
 if grep -q '"healthy": true' "$F"/out/smoke/gsmoke_*.json 2>/dev/null; then touch "$F/out/SMOKE_OK"; else touch "$F/out/SMOKE_FAIL"; exit 1; fi
@@ -14,23 +15,23 @@ mk() {   # mk DIR GATE ARGS...  -> one job line
 }
 G=$F/out/gates; mkdir -p "$G"
 {
-  mk a_nom a
-  mk a_nosu a --copy nosu
-  mk bc_nom_tt bc --m 7
-  mk bc_nom_ss bc --m 7 --corner ss --temp -40 --vdd 3.0
-  mk bc_dacswap bc --m 3 --copy dacswap
-  mk bc_ota2dead bc --m 3 --copy ota2dead
-  mk d_nom d
-  mk d_noswap d --copy noswap
-  mk e_nom e
-  mk e_noreset e --copy noreset
+  mk a_nom a $O2
+  mk a_nosu a $O2 --copy nosu
+  mk bc_nom_tt bc $O2 --m 7
+  mk bc_nom_ss bc $O2 --m 7 --corner ss --temp -40 --vdd 3.0
+  mk bc_dacswap bc $O2 --m 3 --copy dacswap
+  mk bc_ota2dead bc $O2 --m 3 --copy ota2dead
+  mk d_nom d $O2
+  mk d_noswap d $O2 --copy noswap
+  mk e_nom e $O2
+  mk e_noreset e $O2 --copy noreset
 } > "$G/jobs.txt"
 cd "$G" && PRIO=high SKIPDONE=1 bash "$F/scripts/lpool.sh" "$G/jobs.txt" "$G/pool" > "$G/pool.out" 2>&1 &
 C=$F/out/corners; mkdir -p "$C"
 {
-  mk a_ss a --corner ss --temp -40 --vdd 3.0
-  mk d_ss d --corner ss --temp -40 --vdd 3.0
-  mk e_ss e --corner ss --temp -40 --vdd 3.0
+  mk a_ss a $O2 --corner ss --temp -40 --vdd 3.0
+  mk d_ss d $O2 --corner ss --temp -40 --vdd 3.0
+  mk e_ss e $O2 --corner ss --temp -40 --vdd 3.0
 } > "$C/jobs.txt"
 cd "$C" && PRIO=low SKIPDONE=1 bash "$F/scripts/lpool.sh" "$C/jobs.txt" "$C/pool" > "$C/pool.out" 2>&1 &
 wait
