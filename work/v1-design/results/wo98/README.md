@@ -114,3 +114,31 @@ Findings, as options for the coordinator and the reviewer. No sizes were changed
    - that the 3 tran broken copies and toggle cbig3n REJECT;
    - the `opac_fs125_b1_ota1cell` span.
 3. If tran still aborts, relax further (reltol 1e-4, the tb9 setting). Then rerun with SKIPDONE=1 after deleting the INVALID JSONs.
+
+## 5. OTA2 offset re-based (D97, SPEC row 97 + CL-40)
+Derivation, HAND, using the C3 loop model data:
+- **(a) x2 headroom.**
+  - C3 §3.1b (`offset_loop.py`) shows that peak |x2| stays at its 1.41 V envelope for a decision-level shift of up to 90 mV.
+  - The comparator row (D75) takes 60 mV of that, which leaves 30 mV.
+  - An OTA2 offset shifts x2 by ≈ Vos2, since the integrator is stray-insensitive with gain ≈ 1. Here it is bounded by 1.5·Vos2 to cover the Ck charge share.
+  - So Vos2 ≤ 20 mV. The row is set at 15 mV, which keeps a 25 % reserve against the HAND bound.
+- **(b) Input-referred error after system chop.**
+  - u = 1.5·2·Vos2/(c1(N−1)) = 87.9 µV at 15 mV and N 4096 (the MC's 9.93 mV gives 58 µV).
+  - It is a constant, so it cancels in the sys pair.
+  - Its chop residue is covered by the C3 model up to a 200 mV decision shift.
+  - Sys-off raw offset is not a budgeted row.
+
+New row: |μ| + 3σ ≤ 15 mV, and every sample ≤ 15 mV.
+
+Re-judged MC against 15 mV:
+
+| corner | result | verdict |
+|---|---|---|
+| tt/27 | n 200: mean −0.25 mV, 3σ 9.93 mV, max 8.19 mV | ACCEPT (1.5× margin) |
+| ss/125 boost | ≤ 10.7 mV | ACCEPT |
+| ff/−40 | ≤ 10.9 mV | ACCEPT |
+
+The bench gate constant `LIM["vos3"]` is still 9 mV. Change it to 15e-3 with |μ| + 3σ before the next run. The pair ×3 broken copy (27 mV) still REJECTs.
+
+## 6. Run-2 status at hand-off
+At 17:12 only 1 of 24 jobs had finished on 1 slot (load ~30). The boost hot-swing diagnostic, `opac 3 1 ota1cell` (job 24, last in the list), is **still pending**. For fast mode, the options in §4 stand, and there is no decision yet.
