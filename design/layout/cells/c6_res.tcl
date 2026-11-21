@@ -10,27 +10,28 @@
 source $env(LAYDIR)/cells/lib.tcl
 set NX1 4; set NX2 10; set T1 144.8; set T2 354.76
 # leg centres in parent internal units: inst = instance name, returns {xs ytop ybot}
-proc legs {parent inst nx} {
+# leg centres (internal units) of the gencell placed with its lower-left at (x0 um, 0): search the mcon heads in
+# a window around it (a3e721f used `select cell <name>`, but gencell instance names are not the given names, so
+# the window was wrong and R2b's straps landed on R2a: LVS saw R2a || R2b).
+proc legs {parent x0 nx} {
     load $parent
     select top cell; expand
-    select clear; select cell $inst
-    lassign [box values] ix1 iy1 ix2 iy2
-    set ym [expr {($iy1+$iy2)/2}]
-    box ${ix1}i ${ym}i ${ix2}i ${iy2}i; select clear; select area mcon; lassign [select bbox] mx1 my1 mx2 my2
-    box ${ix1}i ${iy1}i ${ix2}i ${ym}i; select clear; select area mcon; lassign [select bbox] bx1 by1 bx2 by2
+    set xa [expr {$x0-0.3}]; set xb [expr {$x0+$nx*1.17+0.6}]
+    box ${xa}um 20um ${xb}um 45um; select clear; select area mcon; lassign [select bbox] mx1 my1 mx2 my2
+    box ${xa}um -1um ${xb}um 20um; select clear; select area mcon; lassign [select bbox] bx1 by1 bx2 by2
     select clear
     set wm 106
     set p [expr {$nx > 1 ? double($mx2-$mx1-$wm)/($nx-1) : 0}]
     set xs {}
     for {set k 0} {$k < $nx} {incr k} { lappend xs [expr {round($mx1+$wm/2.0+$k*$p)}] }
-    puts "C6 LEGS $inst pitch [expr {$p/200.0}] um top [expr {$my1/200.0}]-[expr {$my2/200.0}] bot [expr {$by1/200.0}]-[expr {$by2/200.0}]"
+    puts "C6 LEGS x0 $x0 x [expr {$mx1/200.0}]-[expr {$mx2/200.0}] pitch [expr {$p/200.0}] um top [expr {$my1/200.0}]-[expr {$my2/200.0}] bot [expr {$by1/200.0}]-[expr {$by2/200.0}]"
     return [list $xs [expr {($my1+$my2)/2}] [expr {($by1+$by2)/2}]]
 }
 proc irect {layer x1 y1 x2 y2} { box ${x1}i ${y1}i ${x2}i ${y2}i; paint $layer }
 proc ipin {name x y} { box [expr {$x-40}]i [expr {$y-40}]i [expr {$x+40}]i [expr {$y+40}]i; label $name FreeSans 0.3u -metal1; port make }
 # series-join the legs of one instance; skip = index of a join to leave out (broken copy "open")
-proc series {parent inst nx a b {skip -1}} {
-    lassign [legs $parent $inst $nx] xs yt yb
+proc series {parent x0 nx a b {skip -1}} {
+    lassign [legs $parent $x0 $nx] xs yt yb
     for {set k 0} {$k < $nx-1} {incr k} {
         if {$k == $skip} continue
         set y [expr {$k % 2 == 0 ? $yt : $yb}]
@@ -46,17 +47,17 @@ proc build {cell s1 s2 {broken none} {which all}} {
     if {$which in {all r1}} {
         box 0um 0um 0um 0um
         magic::gencell sky130::sky130_fd_pr__res_xhigh_po_0p69 R1 w 0.69 l $s1 nx $NX1 snake 0 guard 0
-        series $cell R1 $NX1 r1a r1b
+        series $cell 0 $NX1 r1a r1b
     }
     if {$which in {all r2}} {
         box 10um 0um 10um 0um
         magic::gencell sky130::sky130_fd_pr__res_xhigh_po_0p69 R2a w 0.69 l $s2 nx $NX2 snake 0 guard 0
-        series $cell R2a $NX2 r2a r2b [expr {$broken eq "open" ? 4 : -1}]
+        series $cell 10 $NX2 r2a r2b [expr {$broken eq "open" ? 4 : -1}]
     }
     if {$which eq "all"} {
         box 26um 0um 26um 0um
         magic::gencell sky130::sky130_fd_pr__res_xhigh_po_0p69 R2b w 0.69 l $s2 nx $NX2 snake 0 guard 0
-        series $cell R2b $NX2 r3a r3b
+        series $cell 26 $NX2 r3a r3b
     }
     if {$broken eq "drc"} { rect metal1 -5.0 0 -4.95 3.0 }
     writeall force

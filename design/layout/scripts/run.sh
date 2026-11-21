@@ -22,6 +22,11 @@ for c in tt_um_sd_adc_fp c9_place mim_u250 mim_s2 mim_s2_drcbad mim_s2_short mim
     klayout -b -r $L/scripts/bbox.py -rd gds=$c.gds 2>/dev/null | grep BBOX >> $S
   fi
 done
+# control: KLayout on the unmodified WO-97 macro GDS (what c9_place must reproduce)
+C9G=/foss/designs/regr/WO-97-6b474df/design/c9_digital/flow/runs/pnr1/final/gds/sd_adc_c9.gds
+timeout 900 klayout -b -r $DECK -rd input=$C9G -rd topcell=sd_adc_c9 -rd report=c9_orig.lyrdb -rd feol=true -rd beol=true -rd offgrid=true -rd floating_metal=false > kl_c9_orig.log 2>&1
+echo "KLDRC c9_orig(WO-97 GDS) items=$(grep -c "<item>" c9_orig.lyrdb) $(grep -o "<category>[^<]*" c9_orig.lyrdb | sort | uniq -c | tr "\n" " ")" >> $S
+for c in c9_place c6_res mim_s1 mim_s2; do echo "KLCAT $c $(grep -o "<category>[^<]*" $c.lyrdb 2>/dev/null | sort | uniq -c | tr "\n" " ")" >> $S; done
 HVLSP=$PDKPATH/libs.ref/sky130_fd_sc_hvl/spice/sky130_fd_sc_hvl.spice
 PINS=$(grep -i "^.subckt sky130_fd_sc_hvl__lsbuflv2hv_clkiso_hlkg_3 " $HVLSP | cut -d' ' -f3- | tr 'A-Z' 'a-z' | sed 's/\bvnb\b/vsub/')
 { echo "* WO-96 reference for c4_sw: c4_sw/netlist.py SW sg (5/0.5) and sin (12/36, L 0.5) devices + one LS (unwired)"

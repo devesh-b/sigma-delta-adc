@@ -14,10 +14,10 @@ proc strap {name x1 x2} {
     port use [expr {$name eq "VGND" ? "ground" : "power"}]
     port class bidirectional
 }
-# C9 macro: D93 plans the WO-101 shrunk die, C9W x 150 um (env C9W, default 165), drawn as a slot outline until the
+# C9 macro: D94 keeps the WO-97 die, C9W x 150 um (env C9W, default 190; 165 shrink dropped), drawn as a slot outline until the
 # WO-101 GDS lands. The WO-96 LEF abstract is no longer placed: its OBS on nwell (sd_adc_c9.lef line 416) became
 # real nwell without taps, the source of the 2 nwell.4 errors. The real macro GDS is checked in cell c9_place.
-set C9W [expr {[info exists env(C9W)] ? $env(C9W) : 165.0}]
+set C9W [expr {[info exists env(C9W)] ? $env(C9W) : 190.0}]
 set C9X2 [expr {4.0 + $C9W}]
 # digital pair just east of the macro; analog pair on the east edge (unchanged)
 strap VDPWR [expr {$C9X2+1.5}] [expr {$C9X2+3.5}]
@@ -25,8 +25,8 @@ strap VGND  [expr {$C9X2+4.5}] [expr {$C9X2+6.5}]
 strap VGND  305.5 307.5
 strap VAPWR 311.0 313.0
 # D93 isolation C9 -> analog: p+ substrate-tap guard ring (psd 1.0 um, licon row, li; tied to VGND at assembly)
-# in an empty moat. East leg 8 um past the digital straps, south leg 7 um below C9 (L shape, macro corner at 4,72).
-set GX [expr {$C9X2+14.5}]; set GY 64.0
+# in an empty moat. East leg 4 um past the digital straps, south leg 7 um below C9 (L shape, macro corner at 4,72).
+set GX [expr {$C9X2+10.5}]; set GY 64.0
 proc gseg {a b c d} {
     box ${a}um ${b}um ${c}um ${d}um; paint psd
     box [expr {$a+0.2}]um [expr {$b+0.2}]um [expr {$c-0.2}]um [expr {$d-0.2}]um; paint locali
@@ -40,14 +40,14 @@ puts "FP GUARD ring east leg x $GX..[expr {$GX+1}], south leg y $GY..[expr {$GY+
 # Circuit slots must not overlap; MIM slots (prefix MIM_) overlay circuit slots and are excluded from the sum.
 set SLOTS [list \
     [list C9_macro      4.0  72.0 $C9X2 222.0 [expr {$C9W*150}] [expr {$C9W*150}]] \
-    [list OTA1          $AX   3.0 303.0 100.0  9100 13100] \
-    [list OTA2          $AX 102.0 303.0 166.0  5350  7450] \
-    [list C6_bias       $AX 168.0 303.0 222.0  5800  7000] \
-    [list C3_comp       3.0   3.0  50.0  62.0  1500  3000] \
-    [list SW_in_ref    52.0   3.0 100.0  62.0  1000  2000] \
-    [list C4_phase_LS 102.0   3.0 [expr {$GX-1.0}] 62.0  3400  4600] \
-    [list MIM_S1_over_OTA1 $AX 3.0 303.0 100.0 0 0] \
-    [list MIM_S2_over_OTA2 $AX 102.0 303.0 166.0 0 0] \
+    [list OTA1          $AX   3.0 303.0 112.0  9100 13100] \
+    [list OTA2          $AX 114.0 303.0 182.0  5350  7450] \
+    [list C3_comp       $AX 184.0 303.0 222.0  1500  3000] \
+    [list SW_in_ref     3.0   3.0  39.0  62.0  1000  2000] \
+    [list C4_phase_LS  41.0   3.0 101.0  62.0  3400  4600] \
+    [list C6_bias     103.0   3.0 [expr {$GX-1.0}] 62.0  5800  7000] \
+    [list MIM_S1_over_OTA1_rot90 $AX 3.0 303.0 112.0 0 0] \
+    [list MIM_S2_over_OTA2 $AX 114.0 303.0 182.0 0 0] \
 ]
 set tile [expr {319.24*225.76}]
 set sa 0; set nlo 0; set nhi 0
