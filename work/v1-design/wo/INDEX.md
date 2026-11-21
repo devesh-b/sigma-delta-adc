@@ -115,3 +115,4 @@ WO-06 and WO-07 are file-disjoint (model/ vs design/). WO-01..03 were file-disjo
     - (2) The broken copy `early` is retired to INFO: under D89 plus D88 its fault is harmless.
     - (3) `hy1` stays a must-REJECT. A follow-up adds a deterministic ripple/noise stimulus on VAPWR near the bias_ok threshold. Losing hysteresis makes bias_ok chatter, and under D88 every drop restarts the 256-cycle count, so release could be delayed without bound. That is a real failure mode the noiseless bench cannot see.
     - (4) WO-87-exp2 is a leftover experiment pool; let it finish.
+- WO-93 done (8b22a3b): OTA1-cell as-is misses fast-mode current by 61.8 µA (+31 %), so D91 picks the 9/16 scale. WO-98 C2 dispatched 2026-11-21
