@@ -56,7 +56,7 @@ proc build_array {cell map {broken none}} {
             }
         }
         set T($c) $tl; set B($c) $bl
-        set w [expr {2.6 + [expr {max([llength $tl],[llength $bl])}]*$TP + 0.8}]
+        set w [expr {3.4 + [expr {max([llength $tl],[llength $bl])}]*$TP + 0.8}]
         if {$w > $gapw} {set gapw $w}
     }
     set CP [expr {$PL + $gapw}]
@@ -71,7 +71,7 @@ proc build_array {cell map {broken none}} {
         set g0 [expr {$x + $PL}]
         foreach lst [list $T($c) $B($c)] {
             set i 0
-            foreach n $lst { set XT($c,$n) [expr {$g0 + 2.6 + $i*$TP}]; incr i }
+            foreach n $lst { set XT($c,$n) [expr {$g0 + 3.4 + $i*$TP}]; incr i }
         }
         foreach n [concat $T($c) $B($c)] { set YTOP($c,$n) -1e9 }
         for {set r 0} {$r < $nr} {incr r} {
@@ -80,10 +80,10 @@ proc build_array {cell map {broken none}} {
             lassign [nets_of [lindex $map $r $c]] nt nb
             # top stub: met4 out of the plate, via3 to a met3 run, then onto the track
             set yt [expr {$y + 2.75}]
-            rect metal4 [expr {$x+11.0-0.1}] [expr {$yt-0.25}] [expr {$g0+1.55}] [expr {$yt+0.25}]
-            via metal3 metal4 via3 [expr {$g0+1.3}] $yt
+            rect metal4 [expr {$x+11.0-0.1}] [expr {$yt-0.25}] [expr {$g0+2.25}] [expr {$yt+0.25}]
+            via metal3 metal4 via3 [expr {$g0+2.0}] $yt
             set xt $XT($c,$nt)
-            rect metal3 [expr {$g0+1.3}] [expr {$yt-0.25}] $xt [expr {$yt+0.25}]
+            rect metal3 [expr {$g0+2.0}] [expr {$yt-0.25}] $xt [expr {$yt+0.25}]
             via metal3 metal4 via3 $xt $yt
             if {$yt > $YTOP($c,$nt)} {set YTOP($c,$nt) $yt}
             # bottom stub: met3 plate extension onto the track (via3 for dmy, via2 to met2 otherwise)

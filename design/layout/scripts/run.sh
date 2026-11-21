@@ -9,12 +9,12 @@ DECK=$PDKPATH/libs.tech/klayout/drc/sky130A_mr.drc
 SETUP=$PDKPATH/libs.tech/netgen/sky130A_setup.tcl
 S=$O/summary.txt; : > $S
 (cd $RUN && timeout 300 python3 design/layout/scripts/area_est.py) > area.txt 2>&1; cat area.txt >> $S
-C9LEF=/foss/designs/regr/WO-97-6b474df/runs/pnr1/final/lef/sd_adc_c9.lef timeout 300 $M $L/frame/floorplan.tcl > fp.log 2>&1; grep "^FP" fp.log >> $S
+C9LEF=/foss/designs/regr/WO-97-6b474df/design/c9_digital/flow/runs/pnr1/61-magic-writelef/sd_adc_c9.lef timeout 300 $M $L/frame/floorplan.tcl > fp.log 2>&1; grep "^FP" fp.log >> $S
 for g in mim c6_res c4_sw; do timeout 900 $M $L/cells/$g.tcl > build_$g.log 2>&1; echo "BUILD $g rc=$? $(grep -c -i error build_$g.log) error-lines" >> $S; grep "^ARRAY\|^C6 PASS" build_$g.log >> $S; done
 grep -o '\$[a-z_]*' $DECK | sort -u | tr '\n' ' ' > deckvars.txt
 for c in tt_um_sd_adc_fp mim_u250 mim_s2 mim_s2_drcbad mim_s2_short c6_res c6_res_drcbad c4_sw c4_sw_drcbad; do
   CELL=$c timeout 900 $M $L/scripts/verify.tcl > ver_$c.log 2>&1
-  echo "$(grep MAGICDRC ver_$c.log || echo "MAGICDRC $c MISSING")" >> $S
+  grep DRCWHY ver_$c.log >> $S; echo "$(grep MAGICDRC ver_$c.log || echo "MAGICDRC $c MISSING")" >> $S
   if [ -f $c.gds ]; then
     timeout 900 klayout -b -r $DECK -rd input=$c.gds -rd topcell=$c -rd report=$c.lyrdb -rd feol=true -rd beol=true -rd offgrid=true -rd floating_metal=false > kl_$c.log 2>&1
     echo "KLDRC $c items=$( [ -f $c.lyrdb ] && grep -c "<item>" $c.lyrdb || echo MISSING) $(grep -A1 "<item>" $c.lyrdb 2>/dev/null | grep -o "<category>[^<]*" | sort | uniq -c | tr "\n" " ")" >> $S
