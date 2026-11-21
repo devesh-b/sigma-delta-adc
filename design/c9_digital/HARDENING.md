@@ -150,3 +150,7 @@ macro (uio_oe = 0xFF via tie cells); `ena`, `uio_in` unused.
 - Utilisation 0.857. Setup at ss_100C_1v40 max -0.095 ns, nom +0.078, min +0.222 (WO-97 had +0.753). ss_1v60 +7.07, tt +8.80, ff +9.28. Hold +0.108.
   Slew: 11 at each ss_1v40 RC corner, worst 1.749 ns (WO-97 1.634). Cap, fanout, Magic/KLayout DRC, XOR, antenna: all 0. LVS matches uniquely.
 - Exit rule (setup < 0): config is back to 190x150, and the WO-97 GDS/LEF remain the hand-off. The D86 slew waiver is unchanged.
+
+## WO-106 (2026-11-21): die 175x150 kept (D96)
+Commit 9650241 changes only DIE_AREA to [0,0,175,150]. Run WO-106-9650241/pnr1: ss_1v40 setup +0.937/+1.060/+1.207 ns (max/nom/min), hold +0.110,
+slew 19/8 at ss_1v40 only (worst 1.655 ns), DRC/XOR/antenna 0, LVS match, util 0.806. Exit rule met. GL/SDF re-run in progress. See work/v1-design/results/wo106/README.md.
