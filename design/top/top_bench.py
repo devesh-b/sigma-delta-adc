@@ -23,6 +23,11 @@ Hold scaling (D85/D88): on silicon rst_analog is held for the C9 VAPWR-good coun
 1/329 of the 65 792-cycle hold); gate (a) checks that bias_ok is up and the bias current within +-1 % of its final
 value at t_rel, so the shortened hold is valid only if (a) passes.
 
+WO-105b: the C6 start-up escapes its zero state at about 20.7 us at tt/27 (a_nom of WO-105: bias_ok first rose at 0.46 us, dropped
+at 1.18 us, rose again at 20.66 us), so --t-rel 20e-6 released before the bias was up and gate (a) could not pass. The gate jobs now
+use --t-rel 40e-6 on every job (same hold for all gates; only (a) proves it). Each gate-(a) check is read from the run itself; an
+unhealthy log (option readback in the .control block, see option_echo_problems) invalidates the verdict.
+
 Decimation: residue estimate u_hat = SPEC 3.7 reconstruction with x2[N] from the sim (tier1_tb.reconstruct, as gate
 B) for INL; bits-only code (what C9 / Ref A accumulates: same formula without the x2 term) against the bits-only code
 of the ideal discrete loop (tier1_tb.ideal_loop, the golden recursion) for the DC-function row.
@@ -269,7 +274,8 @@ def run(a, us, tag, **kw):
         res["problems"].append(f"no / empty data file (rc {p.returncode})")
         return res, None
     d = np.loadtxt(a.csv, skiprows=1)
-    os.remove(a.csv)
+    if a.gate != "a":   # WO-105b: gate (a) keeps its wrdata so the bias settle can be re-read (the WO-105 a_nom csv was deleted, so settle could not be re-derived)
+        os.remove(a.csv)
     t = d[:, 0]
     if abs(t[-1] - meta["tstop"]) > 1e-9 * meta["tstop"] + 1e-12:
         res["problems"].append(f"final time {t[-1]:.6e} != tstop {meta['tstop']:.6e}")
@@ -312,7 +318,8 @@ def run(a, us, tag, **kw):
     rel = meta["t_rel"]
     res["startup"] = dict(ok_rises_us=[float(t[i] * 1e6) for i in rises[:6]], ok_drops_us=[float(t[i] * 1e6) for i in drops[:6]],
                           ok_at_rel=bool(np.interp(rel, t, cols["ok"]) > 1.5), ib_final=ifin, ib_design=meta["ports"]["b1_ibtp"],
-                          ib_at_rel_err=float(np.interp(rel, t, ib) / ifin - 1), ib_range_after_rel=float((ib[t > rel].max() - ib[t > rel].min()) / ifin) if np.any(t > rel) else float("nan"))
+                          ib_at_rel_err=float(np.interp(rel, t, ib) / ifin - 1), ib_range_after_rel=float((ib[t > rel].max() - ib[t > rel].min()) / ifin) if np.any(t > rel) else float("nan"),
+                          ib_range_hold=float((ib[(t > rel) & (t < meta["t0"][0])].max() - ib[(t > rel) & (t < meta["t0"][0])].min()) / ifin) if np.any((t > rel) & (t < meta["t0"][0])) else float("nan"))
     within = np.abs(ib / ifin - 1) <= 0.01
     last_out = np.where(~within)[0]
     res["startup"]["t_settle_1pct_us"] = float(t[last_out[-1] + 1] * 1e6) if len(last_out) and last_out[-1] + 1 < len(t) else float("nan")
