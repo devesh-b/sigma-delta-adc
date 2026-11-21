@@ -230,11 +230,23 @@ def build(a, us, swaps=None, vos=None, t_rel=None):
     L += ["Cq q 0 20f", "Cqb qb 0 20f", ".ic v(yq)=1"]
     L.append(f".tran 1n {tstop:.9e} 0 {tmax:.6e}")
     vecs = ["v(yq)", "v(o2p)", "v(o2n)", "v(o1p)", "v(o1n)", "v(ok)", "i(vm1ibtp)", "v(vdd)", "v(q)"]
-    L += [".control", "set wr_singlescale", "set wr_vecnames", "option numdgt=8", "run",
+    L += [".control", "set wr_singlescale", "set wr_vecnames", "option numdgt=8", "run", "option",
           "echo FINAL_TIME_CHECK", "print time[length(time)-1]", f"wrdata {a.csv} " + " ".join(vecs), "quit", ".endc", ".end"]
     meta = dict(T=T, n=n, nrst=nrst, t0=t0, t_rel=t_rel, tstop=tstop, u=list(us), swaps=list(sws), vos=vos, ports=meta_ports,
                 tmax=tmax, opt=o)
     return "\n".join(L) + "\n", meta
+
+
+OPT_KEYS = ("reltol", "abstol", "vntol", "chgtol", "trtol")
+
+
+def option_echo_problems(txt, opt):
+    """WO-105b: ngspice -b -o does not echo .options, so the deck runs `option` in .control after `run`; the log then holds
+    ngspice's own readback ("reltol      (current) = 0.0007"). Every option the deck set must read back equal, else a problem."""
+    got = {m.group(1): float(m.group(2)) for m in re.finditer(r"^(reltol|abstol|vntol|chgtol|trtol)\b[^=\n]*=\s*(\S+)", txt, re.M)}
+    bad = [f"log option readback {k}: " + (f"{got[k]:g} != deck {opt[k]:g}" if k in got else "missing") for k in OPT_KEYS
+           if k not in got or abs(got[k] - opt[k]) > 1e-6 * abs(opt[k])]
+    return bad
 
 
 def run(a, us, tag, **kw):
@@ -252,8 +264,7 @@ def run(a, us, tag, **kw):
                         and "gmin" not in l.lower()][:5]
     if re.search(r"transient op", txt, re.I) or re.search(r"(gmin|source) stepping", txt, re.I):
         res["problems"].append("log: transient-op / stepping fallback")
-    if f"reltol={meta['opt']['reltol']:g}" not in txt.lower():
-        res["problems"].append("log does not echo the reltol option")
+    res["problems"] += option_echo_problems(txt, meta["opt"])
     if not os.path.exists(a.csv) or os.path.getsize(a.csv) < 1000:
         res["problems"].append(f"no / empty data file (rc {p.returncode})")
         return res, None
