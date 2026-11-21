@@ -43,3 +43,22 @@ Summaries (run in the frozen copy with the venv): `python design/c6_bias/c6_fina
 ## 5. Not done (budget)
 - D93 added scope, not started: the C4 delay caps MIM→MOS and the dead-time table. It needs a fresh WO/agent.
 - All verdicts above are pending the queued runs.
+
+## 6. Results (pool at 40/42 jobs with an EXIT line; job_5 and job_41 have no EXIT=0. The tap and nosr2 broken copies are missing from the summaries.)
+**C6: not accepted.**
+- **Toggle fails at every corner:** worst deviation in the 4–10 µs window after a toggle is 6–15 % (gate 0.1 %). Not diagnosed: it may be a real slow settling node (vn2 / vnc / the OTA diode nodes) or the bench window. That is the next item.
+- **Trim:** cover is 1.408–1.417 (gate ≥ 1.38), but the max step is 0.057–0.061, so tt/27, ss/−40 and fs/−40 fail the 6 % step limit.
+- **Port** fails at ss/−40 and fs/−40 (cold; which sub-row was not separated).
+- **Passing:** compliance margin 0.67–0.97 V (gate 0.2), own current 4.25–4.72 µA core / 4.78–5.25 µA total (gate 6), and start at all 9 corners.
+- **Broken copies:** 11 of 12 fail their own gate. The exception is stack3 at tt/27, which **does not** fail compliance (margin 0.615 V); stack3 fails it only at ss/−40.
+
+**C5/C7:**
+- DC passes at every corner: vicm 1.209, vocm 1.488, vscm 1.023 V, I_vref 3.5–4.4 µA.
+- Loaded shift: vicm 4.8–5.2 mV and vocm 2.8–3.0 mV pass the 10 mV limit. **vscm 3.4–3.6 mV fails the 2 mV limit**, so the verdict is REJECT. The 2 mV limit is my own choice: the 10 mV CM tolerance would pass.
+- The shortvicm broken copy fails as required (vicm −27.5 mV), which confirms that the WO-94 short node is wrong.
+
+**r2:**
+- Slot residue at 500 ns is about 0 at 9/9 corners (ACCEPT), but the nosr2 broken copy result is missing, so the gate is unproven.
+- Order-1 residue at 15 ns is 7.5e-6 to 9.4e-2 (hot slow corners are worst).
+
+**ivbnc / ivbpc (WO-102):** OTA1 generates both internally. Xmbpd is the ivbpc diode, fed by the replica Xmrt/Xmrnc. Xmbnd is the ivbnc diode, fed by Xmbpx (with the gbk bank devices Xmbpds/Xmbpxs). OTA2 (`design/c2_ota2/ota2.spice`) has no driver on either net. C6 needs no new ports: in the top, wire OTA1 pins `ivbnc`/`ivbpc` to nets `o1_ivbnc`/`o1_ivbpc` (OTA1 is the source) and OTA2's `ivbnc`/`ivbpc` pins to the same nets.
