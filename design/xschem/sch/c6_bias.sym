@@ -7,21 +7,42 @@ template="name=x1"
 V {}
 S {}
 E {}
-B 4 -60 0 60 80 {}
+B 4 -60 0 60 140 {}
 T {@symname} 0 -28 0 0 0.3 0.3 {hcenter=true}
-T {@name} 0 84 0 0 0.2 0.2 {hcenter=true}
+T {@name} 0 144 0 0 0.2 0.2 {hcenter=true}
 B 5 -82.5 17.5 -77.5 22.5 {name=vdd dir=inout}
 L 4 -80 20 -60 20 {}
 T {vdd} -55 14 0 0 0.2 0.2 {}
 B 5 -82.5 37.5 -77.5 42.5 {name=vss dir=inout}
 L 4 -80 40 -60 40 {}
 T {vss} -55 34 0 0 0.2 0.2 {}
-B 5 -82.5 57.5 -77.5 62.5 {name=vg dir=inout}
+B 5 -82.5 57.5 -77.5 62.5 {name=vdl dir=inout}
 L 4 -80 60 -60 60 {}
-T {vg} -55 54 0 0 0.2 0.2 {}
-B 5 77.5 17.5 82.5 22.5 {name=vn dir=inout}
+T {vdl} -55 54 0 0 0.2 0.2 {}
+B 5 -82.5 77.5 -77.5 82.5 {name=boost dir=inout}
+L 4 -80 80 -60 80 {}
+T {boost} -55 74 0 0 0.2 0.2 {}
+B 5 -82.5 97.5 -77.5 102.5 {name=trim0 dir=inout}
+L 4 -80 100 -60 100 {}
+T {trim0} -55 94 0 0 0.2 0.2 {}
+B 5 -82.5 117.5 -77.5 122.5 {name=trim1 dir=inout}
+L 4 -80 120 -60 120 {}
+T {trim1} -55 114 0 0 0.2 0.2 {}
+B 5 77.5 17.5 82.5 22.5 {name=trim2 dir=inout}
 L 4 80 20 60 20 {}
-T {vn} 55 14 0 1 0.2 0.2 {}
-B 5 77.5 37.5 82.5 42.5 {name=ok dir=inout}
+T {trim2} 55 14 0 1 0.2 0.2 {}
+B 5 77.5 37.5 82.5 42.5 {name=ibtp dir=inout}
 L 4 80 40 60 40 {}
-T {ok} 55 34 0 1 0.2 0.2 {}
+T {ibtp} 55 34 0 1 0.2 0.2 {}
+B 5 77.5 57.5 82.5 62.5 {name=ibn dir=inout}
+L 4 80 60 60 60 {}
+T {ibn} 55 54 0 1 0.2 0.2 {}
+B 5 77.5 77.5 82.5 82.5 {name=ibp dir=inout}
+L 4 80 80 60 80 {}
+T {ibp} 55 74 0 1 0.2 0.2 {}
+B 5 77.5 97.5 82.5 102.5 {name=ivbl0 dir=inout}
+L 4 80 100 60 100 {}
+T {ivbl0} 55 94 0 1 0.2 0.2 {}
+B 5 77.5 117.5 82.5 122.5 {name=ok dir=inout}
+L 4 80 120 60 120 {}
+T {ok} 55 114 0 1 0.2 0.2 {}

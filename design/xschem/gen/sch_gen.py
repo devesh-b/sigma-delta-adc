@@ -133,11 +133,17 @@ def gen_sch(cell, c, cells, lports, outdir, brk):
         sym, pn, attr, pins, h = classify(t, cells, lports, outdir)
         if brk and cell == brk[2] and brk[0] in (t[0], t[0][1:]) and "done" not in brk:
             a, v = brk[1].split("=")
-            attr, n = re.subn(rf"\b{a}=\S+", f"{a}={v}", attr)
-            assert n == 1, (brk, attr)
-            brk.append("done")
+            if not a.startswith("pin"):
+                attr, n = re.subn(rf"\b{a}=\S+", f"{a}={v}", attr)
+                assert n == 1, (brk, attr)
+                brk.append("done")
         k = max(i for i, z in enumerate(t) if "=" not in z) if t[0][0] in "Xx" else 3
         nets = t[1:k]
+        if brk and cell == brk[2] and brk[0] in (t[0], t[0][1:]) and brk[1].startswith("pin") and "done" not in brk:
+            i = int(brk[1].split("=")[0][3:])           # wiring broken copy: net of pin i (SPICE order) replaced
+            assert nets[i] != brk[1].split("=")[1], (brk, nets)
+            nets = nets[:i] + [brk[1].split("=")[1]] + nets[i + 1:]
+            brk.append("done")
         assert len(nets) == len(pn), (t, pn)
         if y + h > 3000:
             x, y = x + 400, 0

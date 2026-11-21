@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-"""WO-94 reference netlists, taken from the Python generators (the source of truth). Sandbox only.
+"""WO-94/WO-102 reference netlists, taken from the Python generators (the source of truth). Sandbox only.
 
     python3 refnets.py OUTDIR
 
-Writes OUTDIR/<cell>.spice for ota1, c3_comp, c4_gen, c6_bias, the MIM cells and sd_mod_top (top + all blocks).
+Writes OUTDIR/<cell>.spice for ota1, ota2, c3_comp, c4_gen, c6_bias, c5c7_ref, the MIM cells and sd_mod_top (top + all blocks).
 No sizes live here except the MIM unit (W = L = MIM_UNIT um) and the unit counts, which follow SPEC 3.4
 (Cs 0.5 pF = 2 units, Cint1 4 pF = 16, Cint2 1 pF = 4, Ck2 0.25 pF = 1).
 
-C6: c6_spot.py has no subckt; c6_bias = the tran deck core (kind tran, mut none) at the WO-80 values
-R1 144.8 um / R2/R1 2.45 (the c6_spot defaults are R1_L 94 / ratio 4.6), with the two 0 V ammeters merged
-(Vlk: lk0 = vdd, Vsm: mo = vn) and node 0 renamed vss. The C6.3 port mirrors are not generated yet.
+WO-102: c6_bias = design/c6_bias/c6_final.py `netlist` (subckt with boost/trim ports), c5c7_ref = design/c5c7_ref/c5c7_ref.py
+`netlist`, ota2 = design/c2_ota2/ota2.spice (D91 sizes, generated file), SW['sr2'] comes from c4_sw/netlist.py.
 """
 import os
 import subprocess
@@ -18,49 +17,37 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 D = os.path.normpath(os.path.join(HERE, "..", ".."))       # design/
 sys.path.insert(0, os.path.join(D, "c4_sw"))
-sys.path.insert(0, os.path.join(D, "c6_bias"))
 import netlist as N  # noqa: E402  (c4_sw/netlist.py: switch sizes SW, PORTS, PH)
-import c6_spot as B  # noqa: E402
 
-C6_R1, C6_RATIO = 144.8, 2.45
 MIM_UNIT = 11.0            # um; ~0.25 pF at ~2 fF/um2 + perimeter (to be confirmed by sim, WO-95/96)
 MIM = dict(mim_cs=2, mim_cint1=16, mim_cint2=4, mim_ck2=1)
 
 
-def run(py):
-    return subprocess.run([sys.executable, py], check=True, capture_output=True, text=True).stdout
-
-
-OTA2_SRC = ("import sys; sys.path.insert(0, sys.argv[1]); import netlist as C, sizes_draft as S; "
-            "z = getattr(S, 'SIZES_OTA2', None); "
-            "sys.stdout.write(('* PENDING D91 sizes (OTA2 = OTA1 cell until WO-98)\\n' if z is None else '') "
-            "+ C.build(name='ota2', sizes=z))")
+def run(py, *args):
+    return subprocess.run([sys.executable, py, *args], check=True, capture_output=True, text=True).stdout
 
 
 def ota2():
-    """D91: OTA2 = 9/16-scaled OTA1 cell from the same generator (build(name='ota2', sizes=SIZES_OTA2)).
-    Follows WO-98 once sizes_draft has SIZES_OTA2; until then the OTA1 sizes, flagged PENDING in the netlist."""
-    return subprocess.run([sys.executable, "-c", OTA2_SRC, os.path.join(D, "c1_ota1")], check=True,
-                          capture_output=True, text=True).stdout
-
-
-def nodes_of(toks):
-    k = max(i for i, t in enumerate(toks) if "=" not in t)  # model / value token
-    return k
-
-
-def c6_bias():
-    txt, _ = B.deck("tran", "tt", 27, 3.3, r1=C6_R1, ratio=C6_RATIO)
-    ren = {"0": "vss", "lk0": "vdd", "mo": "vn"}
-    out = [".subckt c6_bias vdd vss vg vn ok"]
-    for ln in txt.splitlines():
-        if not ln or ln[0] not in "XC":
-            continue
+    """D91 OTA2 from the generated file design/c2_ota2/ota2.spice (no PENDING flag any more).
+    The file carries 0 V wire sources (Vwi1/Vwi2 inp-gp/inn-gm, Vwf1/Vwf2 fa-xa/fb-xb) that the schematic does not
+    draw; they are merged here (second node renamed to the first, source dropped), the same as the C6 ammeters."""
+    ren, keep = {}, []
+    for ln in open(os.path.join(D, "c2_ota2", "ota2.spice")).read().splitlines():
         t = ln.split()
-        k = nodes_of(t) if t[0][0] == "X" else 3
-        t[1:k] = [ren.get(n, n) for n in t[1:k]]
-        out.append(" ".join(t))
-    return "\n".join(out + [".ends c6_bias"]) + "\n"
+        if t and t[0].startswith("Vw"):
+            assert t[3] == "0", ln
+            ren[t[2]] = t[1]
+        else:
+            keep.append(ln)
+    out = []
+    for ln in keep:
+        t = ln.split()
+        if t and t[0][0] in "XC" and not ln.startswith("*"):
+            k = max(i for i, z in enumerate(t) if "=" not in z) if t[0][0] == "X" else 3
+            t[1:k] = [ren.get(n, n) for n in t[1:k]]
+            ln = " ".join(t)
+        out.append(ln)
+    return "\n".join(out) + "\n"
 
 
 def mim(name, n):
@@ -68,7 +55,7 @@ def mim(name, n):
             f"MF={n} m={n}\n.ends {name}\n")
 
 
-TOP_PORTS = "ua0 ua1 ua2 ua3 VAPWR VDPWR VGND fs y swap short chop rst_analog order comp_out bias_ok"
+TOP_PORTS = "ua0 ua1 ua2 ua3 VAPWR VDPWR VGND fs y swap short chop rst_analog order boost trim0 trim1 trim2 comp_out bias_ok"
 BULK = {"0": "VGND", "vdd": "VAPWR"}
 
 
@@ -86,10 +73,10 @@ def top():
     vin = dict(p="ua0", n="ua1")
     for s, o in (("p", "n"), ("n", "p")):
         hi, lo = ("dh", "dl") if s == "p" else ("dl", "dh")       # 1-bit DAC: side p to VREF+ on y, side n on not y
-        khi, klo = ("kh", "kl") if s == "p" else ("kl", "kh")
+        khi, klo = ("kl", "kh") if s == "p" else ("kh", "kl")     # WO-99 item 2: Cint crossed, so Ck2 polarity is opposite to stage 1
         L += sw(f"sin{s}", vin[s], f"b1{s}", "pas", "sin")      # 1  merged input / sys-swap / short
         L += sw(f"ssw{s}", vin[o], f"b1{s}", "swp", "sin")
-        L += sw(f"ssh{s}", "vicm", f"b1{s}", "sho", "sin")
+        L += sw(f"ssh{s}", "vscm", f"b1{s}", "sho", "sin")   # WO-99 item 1: short CM = vscm (VREF/2)
         L += sw(f"sdh{s}", "ua2", f"b1{s}", hi, "sdh")          # 2  DAC
         L += sw(f"sdl{s}", "ua3", f"b1{s}", lo, "sdl")
         L.append(f"Xcs1{s} tp1{s} b1{s} mim_cs")                # Cs1 0.5 pF, bottom plate on the driven side
@@ -106,17 +93,20 @@ def top():
     L += sw("s2cm", "b2p", "b2n", "il", "s2cm")                 # 7  Cs2 plate short (CL-2)
     L += sw("stp2", "tp2p", "tp2n", "se", "stp")                # 8
     L += sw("sk0", "bkp", "bkn", "k0", "sk0")                   # 11 Ck2 rest short
+    L += sw("sr2", "x2p", "x2n", "r2", "sr2")                   # 12 Cint2 reset: x2p <-> x2n short (WO-99 item 3)
     cm = "vicm vocm"
     ctl = "chp chn chlp chln isl il_t il_c sl_t sl_c rstb"     # CMFB ph1 = il (integrate), ph2 = sl (hold)
     b = " ".join(f"o1_{p}" for p in ("ibtp", "ibn", "ibp", "ivbnc", "ivbpc", "ivbl0"))   # D91: OTA2 shares OTA1 bias
     for i in (1, 2):                                            # own CMFB inside each cell
-        L.append(f"Xota{i} VAPWR VGND vg{i}p vg{i}n x{i}p x{i}n {cm} {b} {ctl} ota{i}")
+        c = ctl.replace(" isl ", " r2_t ") if i == 2 else ctl   # OTA2 isl driven by r2_t (rstb stays C4's)
+        L.append(f"Xota{i} VAPWR VGND vg{i}p vg{i}n x{i}p x{i}n {cm} {b} {c} ota{i}")
     L.append("Xcmp x2p x2n phc comp_out qb VDPWR VGND c3_comp")
     L.append("Xdec comp_out qb VGND VGND VDPWR VDPWR dec sky130_fd_sc_hd__nand2_1")   # dec = NAND(q, qb), 1.8 V
     ph = " ".join(f"{x}_t {x}_c" for x in N.PH)
     L.append(f"Xgen VAPWR VDPWR VGND fs y swap short chop rst_analog order dec {ph} "
              "isl rstb chp chn chlp chln phc pwrok fsh c4_gen")
-    L.append("Xbias VAPWR VGND vgb vnb ok c6_bias")
+    L.append("Xbias VAPWR VGND VDPWR boost trim0 trim1 trim2 o1_ibtp o1_ibn o1_ibp o1_ivbl0 ok c6_bias")
+    L.append("Xref ua2 VGND vocm vicm vscm c5c7_ref")
     L.append("Xlsok ok VDPWR VGND VGND VAPWR VAPWR bias_ok sky130_fd_sc_hvl__lsbufhv2lv_1")   # bias_ok to 1.8 V
     return "\n".join(L + [".ends sd_mod_top"]) + "\n"
 
@@ -127,7 +117,8 @@ def main(out):
              "ota2": ota2(),
              "c3_comp": run(os.path.join(D, "c3_comp", "netlist.py")),
              "c4_gen": run(os.path.join(D, "c4_sw", "netlist.py")),
-             "c6_bias": c6_bias()}
+             "c6_bias": run(os.path.join(D, "c6_bias", "c6_final.py"), "netlist"),
+             "c5c7_ref": run(os.path.join(D, "c5c7_ref", "c5c7_ref.py"), "netlist")}
     cells.update({k: mim(k, n) for k, n in MIM.items()})
     for k, v in cells.items():
         open(os.path.join(out, k + ".spice"), "w").write(v)

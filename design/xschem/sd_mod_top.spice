@@ -1,6 +1,7 @@
-** sch_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/sd_mod_top.sch
-.subckt sd_mod_top ua0 ua1 ua2 ua3 VAPWR VDPWR VGND fs y swap short chop rst_analog order comp_out bias_ok
-*.PININFO ua0:B ua1:B ua2:B ua3:B VAPWR:B VDPWR:B VGND:B fs:B y:B swap:B short:B chop:B rst_analog:B order:B comp_out:B bias_ok:B
+** sch_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/sd_mod_top.sch
+.subckt sd_mod_top ua0 ua1 ua2 ua3 VAPWR VDPWR VGND fs y swap short chop rst_analog order boost trim0 trim1 trim2 comp_out bias_ok
+*.PININFO ua0:B ua1:B ua2:B ua3:B VAPWR:B VDPWR:B VGND:B fs:B y:B swap:B short:B chop:B rst_analog:B order:B boost:B trim0:B
+*+ trim1:B trim2:B comp_out:B bias_ok:B
 Xsinpn ua0 pas_t b1p VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=12 nf=1 ad=3.48 as=3.48 pd=24.58 ps=24.58 nrd=0.0241666666666667
 + nrs=0.0241666666666667 sa=0 sb=0 sd=0 mult=1
 Xsinpp ua0 pas_c b1p VAPWR sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=36 nf=1 ad=10.44 as=10.44 pd=72.58 ps=72.58
@@ -9,9 +10,9 @@ Xsswpn ua1 swp_t b1p VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=12 nf=1 ad=3.48 a
 + nrs=0.0241666666666667 sa=0 sb=0 sd=0 mult=1
 Xsswpp ua1 swp_c b1p VAPWR sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=36 nf=1 ad=10.44 as=10.44 pd=72.58 ps=72.58
 + nrd=0.00805555555555556 nrs=0.00805555555555556 sa=0 sb=0 sd=0 mult=1
-Xsshpn vicm sho_t b1p VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=12 nf=1 ad=3.48 as=3.48 pd=24.58 ps=24.58 nrd=0.0241666666666667
+Xsshpn vscm sho_t b1p VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=12 nf=1 ad=3.48 as=3.48 pd=24.58 ps=24.58 nrd=0.0241666666666667
 + nrs=0.0241666666666667 sa=0 sb=0 sd=0 mult=1
-Xsshpp vicm sho_c b1p VAPWR sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=36 nf=1 ad=10.44 as=10.44 pd=72.58 ps=72.58
+Xsshpp vscm sho_c b1p VAPWR sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=36 nf=1 ad=10.44 as=10.44 pd=72.58 ps=72.58
 + nrd=0.00805555555555556 nrs=0.00805555555555556 sa=0 sb=0 sd=0 mult=1
 Xsdhpn ua2 dh_t b1p VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0
 + sb=0 sd=0 mult=1
@@ -30,11 +31,11 @@ Xs2inpp x1p sl_c b2p VAPWR sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=12 nf=1 ad=3.48 
 Xcs2p tp2p b2p mim_cs
 Xsg2pn tp2p ie_t vg2p VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=5 nf=1 ad=1.45 as=1.45 pd=10.58 ps=10.58 nrd=0.058 nrs=0.058 sa=0
 + sb=0 sd=0 mult=1
-Xskhpn ua2 kh_t bkp VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0
+Xskhpn ua2 kl_t bkp VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0
 + sb=0 sd=0 mult=1
-Xskhpp ua2 kh_c bkp VAPWR sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=12 nf=1 ad=3.48 as=3.48 pd=24.58 ps=24.58 nrd=0.0241666666666667
+Xskhpp ua2 kl_c bkp VAPWR sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=12 nf=1 ad=3.48 as=3.48 pd=24.58 ps=24.58 nrd=0.0241666666666667
 + nrs=0.0241666666666667 sa=0 sb=0 sd=0 mult=1
-Xsklpn ua3 kl_t bkp VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0
+Xsklpn ua3 kh_t bkp VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0
 + sb=0 sd=0 mult=1
 Xck2p vg2p bkp mim_ck2
 Xci2p vg2p x2n mim_cint2
@@ -46,9 +47,9 @@ Xsswnn ua0 swp_t b1n VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=12 nf=1 ad=3.48 a
 + nrs=0.0241666666666667 sa=0 sb=0 sd=0 mult=1
 Xsswnp ua0 swp_c b1n VAPWR sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=36 nf=1 ad=10.44 as=10.44 pd=72.58 ps=72.58
 + nrd=0.00805555555555556 nrs=0.00805555555555556 sa=0 sb=0 sd=0 mult=1
-Xsshnn vicm sho_t b1n VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=12 nf=1 ad=3.48 as=3.48 pd=24.58 ps=24.58 nrd=0.0241666666666667
+Xsshnn vscm sho_t b1n VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=12 nf=1 ad=3.48 as=3.48 pd=24.58 ps=24.58 nrd=0.0241666666666667
 + nrs=0.0241666666666667 sa=0 sb=0 sd=0 mult=1
-Xsshnp vicm sho_c b1n VAPWR sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=36 nf=1 ad=10.44 as=10.44 pd=72.58 ps=72.58
+Xsshnp vscm sho_c b1n VAPWR sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=36 nf=1 ad=10.44 as=10.44 pd=72.58 ps=72.58
 + nrd=0.00805555555555556 nrs=0.00805555555555556 sa=0 sb=0 sd=0 mult=1
 Xsdhnn ua2 dl_t b1n VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0
 + sb=0 sd=0 mult=1
@@ -67,11 +68,11 @@ Xs2innp x1n sl_c b2n VAPWR sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=12 nf=1 ad=3.48 
 Xcs2n tp2n b2n mim_cs
 Xsg2nn tp2n ie_t vg2n VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=5 nf=1 ad=1.45 as=1.45 pd=10.58 ps=10.58 nrd=0.058 nrs=0.058 sa=0
 + sb=0 sd=0 mult=1
-Xskhnn ua2 kl_t bkn VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0
+Xskhnn ua2 kh_t bkn VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0
 + sb=0 sd=0 mult=1
-Xskhnp ua2 kl_c bkn VAPWR sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=12 nf=1 ad=3.48 as=3.48 pd=24.58 ps=24.58 nrd=0.0241666666666667
+Xskhnp ua2 kh_c bkn VAPWR sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=12 nf=1 ad=3.48 as=3.48 pd=24.58 ps=24.58 nrd=0.0241666666666667
 + nrs=0.0241666666666667 sa=0 sb=0 sd=0 mult=1
-Xsklnn ua3 kh_t bkn VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0
+Xsklnn ua3 kl_t bkn VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0
 + sb=0 sd=0 mult=1
 Xck2n vg2n bkn mim_ck2
 Xci2n vg2n x2p mim_cint2
@@ -91,21 +92,26 @@ Xsk0n bkp k0_t bkn VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=4 nf=1 ad=1.16 as=1
 + sb=0 sd=0 mult=1
 Xsk0p bkp k0_c bkn VAPWR sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=12 nf=1 ad=3.48 as=3.48 pd=24.58 ps=24.58 nrd=0.0241666666666667
 + nrs=0.0241666666666667 sa=0 sb=0 sd=0 mult=1
+Xsr2n x2p r2_t x2n VGND sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=8 nf=1 ad=2.32 as=2.32 pd=16.58 ps=16.58 nrd=0.03625 nrs=0.03625 sa=0
++ sb=0 sd=0 mult=1
+Xsr2p x2p r2_c x2n VAPWR sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=24 nf=1 ad=6.96 as=6.96 pd=48.58 ps=48.58 nrd=0.0120833333333333
++ nrs=0.0120833333333333 sa=0 sb=0 sd=0 mult=1
 Xota1 VAPWR VGND vg1p vg1n x1p x1n vicm vocm o1_ibtp o1_ibn o1_ibp o1_ivbnc o1_ivbpc o1_ivbl0 chp chn chlp chln isl il_t il_c sl_t
 + sl_c rstb ota1
-Xota2 VAPWR VGND vg2p vg2n x2p x2n vicm vocm o1_ibtp o1_ibn o1_ibp o1_ivbnc o1_ivbpc o1_ivbl0 chp chn chlp chln isl il_t il_c sl_t
-+ sl_c rstb ota2
+Xota2 VAPWR VGND vg2p vg2n x2p x2n vicm vocm o1_ibtp o1_ibn o1_ibp o1_ivbnc o1_ivbpc o1_ivbl0 chp chn chlp chln r2_t il_t il_c
++ sl_t sl_c rstb ota2
 Xcmp x2p x2n phc comp_out qb VDPWR VGND c3_comp
 Xdec comp_out qb VGND VGND VDPWR VDPWR dec sky130_fd_sc_hd__nand2_1
 Xgen VAPWR VDPWR VGND fs y swap short chop rst_analog order dec ie_t ie_c il_t il_c se_t se_c sl_t sl_c pas_t pas_c swp_t swp_c
 + sho_t sho_c dh_t dh_c dl_t dl_c kh_t kh_c kl_t kl_c k0_t k0_c r2_t r2_c isl rstb chp chn chlp chln phc pwrok fsh c4_gen
-Xbias VAPWR VGND vgb vnb ok c6_bias
+Xbias VAPWR VGND VDPWR boost trim0 trim1 trim2 o1_ibtp o1_ibn o1_ibp o1_ivbl0 ok c6_bias
+Xref ua2 VGND vocm vicm vscm c5c7_ref
 Xlsok ok VDPWR VGND VGND VAPWR VAPWR bias_ok sky130_fd_sc_hvl__lsbufhv2lv_1
 .ends
 
 * expanding   symbol:  mim_cs.sym # of pins=2
-** sym_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/mim_cs.sym
-** sch_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/mim_cs.sch
+** sym_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/mim_cs.sym
+** sch_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/mim_cs.sch
 .subckt mim_cs top bot
 *.PININFO top:B bot:B
 Xc top bot sky130_fd_pr__cap_mim_m3_1 W=11 L=11 MF=2 m=2
@@ -113,8 +119,8 @@ Xc top bot sky130_fd_pr__cap_mim_m3_1 W=11 L=11 MF=2 m=2
 
 
 * expanding   symbol:  mim_cint1.sym # of pins=2
-** sym_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/mim_cint1.sym
-** sch_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/mim_cint1.sch
+** sym_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/mim_cint1.sym
+** sch_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/mim_cint1.sch
 .subckt mim_cint1 top bot
 *.PININFO top:B bot:B
 Xc top bot sky130_fd_pr__cap_mim_m3_1 W=11 L=11 MF=16 m=16
@@ -122,8 +128,8 @@ Xc top bot sky130_fd_pr__cap_mim_m3_1 W=11 L=11 MF=16 m=16
 
 
 * expanding   symbol:  mim_ck2.sym # of pins=2
-** sym_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/mim_ck2.sym
-** sch_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/mim_ck2.sch
+** sym_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/mim_ck2.sym
+** sch_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/mim_ck2.sch
 .subckt mim_ck2 top bot
 *.PININFO top:B bot:B
 Xc top bot sky130_fd_pr__cap_mim_m3_1 W=11 L=11 MF=1
@@ -131,8 +137,8 @@ Xc top bot sky130_fd_pr__cap_mim_m3_1 W=11 L=11 MF=1
 
 
 * expanding   symbol:  mim_cint2.sym # of pins=2
-** sym_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/mim_cint2.sym
-** sch_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/mim_cint2.sch
+** sym_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/mim_cint2.sym
+** sch_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/mim_cint2.sch
 .subckt mim_cint2 top bot
 *.PININFO top:B bot:B
 Xc top bot sky130_fd_pr__cap_mim_m3_1 W=11 L=11 MF=4 m=4
@@ -140,8 +146,8 @@ Xc top bot sky130_fd_pr__cap_mim_m3_1 W=11 L=11 MF=4 m=4
 
 
 * expanding   symbol:  ota1.sym # of pins=24
-** sym_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/ota1.sym
-** sch_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/ota1.sch
+** sym_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/ota1.sym
+** sch_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/ota1.sch
 .subckt ota1 vdd vss inp inn outp outn vicm vocm ibtp ibn ibp ivbnc ivbpc ivbl0 chp chn chlp chln isl ph1 ph1b ph2 ph2b rstb
 *.PININFO vdd:B vss:B inp:B inn:B outp:B outn:B vicm:B vocm:B ibtp:B ibn:B ibp:B ivbnc:B ivbpc:B ivbl0:B chp:B chn:B chlp:B chln:B
 *+ isl:B ph1:B ph1b:B ph2:B ph2b:B rstb:B
@@ -296,95 +302,45 @@ XSr2bnp rbn ph2b ctl vdd sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=2 nf=1 ad=0.58 as=
 
 
 * expanding   symbol:  ota2.sym # of pins=24
-** sym_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/ota2.sym
-** sch_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/ota2.sch
+** sym_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/ota2.sym
+** sch_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/ota2.sch
 .subckt ota2 vdd vss inp inn outp outn vicm vocm ibtp ibn ibp ivbnc ivbpc ivbl0 chp chn chlp chln isl ph1 ph1b ph2 ph2b rstb
 *.PININFO vdd:B vss:B inp:B inn:B outp:B outn:B vicm:B vocm:B ibtp:B ibn:B ibp:B ivbnc:B ivbpc:B ivbl0:B chp:B chn:B chlp:B chln:B
 *+ isl:B ph1:B ph1b:B ph2:B ph2b:B rstb:B
-Xmtr ibtp ibtp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=6 W=3.75 nf=1 ad=1.0875 as=1.0875 pd=8.08 ps=8.08 nrd=0.0773333333333333
-+ nrs=0.0773333333333333 sa=0 sb=0 sd=0 mult=4 m=4
-Xmnr ibn ibn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=8 W=2.25 nf=1 ad=0.6525 as=0.6525 pd=5.08 ps=5.08 nrd=0.128888888888889
-+ nrs=0.128888888888889 sa=0 sb=0 sd=0 mult=4 m=4
-Xmplr ibp ibp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=4 W=2.5 nf=1 ad=0.725 as=0.725 pd=5.58 ps=5.58 nrd=0.116 nrs=0.116 sa=0 sb=0
-+ sd=0 mult=4 m=4
-Xmbpd ivbpc ivbpc vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=15 W=1.5 nf=1 ad=0.435 as=0.435 pd=3.58 ps=3.58 nrd=0.193333333333333
-+ nrs=0.193333333333333 sa=0 sb=0 sd=0 mult=4 m=4
-Xmbpds ivbpc gbk vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=15 W=1.5 nf=1 ad=0.435 as=0.435 pd=3.58 ps=3.58 nrd=0.193333333333333
-+ nrs=0.193333333333333 sa=0 sb=0 sd=0 mult=3 m=3
-Xmbnd ivbnc ivbnc vss vss sky130_fd_pr__nfet_g5v0d10v5 L=16 W=1.25 nf=1 ad=0.3625 as=0.3625 pd=3.08 ps=3.08 nrd=0.232 nrs=0.232
-+ sa=0 sb=0 sd=0 mult=1
-XSbkn gbk vss ivbpc vss sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=1 nf=1 ad=0.29 as=0.29 pd=2.58 ps=2.58 nrd=0.29 nrs=0.29 sa=0 sb=0
-+ sd=0 mult=1
-XSbkp gbk vdd ivbpc vdd sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
-+ sd=0 mult=1
-Xmbku gbk vss vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
-+ sd=0 mult=1
-Xmrcp rcb ibp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=4 W=2.5 nf=1 ad=0.725 as=0.725 pd=5.58 ps=5.58 nrd=0.116 nrs=0.116 sa=0 sb=0
-+ sd=0 mult=1
-Xmrcb rcb rcb vss vss sky130_fd_pr__nfet_g5v0d10v5 L=16 W=0.47 nf=1 ad=0.1363 as=0.1363 pd=1.52 ps=1.52 nrd=0.617021276595745
-+ nrs=0.617021276595745 sa=0 sb=0 sd=0 mult=1
-Xmrt ivbpc ibtp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=6 W=3.75 nf=1 ad=1.0875 as=1.0875 pd=8.08 ps=8.08 nrd=0.0773333333333333
-+ nrs=0.0773333333333333 sa=0 sb=0 sd=0 mult=2 m=2
-Xmrnc ivbpc rcb rnd vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=5 nf=1 ad=1.45 as=1.45 pd=10.58 ps=10.58 nrd=0.058 nrs=0.058 sa=0 sb=0
-+ sd=0 mult=1
-Xmrn rnd ibn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=8 W=2.25 nf=1 ad=0.6525 as=0.6525 pd=5.08 ps=5.08 nrd=0.128888888888889
-+ nrs=0.128888888888889 sa=0 sb=0 sd=0 mult=4 m=4
-Xmbpx ivbnc ivbpc vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=15 W=0.75 nf=1 ad=0.2175 as=0.2175 pd=2.08 ps=2.08 nrd=0.386666666666667
-+ nrs=0.386666666666667 sa=0 sb=0 sd=0 mult=4 m=4
-Xmbpxs ivbnc gbk vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=15 W=0.75 nf=1 ad=0.2175 as=0.2175 pd=2.08 ps=2.08 nrd=0.386666666666667
-+ nrs=0.386666666666667 sa=0 sb=0 sd=0 mult=3 m=3
-Xmbl0 ivbl0 ivbl0 vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=1.875 nf=1 ad=0.54375 as=0.54375 pd=4.33 ps=4.33
-+ nrd=0.154666666666667 nrs=0.154666666666667 sa=0 sb=0 sd=0 mult=1
-XSci1 inp chp gp vss sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0 sb=0
-+ sd=0 mult=1
-XSci2 inn chp gm vss sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0 sb=0
-+ sd=0 mult=1
-XSci3 inp chn gm vss sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0 sb=0
-+ sd=0 mult=1
-XSci4 inn chn gp vss sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0 sb=0
-+ sd=0 mult=1
 XSisl1 inp isl vicm vss sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
 + sd=0 mult=1
 XSisl2 inn isl vicm vss sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
 + sd=0 mult=1
 Xmt tail ibtp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=6 W=3.75 nf=1 ad=1.0875 as=1.0875 pd=8.08 ps=8.08 nrd=0.0773333333333333
-+ nrs=0.0773333333333333 sa=0 sb=0 sd=0 mult=32 m=32
-Xmin1 da gp tail tail sky130_fd_pr__pfet_01v8 L=0.5 W=10 nf=1 ad=2.9 as=2.9 pd=20.58 ps=20.58 nrd=0.029 nrs=0.029 sa=0 sb=0 sd=0
-+ mult=12 m=12
-Xmin2 db gm tail tail sky130_fd_pr__pfet_01v8 L=0.5 W=10 nf=1 ad=2.9 as=2.9 pd=20.58 ps=20.58 nrd=0.029 nrs=0.029 sa=0 sb=0 sd=0
-+ mult=12 m=12
-Xmpp1 fa vss da da sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=5 nf=1 ad=1.45 as=1.45 pd=10.58 ps=10.58 nrd=0.058 nrs=0.058 sa=0 sb=0
-+ sd=0 mult=2 m=2
-Xmpp2 fb vss db db sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=5 nf=1 ad=1.45 as=1.45 pd=10.58 ps=10.58 nrd=0.058 nrs=0.058 sa=0 sb=0
-+ sd=0 mult=2 m=2
++ nrs=0.0773333333333333 sa=0 sb=0 sd=0 mult=18 m=18
+Xmin1 da inp tail tail sky130_fd_pr__pfet_01v8 L=0.5 W=10 nf=1 ad=2.9 as=2.9 pd=20.58 ps=20.58 nrd=0.029 nrs=0.029 sa=0 sb=0 sd=0
++ mult=7 m=7
+Xmin2 db inn tail tail sky130_fd_pr__pfet_01v8 L=0.5 W=10 nf=1 ad=2.9 as=2.9 pd=20.58 ps=20.58 nrd=0.029 nrs=0.029 sa=0 sb=0 sd=0
++ mult=7 m=7
+Xmpp1 fa vss da da sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=5.625 nf=1 ad=1.63125 as=1.63125 pd=11.83 ps=11.83 nrd=0.0515555555555555
++ nrs=0.0515555555555555 sa=0 sb=0 sd=0 mult=1
+Xmpp2 fb vss db db sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=5.625 nf=1 ad=1.63125 as=1.63125 pd=11.83 ps=11.83 nrd=0.0515555555555555
++ nrs=0.0515555555555555 sa=0 sb=0 sd=0 mult=1
 Xmn1 fa ibn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=8 W=2.25 nf=1 ad=0.6525 as=0.6525 pd=5.08 ps=5.08 nrd=0.128888888888889
-+ nrs=0.128888888888889 sa=0 sb=0 sd=0 mult=32 m=32
++ nrs=0.128888888888889 sa=0 sb=0 sd=0 mult=18 m=18
 Xmn2 fb ibn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=8 W=2.25 nf=1 ad=0.6525 as=0.6525 pd=5.08 ps=5.08 nrd=0.128888888888889
-+ nrs=0.128888888888889 sa=0 sb=0 sd=0 mult=32 m=32
-XScf1 fa chlp xa vss sky130_fd_pr__nfet_01v8 L=0.15 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0 sb=0 sd=0
-+ mult=1
-XScf2 fb chlp xb vss sky130_fd_pr__nfet_01v8 L=0.15 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0 sb=0 sd=0
-+ mult=1
-XScf3 fa chln xb vss sky130_fd_pr__nfet_01v8 L=0.15 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0 sb=0 sd=0
-+ mult=1
-XScf4 fb chln xa vss sky130_fd_pr__nfet_01v8 L=0.15 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0 sb=0 sd=0
-+ mult=1
-Xmnc1 outn ivbnc xa vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=5 nf=1 ad=1.45 as=1.45 pd=10.58 ps=10.58 nrd=0.058 nrs=0.058 sa=0 sb=0
-+ sd=0 mult=4 m=4
-Xmnc2 outp ivbnc xb vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=5 nf=1 ad=1.45 as=1.45 pd=10.58 ps=10.58 nrd=0.058 nrs=0.058 sa=0 sb=0
-+ sd=0 mult=4 m=4
++ nrs=0.128888888888889 sa=0 sb=0 sd=0 mult=18 m=18
+Xmnc1 outn ivbnc fa vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=5.625 nf=1 ad=1.63125 as=1.63125 pd=11.83 ps=11.83
++ nrd=0.0515555555555555 nrs=0.0515555555555555 sa=0 sb=0 sd=0 mult=2 m=2
+Xmnc2 outp ivbnc fb vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=5.625 nf=1 ad=1.63125 as=1.63125 pd=11.83 ps=11.83
++ nrd=0.0515555555555555 nrs=0.0515555555555555 sa=0 sb=0 sd=0 mult=2 m=2
 Xmpc1 outn ivbpc sa sa sky130_fd_pr__pfet_g5v0d10v5 L=2 W=5 nf=1 ad=1.45 as=1.45 pd=10.58 ps=10.58 nrd=0.058 nrs=0.058 sa=0 sb=0
-+ sd=0 mult=16 m=16
++ sd=0 mult=9 m=9
 Xmpc2 outp ivbpc sb sb sky130_fd_pr__pfet_g5v0d10v5 L=2 W=5 nf=1 ad=1.45 as=1.45 pd=10.58 ps=10.58 nrd=0.058 nrs=0.058 sa=0 sb=0
-+ sd=0 mult=16 m=16
++ sd=0 mult=9 m=9
 Xmpl1 sa ibp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=4 W=2.5 nf=1 ad=0.725 as=0.725 pd=5.58 ps=5.58 nrd=0.116 nrs=0.116 sa=0 sb=0
-+ sd=0 mult=32 m=32
++ sd=0 mult=18 m=18
 Xmpl2 sb ibp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=4 W=2.5 nf=1 ad=0.725 as=0.725 pd=5.58 ps=5.58 nrd=0.116 nrs=0.116 sa=0 sb=0
-+ sd=0 mult=32 m=32
-Xmplc1 sa ctl vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=1.875 nf=1 ad=0.54375 as=0.54375 pd=4.33 ps=4.33 nrd=0.154666666666667
-+ nrs=0.154666666666667 sa=0 sb=0 sd=0 mult=8 m=8
-Xmplc2 sb ctl vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=1.875 nf=1 ad=0.54375 as=0.54375 pd=4.33 ps=4.33 nrd=0.154666666666667
-+ nrs=0.154666666666667 sa=0 sb=0 sd=0 mult=8 m=8
++ sd=0 mult=18 m=18
+Xmplc1 sa ctl vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=2.1 nf=1 ad=0.609 as=0.609 pd=4.78 ps=4.78 nrd=0.138095238095238
++ nrs=0.138095238095238 sa=0 sb=0 sd=0 mult=4 m=4
+Xmplc2 sb ctl vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=2.1 nf=1 ad=0.609 as=0.609 pd=4.78 ps=4.78 nrd=0.138095238095238
++ nrs=0.138095238095238 sa=0 sb=0 sd=0 mult=4 m=4
 Ccp outp ctl 1e-13
 Ccn outn ctl 1e-13
 Xmrst ctl rstb ivbl0 vdd sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=1 nf=1 ad=0.29 as=0.29 pd=2.58 ps=2.58 nrd=0.29 nrs=0.29 sa=0 sb=0
@@ -452,8 +408,8 @@ XSr2bnp rbn ph2b ctl vdd sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=2 nf=1 ad=0.58 as=
 
 
 * expanding   symbol:  c3_comp.sym # of pins=7
-** sym_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/c3_comp.sym
-** sch_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/c3_comp.sch
+** sym_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/c3_comp.sym
+** sch_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/c3_comp.sch
 .subckt c3_comp inp inn clk q qb vdd vss
 *.PININFO inp:B inn:B clk:B q:B qb:B vdd:B vss:B
 XT tl clk vss vss sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=5.0 nf=1 ad=1.45 as=1.45 pd=10.58 ps=10.58 nrd=0.058 nrs=0.058 sa=0 sb=0
@@ -546,8 +502,8 @@ XOb2p qb qbo1 vdd vdd sky130_fd_pr__pfet_01v8 L=0.15 W=4.0 nf=1 ad=1.16 as=1.16 
 
 
 * expanding   symbol:  c4_gen.sym # of pins=46
-** sym_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/c4_gen.sym
-** sch_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/c4_gen.sch
+** sym_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/c4_gen.sym
+** sch_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/c4_gen.sch
 .subckt c4_gen vdd vdl vss fs y swap short chop rst order dec ie_t ie_c il_t il_c se_t se_c sl_t sl_c pas_t pas_c swp_t swp_c
 + sho_t sho_c dh_t dh_c dl_t dl_c kh_t kh_c kl_t kl_c k0_t k0_c r2_t r2_c isl rstb chp chn chlp chln phc pwrok fsh
 *.PININFO vdd:B vdl:B vss:B fs:B y:B swap:B short:B chop:B rst:B order:B dec:B ie_t:B ie_c:B il_t:B il_c:B se_t:B se_c:B sl_t:B
@@ -573,35 +529,71 @@ Xfsg fshb pwrokb vss vss vdd vdd fsg sky130_fd_sc_hvl__nor2_1
 Xfsbg fsh pwrokb vss vss vdd vdd fsbg sky130_fd_sc_hvl__nor2_1
 Xsli sl vss vss vdd vdd slb sky130_fd_sc_hvl__inv_1
 Xcsi0 slb vss vss vdd vdd cs0 sky130_fd_sc_hvl__inv_1
-Ccs0 cs0 vss 5.5e-14
+XCcs0n vss cs0 vss vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=3 nf=1 ad=0.87 as=0.87 pd=6.58 ps=6.58 nrd=0.0966666666666667
++ nrs=0.0966666666666667 sa=0 sb=0 sd=0 mult=1
+XCcs0p vdd cs0 vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=3 nf=1 ad=0.87 as=0.87 pd=6.58 ps=6.58 nrd=0.0966666666666667
++ nrs=0.0966666666666667 sa=0 sb=0 sd=0 mult=1
 Xcsi1 cs0 vss vss vdd vdd cs1 sky130_fd_sc_hvl__inv_1
-Ccs1 cs1 vss 5.5e-14
+XCcs1n vss cs1 vss vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=3 nf=1 ad=0.87 as=0.87 pd=6.58 ps=6.58 nrd=0.0966666666666667
++ nrs=0.0966666666666667 sa=0 sb=0 sd=0 mult=1
+XCcs1p vdd cs1 vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=3 nf=1 ad=0.87 as=0.87 pd=6.58 ps=6.58 nrd=0.0966666666666667
++ nrs=0.0966666666666667 sa=0 sb=0 sd=0 mult=1
 Xcsi2 cs1 vss vss vdd vdd cs2 sky130_fd_sc_hvl__inv_1
-Ccs2 cs2 vss 5.5e-14
+XCcs2n vss cs2 vss vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=3 nf=1 ad=0.87 as=0.87 pd=6.58 ps=6.58 nrd=0.0966666666666667
++ nrs=0.0966666666666667 sa=0 sb=0 sd=0 mult=1
+XCcs2p vdd cs2 vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=3 nf=1 ad=0.87 as=0.87 pd=6.58 ps=6.58 nrd=0.0966666666666667
++ nrs=0.0966666666666667 sa=0 sb=0 sd=0 mult=1
 Xcsi3 cs2 vss vss vdd vdd sfb sky130_fd_sc_hvl__inv_1
-Ccs3 sfb vss 5.5e-14
+XCcs3n vss sfb vss vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=3 nf=1 ad=0.87 as=0.87 pd=6.58 ps=6.58 nrd=0.0966666666666667
++ nrs=0.0966666666666667 sa=0 sb=0 sd=0 mult=1
+XCcs3p vdd sfb vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=3 nf=1 ad=0.87 as=0.87 pd=6.58 ps=6.58 nrd=0.0966666666666667
++ nrs=0.0966666666666667 sa=0 sb=0 sd=0 mult=1
 Xili il vss vss vdd vdd ilb sky130_fd_sc_hvl__inv_1
 Xcii0 ilb vss vss vdd vdd ci0 sky130_fd_sc_hvl__inv_1
-Cci0 ci0 vss 5.5e-14
+XCci0n vss ci0 vss vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=3 nf=1 ad=0.87 as=0.87 pd=6.58 ps=6.58 nrd=0.0966666666666667
++ nrs=0.0966666666666667 sa=0 sb=0 sd=0 mult=1
+XCci0p vdd ci0 vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=3 nf=1 ad=0.87 as=0.87 pd=6.58 ps=6.58 nrd=0.0966666666666667
++ nrs=0.0966666666666667 sa=0 sb=0 sd=0 mult=1
 Xcii1 ci0 vss vss vdd vdd ci1 sky130_fd_sc_hvl__inv_1
-Cci1 ci1 vss 5.5e-14
+XCci1n vss ci1 vss vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=3 nf=1 ad=0.87 as=0.87 pd=6.58 ps=6.58 nrd=0.0966666666666667
++ nrs=0.0966666666666667 sa=0 sb=0 sd=0 mult=1
+XCci1p vdd ci1 vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=3 nf=1 ad=0.87 as=0.87 pd=6.58 ps=6.58 nrd=0.0966666666666667
++ nrs=0.0966666666666667 sa=0 sb=0 sd=0 mult=1
 Xcii2 ci1 vss vss vdd vdd ci2 sky130_fd_sc_hvl__inv_1
-Cci2 ci2 vss 5.5e-14
+XCci2n vss ci2 vss vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=3 nf=1 ad=0.87 as=0.87 pd=6.58 ps=6.58 nrd=0.0966666666666667
++ nrs=0.0966666666666667 sa=0 sb=0 sd=0 mult=1
+XCci2p vdd ci2 vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=3 nf=1 ad=0.87 as=0.87 pd=6.58 ps=6.58 nrd=0.0966666666666667
++ nrs=0.0966666666666667 sa=0 sb=0 sd=0 mult=1
 Xcii3 ci2 vss vss vdd vdd ifb sky130_fd_sc_hvl__inv_1
-Cci3 ifb vss 5.5e-14
+XCci3n vss ifb vss vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=3 nf=1 ad=0.87 as=0.87 pd=6.58 ps=6.58 nrd=0.0966666666666667
++ nrs=0.0966666666666667 sa=0 sb=0 sd=0 mult=1
+XCci3p vdd ifb vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=3 nf=1 ad=0.87 as=0.87 pd=6.58 ps=6.58 nrd=0.0966666666666667
++ nrs=0.0966666666666667 sa=0 sb=0 sd=0 mult=1
 Xa1 fsg sfb vss vss vdd vdd a1 sky130_fd_sc_hvl__nand2_1
 Xie a1 vss vss vdd vdd ie sky130_fd_sc_hvl__inv_1
 Xa2 fsbg ifb vss vss vdd vdd a2 sky130_fd_sc_hvl__nand2_1
 Xse a2 vss vss vdd vdd se sky130_fd_sc_hvl__inv_1
 Xe1i0 a1 vss vss vdd vdd e10 sky130_fd_sc_hvl__inv_1
-Ce10 e10 vss 1e-13
+XCe10n vss e10 vss vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=6 nf=1 ad=1.74 as=1.74 pd=12.58 ps=12.58 nrd=0.0483333333333333
++ nrs=0.0483333333333333 sa=0 sb=0 sd=0 mult=1
+XCe10p vdd e10 vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=6 nf=1 ad=1.74 as=1.74 pd=12.58 ps=12.58 nrd=0.0483333333333333
++ nrs=0.0483333333333333 sa=0 sb=0 sd=0 mult=1
 Xe1i1 e10 vss vss vdd vdd a1e sky130_fd_sc_hvl__inv_1
-Ce11 a1e vss 1e-13
+XCe11n vss a1e vss vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=6 nf=1 ad=1.74 as=1.74 pd=12.58 ps=12.58 nrd=0.0483333333333333
++ nrs=0.0483333333333333 sa=0 sb=0 sd=0 mult=1
+XCe11p vdd a1e vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=6 nf=1 ad=1.74 as=1.74 pd=12.58 ps=12.58 nrd=0.0483333333333333
++ nrs=0.0483333333333333 sa=0 sb=0 sd=0 mult=1
 Xil a1 a1e vss vss vdd vdd il sky130_fd_sc_hvl__nand2_1
 Xe2i0 a2 vss vss vdd vdd e20 sky130_fd_sc_hvl__inv_1
-Ce20 e20 vss 1e-13
+XCe20n vss e20 vss vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=6 nf=1 ad=1.74 as=1.74 pd=12.58 ps=12.58 nrd=0.0483333333333333
++ nrs=0.0483333333333333 sa=0 sb=0 sd=0 mult=1
+XCe20p vdd e20 vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=6 nf=1 ad=1.74 as=1.74 pd=12.58 ps=12.58 nrd=0.0483333333333333
++ nrs=0.0483333333333333 sa=0 sb=0 sd=0 mult=1
 Xe2i1 e20 vss vss vdd vdd a2e sky130_fd_sc_hvl__inv_1
-Ce21 a2e vss 1e-13
+XCe21n vss a2e vss vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=6 nf=1 ad=1.74 as=1.74 pd=12.58 ps=12.58 nrd=0.0483333333333333
++ nrs=0.0483333333333333 sa=0 sb=0 sd=0 mult=1
+XCe21p vdd a2e vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=6 nf=1 ad=1.74 as=1.74 pd=12.58 ps=12.58 nrd=0.0483333333333333
++ nrs=0.0483333333333333 sa=0 sb=0 sd=0 mult=1
 Xsl a2 a2e vss vss vdd vdd sl sky130_fd_sc_hvl__nand2_1
 Xswb swaph vss vss vdd vdd swapb sky130_fd_sc_hvl__inv_1
 Xyb yh vss vss vdd vdd yb sky130_fd_sc_hvl__inv_1
@@ -698,9 +690,15 @@ Xon2 on1 vss vss vdd vdd chn sky130_fd_sc_hvl__inv_4
 Xlfp chp vdl vss vss vdd vdd chlp sky130_fd_sc_hvl__lsbufhv2lv_1
 Xlfn chn vdl vss vss vdd vdd chln sky130_fd_sc_hvl__lsbufhv2lv_1
 Xsti0 se vss vss vdd vdd st0 sky130_fd_sc_hvl__inv_1
-Cst0 st0 vss 4e-14
+XCst0n vss st0 vss vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+XCst0p vdd st0 vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
 Xsti1 st0 vss vss vdd vdd phch sky130_fd_sc_hvl__inv_1
-Cst1 phch vss 4e-14
+XCst1n vss phch vss vss sky130_fd_pr__nfet_g5v0d10v5 L=2 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+XCst1p vdd phch vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=2 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
 Xlst phch vdl vss vss vdd vdd phc sky130_fd_sc_hvl__lsbufhv2lv_1
 Xrb rsth vss vss vdd vdd rstbh sky130_fd_sc_hvl__inv_1
 Xgisl rstbh pwrok vss vss vdd vdd isli sky130_fd_sc_hvl__nand2_1
@@ -710,11 +708,11 @@ Xrs1 isli vss vss vdd vdd rstb sky130_fd_sc_hvl__inv_4
 .ends
 
 
-* expanding   symbol:  c6_bias.sym # of pins=5
-** sym_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/c6_bias.sym
-** sch_path: /foss/designs/regr/WO-94-6b474df/design/xschem/sch/c6_bias.sch
-.subckt c6_bias vdd vss vg vn ok
-*.PININFO vdd:B vss:B vg:B vn:B ok:B
+* expanding   symbol:  c6_bias.sym # of pins=12
+** sym_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/c6_bias.sym
+** sch_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/c6_bias.sch
+.subckt c6_bias vdd vss vdl boost trim0 trim1 trim2 ibtp ibn ibp ivbl0 ok
+*.PININFO vdd:B vss:B vdl:B boost:B trim0:B trim1:B trim2:B ibtp:B ibn:B ibp:B ivbl0:B ok:B
 Xm1 a vg vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=20 W=0.42 nf=1 ad=0.1218 as=0.1218 pd=1.42 ps=1.42 nrd=0.69047619047619
 + nrs=0.69047619047619 sa=0 sb=0 sd=0 mult=17 m=17
 Xm2 b vg vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=20 W=0.42 nf=1 ad=0.1218 as=0.1218 pd=1.42 ps=1.42 nrd=0.69047619047619
@@ -755,8 +753,8 @@ Xlk6 l7 vss l6 vdd sky130_fd_pr__pfet_g5v0d10v5 L=20 W=0.42 nf=1 ad=0.1218 as=0.
 + nrs=0.69047619047619 sa=0 sb=0 sd=0 mult=1
 Xlk7 tsu vss l7 vdd sky130_fd_pr__pfet_g5v0d10v5 L=20 W=0.42 nf=1 ad=0.1218 as=0.1218 pd=1.42 ps=1.42 nrd=0.69047619047619
 + nrs=0.69047619047619 sa=0 sb=0 sd=0 mult=1
-Xmk tsu vn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=4 W=1.05 nf=1 ad=0.3045 as=0.3045 pd=2.68 ps=2.68 nrd=0.276190476190476
-+ nrs=0.276190476190476 sa=0 sb=0 sd=0 mult=1
+Xmk tsu vn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=4 W=2.1 nf=1 ad=0.609 as=0.609 pd=4.78 ps=4.78 nrd=0.138095238095238
++ nrs=0.138095238095238 sa=0 sb=0 sd=0 mult=1
 Xmct tc vg vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=20 W=0.42 nf=1 ad=0.1218 as=0.1218 pd=1.42 ps=1.42 nrd=0.69047619047619
 + nrs=0.69047619047619 sa=0 sb=0 sd=0 mult=8 m=8
 Xmcc q c tc tc sky130_fd_pr__pfet_g5v0d10v5 L=4 W=4 nf=1 ad=1.16 as=1.16 pd=8.58 ps=8.58 nrd=0.0725 nrs=0.0725 sa=0 sb=0 sd=0
@@ -799,9 +797,158 @@ Xkc6 k7 vss k6 vdd sky130_fd_pr__pfet_g5v0d10v5 L=20 W=0.42 nf=1 ad=0.1218 as=0.
 + nrs=0.69047619047619 sa=0 sb=0 sd=0 mult=1
 Xkc7 o1 vss k7 vdd sky130_fd_pr__pfet_g5v0d10v5 L=20 W=0.42 nf=1 ad=0.1218 as=0.1218 pd=1.42 ps=1.42 nrd=0.69047619047619
 + nrs=0.69047619047619 sa=0 sb=0 sd=0 mult=1
-Xmm vn vg vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=20 W=0.42 nf=1 ad=0.1218 as=0.1218 pd=1.42 ps=1.42 nrd=0.69047619047619
-+ nrs=0.69047619047619 sa=0 sb=0 sd=0 mult=21 m=21
-Xmn vn vn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=4 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0 sd=0
+Xls_boost boost vdl vss vss vdd vdd boost_h sky130_fd_sc_hvl__lsbuflv2hv_1
+Xiv_boost boost_h vss vss vdd vdd boost_b sky130_fd_sc_hvl__inv_1
+Xls_trim0 trim0 vdl vss vss vdd vdd trim0_h sky130_fd_sc_hvl__lsbuflv2hv_1
+Xiv_trim0 trim0_h vss vss vdd vdd trim0_b sky130_fd_sc_hvl__inv_1
+Xls_trim1 trim1 vdl vss vss vdd vdd trim1_h sky130_fd_sc_hvl__lsbuflv2hv_1
+Xiv_trim1 trim1_h vss vss vdd vdd trim1_b sky130_fd_sc_hvl__inv_1
+Xls_trim2 trim2 vdl vss vss vdd vdd trim2_h sky130_fd_sc_hvl__lsbuflv2hv_1
+Xiv_trim2 trim2_h vss vss vdd vdd trim2_b sky130_fd_sc_hvl__inv_1
+Xmm vnc vg vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=20 W=0.42 nf=1 ad=0.1218 as=0.1218 pd=1.42 ps=1.42 nrd=0.69047619047619
++ nrs=0.69047619047619 sa=0 sb=0 sd=0 mult=17 m=17
+Xmt0 ts0 vg vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=20 W=0.42 nf=1 ad=0.1218 as=0.1218 pd=1.42 ps=1.42 nrd=0.69047619047619
++ nrs=0.69047619047619 sa=0 sb=0 sd=0 mult=1
+Xmw0 vnc trim0_b ts0 vdd sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=1 nf=1 ad=0.29 as=0.29 pd=2.58 ps=2.58 nrd=0.29 nrs=0.29 sa=0 sb=0
++ sd=0 mult=1
+Xmt1 ts1 vg vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=20 W=0.42 nf=1 ad=0.1218 as=0.1218 pd=1.42 ps=1.42 nrd=0.69047619047619
++ nrs=0.69047619047619 sa=0 sb=0 sd=0 mult=2 m=2
+Xmw1 vnc trim1_b ts1 vdd sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=1 nf=1 ad=0.29 as=0.29 pd=2.58 ps=2.58 nrd=0.29 nrs=0.29 sa=0 sb=0
++ sd=0 mult=1
+Xmt2 ts2 vg vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=20 W=0.42 nf=1 ad=0.1218 as=0.1218 pd=1.42 ps=1.42 nrd=0.69047619047619
++ nrs=0.69047619047619 sa=0 sb=0 sd=0 mult=4 m=4
+Xmw2 vnc trim2_b ts2 vdd sky130_fd_pr__pfet_g5v0d10v5 L=0.5 W=1 nf=1 ad=0.29 as=0.29 pd=2.58 ps=2.58 nrd=0.29 nrs=0.29 sa=0 sb=0
++ sd=0 mult=1
+Xmdc1 vnc vnc vn vss sky130_fd_pr__nfet_g5v0d10v5 L=1 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0 sd=0
 + mult=1
+Xmdm1 vn vn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=4 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0 sd=0
++ mult=1
+Xmsb vnc boost_b vns vss sky130_fd_pr__nfet_g5v0d10v5 L=0.5 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmdc2 vns vnc vn2 vss sky130_fd_pr__nfet_g5v0d10v5 L=1 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0 sd=0
++ mult=1
+Xmdm2 vn2 vn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=4 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0 sd=0
++ mult=1
+Xmibtp0 ibtpm vn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=4 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xcibtp0 ibtp vnc ibtpm vss sky130_fd_pr__nfet_g5v0d10v5 L=1 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibtp1 ibtpm vn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=4 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xcibtp1 ibtp vnc ibtpm vss sky130_fd_pr__nfet_g5v0d10v5 L=1 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibtp2 ibtpm vn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=4 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xcibtp2 ibtp vnc ibtpm vss sky130_fd_pr__nfet_g5v0d10v5 L=1 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibtp3 ibtpm vn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=4 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xcibtp3 ibtp vnc ibtpm vss sky130_fd_pr__nfet_g5v0d10v5 L=1 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibtp4 ibtpm vn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=4 W=0.809 nf=1 ad=0.23461 as=0.23461 pd=2.198 ps=2.198
++ nrd=0.358467243510507 nrs=0.358467243510507 sa=0 sb=0 sd=0 mult=1
+Xcibtp4 ibtp vnc ibtpm vss sky130_fd_pr__nfet_g5v0d10v5 L=1 W=0.809 nf=1 ad=0.23461 as=0.23461 pd=2.198 ps=2.198
++ nrd=0.358467243510507 nrs=0.358467243510507 sa=0 sb=0 sd=0 mult=1
+Xmibp0 ibpm vn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=4 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xcibp0 ibp vnc ibpm vss sky130_fd_pr__nfet_g5v0d10v5 L=1 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibp1 ibpm vn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=4 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xcibp1 ibp vnc ibpm vss sky130_fd_pr__nfet_g5v0d10v5 L=1 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibp2 ibpm vn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=4 W=1.511 nf=1 ad=0.43819 as=0.43819 pd=3.602 ps=3.602 nrd=0.191925876902713
++ nrs=0.191925876902713 sa=0 sb=0 sd=0 mult=1
+Xcibp2 ibp vnc ibpm vss sky130_fd_pr__nfet_g5v0d10v5 L=1 W=1.511 nf=1 ad=0.43819 as=0.43819 pd=3.602 ps=3.602
++ nrd=0.191925876902713 nrs=0.191925876902713 sa=0 sb=0 sd=0 mult=1
+Xmivbl00 ivbl0m vn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=4 W=1.837 nf=1 ad=0.53273 as=0.53273 pd=4.254 ps=4.254
++ nrd=0.157866086009799 nrs=0.157866086009799 sa=0 sb=0 sd=0 mult=1
+Xcivbl00 ivbl0 vnc ivbl0m vss sky130_fd_pr__nfet_g5v0d10v5 L=1 W=1.837 nf=1 ad=0.53273 as=0.53273 pd=4.254 ps=4.254
++ nrd=0.157866086009799 nrs=0.157866086009799 sa=0 sb=0 sd=0 mult=1
+Xmfm vfm vn vss vss sky130_fd_pr__nfet_g5v0d10v5 L=4 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0 sd=0
++ mult=1
+Xmfc vp vnc vfm vss sky130_fd_pr__nfet_g5v0d10v5 L=1 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0 sd=0
++ mult=1
+Xmvp vp vp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=16 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0 sd=0
++ mult=2 m=2
+Xmibn0 ibn vp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=16 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibn1 ibn vp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=16 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibn2 ibn vp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=16 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibn3 ibn vp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=16 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibn4 ibn vp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=16 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibn5 ibn vp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=16 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibn6 ibn vp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=16 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibn7 ibn vp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=16 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibn8 ibn vp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=16 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibn9 ibn vp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=16 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibn10 ibn vp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=16 W=2 nf=1 ad=0.58 as=0.58 pd=4.58 ps=4.58 nrd=0.145 nrs=0.145 sa=0 sb=0
++ sd=0 mult=1
+Xmibn11 ibn vp vdd vdd sky130_fd_pr__pfet_g5v0d10v5 L=16 W=1.341 nf=1 ad=0.38889 as=0.38889 pd=3.262 ps=3.262
++ nrd=0.216256524981357 nrs=0.216256524981357 sa=0 sb=0 sd=0 mult=1
+.ends
+
+
+* expanding   symbol:  c5c7_ref.sym # of pins=5
+** sym_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/c5c7_ref.sym
+** sch_path: /foss/designs/regr/WO-102-a3cd977/design/xschem/sch/c5c7_ref.sch
+.subckt c5c7_ref vref vss vocm vicm vscm
+*.PININFO vref:B vss:B vocm:B vicm:B vscm:B
+Xr0 vss n1 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr1 n1 n2 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr2 n2 n3 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr3 n3 n4 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr4 n4 n5 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr5 n5 n6 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr6 n6 n7 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr7 n7 n8 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr8 n8 n9 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr9 n9 n10 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr10 n10 n11 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr11 n11 n12 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr12 n12 n13 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr13 n13 n14 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr14 n14 n15 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr15 n15 n16 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr16 n16 n17 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr17 n17 n18 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr18 n18 n19 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr19 n19 n20 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr20 n20 n21 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr21 n21 vscm vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr22 vscm n23 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr23 n23 n24 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr24 n24 n25 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr25 n25 vicm vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr26 vicm n27 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr27 n27 n28 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr28 n28 n29 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr29 n29 n30 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr30 n30 n31 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr31 n31 vocm vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr32 vocm n33 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr33 n33 n34 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr34 n34 n35 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr35 n35 n36 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr36 n36 n37 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr37 n37 n38 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr38 n38 n39 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr39 n39 n40 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr40 n40 n41 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr41 n41 n42 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr42 n42 n43 vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xr43 n43 vref vss sky130_fd_pr__res_xhigh_po_0p69 L=4 mult=1
+Xdvscm vscm vss sky130_fd_pr__cap_mim_m3_1 W=11 L=11 MF=4 m=4
+Xdvicm vicm vss sky130_fd_pr__cap_mim_m3_1 W=11 L=11 MF=4 m=4
+Xdvocm vocm vss sky130_fd_pr__cap_mim_m3_1 W=11 L=11 MF=4 m=4
 .ends
 

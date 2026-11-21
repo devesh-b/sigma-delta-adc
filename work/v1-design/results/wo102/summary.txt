@@ -1,0 +1,12 @@
+cell        elems  good      size_copy            size      wire_copy              wire      result
+ota1        76     MATCH     mtr:W=4              MISMATCH  min1:pin1=gm           MISMATCH  ACCEPT
+ota2        51     MATCH     mt:W=4               MISMATCH  min1:pin1=gm           MISMATCH  ACCEPT
+c3_comp     43     MATCH     M1:W=4.5             MISMATCH  M1:pin1=inn            MISMATCH  ACCEPT
+c4_gen      166    MATCH     mdp:W=0.5            MISMATCH  mdn:pin1=vss           MISMATCH  ACCEPT
+c6_bias     99     MATCH     m1:mult=16           MISMATCH  m1:pin1=a              MISMATCH  ACCEPT
+c5c7_ref    47     MATCH     r1:L=5               MISMATCH  r1:pin0=n3             MISMATCH  ACCEPT
+mim_cs      1      MATCH     c:MF=3               MISMATCH  c:pin0=bot             MISMATCH  ACCEPT
+mim_cint1   1      MATCH     c:MF=15              MISMATCH  c:pin0=bot             MISMATCH  ACCEPT
+mim_cint2   1      MATCH     c:MF=5               MISMATCH  c:pin0=bot             MISMATCH  ACCEPT
+mim_ck2     1      MATCH     c:W=12               MISMATCH  c:pin0=bot             MISMATCH  ACCEPT
+sd_mod_top  60     MATCH     sinpn:W=11           MISMATCH  Xota1:pin2=vg1n        MISMATCH  ACCEPT
