@@ -23,6 +23,7 @@ lvs() {  # sch_dir cell tag
   netgen -batch lvs "$d/$2.spice $2" "$OUT/ref/$2.spice $2" "$SETUP" "$d/$2.lvs" > "$d/$2.netgen.log" 2>&1
   [ -s "$d/$2.lvs" ] && verdict "$d/$2.lvs" || echo NOLVS
 }
+rm -f "$OUT/nobreak.txt"
 printf "%-11s %-6s %-9s %-20s %-9s %-22s %-9s %s\n" cell elems good size_copy size wire_copy wire result > "$OUT/summary.txt"
 for c in $CELLS; do
   g=$(lvs "$X/sch" "$c" good)
@@ -34,5 +35,6 @@ for c in $CELLS; do
   r=REJECT; [ "$g" = MATCH ] && [ "$b" = MISMATCH ] && [ "$w" = MISMATCH ] && r=ACCEPT
   printf "%-11s %-6s %-9s %-20s %-9s %-22s %-9s %s\n" "$c" "$n" "$g" "${BRK[$c]}" "$b" "${WBRK[$c]}" "$w" "$r" >> "$OUT/summary.txt"
 done
+[ -s "$OUT/nobreak.txt" ] && { echo "REJECT: --break target missing:"; cat "$OUT/nobreak.txt"; echo "REJECT nobreak" >> "$OUT/summary.txt"; }
 cp "$OUT/good/sd_mod_top.spice" "$X/sd_mod_top.spice"
 cat "$OUT/summary.txt"; ! grep -q REJECT "$OUT/summary.txt"

@@ -41,3 +41,7 @@ the logs by hand for the second run. A guard was attempted but its sed did not a
 - `r2_c` is only the complement phase for the sr2 TG; OTA2 `isl` takes `r2_t` only.
 - WO-99 item 6 (WO-95 deck `so1` on r2) and item 7 (OTA `boost` static) are not xschem items; not touched.
 - `design/c4_sw/netlist.py` shows as modified in the work tree from another WO; not staged here.
+
+## Follow-up (guard, ivbnc/ivbpc)
+- `run_wo94.sh` now fails hard (REJECT row, exit 1) when a `--break` target is missing. Tested with the bad ota2 target `mtr`: exit 1. Real run: exit 0, all 11 rows ACCEPT.
+- ivbnc/ivbpc: no change needed. The top already ties OTA1 and OTA2 `ivbnc ivbpc` to the shared nets `o1_ivbnc`/`o1_ivbpc`; OTA1 drives them through its internal diodes Xmbnd/Xmbpd (checked in `sd_mod_top.spice`). This replaces the "unsourced" open item above.
