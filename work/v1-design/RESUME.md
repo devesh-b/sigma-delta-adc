@@ -1046,3 +1046,21 @@ Next steps:
   - **Paused, resume at low priority later:** WO-91 p2–p4.
   - **Open:** the OTA boost bank port, so boost mode can be verified later.
   - **Plan:** `TAPEOUT_10D.md`.
+- **16:30 IST, after the usage limit reset (1Password unlocked).**
+  - **Sandbox state:**
+    - load ~30, 1 GB RAM free. **Mostly other projects on the same account** (AlphaOneSoC riscv-dv, fpga-up5k, openroad, eqy, …), not ours.
+    - Our slots: only WO-85 and WO-99 held.
+  - **Pool results:**
+
+    | WO | Result |
+    |---|---|
+    | WO-95 | **SMOKE_FAIL** |
+    | WO-98 | POOL_DONE, 38 OK / 21 failed |
+    | WO-97 | GL/SDF 5/5 OK |
+    | WO-77 | 11/11 OK |
+    | WO-85 | 40 OK / 13 failed |
+    | WO-99 | 39/41 |
+
+  - **Resumed with SendMessage:** WO-95 (smoke diagnosis), WO-98 (triage the fails), WO-100 (layout), WO-102 (xschem), WO-97 (collect GL).
+  - **To resume later** (held to save usage): WO-99 (collect its pool), WO-101 (C9 shrink), WO-103 (MOS caps).
+  - **Still paused:** WO-91 p2–p4.
