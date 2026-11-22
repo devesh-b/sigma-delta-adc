@@ -67,15 +67,15 @@ The block's own port list is the IP interface. The mapping to the Chipalooza slo
 |---|---|---|---|
 | VIN+, VIN− | in | Differential input, sampled at fs (charge kicks at fs) | 2 dedicated analog pads |
 | VREF+ | in | External reference, 1.0–2.048 V (nominal 2.048 V) | 1 dedicated analog pad |
-| VREF− | in | Reference return (Kelvin to the sensor ground) | Tied to VSSA inside the slot (see note) |
-| BIAS_EXT | in | Bandgap-referenced current from the harness. When `bias_sel` = 1 it replaces the internal bias-reference master current, and all bias currents follow it ratiometrically. Fallback if the on-chip reference misbehaves on silicon | Harness current source 1 |
+| VREF− | in | Reference return (Kelvin to the sensor ground) | 1 of the 4 shared analog lines (organiser agreed, 2026-11-23); fallback: tied to VSSA inside the slot (see note) |
+| BIAS_EXT | in | Bandgap-referenced current from the harness. When `bias_sel` = 1 it replaces the internal bias-reference master current, and all bias currents follow it ratiometrically. Fallback if the on-chip reference misbehaves on silicon. Design range 2.5–10 µA; harness fine mode (250 nA steps, 0–7.75 µA) gives 5.25 or 5.5 µA near the 5.35 µA nominal; coarse mode (1 µA steps, 0–31 µA) or both sources combined reach 10 µA | Harness current source 1 |
 | AMON[1:0] | out (test) | Buffered DC monitors: bias-reference voltage and CM reference, switch-selected (proposed, not yet designed) | 2 of the 4 shared analog lines |
 
 **Digital ports.**
 
 | Port | Dir | Description | Slot mapping |
 |---|---|---|---|
-| clk | in | Digital clock (48 MHz nominal); fs = clk / divider | Control input |
+| clk | in | Digital clock (48 MHz nominal); fs = clk / divider. Board clock (programmable part) or function-generator bypass | Control input |
 | rst_n | in | Asynchronous reset, synchronous release | Control input |
 | cfg_clk, cfg_dat, cfg_ld | in | Serial configuration write | 3 control inputs |
 | bias_sel | in | 0 = internal bias reference, 1 = BIAS_EXT. Static; change only while rst_n is low | Control input |
@@ -91,9 +91,7 @@ That uses 13 of 24 control inputs and 12 of 12 test outputs.
 
 **Byte-select read bus.** The digital macro keeps its native registered 16-bit read port. A small wrapper cell (`cz_bus8`) outputs bus[7:0] when bsel = 0 and bus[15:8] when bsel = 1. Each 16-bit word is read as two bytes, and a byte is valid one mux delay after bsel changes. In an SoC the 16-bit port can be used directly.
 
-**VREF− (request to the organisers).** The design has a Kelvin VREF− input. **Baseline:** with three dedicated pads, VREF− is tied to VSSA inside the slot. The block is designed to meet its specification in this configuration; ground drop in the slot appears as a small, calibratable gain error. **Request:** if the harness allows, we would like either of the following for a true Kelvin reference return. Either is optional, and the design does not depend on it:
-- a fourth dedicated pad for VREF−;
-- VREF− on one of the shared analog lines (DC only, but it carries the DAC charge kicks at fs).
+**VREF− (agreed with the organisers: shared analog line).** The design has a Kelvin VREF− input. **Plan:** VREF− goes to one of the shared analog lines, as the organisers suggested. This gives a true Kelvin reference return to the sensor ground on the board. The line is DC-only and carries the DAC charge kicks at fs, so its settling is part of the design check. **Fallback:** VREF− is tied to VSSA inside the slot. The block is designed to meet its specification in that configuration too; ground drop in the slot then appears as a small, calibratable gain error.
 
 ## 4. Target specification
 
@@ -181,7 +179,7 @@ Measurements:
 4. **Offset.** With system chop on and off, and with OTA chop.
 5. **CMRR.** Input common mode swept from 0.2 to 2.0 V, chop on and off.
 6. **Supply.** Analog and digital current per mode and boost setting; supply sensitivity over 3.0–3.6 V.
-7. **Bias.** Trim range and the trim calibration rule; internal against harness bias current (if BIAS_EXT is accepted); AMON monitors.
+7. **Bias.** Trim range and the trim calibration rule; internal against harness bias current over the harness steps (5.25 and 5.5 µA fine mode; 3, 5, 10 µA coarse mode); AMON monitors.
 8. **Temperature.** Chamber or hot plate, 0–85 °C at least, plus the derating of the 0.25 MHz mode.
 9. **First-order fallback mode** as a comparison.
 
@@ -250,3 +248,10 @@ The Chipalooza schedule fits this state:
 - **Overvoltage protection:** the rules ask for it on 1.8 V blocks that face the pad frame. Here only the 3.3 V analog front end faces pads, and the 1.8 V digital section talks to harness logic. **Answered (Tim Edwards, 2026-11-22):** "That is the normal configuration." The SkyWater OVT pad is an option, but it is wider than the standard pads and the harness has no way to swap it in yet. Plan: standard pads, no OVT request.
 - **Apache 2.0:** **answered (2026-11-22):** it is the standard license expected.
 - **Still open after the 2026-11-22 reply:** area, 48 MHz clock, VREF−, BIAS_EXT range, test-output rate, and (new) who tests the chips and who owns the measurement data. A follow-up was drafted on 2026-11-23. It corrects two figures from the first email: area (that email said about 72,000 µm²) and BIAS_EXT (that email said 1–20 µA, nominal 5 µA).
+- **Organiser answers, 2026-11-23 (Tim Edwards):**
+  - **Slot:** not final; expected about 1200 × 400 µm. Area is not a problem, but the aspect ratio matters, so the floorplan targets a 3:1 shape.
+  - **Harness bias:** fine mode has 250 nA steps over 0–7.75 µA, so 5.25 or 5.5 µA sit near the 5.35 µA nominal. Coarse mode has 1 µA steps over 0–31 µA. The two sources can also be combined, which reaches 10 µA. Whether to move the design nominal to a harness step (5.25, 5.5 or 5.0 µA) is a design decision for later.
+  - **Clock:** 48 MHz should work. The board will have a programmable clock part (not chosen yet) and a bypass for a function generator.
+  - **VREF−:** use a shared analog line ("makes the most sense"). That is 3 of the 4 shared lines with AMON[1:0]. The DAC charge kicks on that line remain a design point.
+  - **Test outputs:** they go through a combinational crossbar to the 12 digital I/O pads, so they are fast.
+  - **Testing:** participants test their own chips. Tim will try to pair teams that lack equipment with others who have it. Publication of the data was not addressed directly; we test, so we hold the data. The equipment list matters for the 18-bit INL and noise tests.
