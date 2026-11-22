@@ -35,8 +35,8 @@ ss/-40 O2 0.165: tol = max(0.017, 0.117) = 0.117 ppm, so V10 must lie in 0.048-0
 ## Verdict table (fill from the pickup)
 | corner / mode | O1 | O2 | third point | Delta | D43c | copies |
 |---|---|---|---|---|---|---|
-| ss/-40 prec | 1.706 | 0.165 (comb.) | V10 p2/p0/p4: PENDING; S2 p2: PENDING | O1->O2 1.54 | O1/O2 fails; O2/V10 PENDING | srdeep PENDING |
-| fs/125 prec | 0.967 | p0 0.472, p1 0.463, p2-p5 PENDING (WO-76) | V10 p0 PENDING | ~0.5 | O1/O2 fails (tol 0.097) | srknee 1.375 (1.03x, weak) |
+| ss/-40 prec | 1.706 | 0.165 (comb.) | V10 p2 0.164 (O2 p2 0.160); p0, p4, S2 p2 PENDING | O1->O2 1.54; O2->V10 p2 0.004 | O2/V10 p2 agrees (0.004 <= tol 0.117) | srdeep p2 1469.7 ppm REJECT (see note) |
+| fs/125 prec | 0.967 | p0 0.472, p1 0.463, p2 0.440, p3-p5 PENDING (WO-76) | V10 p0 PENDING | ~0.5 | O1/O2 fails (tol 0.097) | srknee 1.375 (1.03x, weak) |
 | tt/27 prec | 0.692 | PENDING | - | | | |
 | ss/125 prec | 0.698 | PENDING | - | | | |
 | tt/27 boost | WO-31 only (old netlist) | O1 PENDING | - | | | |
@@ -53,3 +53,12 @@ grep -h '"inl_ep_ppm"' /home/mempool/regr/tt/WO-76-f00f9bf/out/gb/c1_nom_O2/gbp_
 ```
 If a run_pN.sh died after its lpool: env as in `run_pN.sh`, then the combine lines at the end of that file.
 srdeep: `broken copy REJECTED (good)` and `STRONG` needed; part logs also say REJECTED per part.
+
+## Interim results (06:56 IST)
+- ss/-40 O2+V10 p2: 0.164 ppm, 3463 s, no problems, against O2 p2 0.160. Delta 0.004 ppm, within the D43c tolerance
+  of 0.117 ppm. One part only; p0 and p4 are still needed for the item 1 verdict.
+- fs/125 O2 p2 (WO-76 pool): 0.440 ppm.
+- srdeep ss/-40 O2 p2: 1469.7 ppm, healthy (no problems), which is about 1100x the gate. It rejects, but the gross size
+  suggests the 6.18 V/us copy has lost loop function (overload or clipping), not a near-gate degradation. So it shows
+  the gate catches a gross break, not that it can tell a near-gate one. Check the residual shape and the u_hat range
+  before calling it STRONG in the meaningful sense; a 0.7x floor copy may be the useful one.
