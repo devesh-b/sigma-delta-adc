@@ -1,0 +1,412 @@
+<title>Paul Thomas CT Sigma-Delta</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column (~68ch) with wide figure bands for the floorplan and signal path; tables scroll in place. */
+:root {
+  --bg: #f4f5f3;
+  --surface: #ffffff;
+  --fg: #1b2022;
+  --muted: #5a6468;
+  --line: #d6dbda;
+  --accent: #0e6a6e;
+  --accent-soft: #e0eeee;
+  --warn: #9a5a00;
+  --warn-soft: #fbefdc;
+  --blk-analog: #3d6fb6;
+  --blk-digital: #3f8a4f;
+  --blk-res: #b07a1f;
+  --blk-cap: #7a58a8;
+  --stripe: #c23b3b;
+  --blk-fill-a: 0.16;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121617; --surface: #1a2022; --fg: #e3e8e8; --muted: #9aa6a8; --line: #2f3a3c;
+    --accent: #5fc2c4; --accent-soft: #173a3b; --warn: #f0b860; --warn-soft: #3a2c14;
+    --blk-analog: #79a6e8; --blk-digital: #74c486; --blk-res: #e0aa52; --blk-cap: #b493e0; --stripe: #ef6f6f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121617; --surface: #1a2022; --fg: #e3e8e8; --muted: #9aa6a8; --line: #2f3a3c;
+  --accent: #5fc2c4; --accent-soft: #173a3b; --warn: #f0b860; --warn-soft: #3a2c14;
+  --blk-analog: #79a6e8; --blk-digital: #74c486; --blk-res: #e0aa52; --blk-cap: #b493e0; --stripe: #ef6f6f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 72px;
+}
+.wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 56px; }
+.col { max-width: 70ch; }
+header { display: grid; gap: 14px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(30px, 5vw, 44px); line-height: 1.1; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 24px; line-height: 1.25; margin: 0 0 14px; text-wrap: balance; }
+h3 { font-family: var(--font-display); font-weight: 600; font-size: 17px; margin: 0 0 6px; }
+p { margin: 0 0 12px; }
+.lede { font-size: 18px; color: var(--fg); }
+.meta { font-size: 14px; color: var(--muted); }
+code, .mono { font-family: var(--font-mono); font-size: 0.88em; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.fact { background: var(--surface); padding: 14px 16px; display: grid; gap: 2px; align-content: start; }
+.fact .k { font-size: 12px; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.fact .v { font-family: var(--font-mono); font-size: 20px; font-variant-numeric: tabular-nums; }
+.fact .n { font-size: 13px; color: var(--muted); }
+
+.status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 10px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); width: fit-content; }
+.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+figure { margin: 0; display: grid; gap: 10px; }
+.fig { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; overflow-x: auto; }
+.fig svg { display: block; width: 100%; height: auto; min-width: 640px; }
+figcaption { font-size: 14px; color: var(--muted); max-width: 80ch; }
+
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; background: var(--bg); }
+td:first-child { font-weight: 600; min-width: 150px; }
+td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.lessons { display: grid; gap: 0; border-top: 1px solid var(--line); }
+.lesson { display: grid; grid-template-columns: 2.2em 1fr; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.lesson .idx { font-family: var(--font-mono); color: var(--accent); font-size: 14px; padding-top: 2px; }
+.lesson > div { min-width: 0; }
+.lesson p { margin: 0; }
+.cost { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); }
+
+.callout { border: 1px solid var(--warn); background: var(--warn-soft); border-radius: 6px; padding: 18px 20px; display: grid; gap: 8px; }
+.callout h3 { color: var(--warn); }
+.callout p { margin: 0; }
+
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.two > div { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 18px 20px; }
+ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 2px; border: 1.5px solid currentColor; display: inline-block; }
+.sources { font-size: 13.5px; color: var(--muted); }
+.sources code { color: var(--fg); }
+
+/* svg text + shapes take theme tokens */
+svg text { font-family: var(--font-mono); fill: var(--fg); }
+svg .lbl { font-size: 6px; }
+svg .lbl-s { font-size: 4.6px; fill: var(--muted); }
+svg .an { stroke: var(--blk-analog); fill: var(--blk-analog); fill-opacity: var(--blk-fill-a); stroke-width: 0.7; }
+svg .dg { stroke: var(--blk-digital); fill: var(--blk-digital); fill-opacity: var(--blk-fill-a); stroke-width: 0.7; }
+svg .rs { stroke: var(--blk-res); fill: var(--blk-res); fill-opacity: var(--blk-fill-a); stroke-width: 0.7; }
+svg .cp { stroke: var(--blk-cap); fill: var(--blk-cap); fill-opacity: var(--blk-fill-a); stroke-width: 0.7; }
+svg .die { fill: var(--bg); stroke: var(--muted); stroke-width: 0.8; }
+svg .stripe { fill: var(--stripe); fill-opacity: 0.35; stroke: none; }
+svg .pin { fill: var(--accent); }
+svg .tied { fill: var(--muted); fill-opacity: 0.35; }
+svg .wire { stroke: var(--fg); stroke-width: 1.4; fill: none; }
+svg .wire-d { stroke: var(--blk-digital); stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+svg .box { fill: var(--surface); stroke: var(--fg); stroke-width: 1.2; }
+svg .box-a { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.2; }
+svg .t { font-size: 12px; }
+svg .ts { font-size: 10px; fill: var(--muted); }
+svg .arrow { fill: var(--fg); }
+@media (max-width: 520px) { body { font-size: 15px; } td:first-child { min-width: 120px; } }
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Reference study · ttsky-sigma-delta · TTSKY26c</div>
+  <h1>Paul Thomas's continuous-time sigma-delta on Tiny Tapeout</h1>
+  <p class="lede col">A first-order, single-ended, continuous-time (active-RC) modulator on the 3.3&nbsp;V analog rail, clocked at 50&nbsp;MHz, with no on-chip decimator. This page covers how it is built, how it is fitted to the Tiny Tapeout analog frame and pin path, and what carries over to our switched-capacitor incremental design.</p>
+  <span class="status">Simulation and extracted-layout results only. No silicon yet.</span>
+  <p class="meta">Prepared 2026-11-10 from the local clone at <code>repos/sd-analog/ttsky-sigma-delta</code> (DESIGN.md decision log, STATUS.md, params.py, info.yaml, docs/, tt_frame/, tools/asm_top.py, sim/top_tb.py).</p>
+</header>
+
+<section class="facts" aria-label="Key figures">
+  <div class="fact"><span class="k">Modulator clock</span><span class="v">50 MHz</span><span class="n">TT clk pin, level-shifted to 3.3 V</span></div>
+  <div class="fact"><span class="k">Analog pins</span><span class="v">2 · €80</span><span class="n">ua[0] VIN, ua[1] INT</span></div>
+  <div class="fact"><span class="k">Tiles</span><span class="v">2×2</span><span class="n">319.24 × 225.76 µm frame</span></div>
+  <div class="fact"><span class="k">Fast path SNDR</span><span class="v">38–40 dB</span><span class="n">extracted, OSR 25 (~1 MHz)</span></div>
+  <div class="fact"><span class="k">Precision path</span><span class="v">~57–66 dB</span><span class="n">OSR 250 (~100 kHz), window-dependent</span></div>
+  <div class="fact"><span class="k">Analog power</span><span class="v">≈ 8 mW</span><span class="n">sum of block sims (OTA 4.5, buffers 3.2)</span></div>
+</section>
+
+<section>
+  <div class="col">
+    <h2>Signal path</h2>
+    <p>The input pin feeds a 132&nbsp;kΩ poly resistor into the OTA's virtual ground. Because the input is a current summed at that node, the input range is set purely by resistor ratios: RIN maps ±1.65&nbsp;V about 1.65&nbsp;V onto ±12.5&nbsp;µA. ROFF (158.4&nbsp;kΩ to ground) cancels the standing current from the 1.65&nbsp;V mid-scale sitting above the 0.9&nbsp;V common mode. The feedback DAC is a 20&nbsp;kΩ resistor driven by five NMOS switches in return-to-zero fashion: data half-cycle to VREFP or VREFN, return half-cycle to VCM.</p>
+  </div>
+  <figure>
+    <div class="fig">
+      <svg viewBox="0 0 900 330" role="img" aria-label="Signal path block diagram">
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrow"/></marker></defs>
+        <!-- pin -->
+        <rect x="14" y="70" width="70" height="34" rx="4" class="box-a"/>
+        <text x="49" y="91" text-anchor="middle" class="t">ua[0]</text>
+        <text x="49" y="120" text-anchor="middle" class="ts">VIN 0–3.3 V</text>
+        <!-- RIN -->
+        <line x1="84" y1="87" x2="130" y2="87" class="wire"/>
+        <rect x="130" y="77" width="64" height="20" class="box"/>
+        <text x="162" y="91" text-anchor="middle" class="ts" style="fill:var(--fg)">RIN 132k</text>
+        <line x1="194" y1="87" x2="270" y2="87" class="wire"/>
+        <circle cx="270" cy="87" r="3" class="arrow"/>
+        <!-- ROFF -->
+        <line x1="240" y1="87" x2="240" y2="40" class="wire"/>
+        <rect x="200" y="20" width="80" height="20" class="box"/>
+        <text x="240" y="34" text-anchor="middle" class="ts" style="fill:var(--fg)">ROFF 158.4k</text>
+        <text x="290" y="34" class="ts">→ VGND</text>
+        <!-- OTA -->
+        <line x1="270" y1="87" x2="320" y2="87" class="wire"/>
+        <path d="M320,60 L320,150 L400,105 Z" class="box"/>
+        <text x="330" y="91" class="ts" style="fill:var(--fg)">−</text>
+        <text x="330" y="134" class="ts" style="fill:var(--fg)">+</text>
+        <text x="352" y="109" class="ts">OTA</text>
+        <line x1="300" y1="130" x2="320" y2="130" class="wire"/>
+        <text x="296" y="134" text-anchor="end" class="ts">vcm 0.9 V</text>
+        <!-- CINT -->
+        <line x1="290" y1="87" x2="290" y2="62"  class="wire" style="display:none"/>
+        <path d="M282,87 L282,180" class="wire" style="display:none"/>
+        <line x1="400" y1="105" x2="470" y2="105" class="wire"/>
+        <path d="M300,87 L300,60" class="wire" style="display:none"/>
+        <path d="M290,87 V250 M290,250 H380" class="wire" style="display:none"/>
+        <!-- cint above -->
+        <path d="M300,87 V58 H350" class="wire"/>
+        <line x1="350" y1="48" x2="350" y2="68" class="wire"/>
+        <line x1="358" y1="48" x2="358" y2="68" class="wire"/>
+        <path d="M358,58 H440 V105" class="wire"/>
+        <text x="354" y="42" text-anchor="middle" class="ts">CINT 2 pF</text>
+        <!-- INT pin -->
+        <line x1="440" y1="105" x2="440" y2="190" class="wire"/>
+        <rect x="405" y="190" width="70" height="34" rx="4" class="box-a"/>
+        <text x="440" y="211" text-anchor="middle" class="t">ua[1]</text>
+        <text x="440" y="240" text-anchor="middle" class="ts">INT monitor (unbuffered)</text>
+        <!-- comparator -->
+        <rect x="470" y="80" width="120" height="50" class="box"/>
+        <text x="530" y="101" text-anchor="middle" class="t">StrongARM</text>
+        <text x="530" y="118" text-anchor="middle" class="ts">PMOS in · NAND SR</text>
+        <text x="530" y="146" text-anchor="middle" class="ts">clocked on clkb33</text>
+        <!-- DFF + odrv -->
+        <line x1="590" y1="95" x2="640" y2="95" class="wire"/>
+        <rect x="640" y="75" width="80" height="40" class="box"/>
+        <text x="680" y="99" text-anchor="middle" class="t">DFF</text>
+        <line x1="720" y1="95" x2="750" y2="95" class="wire"/>
+        <rect x="750" y="75" width="70" height="40" class="box"/>
+        <text x="785" y="93" text-anchor="middle" class="t">odrv</text>
+        <text x="785" y="107" text-anchor="middle" class="ts">3.3→1.8</text>
+        <line x1="820" y1="88" x2="840" y2="88" class="wire-d" marker-end="url(#ah)"/>
+        <line x1="820" y1="104" x2="840" y2="104" class="wire-d" marker-end="url(#ah)"/>
+        <text x="846" y="91" class="ts" style="fill:var(--fg)">uo[0] Q</text>
+        <text x="846" y="108" class="ts" style="fill:var(--fg)">uo[1] Q̄</text>
+        <!-- latch to DAC -->
+        <path d="M560,130 V275 H330" class="wire"/>
+        <text x="570" y="200" class="ts">latch drives switches</text>
+        <!-- DAC -->
+        <rect x="200" y="255" width="130" height="40" class="box"/>
+        <text x="265" y="273" text-anchor="middle" class="t">RZ DAC</text>
+        <text x="265" y="288" text-anchor="middle" class="ts">5 NMOS switches</text>
+        <text x="265" y="314" text-anchor="middle" class="ts">vrefn 0.4 · vcm 0.9 · vrefp 1.4</text>
+        <path d="M200,275 H150 V200" class="wire"/>
+        <rect x="140" y="160" width="20" height="40" class="box"/>
+        <text x="132" y="184" text-anchor="end" class="ts" style="fill:var(--fg)">RDAC 20k</text>
+        <path d="M150,160 V125 H255 V87" class="wire"/>
+        <!-- clock -->
+        <rect x="640" y="200" width="110" height="40" class="box"/>
+        <text x="695" y="218" text-anchor="middle" class="t">level shift</text>
+        <text x="695" y="232" text-anchor="middle" class="ts">1.8 → 3.3 V</text>
+        <line x1="790" y1="220" x2="750" y2="220" class="wire-d" marker-end="url(#ah)"/>
+        <text x="796" y="224" class="ts" style="fill:var(--fg)">clk 50 MHz</text>
+        <path d="M640,220 H600 V150 H590" class="wire-d" marker-end="url(#ah)"/>
+        <path d="M680,200 V115" class="wire-d" marker-end="url(#ah)"/>
+        <text x="610" y="262" class="ts">clk33 / clkb33 also time the RZ window</text>
+      </svg>
+    </div>
+    <figcaption>Simplified signal path. Solid lines are 3.3 V analog nets; dashed lines are clock and digital. The comparator's SR latch drives the DAC switches directly; the DFF only retimes the bitstream for the output pins.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Blocks and measured numbers</h2>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>Block</th><th>Implementation</th><th>Key numbers</th></tr></thead>
+      <tbody>
+        <tr><td>OTA (integrator)</td><td>Folded cascode, PMOS input pair, thick-oxide 5 V devices, 250 µm input width</td><td class="num">A0 65 dB · GBW 209→119 MHz · PM 58→46° (schematic → extracted) · 1.37 mA</td></tr>
+        <tr><td>Loop passives</td><td>High-res poly RIN, ROFF (0.35 µm bin), RDAC (1.41 µm bin); MiM CINT</td><td class="num">132k · 158.4k · 20k · 2 pF · k = 0.25 V/cycle</td></tr>
+        <tr><td>Comparator</td><td>StrongARM, PMOS input, precharge to VSS, inverter-buffered NAND SR latch</td><td class="num">τ 77 ps · worst 1.18 ns · σ<sub>os</sub> 13.6 mV · 71 µW</td></tr>
+        <tr><td>Retimer</td><td>Static master-slave DFF with transmission gates</td><td class="num">clk-to-Q 0.37 ns</td></tr>
+        <tr><td>References</td><td>Poly ladder off VAPWR (190k/50k/50k/40k) into three 5T PMOS-input unity followers, 5 pF MiM decap each</td><td class="num">0.4 / 0.9 / 1.4 V · Zout ≈ 754 Ω · 3.2 mW total</td></tr>
+        <tr><td>Bias</td><td>Beta-multiplier (constant-gm), cascoded mirrors, startup that steps aside once running</td><td class="num">~19 µA master</td></tr>
+        <tr><td>Clock level shifter</td><td>Cross-coupled 1.8→3.3 V, thin-oxide input inverter, buffered complementary outputs</td><td class="num">0.22–0.92 ns · duty error ≤ 3% · ~300 µW</td></tr>
+        <tr><td>Output drivers</td><td>5 V-gate stage on the 1.8 V rail then thin-oxide buffers</td><td class="num">≤ 0.4 ns · Q/Q̄ skew ≤ 407 ps</td></tr>
+        <tr><td>Decimator</td><td>None on chip. FPGA (PolarFire SoC) runs dual sinc³ paths on the one bitstream</td><td class="num">OSR 25 and OSR 250</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <h2>Floorplan and pin map</h2>
+    <p>He assembled the top cell directly in frame coordinates, so the cell's die matches the 2×2 3.3&nbsp;V template and its pin legs land on the template's exact pin positions. Power arrives on three full-height met4 stripes. The blocks alone would fit a 1×2, but routing corridors and clearance rules spread the layout to about 315&nbsp;µm wide, so he paid for 2×2.</p>
+  </div>
+  <figure>
+    <div class="fig">
+      <svg viewBox="-14 -26 350 282" role="img" aria-label="Top-level floorplan with pins">
+        <rect x="0" y="0" width="319.24" height="225.76" class="die"/>
+        <!-- stripes -->
+        <rect x="221" y="0" width="2" height="225.76" class="stripe"/>
+        <rect x="256" y="0" width="2" height="225.76" class="stripe"/>
+        <rect x="310" y="0" width="2" height="225.76" class="stripe"/>
+        <!-- blocks: svg y = 225.76 - y_top -->
+        <rect x="12" y="126.25" width="123.61" height="87.51" class="an"/><text x="73.8" y="172" text-anchor="middle" class="lbl">OTA</text>
+        <rect x="142" y="89.76" width="88.36" height="124" class="an"/><text x="186" y="154" text-anchor="middle" class="lbl">bias</text>
+        <rect x="236" y="165.17" width="43.57" height="48.59" class="an"/><text x="257.8" y="191" text-anchor="middle" class="lbl">bufn</text>
+        <rect x="236" y="113.17" width="43.57" height="48.59" class="an"/><text x="257.8" y="139" text-anchor="middle" class="lbl">bufc</text>
+        <rect x="236" y="61.17" width="43.57" height="48.59" class="an"/><text x="257.8" y="87" text-anchor="middle" class="lbl">bufp</text>
+        <rect x="285" y="150.96" width="29.53" height="62.8" class="rs"/><text x="299.8" y="184" text-anchor="middle" class="lbl-s">ladder</text>
+        <rect x="285" y="96.99" width="10.63" height="50.77" class="rs"/>
+        <rect x="300" y="96.99" width="10.63" height="50.77" class="rs"/>
+        <rect x="285" y="53.68" width="10.63" height="42.08" class="rs"/>
+        <rect x="12" y="102.42" width="6.16" height="19.34" class="rs"/>
+        <rect x="24" y="101.01" width="6.16" height="22.75" class="rs"/>
+        <rect x="42" y="106.57" width="12.52" height="15.19" class="rs"/>
+        <text x="33" y="98" text-anchor="middle" class="lbl-s">RIN ROFF RDAC</text>
+        <rect x="59" y="109.18" width="2.8" height="12.58" class="dg"/>
+        <rect x="66" y="109.18" width="2.8" height="12.58" class="dg"/>
+        <rect x="73" y="109.18" width="2.8" height="12.58" class="dg"/>
+        <rect x="80" y="109.18" width="2.8" height="12.58" class="dg"/>
+        <rect x="87" y="109.18" width="2.8" height="12.58" class="dg"/>
+        <text x="96" y="118" class="lbl-s">DAC sw</text>
+        <rect x="12" y="76.36" width="57.65" height="20.4" class="cp"/><text x="40.8" y="89" text-anchor="middle" class="lbl">CINT</text>
+        <rect x="74" y="76.36" width="57.65" height="20.4" class="cp"/><text x="102.8" y="89" text-anchor="middle" class="lbl">cdec1</text>
+        <rect x="12" y="38.91" width="66.9" height="33.85" class="dg"/><text x="45.4" y="58" text-anchor="middle" class="lbl">comp</text>
+        <rect x="85" y="40.29" width="40.95" height="32.47" class="dg"/><text x="105.5" y="58" text-anchor="middle" class="lbl">lvl</text>
+        <rect x="12" y="12.36" width="57.65" height="20.4" class="cp"/><text x="40.8" y="25" text-anchor="middle" class="lbl">cdec2</text>
+        <rect x="78" y="12.36" width="57.65" height="20.4" class="cp"/><text x="106.8" y="25" text-anchor="middle" class="lbl">cdec3</text>
+        <rect x="142" y="55.11" width="59.1" height="30.65" class="dg"/><text x="171.5" y="72" text-anchor="middle" class="lbl">dff</text>
+        <rect x="142" y="17.27" width="31.6" height="33.49" class="dg"/><text x="157.8" y="36" text-anchor="middle" class="lbl-s">odrv Q̄</text>
+        <rect x="178" y="28.16" width="24.36" height="22.6" class="cp"/><text x="190.2" y="41" text-anchor="middle" class="lbl-s">cflt</text>
+        <rect x="206" y="17.27" width="31.6" height="33.49" class="dg"/><text x="221.8" y="36" text-anchor="middle" class="lbl-s">odrv Q</text>
+        <rect x="270" y="11.16" width="24.36" height="22.6" class="cp"/><text x="282.2" y="24" text-anchor="middle" class="lbl-s">cflt</text>
+        <!-- tied unused outputs, top edge -->
+        <rect x="15.18" y="-3" width="57.96" height="3" class="tied"/>
+        <text x="44" y="-6" text-anchor="middle" class="lbl-s">22 unused outputs → VGND</text>
+        <!-- top pins -->
+        <rect x="74.9" y="-6" width="2" height="6" class="pin"/>
+        <rect x="77.66" y="-6" width="2" height="6" class="pin"/>
+        <text x="80" y="-15" class="lbl-s" style="fill:var(--accent)">uo[1] uo[0]</text>
+        <rect x="127.34" y="-6" width="2" height="6" class="pin"/>
+        <text x="128.3" y="-9" text-anchor="middle" class="lbl-s" style="fill:var(--accent)">clk</text>
+        <!-- bottom pins -->
+        <rect x="116.3" y="225.76" width="2" height="6" class="pin"/>
+        <rect x="135.62" y="225.76" width="2" height="6" class="pin"/>
+        <text x="113" y="240" text-anchor="end" class="lbl-s" style="fill:var(--accent)">ua[1] INT</text>
+        <text x="140" y="240" class="lbl-s" style="fill:var(--accent)">ua[0] VIN</text>
+        <!-- stripe labels -->
+        <text x="222" y="248" text-anchor="middle" class="lbl-s" style="fill:var(--stripe)">VDPWR</text>
+        <text x="257" y="248" text-anchor="middle" class="lbl-s" style="fill:var(--stripe)">VGND</text>
+        <text x="311" y="248" text-anchor="middle" class="lbl-s" style="fill:var(--stripe)">VAPWR</text>
+        <!-- dims -->
+        <text x="-4" y="113" text-anchor="end" class="lbl-s" transform="rotate(-90 -4 113)">225.76 µm</text>
+      </svg>
+    </div>
+    <div class="legend">
+      <span style="color:var(--blk-analog)"><i class="sw"></i>analog blocks</span>
+      <span style="color:var(--blk-digital)"><i class="sw"></i>clocked / digital / switches</span>
+      <span style="color:var(--blk-res)"><i class="sw"></i>poly resistors</span>
+      <span style="color:var(--blk-cap)"><i class="sw"></i>MiM caps</span>
+      <span style="color:var(--stripe)"><i class="sw"></i>met4 power stripes</span>
+      <span style="color:var(--accent)"><i class="sw"></i>used pins</span>
+    </div>
+    <figcaption>Drawn to scale from <code>PLACE</code> in <code>tools/asm_top.py</code> and cell boxes in <code>mag/asm_bbox.json</code>; pin positions from <code>tt_frame/build_frame.tcl</code>. Top of the drawing is the frame's top edge. Routing is omitted.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="col">
+    <h2>How the design is fitted to Tiny Tapeout</h2>
+    <p>Each row pairs a platform constraint with the choice it drove.</p>
+  </div>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>TT constraint</th><th>What he did</th></tr></thead>
+      <tbody>
+        <tr><td>Analog pin path: under 500 Ω and 5 pF through <code>tt_asw_3v3</code></td><td>The input is a 132k resistor into a virtual ground. With no switched-capacitor sampling there is no kickback through the mux, and the 500 Ω switch is about a 0.4% gain error. The resistor input also filters aliases on its own.</td></tr>
+        <tr><td>Analog pins cost €40 each for two, then €100 each</td><td>Two pins. VOFF and vcm/vrefp monitor pins were added (5 pins, €380) and removed the same day (back to €80). The references are inferred from the transfer function instead: ones-density 0.5 gives vcm, the full-scale points give the vrefp−vcm span, and a VAPWR sweep checks ratiometry.</td></tr>
+        <tr><td>Six analog pins at most; digital pins are free</td><td>Clock on the normal <code>clk</code> pin; bitstream on <code>uo[0]/uo[1]</code> as complementary Q/Q̄ for a pseudo-differential FPGA receiver. Nothing at 50 MHz goes through the analog mux.</td></tr>
+        <tr><td>Unequal rise and fall delays on TT IO</td><td>The feedback DAC never leaves the chip. RZ makes edge errors identical every cycle, so they become a fixed gain error. Clock duty error is also a gain shift, and the level shifter is gated at ≤ 3%. The bitstream is captured one bit per clock, so pin edge shape does not enter the signal.</td></tr>
+        <tr><td>Clock speed through the TT clock path</td><td>50 MHz, based on the urish charge-pump projects measuring 62–100 MHz through that path in silicon. The stated fallback is a lower fs, not an output demultiplexer.</td></tr>
+        <tr><td>1.8 V digital IO, 3.3 V analog core</td><td>1.8→3.3 V cross-coupled level shifter on the clock. Output drivers use a 5 V-gate stage on the 1.8 V rail so no thin-oxide gate sees 3.3 V.</td></tr>
+        <tr><td>Unused outputs must be tied low</td><td>Precheck does not check this. After submitting he found 22 floating outputs and tied them to VGND with one met4 bar.</td></tr>
+        <tr><td>Precheck power-port rule</td><td>Power ports must reach within 10 µm of both tile edges, so each stripe's port label covers the full stripe height.</td></tr>
+        <tr><td>Precheck gaps on sky130</td><td>TT's antenna deck runs only for gf180, so he runs magic <code>antennacheck</code> himself. He extracts the framed cell and proves pin connectivity with a union-find over the .ext merge and equiv records, because precheck checks pin geometry only.</td></tr>
+        <tr><td>Config key renamed upstream</td><td><code>uses_vapwr</code> became <code>uses_3v3</code> with no fallback, which failed his shuttle PR on all three prechecks. info.yaml now sets both keys.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="col">
+    <h2>Lessons he paid for</h2>
+    <p>Each item came from a failure in his own flow and is recorded in DESIGN.md with a date.</p>
+  </div>
+  <div class="lessons">
+    <div class="lesson"><span class="idx">1</span><div><h3>Comparator sampling instant is part of loop timing</h3><p>A StrongARM samples when its tail turns on, which was the falling edge of clk33. That put the decision half a cycle earlier than the behavioural models assumed. The fix was to clock the comparator on clkb33 and drive the DAC switches from its SR latch.</p><p class="cost">cost ≈ 4 dB fast-path SNDR · 2026-07-25</p></div></div>
+    <div class="lesson"><span class="idx">2</span><div><h3>Output polarity hidden by self-consistent checks</h3><p>The DFF's Q and Q̄ were swapped. Golden netlist, schematic and LVS were all generated from the same subcircuit, so they agreed with each other. The first closed-loop extracted simulation railed. Block testbenches now check output sense, not only timing.</p><p class="cost">loop railed · 2026-07-20</p></div></div>
+    <div class="lesson"><span class="idx">3</span><div><h3>Clock edge rate inside the chip</h3><p>The comparator saw a 545 ps clk33 rise after level shifter and wiring; the block had been verified with 100 ps edges. Doubling the level shifter's output PMOS brought it to 317 ps.</p><p class="cost">cost 1.3 dB · 2026-07-25</p></div></div>
+    <div class="lesson"><span class="idx">4</span><div><h3>Estimator variance sets the gate</h3><p>512-bit windows scattered ±3 dB between runs of the same netlist, larger than the effects being chased. He moved to 2048-bit windows and sets each gate 2 dB below the measured value.</p><p class="cost">a lucky 36.2 dB draw passed a netlist whose real value was 32.3 dB</p></div></div>
+    <div class="lesson"><span class="idx">5</span><div><h3>Transient runs contain no device noise</h3><p>A separate <code>.noise</code> bench found the OTA 1/f corner at 631 kHz, covering the whole precision band. Input-referred noise is 126 µV against a 351 µV quantization floor, so about 0.5 dB.</p><p class="cost">2026-07-26</p></div></div>
+    <div class="lesson"><span class="idx">6</span><div><h3>Magic reports DRC wrongly in both directions</h3><p>A freshly loaded cell needs <code>select top cell; expand</code> before DRC, or hierarchy checks are skipped and it reads clean. <code>writeall force</code> after <code>load</code> halves coordinates in unmodified subcells and creates hundreds of fake violations.</p><p class="cost">894 fake violations chased · 2026-07-19</p></div></div>
+    <div class="lesson"><span class="idx">7</span><div><h3>Extraction output order changes run to run</h3><p>ext2spice writes parasitic caps in hash order, so each extraction gave ngspice a differently ordered matrix and an occasional convergence failure. He now sorts the netlist into a canonical form, commits it, and diffs it in CI.</p><p class="cost">nightly aborts · 2026-08-01</p></div></div>
+  </div>
+</section>
+
+<section class="callout">
+  <h3>One gap: the integrator monitor pin load</h3>
+  <p><code>sim/top_tb.py</code> line 117 loads ua[1] with 50 fF. On silicon the integrator output drives the TT mux path directly: under 500 Ω and under 5 pF, plus board and probe. The OTA was sized for about 2.2 pF total (1.5 pF plus 0.72 pF extracted parasitic), and extracted PM is already 46°.</p>
+  <p>A few pF more, partly isolated by the 500 Ω switch, could lower GBW and phase margin. The size of the effect is not simulated. If we expose an integrator monitor, buffer it (TilesOS does) or simulate the real pin load.</p>
+</section>
+
+<section>
+  <h2>What this means for our design</h2>
+  <div class="two">
+    <div>
+      <h3>Carries over</h3>
+      <ul>
+        <li>Ratiometric references: ladder, followers and decap, with decap sized so each pulse sees a recovered reference.</li>
+        <li>Pin plan: signal on an analog pin, clock and bitstream on digital pins, references inferred rather than bought.</li>
+        <li>Frame hardening: tie unused outputs, run antenna checks, prove frame connectivity, set both <code>uses_vapwr</code> and <code>uses_3v3</code>.</li>
+        <li>Verification habits: closed-loop polarity check, comparator sampling instant, estimator variance, separate noise bench, canonical extracted netlist.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Does not carry over</h3>
+      <ul>
+        <li>His choice of CT is what makes the analog pin path harmless. Our switched-capacitor input samples through it, so the 500 Ω / 5 pF path belongs in the sampling settling budget.</li>
+        <li>He has no on-chip decimator; <code>src/project.v</code> is empty. Our decimator uses the digital area he leaves unused.</li>
+        <li>Single-ended with no CMFB. Our fully-differential OTA needs CMFB, which none of the TT references has done.</li>
+        <li>First-order pattern tones limit his precision path; our higher-order incremental loop avoids that class.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="sources">
+  <h3>Sources in the local clone</h3>
+  <p><code>DESIGN.md</code> decision log (2026-07-05 to 2026-08-01) · <code>STATUS.md</code> · <code>params.py</code> · <code>info.yaml</code> · <code>docs/02-architecture.md</code>, <code>02b-datasheet.md</code>, <code>09b-testplan.md</code> · <code>tt_frame/build_frame.tcl</code> · <code>tools/asm_top.py</code> · <code>mag/asm_bbox.json</code> · <code>sim/top_tb.py</code>. Design repo: <a href="https://gitlab.com/pthomas1/sigma-delta">gitlab.com/pthomas1/sigma-delta</a>.</p>
+</section>
+
+</div>
