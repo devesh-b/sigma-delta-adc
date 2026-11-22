@@ -236,7 +236,7 @@ The Chipalooza schedule fits this state:
   - the equipment list and CVs, sent separately;
   - confirm Apache 2.0.
 - **Questions for the organisers** (chipalooza@opencircuitdesign.com or fossi-chat #chipalooza):
-  - the slot area (this block needs about 72,000 µm² today);
+  - the slot area (the full block is likely more than 100,000 µm² as sized; OTA1 layout alone is about 27,000 µm²);
   - whether a 48 MHz clock is available on a control input;
   - the VREF− request (4th pad or shared line; optional);
   - the BIAS_EXT current value and range;
@@ -246,5 +246,5 @@ The Chipalooza schedule fits this state:
   - still an option: AMON monitor taps;
   - VREF− is a request, not a dependency (baseline is tied to VSSA).
 - **BIAS_EXT current range:** nominal 5.35 µA; the gated range is 2.5–10 µA (0.5× to 2× the OTA bias), with 1 µA and 20 µA reported as info. Confirm the value with the harness.
-- **Same core on Tiny Tapeout (Dec 1):** you decide whether to mention it. It could give early silicon data before the Chipalooza tapeout.
+- **Tiny Tapeout:** dropped as a target (D101); the design does not fit the TT 2×2 tile as sized. Slot area matters: OTA1 alone is about 27,000 µm² in layout today.
 - **Overvoltage protection:** the rules ask for it on 1.8 V blocks that face the pad frame. Here only the 3.3 V analog front end faces pads, and the 1.8 V digital section talks to harness logic. Confirm this with the harness.
