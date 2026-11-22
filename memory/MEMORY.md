@@ -11,3 +11,8 @@
 - [Full context snapshot](../CONTEXT.md) — ~/projects/tt/CONTEXT.md: all decisions, learnings, corrections, model results, next steps
 - [Sandbox incident 2026-11-07](project-sandbox-incident-2026-11-07.md) — first sync deleted AlphaOneSoC files in /home/mempool/tt; tt lives in tt-sd
 - [No load gate](feedback-no-load-gate.md) — don't wait for sandbox load; run now, still ≤5 own procs, nice+timeout
+- [Load-adaptive parallel](feedback-load-adaptive-parallel.md) — size sandbox parallelism by load via scripts/lpool.sh; single-thread ngspice
+- [Agent resume vs new](feedback-agent-resume-vs-new.md) — new WO → new agent; rate-limited/interrupted agent → resume via SendMessage
+- [Decision quality](feedback-decision-quality.md) — verify bench can fail + data present; rules→user; one PnR change; recheck cross-block budgets; STATE snapshot
+- [Layout after schematic](feedback-layout-after-schematic.md) — block layout only after its schematic is verified (D100)
+- [Sandbox memory cap](feedback-sandbox-memory-cap.md) — runs limited by RAM: top ngspice ~4 GB each, ≤2 at once, keep 4 GB free; 16 GB box hangs
