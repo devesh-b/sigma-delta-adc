@@ -60,7 +60,7 @@ The final scaling (acc2 + 4·acc1, then normalisation) and chop demodulation are
 
 ## 3. Interface and I/O (including test ports)
 
-The block's own port list is the IP interface. The mapping to the Chipalooza slot follows the resources in rules item 12 and is a proposal: slot size and I/O configuration are still TBD in the harness.
+The block's own port list is the IP interface. The mapping to the Chipalooza slot follows the resources in rules item 12 and is a proposal. The organisers expect a slot of about 1200 × 400 µm (not final), with the test outputs reaching the digital pads through a combinational crossbar.
 
 **Supplies.**
 
@@ -210,7 +210,7 @@ Results will be published with the measurement scripts in the repository.
   - the reference decoder.
 - Standalone layout sized to the block, not expanded to fill the slot.
 
-## 8. Status (2026-11-21)
+## 8. Status (2026-11-23)
 
 - **Specification:** frozen, with a change log. Full behavioural model and golden vectors exist.
 - **Schematics:** done for all blocks. xschem schematics match the generator netlists (11 of 11 cells) and each match has a broken copy.
@@ -218,8 +218,10 @@ Results will be published with the measurement scripts in the repository.
 - **OTA2:** precision rows pass. The fast-mode output swing at hot corners is open.
 - **Comparator:** final revision selected.
 - **Bias reference:** DC and start-up rows pass. Trim and boost rows are being fixed.
-- **Digital macro:** hardened, DRC, LVS and antenna clean, gate-level simulation in progress.
-- **Layout:** MIM capacitor arrays and the bias resistor are DRC/LVS clean. The active cells and the top-level assembly are in progress.
+- **Digital macro:** hardened, DRC, LVS and antenna clean; gate-level simulation with SDF passes (5 of 5).
+- **Layout:** MIM capacitor arrays and the bias resistor are DRC/LVS clean. The OTA1 layout is LVS clean, with two DRC items left. Further block layout starts as each schematic is signed off.
+- **Full-block transistor-level simulation** (analog at transistor level, ideal digital loop): start-up and conversions are correct at the nominal corner (0.5 gives 0.500014; −0.3 gives −0.299978). A bias-current settling check is open.
+- **Chipalooza additions:** the byte-select read bus is verified (RTL testbench, mutants rejected). The BIAS_EXT selector passes at the ss/−40 °C and tt/27 °C corners; ff/125 °C leakage is being fixed. The SPI read port is specified, not yet designed.
 - **Not started:** full post-layout verification.
 
 The Chipalooza schedule fits this state:
@@ -234,7 +236,8 @@ The Chipalooza schedule fits this state:
 | Digital-to-analog coupling in one block | Placement separation, guard rings, quiet sampling instants; measured on silicon |
 | Fast-mode current close to the 200 µA budget | Bias-boost trim; fast mode can be dropped to precision-only without other changes |
 | Precision-layout parasitics (MIM bottom plate and voltage coefficient are not in the model) | Fully differential, bottom-plate sampling; PEX at all corners; silicon INL |
-| Slot I/O limits (VREF− Kelvin, 12 outputs) | Byte-wide read bus; VREF− options for organiser decision |
+| Slot I/O limits (VREF− Kelvin, 12 outputs) | Byte-wide read bus plus SPI read port; VREF− on a shared analog line (agreed with the organisers) |
+| Slot aspect ratio (about 1200 × 400 µm expected) | Floorplan planned as a long strip, about 3:1 |
 
 ---
 ## Notes for the author (delete before sending)
