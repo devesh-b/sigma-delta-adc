@@ -247,4 +247,6 @@ The Chipalooza schedule fits this state:
   - VREF− is a request, not a dependency (baseline is tied to VSSA).
 - **BIAS_EXT current range:** nominal 5.35 µA; the gated range is 2.5–10 µA (0.5× to 2× the OTA bias), with 1 µA and 20 µA reported as info. Confirm the value with the harness.
 - **Tiny Tapeout:** dropped as a target (D101); the design does not fit the TT 2×2 tile as sized. Slot area matters: OTA1 alone is about 27,000 µm² in layout today.
-- **Overvoltage protection:** the rules ask for it on 1.8 V blocks that face the pad frame. Here only the 3.3 V analog front end faces pads, and the 1.8 V digital section talks to harness logic. Confirm this with the harness.
+- **Overvoltage protection:** the rules ask for it on 1.8 V blocks that face the pad frame. Here only the 3.3 V analog front end faces pads, and the 1.8 V digital section talks to harness logic. **Answered (Tim Edwards, 2026-11-22):** "That is the normal configuration." The SkyWater OVT pad is an option, but it is wider than the standard pads and the harness has no way to swap it in yet. Plan: standard pads, no OVT request.
+- **Apache 2.0:** **answered (2026-11-22):** it is the standard license expected.
+- **Still open after the 2026-11-22 reply:** area, 48 MHz clock, VREF−, BIAS_EXT range, test-output rate, and (new) who tests the chips and who owns the measurement data. A follow-up was drafted on 2026-11-23. It corrects two figures from the first email: area (that email said about 72,000 µm²) and BIAS_EXT (that email said 1–20 µA, nominal 5 µA).
