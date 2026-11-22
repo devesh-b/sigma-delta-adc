@@ -28,6 +28,15 @@
 #   PRIO=high (default) tries the slots from the top (GMAX-1 .. 0).
 #   PRIO=low may only use slots 0 .. LOWSLOTS-1 (default 2), so at least GMAX-LOWSLOTS slots
 #   always stay free for high-priority (fast) pools.
+# Memory gate (user request 2026-11-22: four full-top ngspice runs at 3-4.4 GB each filled the
+#   16 GB box and hung it). A job starts only when
+#     MemAvailable - pending >= JOBMEM + MEMRESERVE      (all in MB)
+#   pending = for each of our running jobs, max(0, JOBMEM - RSS of its process tree), so jobs that
+#   were just launched and have not grown yet still count as JOBMEM. Defaults: JOBMEM=4500 (a
+#   full-top transient), MEMRESERVE=4096. Light pools (block benches, RTL) may set a smaller
+#   JOBMEM. MemAvailable is read live, so added RAM is used without a script change. Jobs of
+#   other pools are counted only through MemAvailable. The gate does not stop a running job
+#   from growing past its estimate.
 # Resume: SKIPDONE=1 skips job i when LOGDIR/job_i.log already ends with EXIT=0, or has no EXIT
 #   line yet (a job left running by a stopped pool). Jobs that ended with EXIT!=0 are rerun.
 #   Before POOL_DONE the pool waits until every skipped-but-running job has written its EXIT line.
@@ -44,12 +53,14 @@ SLOTDIR=${SLOTDIR:-/home/mempool/regr/tt/.lpool_slots}
 PRIO=${PRIO:-high}
 LOWSLOTS=${LOWSLOTS:-2}
 SKIPDONE=${SKIPDONE:-0}
+JOBMEM=${JOBMEM:-4500}
+MEMRESERVE=${MEMRESERVE:-4096}
 mkdir -p "$LOGDIR" "$SLOTDIR"
 export OMP_NUM_THREADS=1
 [ -f .spiceinit ] || printf 'set num_threads=1\n' > .spiceinit
 
 mapfile -t JOBS < <(grep -v '^[[:space:]]*\(#\|$\)' "$JOBFILE")
-echo "lpool start $(date +%T) jobs=${#JOBS[@]} nproc=$NPROC max=$MAXJOBS prio=$PRIO skipdone=$SKIPDONE" >> "$LOGDIR/pool.status"
+echo "lpool start $(date +%T) jobs=${#JOBS[@]} nproc=$NPROC max=$MAXJOBS prio=$PRIO skipdone=$SKIPDONE jobmem=${JOBMEM}M memreserve=${MEMRESERVE}M" >> "$LOGDIR/pool.status"
 
 # Our running jobs are tracked as an explicit PID list checked with kill -0, in the main shell.
 # (The old `jobs -rp` inside $(...) ran in a subshell and miscounted, so the pool over-launched;
@@ -70,6 +81,27 @@ compute_slots() {
   NSLOT=$(( NRUN + free ))
   [ "$NSLOT" -lt 1 ] && NSLOT=1
   [ "$NSLOT" -gt "$MAXJOBS" ] && NSLOT=$MAXJOBS
+}
+
+AVAIL=0
+PEND=0
+mem_ok() {   # 0 when MemAvailable minus the not-yet-grown share of our jobs leaves room for one more
+  AVAIL=$(awk '/^MemAvailable:/{print int($2/1024)}' /proc/meminfo)
+  PEND=0
+  if [ "${#PIDS[@]}" -gt 0 ]; then
+    PEND=$(ps -eo pid=,ppid=,rss= | awk -v roots="${PIDS[*]}" -v jm="$JOBMEM" '
+      { rss[$1]=$3; kids[$2]=kids[$2] " " $1 }
+      END {
+        n=split(roots, r, " "); tot=0
+        for (i=1; i<=n; i++) {
+          head=1; tail=1; Q[1]=r[i]; s=0
+          while (head<=tail) { p=Q[head++]; s+=rss[p]; m=split(kids[p], c, " "); for (j=1; j<=m; j++) Q[++tail]=c[j] }
+          mb=int(s/1024); if (mb<jm) tot+=jm-mb
+        }
+        print tot
+      }')
+  fi
+  [ $(( AVAIL - PEND )) -ge $(( JOBMEM + MEMRESERVE )) ]
 }
 
 SLOTFD=
@@ -97,16 +129,24 @@ for j in "${JOBS[@]}"; do
       continue
     fi
   fi
+  MEMWAIT=0
   while :; do
     count_running; compute_slots
-    if [ "$NRUN" -lt "$NSLOT" ] && acquire_gslot; then break; fi
+    if [ "$NRUN" -lt "$NSLOT" ]; then
+      if ! mem_ok; then
+        [ "$MEMWAIT" = 0 ] && echo "memwait $i $(date +%T) avail=${AVAIL}M pending=${PEND}M need=$((JOBMEM+MEMRESERVE))M" >> "$LOGDIR/pool.status"
+        MEMWAIT=1
+      elif acquire_gslot; then
+        break
+      fi
+    fi
     sleep "$POLL"
   done
   ( nice -n 10 bash -c "$j" > "$LOGDIR/job_$i.log" 2>&1; echo "EXIT=$?" >> "$LOGDIR/job_$i.log" ) &
   PIDS+=("$!")
   exec {SLOTFD}>&-   # the job keeps the inherited lock; ours is closed
   count_running
-  echo "launch $i $(date +%T) running=$NRUN slots=$NSLOT gslot=$GSLOT/$GMAX load=$(cut -d' ' -f1 /proc/loadavg) :: $j" >> "$LOGDIR/pool.status"
+  echo "launch $i $(date +%T) running=$NRUN slots=$NSLOT gslot=$GSLOT/$GMAX load=$(cut -d' ' -f1 /proc/loadavg) avail=${AVAIL}M :: $j" >> "$LOGDIR/pool.status"
   sleep 30   # let load1 catch up before the next decision
 done
 wait
