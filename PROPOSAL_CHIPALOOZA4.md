@@ -42,10 +42,12 @@ The sky130 analog ΣΔ designs found in an open-source survey are all first orde
 
 **SPI read port** (Chipalooza wrapper `cz_spi`, outside the digital macro, like `cz_bus8`). The block can be read by any microcontroller or FPGA over standard SPI, as well as through the parallel byte bus:
 - SPI target, mode 0 (CPOL 0, CPHA 0), MSB first, read-only. Configuration stays on the existing serial configuration port.
-- On the falling edge of CS_n, the wrapper snapshots the whole frame from the hold register into a 96-bit shift register in the clk domain: status (16 bits), acc1 (32), acc2 (32), tag (16). SCLK then shifts the snapshot out on MISO. The snapshot does not change while CS_n is low, so SCLK may be asynchronous to clk.
-- frame_ready acts as the data-ready (DRDY) line. Raising CS_n after a full 96-bit read acknowledges the frame, so `rd` is not needed in SPI mode.
-- SCLK up to 12 MHz (clk/4 at 48 MHz). A frame read takes about 8 µs, so the 60 kSPS fast mode (16.7 µs frame) can still be read.
-- CS_n setup to the first SCLK edge is at least 4 clk cycles (about 83 ns at 48 MHz), for the synchroniser and the snapshot.
+- On the falling edge of CS_n, the wrapper snapshots the whole frame from the hold register into a 96-bit shift register in the clk domain. The bits go out in the order status (16 bits), acc1 (32), acc2 (32), tag (16). The wrapper captures tag first and status last, and retakes the snapshot if their frame counters differ, so a frame is never mixed. SCLK then shifts the snapshot out on MISO. The snapshot does not change while CS_n is low, so SCLK may be asynchronous to clk.
+- frame_ready acts as the data-ready (DRDY) line: a level, one per sub-conversion. The host pairs chop phases and drops invalid frames using the tag. The wrapper acknowledges the frame as soon as it has taken the snapshot, and a partial read can be repeated. A lost frame shows as a gap in the frame counter (tag).
+- SCLK up to 12 MHz, independent of clk. The limit is the pad and crossbar round trip (to be confirmed in post-layout timing). A frame read takes 8 µs at 12 MHz, so the 60 kSPS fast mode (16.5 µs frame) can still be read.
+- CS_n setup to the first SCLK edge is at least 32 clk cycles (about 0.67 µs at 48 MHz), for the synchroniser and the 6-word snapshot. CS_n high time is at least 8 clk cycles.
+- When spi_en = 1, the wrapper drives the digital macro's addr, rd and dbg inputs, with dbg forced to 0. The addr, bsel, rd and dbg pins are ignored, and data[7:1] are don't-care. spi_en is static and changes only while CS_n is high.
+- MISO is not tri-stated: one target per host SPI bus.
 - I²C (as on the MCP3421) is possible later if the harness supports a bidirectional open-drain pad. SPI needs only one-way pins.
 
 The final scaling (acc2 + 4·acc1, then normalisation) and chop demodulation are two adds and a shift per frame, done by the host processor. A reference decoder in C and Python is part of the deliverables.
@@ -183,7 +185,7 @@ Board:
 - a host reading the slot's digital outputs (logic analyser or MCU).
 
 Measurements:
-1. **Functional check.** Configuration write and read back; frame counter; bitstream on y_raw; power-good hold timing; bias_ok. SPI read of every frame against the parallel byte-bus read, at SCLK 1, 6 and 12 MHz, with frame_ready as DRDY; read from a microcontroller (no FPGA needed).
+1. **Functional check.** Configuration write and read back; frame counter; bitstream on y_raw; power-good hold timing; bias_ok. SPI read of every frame against the parallel byte-bus read, at SCLK 1, 6 and 12 MHz (1 and 6 MHz only at frame rates ≤ 15 kSPS), with frame_ready as DRDY; read from a microcontroller (no FPGA needed).
 2. **Noise.** Shorted input, versus N and fs, chop on and off: µV rms at 3.75, 15, 60 and 240 SPS.
 3. **INL and gain.** Stepped precision DC source over ±0.9·VREF, ratiometric (source and VREF from the same reference). Best-fit-line INL in ppm FSR at N 4096 and in fast mode at N 64, 256 and 1024.
 4. **Offset.** With system chop on and off, and with OTA chop.

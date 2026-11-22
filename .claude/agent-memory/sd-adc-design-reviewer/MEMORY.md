@@ -499,3 +499,17 @@ Held up: hvl pin orders (inv_1, mux2_1, lsbuflv2hv_1) PROVEN vs PDK; replica top
 - Probe note: TG Ioff/Ron + xhigh_po probe (3 decks, timeout 500 s) produced no output: sandbox load ~12, ngspice at ~15 % CPU, killed before flush.
   Next time: write results with `echo`/wrdata to a file early, and use timeout >= 900 s under load. Leakage numbers stay REASONED.
 - Severity given: Major B1 (LS on bias_sel), B2 (ext isolation untested), B3 (kwrong vacuous at ff). Rec: bench fixes B2/B3 + gated reopen row, decide B1, then GO.
+
+## Review 2026-11-23: D102 SPI read port intent (cz_spi), proposal wording only (no sim, read-only)
+Facts from C9 RTL: addr ui_in[2:0], rd ui_in[3], dbg ui_in[7]; addr 2FF + word reg -> word valid 3 clk after addr;
+hold reloads on every slot end regardless of frame_ready (overrun set if frame_ready=1); rd guard (D66) only covers a
+load in the same clk as rd_rise; rd has 2FF sync. dbg=1 puts dbg_hi/status on the bus outputs.
+Findings (open, design not drawn yet):
+- SPI-1 CS_n setup >=4 clk wrong: sync 2-3 + 6 words x 3 clk (or 6+3 pipelined) -> 12-21 clk; state >=32 clk.
+- SPI-2 torn snapshot: hold can reload between word captures; capture tag first/status last, compare frame_ctr, retake.
+- SPI-3 ack on CS_n rise after full read clears a frame loaded during the read (guard compares post-load ctr) -> silent
+  loss incl. overrun. Fix: ack right after snapshot (rd pulse), lost frames visible as frame_ctr gaps.
+- SPI-4 dbg must be forced 0 in SPI mode; external rd ignored; spi_en static while CS_n high; bsel irrelevant.
+- SPI-5 SCLK limit is pad/crossbar round trip in half period (41.7 ns @12 MHz), not clk/4; 6 MHz read 16 us ~ frame
+  16.5 us at 60 kSPS; 1 MHz test only at slow modes. MISO not tri-stated -> point-to-point only.
+- Held: pin count 16/24 in, 12/12 out; 96/12 MHz = 8.0 us; frame (64+2)/4 MHz = 16.5 us; frame_ready flop = clean DRDY (level).
