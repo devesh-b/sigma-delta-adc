@@ -242,6 +242,13 @@ def build(a, us, swaps=None, vos=None, t_rel=None):
     return "\n".join(L) + "\n", meta
 
 
+def log_error_lines(txt):
+    """Error lint on the ngspice log. The `option` echo (option_echo_problems) prints the section header
+    "Truncation error correction:", which contains "error"; only that exact whole line is exempt (WO-105b follow-up)."""
+    return [f"log: {l.strip()}" for l in txt.splitlines() if TB.BAD_LOG.search(l)
+            and "gmin" not in l.lower() and l.strip() != "Truncation error correction:"][:5]
+
+
 OPT_KEYS = ("reltol", "abstol", "vntol", "chgtol", "trtol")
 
 
@@ -265,8 +272,7 @@ def run(a, us, tag, **kw):
                        capture_output=True, text=True, cwd=a.out)
     res = dict(tag=tag, runtime_s=time.time() - t_s, rc=p.returncode, problems=[], meta=meta)
     txt = open(log).read() if os.path.exists(log) else ""
-    res["problems"] += [f"log: {l.strip()}" for l in txt.splitlines() if TB.BAD_LOG.search(l)
-                        and "gmin" not in l.lower()][:5]
+    res["problems"] += log_error_lines(txt)
     if re.search(r"transient op", txt, re.I) or re.search(r"(gmin|source) stepping", txt, re.I):
         res["problems"].append("log: transient-op / stepping fallback")
     res["problems"] += option_echo_problems(txt, meta["opt"])
