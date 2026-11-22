@@ -5,8 +5,7 @@
 #   finger (contact column) pitch p = L + 0.29; columns j = 0..nf at cx + (j - nf/2) p, even j = drain, odd j = source;
 #   row pitch W + 0.78 (nfet) / W + 0.825 (pfet); contact row centre offset -0.155 (n) / -0.1775 (p) from cy;
 #   top gate contact at row y + W/2 + 0.275 (n) / 0.32 (p); guard-ring met1 column at column 0 - 0.57 (1.8 V) /
-#   0.68 (HV n) / 0.67 (HV p). viagl 0: our via1 lands on the ring met1 (gencell ring via1 arrays, partly overlapped
-#   by ours, gave via.1a slivers).
+#   0.68 (HV n) / 0.67 (HV p), with viagl 100 (viagl 0 leaves the ring met1 unconnected: WO-109 iteration 2 LVS fail).
 # Routing: source/drain columns get a met2 strap (via1 on every row) DOWN to the channel below the row; gate (a met2
 # strap through the row gate bars, at gate 0) and bulk (ring) go UP to the channel above. In each channel the tracks of
 # the row below's up-nets lie under the tracks of the row above's down-nets, so up- and down-stubs never meet. A net
@@ -38,7 +37,7 @@ proc r2::fet {X Y name model w l nf m d g s b} {
     if {$nf == 1 && $m > 1 && $p < 0.84} { error "r2::fet $name: m > 1 needs L >= 0.55" }
     box ${X}um ${Y}um ${X}um ${Y}um
     magic::gencell sky130::sky130_fd_pr__$model $name w $w l $l nf $nf m $m conn_gates 1 topc 1 botc 0 \
-        guard 1 viagl 0 viagr 0 viagt 0 viagb 0 full_metal 1
+        guard 1 viagl 100 viagr 0 viagt 0 viagb 0 full_metal 1
     select cell $name; lassign [box values] x1 y1 x2 y2
     set dx [expr {round($X*200) - $x1}]; set dy [expr {round($Y*200) - $y1}]
     if {$dx > 0} { move e ${dx}i } elseif {$dx < 0} { move w [expr {-$dx}]i }
@@ -175,5 +174,26 @@ proc r2::finish {ports ytop x0} {
         lassign $c lay x y h
         r2::r $lay [expr {$x-$h}] [expr {$y-$h}] [expr {$x+$h}] [expr {$y+$h}]
     }
+    r2::clash
     puts "R2 spines $k tracks [llength $TRK] contacts [llength $CONT]"
+}
+# Self-check: via1 / via2 pairs closer than cut size + spacing that are not the same via (prints R2CLASH; 0 expected).
+proc r2::clash {} {
+    variable CONT
+    set n 0
+    foreach lay {via1 via2} lim {0.43 0.48} {
+        set v [lsort -real -index 1 [lsearch -all -inline -index 0 $CONT $lay]]
+        set k [llength $v]
+        for {set i 0} {$i < $k} {incr i} {
+            lassign [lindex $v $i] _ xi yi
+            for {set j [expr {$i+1}]} {$j < $k} {incr j} {
+                lassign [lindex $v $j] _ xj yj
+                if {$xj - $xi >= $lim} break
+                if {abs($yj - $yi) < $lim && (abs($xj-$xi) > 1e-6 || abs($yj-$yi) > 1e-6)} {
+                    incr n; if {$n <= 20} { puts "R2CLASH $lay ($xi,$yi) ($xj,$yj)" }
+                }
+            }
+        }
+    }
+    puts "R2CLASH total $n"
 }
