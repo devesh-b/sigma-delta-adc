@@ -28,3 +28,5 @@ User decisions, 2026-11-21:
 ## Risks
 - Agent-generated precision analog layout may not reach DRC/LVS-clean in time. The fallback is decided at D4–D5 from layout progress.
 - The tile area is about 62 % committed before analog layout. OTA2 reuse adds area (WO-93 quantifies it).
+
+> **Superseded 2026-11-22 by D101:** the target is Chipalooza #4, not the Dec 1 TT tape-out.
