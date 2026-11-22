@@ -40,6 +40,14 @@ The sky130 analog ΣΔ designs found in an open-source survey are all first orde
 - a hold register with frame-ready and overrun flags;
 - a power-good hold, which starts conversions only after 2^16 cycles and once bias-good has been high for 256 consecutive cycles.
 
+**SPI read port** (Chipalooza wrapper `cz_spi`, outside the digital macro, like `cz_bus8`). The block can be read by any microcontroller or FPGA over standard SPI, as well as through the parallel byte bus:
+- SPI target, mode 0 (CPOL 0, CPHA 0), MSB first, read-only. Configuration stays on the existing serial configuration port.
+- On the falling edge of CS_n, the wrapper snapshots the whole frame from the hold register into a 96-bit shift register in the clk domain: status (16 bits), acc1 (32), acc2 (32), tag (16). SCLK then shifts the snapshot out on MISO. The snapshot does not change while CS_n is low, so SCLK may be asynchronous to clk.
+- frame_ready acts as the data-ready (DRDY) line. Raising CS_n after a full 96-bit read acknowledges the frame, so `rd` is not needed in SPI mode.
+- SCLK up to 12 MHz (clk/4 at 48 MHz). A frame read takes about 8 µs, so the 60 kSPS fast mode (16.7 µs frame) can still be read.
+- CS_n setup to the first SCLK edge is at least 4 clk cycles (about 83 ns at 48 MHz), for the synchroniser and the snapshot.
+- I²C (as on the MCP3421) is possible later if the harness supports a bidirectional open-drain pad. SPI needs only one-way pins.
+
 The final scaling (acc2 + 4·acc1, then normalisation) and chop demodulation are two adds and a shift per frame, done by the host processor. A reference decoder in C and Python is part of the deliverables.
 
 **Modes.**
@@ -82,12 +90,14 @@ The block's own port list is the IP interface. The mapping to the Chipalooza slo
 | addr[2:0], bsel | in | Read word select (acc1 hi/lo, acc2 hi/lo, tag, status) and byte select | 4 control inputs |
 | rd | in | Frame acknowledge | Control input |
 | dbg | in | Debug bus select | Control input |
-| data[7:0] | out | Read bus byte; in debug mode: bitstream y, bit clock, valid, rst_analog, chop phase, invalid | 8 test outputs |
+| spi_en | in | 1 = SPI read mode: data[0] carries MISO and the wrapper drives the read-word select itself | Control input |
+| spi_sck, spi_cs_n | in | SPI clock and chip select (mode 0) | 2 control inputs |
+| data[7:0] | out | Read bus byte; in debug mode: bitstream y, bit clock, valid, rst_analog, chop phase, invalid; in SPI mode data[0] = MISO | 8 test outputs |
 | frame_ready, overrun | out | Frame status | 2 test outputs |
 | bias_ok | out (test) | Bias-good from the analog bias reference | Test output |
 | y_raw | out (test) | Raw modulator bitstream | Test output |
 
-That uses 13 of 24 control inputs and 12 of 12 test outputs.
+That uses 16 of 24 control inputs and 12 of 12 test outputs. SPI needs no extra output, because MISO shares data[0].
 
 **Byte-select read bus.** The digital macro keeps its native registered 16-bit read port. A small wrapper cell (`cz_bus8`) outputs bus[7:0] when bsel = 0 and bus[15:8] when bsel = 1. Each 16-bit word is read as two bytes, and a byte is valid one mux delay after bsel changes. In an SoC the 16-bit port can be used directly.
 
@@ -173,7 +183,7 @@ Board:
 - a host reading the slot's digital outputs (logic analyser or MCU).
 
 Measurements:
-1. **Functional check.** Configuration write and read back; frame counter; bitstream on y_raw; power-good hold timing; bias_ok.
+1. **Functional check.** Configuration write and read back; frame counter; bitstream on y_raw; power-good hold timing; bias_ok. SPI read of every frame against the parallel byte-bus read, at SCLK 1, 6 and 12 MHz, with frame_ready as DRDY; read from a microcontroller (no FPGA needed).
 2. **Noise.** Shorted input, versus N and fs, chop on and off: µV rms at 3.75, 15, 60 and 240 SPS.
 3. **INL and gain.** Stepped precision DC source over ±0.9·VREF, ratiometric (source and VREF from the same reference). Best-fit-line INL in ppm FSR at N 4096 and in fast mode at N 64, 256 and 1024.
 4. **Offset.** With system chop on and off, and with OTA chop.
@@ -255,3 +265,4 @@ The Chipalooza schedule fits this state:
   - **VREF−:** use a shared analog line ("makes the most sense"). That is 3 of the 4 shared lines with AMON[1:0]. The DAC charge kicks on that line remain a design point.
   - **Test outputs:** they go through a combinational crossbar to the 12 digital I/O pads, so they are fast.
   - **Testing:** participants test their own chips. Tim will try to pair teams that lack equipment with others who have it. Publication of the data was not addressed directly; we test, so we hold the data. The equipment list matters for the 18-bit INL and noise tests.
+- **SPI read port (D102, 2026-11-23):** added to the proposal as the `cz_spi` wrapper outside C9, so frozen C9 stays as it is. It is not designed yet. It follows the D99 pattern: RTL, a testbench with mutants, review by rtl-verification-engineer and sd-adc-design-reviewer, done before the schematic review (week of 2026-12-28). Question for the organisers: does the harness support a bidirectional or open-drain digital pad (for I²C)?
