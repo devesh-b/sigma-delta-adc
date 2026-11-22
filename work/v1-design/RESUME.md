@@ -1082,3 +1082,11 @@ Next steps:
 - WO-104 jobs 1-2: c6_final diag output missing. That is the WO-104 agent's to triage when it is resumed.
 - WO-103 C4: 7/27 ok, running. WO-95 smoke and WO-105 t1 are running (low).
 - Lesson: relaunch scripts must source each WO's env.sh, or check that each job line sets PATH.
+
+## 2026-11-22/23 — third reboot (~10:10), memory cause, lpool memory gate
+- The box rebooted at about 10:10 on 2026-11-22. The cause was memory, not CPU: four full-top gate ngspice runs at 3–4.4 GB each used 14.4 GB of 16 GB and the box swapped. User: limit runs. lpool now has a memory gate (59c2eb0, deployed to tt-sd): it launches only if MemAvailable − pending ≥ JOBMEM (4500 MB) + MEMRESERVE (4096 MB). Rule: at most 2 full-top sims at once (memory/feedback-sandbox-memory-cap.md).
+- Finished before or around the reboot: WO-98 24/24, WO-103 27/27, WO-108 61/61. The rest were not relaunched.
+- WO-108 BIAS_EXT is not verified at ff/125. G3 lost current is 25.6–28.7 nA against a 20 nA limit. G4 leakage with ext present is 5e-3. 11 ff/125 s0/lk decks abort ("Timestep too small"). s1z stress fails at −0.66/−0.81 V. ss/tt ACCEPT and the broken copies REJECT. Opus pass pending a user OK.
+- WO-105b: the lint false-flagged the option echo; fixed in cc5472e. New pool WO-105b-cc5472e. Its scheduler was stopped, and b16_nom and b16_dacswap were killed (memory). a_nom: healthy, both conversions ok, REJECT only on ib_steady (hold range 3.5 %, settles 1 % at 59.5 µs, ib_final 2.61 vs 2.36 µA). This goes to Opus (analysis only, no runs). a_nosu broken copy is REJECTED (good). 8 gate jobs remain, about 70 min each.
+- **No new runs:** the user is adding RAM to the sandbox. Wait for their go.
+- Chipalooza: Tim Edwards answered overvoltage (normal configuration) and Apache 2.0 (standard). Follow-up mailed 2026-11-23 with a corrected area and BIAS_EXT 2.5–10 µA (nom 5.35), the open questions (clock, VREF−, test outputs) and a new one (testing and data publication). Waiting for a reply.
