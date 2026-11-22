@@ -189,3 +189,16 @@
 - `pgrep -f pattern` inside ssh matches its own bash -c; pick the PID with ps | grep "bash -c" | grep -v grep.
 - TT precheck needs info.yaml project dir (PrecheckFailure) - frame precheck still not run.
 - D98: C9 175x150 (WO-106 9650241); floorplan C9W default 175; D100: layout only after schematic verified (C3/C4 on hold).
+
+## WO-109 (2026-11-22): OTA1 multi-finger layout - STOPPED on ssh agent signing failure
+- Commits 0011346 (route2.tcl, c1_ota1.tcl, run.sh PART=ota1), 182be04 (precheck_top.tcl, precheck_frame.sh, run.sh precheck build);
+  uncommitted: route2.tcl viagl revert + r2::clash self-check (iteration 3 inputs). Dev runs in /home/mempool/regr/tt/WO-109-probe (not frozen).
+- Gencell nf/m probe (WO-109-probe/p1): finger pitch L+0.29 (LV and HV); row pitch W+0.78 n / W+0.825 p; row centre -0.155 n / -0.1775 p;
+  labels D0,S1,D2.. (last D unlabelled with doverlap); nf>1 m>1 cells DRC 0 alone. conn_gates 1 topc 1 botc 0.
+- viagl 0 leaves the gencell ring met1 unconnected -> LVS fail (bulk nets float). Keep viagl 100.
+- Iteration 3: LVS PASS (caps -> cap_mim_m3_1, XDUMP m=4 in ref); bad ref min1 W 9.5 FAIL, finger swap FAIL (property).
+  KLayout 0 (drcbad 1). Magic 2 (6 boxes via.1a sliver at flat (59.755..59.97, 233.945), row 8) on good + copies; r2::clash = 0, so it is
+  my via1 vs a gencell via1 (likely ring viagl array), Magic-only. Open.
+- Area 90.67 x 295.76 = 26,818 um2 vs slot 10,628; gencell+MIM bbox sum alone 9,633 um2 (91 % of the slot). Slot infeasible for the
+  WO-52 sizes at any realistic packing -> user decision (slot/frame or sizing).
+- lpool can queue for minutes behind other WO pools (all 5 global slots).
