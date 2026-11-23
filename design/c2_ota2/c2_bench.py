@@ -39,9 +39,17 @@ BROKEN = {   # tag: (test, ci, b, mut, rows that must REJECT)
     "opac_tt_b1_cl4": ("opac", 0, 1, "cl4", ("gbw",)),
     "opac_tt_b0_tail_half": ("opac", 0, 0, "tail_half", ("sr",)),
     "tran_tt_b0_tail_half": ("tran", 0, 0, "tail_half", ("eps",)),
+    # TODO(WO-98 triage): kick_cm gate still blind (kick 2.3 mV vs the 10 mV SPEC limit, CL-2). cm_open is an AC loop break, not a
+    # property breaker. The limit cannot be tightened (SPEC, and nominal kick_cm is not in the triage so no margin argument). A
+    # stronger mutant needs a sim to pick: cm_open+int_off, cm_open+cc_div4, or the CL-2 case (Cs2 x1-side plates tied to V_ICM,
+    # SPEC kick -79 mV). Left as is: this copy is blind, not proof.
     "tran_tt_b1_cm_open": ("tran", 0, 1, "cm_open", ("kick_cm",)),
     "tran_tt_b1_kb": ("tran", 0, 1, "kb", ("coup1", "coup2")),
-    "toggle_tt_b0_cbig3n": ("toggle", 0, 0, "cbig3n", ("tog",)),
+    # WO-98 triage 2026-11-24: cbig3n gave tog 2.86 us vs the 4 us limit (nominal worst 2.38 us), so it was blind. The limit is
+    # SPEC (3.0 bias row, tb12, 4 us) and stays. Settling is linear in C on the bias node (tau = C/gm): 3 nF added ~0.5 us, so the
+    # mutant is scaled to 20 nF (estimated tog ~5 us or more). UNVERIFIED, needs a rerun; if the 5 us edge window truncates
+    # the settling, the last out-of-tolerance sample still lies beyond 4 us.
+    "toggle_tt_b0_cbig20n": ("toggle", 0, 0, "cbig20n", ("tog",)),
     "mc_tt_b0_s9_pair3": ("mc", 0, 0, "pair3", ("vos",)),
 }
 PCH = "pfet_g5v0d10v5"
@@ -345,8 +353,9 @@ def t_toggle(c, t, v, b, mut, tag, out):
           f"Vbkb bkb 0 PWL(0 {v} {t1:.6g} {v} {t1 + tr:.6g} 0 {t2:.6g} 0 {t2 + tr:.6g} {v})"]
     L += [inst(1, "t", "ota1", "vdd1_t", extra=" bk bkb"), inst(2, "t", "ota2", "vdd2_t")]
     L += fb(1, "t", 0.5e-12, 4e-12, 0, 0.52e-12, "vicm", "vicm") + fb(2, "t", S2.CS2, S2.CINT2, S2.CK2, S2.C_EXT2, "vicm", "vicm")
-    if "cbig3n" in mt:
-        L.append("Cbig ibtp_t vdd1_t 3n")
+    cb = [m_ for m_ in (re.fullmatch(r"cbig(\d+)n", x_) for x_ in mt) if m_]
+    if cb:   # broken copy: extra C on the shared bias node (cbig3n was too small, WO-98 triage)
+        L.append(f"Cbig ibtp_t vdd1_t {cb[0][1]}n")
     L += [".control", "set wr_singlescale", "set wr_vecnames", "tran 1n 12u 0 5n",
           f"wrdata {tag}_tg.csv i(vdd1_t) i(vdd2_t) v(o2p_t) v(o2n_t)", "quit", ".endc", ".end"]
     vals, lint = run("\n".join(L) + "\n", tag, out, 1800)
