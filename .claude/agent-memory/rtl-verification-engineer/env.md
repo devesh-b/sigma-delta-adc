@@ -56,3 +56,6 @@
 - wo42_job.sh kinds: `real [TEST]` (16/8), `fmlw PW B PROP [TO]` (props -DF_PW/-DF_B + chparam). gl_job.sh PW B (TESTS, GL_TO env).
 - Freeze: cp -a tt-sd/design/c9_digital/{rtl,tb} + tt-sd/golden into WO-83-<sha>/; launch lpool from ssh with setsid nohup ... < /dev/null & (returns at once).
 - Wait: one run_in_background ssh loop `until POOL_DONE; sleep 30` (no local sleep).
+## cz_spi bench (2026-11-24, not yet run)
+- design/cz/tb/run_spi.sh: iverilog -g2012 tb_cz_spi.v + cz_spi + cz_bus8 + 6 C9 files; SEEDS, TO env; mutants via sed -f
+  mutants_spi/M*.sed -> mutants_spi/gen/ (cmp guard). Needs GNU sed (sandbox container), `timeout`.

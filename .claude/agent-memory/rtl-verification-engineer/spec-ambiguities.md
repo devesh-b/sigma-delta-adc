@@ -27,3 +27,9 @@ SPEC-AMB-01..16: C9_VERIF_PLAN §8; answered by D66/D67 (CL-12..26) except as be
   in the remaining ~16 ms of the pw hold is ignored; slot 0 can start with bias low. Coordinator to confirm.
 - AMB-31 (CL-36): fs_clk during the hold. Bench assumes the divider runs (fs_clk toggles from the first tick,
   "first fs_tick is still div clk after release"). SPEC does not say what the analog sees on fs_clk in the hold.
+
+## cz_spi (D102), 2026-11-24 — details in design/cz/tb/VPLAN_cz_spi.md §6
+- SA-SPI-1 re-read pulses rd again (every CS_n fall = snapshot = ack); bench default allows if harmless, +STRICT_ONE_ACK fails.
+- SA-SPI-2 "same data" on re-read: status[15:14] live; new frame if one loaded in between.
+- SA-SPI-3 DRDY pin missing in SPI mode. SA-SPI-4 residual window "about 5 clk" -> bench limit 6 clk from CS_n fall.
+- SA-SPI-5 bits after 96 unspecified. SA-SPI-6 reset release with CS_n low unspecified.

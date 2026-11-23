@@ -513,3 +513,17 @@ Findings (open, design not drawn yet):
 - SPI-5 SCLK limit is pad/crossbar round trip in half period (41.7 ns @12 MHz), not clk/4; 6 MHz read 16 us ~ frame
   16.5 us at 60 kSPS; 1 MHz test only at slow modes. MISO not tri-stated -> point-to-point only.
 - Held: pin count 16/24 in, 12/12 out; 96/12 MHz = 8.0 us; frame (64+2)/4 MHz = 16.5 us; frame_ready flop = clean DRDY (level).
+
+## Review 2026-11-24: pre-push of 95bfb9b (WO-108c), 655a4de (WO-105c), 4a80d9f (WO-104), cacb8cf (WO-98); no runs
+- hvl nand2_1 pins A B VGND VNB VPB VPWR Y PROVEN (/home/mempool/.ciel/sky130A/libs.ref/sky130_fd_sc_hvl/spice/...). D1 netlist correct:
+  TG polarity, pull-down/pull-up gates, no detect<->enable loop (sense leg on bias_ext/vne only). 4 devices = TG2+PD+PU = all named items.
+- CRIT jobs_wo108c.txt: 24/58 lines malformed for run(out,kind,corner,temp,vdd,mut): extra 'light' (12-19), multi-corner ss:-40:3.0
+  syntax (21-23,29-31,38,42), mutant lines missing kind/misordered (24-27,33-36) -> TypeError/ValueError. Regenerate from job_list.
+- MAJ s1c (100 pF) will false-REJECT: detect delay ~ C*a/I_th (a 0.119 V tt, 0.161 ff) = 7-18 us > early window 6-10 us; and
+  G2 5.25 uA limb after 20->5.25 down-step tau = C*a/I = 2.3 us at 100 pF -> ~6-11 % residual. At 10 pF fine (tau 0.23 us).
+  Analysis claim "independent of board C" wrong for detect delay. Gate s1c on +60 us only.
+- nocap == none unless CZ_OPT has cap; span limb vacuous (rail limbs imply span <= VDD+1.2 = 4.8 < 4.95).
+- WO-105c rescore: skips gate-a json with no csv/convs (silent pass path); fs from CLI not json (json lacks fs). step2 +2% aligned
+  to cycle 100 at 2 MHz -> rejects (baseline +-0.15 %). ifin = raw-sample median vs cycle-mean metric (minor).
+- WO-98 cbig20n: truncation at 5 us window caps measured ts ~4.45-4.9 us, still > 4 us -> rejects (REASONED). README wo98:114 stale.
+- WO-104 diag v(ok) top-level: correct (Xc6 ... ok ... at c6_final.py:199).

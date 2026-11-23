@@ -75,3 +75,7 @@ Bench: design/c9_digital/tb (commit 5c57793 + fixes), DUT tt_um_sd_adc_c9 (WO-37
 ## WO-83 (2026-11-14): D88/CL-37 rows
 - H-05 d_hold05_d88 written, s1 PASS at 4/2 (smoke); 16/8 run, mutant kills (M66/M68/M71-M74), F19 at widths: pending in pool WO-83-9f4bab2/pool.
 - F19 (no late slot 0) + drop cover written; F18/F19 PASS at 3/2 PDR.
+
+## cz_spi (D102) — 2026-11-24, written, NOT RUN (user: no sims yet)
+- Plan: design/cz/tb/VPLAN_cz_spi.md (REQ-FRM/SNAP/M0/TIM/CDC/ACK/ABT/EN0/EN1/RST, 27 REQs). Bench tb_cz_spi.v (real C9 x2:
+  DUT side + lockstep twin without wrapper), run_spi.sh, 16 sed mutants in mutants_spi/. All status = written.

@@ -21,3 +21,9 @@ not cleared before the first edge (sim artifact); fixed 87a05a2 (rst_n 1 -> 0 at
 (M45 survived); fixed 87a05a2 via defparam (Icarus OK, Verilator rejects it: open).
 
 - 2026-11-14 WO-83: no new RTL bug. Stale RTL comment c9_seq.v:29 "sticky done flag (counter freezes)" contradicts D88 (Low, comment only).
+
+## cz_spi (D102) read-only review 2026-11-24 (no sim). No functional bug found by reading. Candidates logged as ambiguities:
+- SA-SPI-3 (potential Medium): DRDY (frame_ready) is on no wrapper output in SPI mode (data[7:1]=0, dbg forced 0).
+- Low: stale snapshot bit 95 visible on MISO ~3-4 clk after CS_n fall (snap_valid cleared only at sync'd fall); only
+  matters when the 32-clk setup rule is violated. Low: reset release with CS_n low starts a capture mid-frame.
+- Low/lint: reg `torn` set but never read (torn 3rd-attempt snapshot has no flag besides tag/status ctr mismatch).

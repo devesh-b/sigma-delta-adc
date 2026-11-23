@@ -9,3 +9,6 @@
 - status[8] tied 0; c_last/div_m1/half_m1 constant bits per code (only codes used); uio_in, ena, uio_oe constant
   (TT pins unused/ignored, CL-20); `_unused` reduction expr.  c9_cfg.v: 0 zero points.
 ## WO-42: fcov.py bins defined (plan §11.2); unreachable: RDST fr0_ov1, WP e+0..e+3 multi/writeback. No hit data yet.
+
+## cz_spi (D102), 2026-11-24: nothing run. Single-FF sync removal not killable in RTL sim (CDC lint/STA); 3rd capture
+attempt unreachable (792-clk frame); SCLK-domain flops have no rst_n (X-init not exercised in Icarus); no GL.
