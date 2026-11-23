@@ -336,9 +336,11 @@ def window_mean(t, y, a, b):
 
 
 def cycle_means(t, y, T):
-    """Means over the whole clock cycles [kT, (k+1)T] from t = 0 to the end of the record."""
-    nc = int(math.floor(t[-1] / T + 1e-9))
-    return np.array([window_mean(t, y, k * T, (k + 1) * T) for k in range(nc)])
+    """Means over the whole clock cycles [kT + T/4, (k+1)T + T/4] (the T/4 offset keeps every clock edge, at multiples of T/2,
+    and every reset edge off a window boundary) from t = 0 to the end of the record."""
+    off = T / 4
+    nc = int(math.floor((t[-1] - off) / T + 1e-9))
+    return np.array([window_mean(t, y, k * T + off, (k + 1) * T + off) for k in range(nc)])
 
 
 def startup_record(t, okc, ib_raw, rel, t_first, T, ib_design, mutate=None):
@@ -352,26 +354,32 @@ def startup_record(t, okc, ib_raw, rel, t_first, T, ib_design, mutate=None):
     rises, drops = np.where(np.diff(ok.astype(int)) == 1)[0], np.where(np.diff(ok.astype(int)) == -1)[0]
     ib = -ib_raw   # current into the sink mirror drain node (Vm from port to mirror drain): sign-normalised
     ib = ib if np.median(ib[t > t_first]) > 0 else -ib
-    ifin = float(np.median(ib[t > t_first]))
+    ifin_raw = float(np.median(ib[t > t_first]))          # info only
+    off = T / 4
+    cm0 = cycle_means(t, ib, T)
+    ifin = float(np.median(cm0[int(math.ceil((t_first - off) / T - 1e-9)):]))   # median of the cycle means in the conversions
+    cm = cm0
     if mutate == "trel30":
         rel = math.ceil(30e-6 / T - 1e-9) * T
     elif mutate == "ramp2":
         ib = ib * (1 + 0.02 * np.clip((t - rel) / (t[-1] - rel), 0, 1))
+        cm = cycle_means(t, ib, T)
     elif mutate == "step2":
         ib = np.where((t >= 50e-6) & (t < 50e-6 + T), ib * 1.02, ib)
-    cm = cycle_means(t, ib, T) / ifin - 1
-    after = cm[int(round(rel / T)):]
+        cm = cycle_means(t, ib, T)
+    cm = cm / ifin - 1
+    after = cm[int(round(rel / T)):]     # windows starting at kT + T/4 >= rel
     out = np.where(np.abs(cm) > IB_TOL)[0]
     aft, hold = t > rel, (t > rel) & (t < t_first)
     return dict(ok_rises_us=[float(t[i] * 1e6) for i in rises[:6]], ok_drops_us=[float(t[i] * 1e6) for i in drops[:6]],
-                ok_at_rel=bool(np.interp(rel, t, okc) > 1.5), ib_final=ifin, ib_design=ib_design, t_rel_eval_us=rel * 1e6, mutate=mutate,
-                ib_at_rel_err=float(window_mean(t, ib, rel - T, rel) / ifin - 1),          # mean of the cycle before rel
+                ok_at_rel=bool(np.interp(rel, t, okc) > 1.5), ib_final=ifin, ib_final_rawmedian=ifin_raw, ib_design=ib_design, t_rel_eval_us=rel * 1e6, mutate=mutate,
+                ib_at_rel_err=float(window_mean(t, ib, rel - T - off, rel - off) / ifin - 1),   # mean of the cycle before rel
                 ib_at_rel_err_sample=float(np.interp(rel, t, ib) / ifin - 1),              # info: the old single sample
                 ib_steady_maxdev=float(np.max(np.abs(after))) if len(after) else float("nan"), n_cycles_after_rel=int(len(after)),
                 ib_final_over_design=ifin / ib_design - 1 if ib_design else float("nan"),   # report-only (gate: --ib-final-gate)
                 ib_range_after_rel=float((ib[aft].max() - ib[aft].min()) / ifin) if np.any(aft) else float("nan"),   # info: raw
                 ib_range_hold=float((ib[hold].max() - ib[hold].min()) / ifin) if np.any(hold) else float("nan"),     # info: raw
-                t_settle_1pct_us=(0.0 if not len(out) else float((out[-1] + 1) * T * 1e6) if out[-1] + 1 < len(cm) else float("nan")))
+                t_settle_1pct_us=(0.0 if not len(out) else float(((out[-1] + 1) * T + off) * 1e6) if out[-1] + 1 < len(cm) else float("nan")))
 
 
 def gate_a_checks(su, c, rel, ib_final_gate=False):
@@ -386,29 +394,50 @@ def gate_a_checks(su, c, rel, ib_final_gate=False):
 
 
 def rescore(a):
-    """WO-105c: re-evaluate kept gate-(a) csv + json in a.rescore without ngspice; writes <stem>.rescore[.<mutate>].json beside the old one."""
+    """WO-105c: re-evaluate kept gate-(a) csv + json in a.rescore without ngspice; writes <stem>.rescore[.<mutate>].json beside the old one.
+    Any gate-(a) json whose data cannot be re-scored is UNHEALTHY (exit 2); only non-gate-(a) jsons are skipped."""
     import glob
-    T, worst, seen = 1.0 / a.fs, 0, 0
+    worst, seen = 0, 0
     for jf in [f for f in sorted(glob.glob(os.path.join(a.rescore, "*.json"))) if ".rescore" not in f]:
+        name = os.path.basename(jf)
         old = json.load(open(jf))
-        csv = jf[:-5] + ".csv"
-        if old.get("gate") != "a" or not os.path.exists(csv) or not old.get("convs"):
-            print(f"skip {os.path.basename(jf)} (not a gate-a json with csv and convs)")
+        if old.get("gate") != "a":
+            print(f"skip {name} (not gate a)")
             continue
         seen += 1
+        csv = jf[:-5] + ".csv"
+        if not os.path.exists(csv) or not old.get("convs"):
+            print(f"{name}: UNHEALTHY, cannot re-score: " + ("csv missing" if not os.path.exists(csv) else "no convs in json"))
+            worst = 2
+            continue
+        fs_json = old.get("fs")
+        if fs_json is None and not a.fs_explicit:
+            print(f"{name}: UNHEALTHY, json has no fs (old run) and --fs was not given explicitly")
+            worst = 2
+            continue
+        if fs_json is not None and a.fs_explicit and abs(fs_json - a.fs) > 1e-9 * fs_json:
+            print(f"{name}: UNHEALTHY, explicit --fs {a.fs:g} != fs {fs_json:g} of the run")
+            worst = 2
+            continue
+        if fs_json is None:
+            print(f"{name}: WARNING fs {a.fs:g} taken from the CLI (old json has none)")
+        fs = fs_json if fs_json is not None else a.fs
+        T, nrst = 1.0 / fs, old.get("nrst", 3)
         d = np.loadtxt(csv, skiprows=1)
         t = d[:, 0]
         t_rel0 = old["t_rel_us"] * 1e-6
-        _, t0 = schedule(old["n"], 3, T, t_rel0, [x["u"] for x in old["convs"]])
+        _, t0 = schedule(old["n"], nrst, T, t_rel0, [x["u"] for x in old["convs"]])
+        tstop = t0[-1] + old["n"] * T + 0.5 * T
         probs = list(old["problems"])
-        if abs(t[-1] - old["sim_time_s"]) > 1e-6 * old["sim_time_s"]:
-            probs.append(f"csv final time {t[-1]:.6e} != json sim_time_s {old['sim_time_s']:.6e} (wrong csv?)")
+        for what, ref in (("recomputed tstop", tstop), ("json sim_time_s", old["sim_time_s"])):
+            if abs(t[-1] - ref) > 1e-6 * ref:
+                probs.append(f"csv final time {t[-1]:.6e} != {what} {ref:.6e} (wrong fs or csv?)")
         su = startup_record(t, d[:, 6], d[:, 7], t_rel0, t0[0], T, old["ports"]["b1_ibtp"], mutate=a.mutate)
         chk = gate_a_checks(su, old["convs"], su["t_rel_eval_us"] * 1e-6, a.ib_final_gate)
         ok = all(chk.values())
         hl = bool(old["healthy"]) and not probs
         row = dict(old) | dict(startup=su, checks=chk, healthy=hl, pass_gate=bool(hl and ok), problems=probs,
-                               rescore=dict(src=os.path.basename(jf), mutate=a.mutate, fs=a.fs, ib_final_gate=a.ib_final_gate))
+                               rescore=dict(src=name, mutate=a.mutate, fs=fs, fs_from_json=fs_json is not None, ib_final_gate=a.ib_final_gate))
         outp = jf[:-5] + ".rescore" + (f".{a.mutate}" if a.mutate else "") + ".json"
         json.dump(row, open(outp, "w"), indent=1, default=str)
         print(os.path.basename(outp), json.dumps(dict(copy=old["copy"], mutate=a.mutate, healthy=hl, checks=chk, ib_steady_maxdev=su["ib_steady_maxdev"],
@@ -433,7 +462,8 @@ def verdict(a, ok, res, extra):
     hl = healthy(res)
     row = dict(gate=a.gate, copy=a.copy, ota2=a.ota2_id, corner=f"{a.corner}/{a.temp}/{a.vdd}", n=a.n, opt=a.opt, healthy=bool(hl), pass_gate=bool(hl and ok),
                runtime_s=res["runtime_s"], npts=res.get("npts"), problems=res["problems"], convs=res.get("convs"),
-               startup=res.get("startup"), ports=res["meta"]["ports"], t_rel_us=res["meta"]["t_rel"] * 1e6, sim_time_s=res["meta"]["tstop"]) | extra
+               startup=res.get("startup"), ports=res["meta"]["ports"], t_rel_us=res["meta"]["t_rel"] * 1e6, sim_time_s=res["meta"]["tstop"],
+               fs=a.fs, nrst=res["meta"]["nrst"], T=res["meta"]["T"]) | extra
     json.dump(row, open(os.path.join(a.out, res["tag"] + ".json"), "w"), indent=1, default=str)
     print(json.dumps({k: v for k, v in row.items() if k not in ("convs", "ports")}, default=str))
     if a.copy != "nom":
@@ -458,7 +488,7 @@ def main():
     ap.add_argument("--ib-final-gate", dest="ib_final_gate", action="store_true", help="gate (a) also requires ib_final within +-3 %% of ib_design (default off: report only)")
     ap.add_argument("--corner", default="tt"); ap.add_argument("--temp", type=float, default=27); ap.add_argument("--vdd", type=float, default=3.3)
     ap.add_argument("--copy", default="nom"); ap.add_argument("--n", type=int, default=1024); ap.add_argument("--m", type=int, default=7)
-    ap.add_argument("--fs", type=float, default=2e6); ap.add_argument("--opt", default="O1")
+    ap.add_argument("--fs", type=float, default=None); ap.add_argument("--opt", default="O1")
     ap.add_argument("--t-rel", dest="t_rel", type=float, default=100e-6); ap.add_argument("--tramp", type=float, default=1e-6)
     ap.add_argument("--ota2-sub", default=None, help="D91: WO-98 OTA2 subckt file (ota1 port order); default = OTA1 cell")
     ap.add_argument("--ota2-name", default="ota2"); ap.add_argument("--ota2-shared", action="store_true", help="OTA2 on OTA1's bias nets")
@@ -466,6 +496,9 @@ def main():
     ap.add_argument("--uset", default=None, help="WO-105: bc u points, comma list (default u_points(m, 0.9))")
     ap.add_argument("--no-dummy", dest="dummy", action="store_false", help="WO-105: bc without the discarded first conversion (gate a covers it)")
     a = ap.parse_args()
+    a.fs_explicit = a.fs is not None     # rescore takes fs from the run json; the CLI value only for old jsons without it
+    if a.fs is None and not a.rescore:
+        a.fs = 2e6
     if a.rescore:
         rescore(a)
     if a.out is None or a.gate is None or a.mutate:
