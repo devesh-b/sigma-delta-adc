@@ -80,6 +80,9 @@ CORNERS5 = [("tt", 27, 3.3), ("ss", -40, 3.0), ("ss", -40, 3.6), ("ff", 125, 3.0
 S1_EXTRA = [("fs", -40, 3.0), ("ff_ll", 125, 3.6), ("ss_hh", -40, 3.0)]
 MUT_CORNERS = [("tt", 27, 3.3), ("ff", 125, 3.6)]
 MUT_CORNERS_RUPQ = [("tt", 27, 3.3), ("ss_hh", -40, 3.0)]
+# per-(mutant, kind) corner lists that differ from MUT_CORNERS (review m2)
+MUT_RUNS = {("noen", "lke20"): [("ff", 125, 3.6)], ("noen", "s1c"): MUT_CORNERS, ("nocap", "s1z"): [("ff", 125, 3.6)]}
+# m3: nopu (s1z, tt) rejects only through the early 276-280 us window (about 1.4x margin over the 20 nA limit).
 LIM = dict(g1=1e-3, track=0.02, ratio=0.03, boost=0.04, tt=0.03, absn=0.04, ok_lo=0.1, ok_hi=0.9, i_open=20e-9, g4=1e-3,
            rail=0.6,   # worst pair = VDD + 2 x 0.6 = 4.8 V <= 4.95 V; floating mirror outputs undershoot to ~-0.45 V at power-up
            span=4.95,  # WO-108c: SPEC row 99 pair rule on the recorded nodes, max(v) - min(v) <= 4.95 V (added, nothing loosened)
@@ -259,6 +262,10 @@ def run(out, kind, corner, temp, vdd, mut="none"):
         tag += "_o-" + "-".join(sorted(OPT - {"ladder"} if "ladder" in OPT else OPT))   # option runs never overwrite default ones
     base = os.path.join(out, tag)
     r = dict(tag=tag, kind=kind, corner=corner, temp=temp, vdd=vdd, mut=mut)
+    if mut == "nocap" and "cap" not in OPT:        # without the flag nocap is identical to none: invalid, never a pass (review M2)
+        r.update(verdict="REJECT", error="invalid: nocap needs CZ_OPT=cap (otherwise identical to none)")
+        json.dump(r, open(base + ".json", "w"), indent=1)
+        return r
     # kinds s0*: bare and wrapper in ONE deck aborted the transient at ~1.23 us (timestep too small, OTA-diode loads, WO-108
     # first pool); each is simulated alone and the wrapper columns are interpolated onto the bare time grid.
     parts = ("b", "z") if kind[:2] == "s0" else (None,)
@@ -339,7 +346,8 @@ def run(out, kind, corner, temp, vdd, mut="none"):
         g["G2"] = dict(I=cur, track=trk, worst_track=max(abs(v) for v in trk.values()), rel=rel, rel_525_550=rel_h, ratio_err=rat,
                        boost_ratio=br,
                        info_track=info, info_boost10=br10, info_port_v=dict(i10=labs(10.0), i20=labs(20.0)), abs_lim=lim_abs,
-                       pass_=bool(pp))
+                       pass_=bool(pp) or kind == "s1c", pass_info=bool(pp))   # s1c (100 pF): detect delay scales with C, the 5.25 uA
+        # step (tau ~2.3 us) leaves a 6-11 % residual in its 4 us window -> G2 is info only there (review M1)
         ok_open = mx(ok, 10, 20)[0]
         i_open = max(abs(win(col[n], 10, 20)) for n in names)
         ok_hi = min(win(ok, END[inom] - WIN, END[inom]), win(ok, END[2.5] - WIN, END[2.5]), win(ok, T_BOOST[0] - WIN, T_BOOST[0]))
@@ -347,15 +355,21 @@ def run(out, kind, corner, temp, vdd, mut="none"):
         i_re = max(abs(win(col[n], T_END - WIN, T_END)) for n in names)
         i_early = max(abs(win(col[n], 276, 280)) for n in names)       # 6-10 us after removal at 270 us (the 1/t tail of the pin)
         ok_early = win(ok, 276, 280)                                   # info only
+        fall = (t >= 270 * U) & (ok < 0.5 * vdd)
+        t_det = float((t[fall][0] - 270 * U) / U) if fall.any() else None   # info: us from removal until ok falls below VDD/2
+        # s1c (100 pF): t_det ~ 7-18 us puts 276-280 us inside the tail (0.4-0.8 uA), so only the +60 us limb gates (review M1)
+        early_ok = (i_early <= LIM["i_early"]) or kind == "s1c"
         g["G3"] = dict(ok_open_max=ok_open, i_open=i_open, ok_present_min=ok_hi, ok_info_1uA=win(ok, END[1.0] - WIN, END[1.0]),
-                       ok_lost_max=ok_re, i_lost=i_re, i_lost_early=i_early, ok_early_info=ok_early,
+                       ok_lost_max=ok_re, i_lost=i_re, i_lost_early=i_early, ok_early_info=ok_early, t_det_us=t_det,
                        pass_=bool(ok_open <= LIM["ok_lo"] * vdd and i_open <= LIM["i_open"] and ok_hi >= LIM["ok_hi"] * vdd
-                                  and ok_re <= LIM["ok_lo"] * vdd and i_re <= LIM["i_open"] and i_early <= LIM["i_early"]))
+                                  and ok_re <= LIM["ok_lo"] * vdd and i_re <= LIM["i_open"] and early_ok))
         nodes = [d[:, 6 + i] for i in range(14)]
     hi = max(float(n.max()) for n in nodes)
     lo = min(float(n.min()) for n in nodes)
-    g["stress"] = dict(v_max=hi, v_min=lo, span=hi - lo,
-                       pass_=bool(hi <= vdd + LIM["rail"] and lo >= -LIM["rail"] and hi - lo <= LIM["span"]))
+    # span_info is NOT part of the verdict: the rail limits already imply span <= VDD + 1.2 V = 4.8 V < 4.95 V (it can never decide).
+    # TODO: real SPEC row 99 device-pair check on esc (drain esn vs gate bias_ext and source esd), needs those vectors recorded.
+    g["stress"] = dict(v_max=hi, v_min=lo, span_info=hi - lo, span_info_lim=LIM["span"],
+                       pass_=bool(hi <= vdd + LIM["rail"] and lo >= -LIM["rail"]))
     r["gates"] = g
     r["verdict"] = "ACCEPT" if all(v["pass_"] for v in g.values()) else "REJECT"
     tg_ = target(mut, kind) if mut in MUTS else None
@@ -398,8 +412,47 @@ def job_list():
     L += [("s1", c, t, v, "nosu") for c, t, v in MUT_CORNERS]
     for m in MUTS:
         cs = MUT_CORNERS_RUPQ if m == "rupq" else MUT_CORNERS
-        L += [(k, c, t, v, m) for k in MUT_KINDS[m] for c, t, v in cs]
+        L += [(k, c, t, v, m) for k in MUT_KINDS[m] for c, t, v in MUT_RUNS.get((m, k), cs)]
     return L
+
+
+def job_list_c():
+    """WO-108c run list: (CZ_OPT, kind, corner, temp, vdd, mut), in the order B1 ladder, G1, G4, G3/G2, G2 mutants, stress."""
+    tt, ss3, ff6 = ("tt", 27, 3.3), ("ss", -40, 3.0), ("ff", 125, 3.6)
+    L = [(o, "s0", "ff", 125, 3.0, "none") for o in ("rs", "ab", "rs,ab")]                       # 1. B1 ladder
+    L += [(o, "lk", "ff", 125, 3.6, "none") for o in ("rs", "rs,ab", "rs,ab,ramp", "ramp")]
+    for c, t, v in (tt, ("ss", -40, 3.6)):                                                         # 1b. neutrality
+        for k in ("s0", "lk"):
+            L += [("", k, c, t, v, "none"), ("ladder", k, c, t, v, "none")]
+    L += [("ladder", k, c, t, v, "none") for c, t, v in CORNERS5 for k in ("s0", "s0e5", "s0e20")]   # 2. G1
+    L += [("ladder", "s0", c, t, v, "swapsel") for c, t, v in (tt, ff6)]
+    L += [("ladder", "s0e5", c, t, v, "noiso") for c, t, v in (tt, ff6)]
+    L += [("ladder", k, c, t, v, "none") for c, t, v in CORNERS5 for k in ("lk", "lke5", "lke20")]   # 3. G4
+    L += [("ladder", "lke20", "ff", 125, 3.6, "noen")]
+    L += [("ladder", k, c, t, v, m) for k, m in (("lk", "leaky"), ("lke20", "noiso")) for c, t, v in (tt, ff6)]
+    L += [("ladder", "s1", c, t, v, "none") for c, t, v in CORNERS5 + S1_EXTRA]                   # 4. G3 (+G2 at 5.25/5.5 uA)
+    L += [("ladder", "s1z", c, t, v, "none") for c, t, v in CORNERS5]
+    L += [("ladder", "s1c", c, t, v, "none") for c, t, v in (tt, ss3, ff6)]
+    L += [("ladder", "s1c", c, t, v, "noen") for c, t, v in MUT_RUNS[("noen", "s1c")]]
+    L += [("ladder", "s1", c, t, v, "nodetect") for c, t, v in MUT_CORNERS]
+    L += [("ladder", "s1z", c, t, v, "nopu") for c, t, v in MUT_CORNERS]
+    L += [("ladder", "s1", c, t, v, "rupq") for c, t, v in MUT_CORNERS_RUPQ]
+    L += [("ladder", "s1", c, t, v, m) for m in ("kwrong", "efinger", "nosu") for c, t, v in MUT_CORNERS]   # 5. G2 / variant
+    L += [("ladder,cap", "s1z", c, t, v, "none") for c, t, v in (tt, ss3, ff6)]                  # 6. stress (cap on)
+    L += [("ladder", "s1", c, t, v, "overv") for c, t, v in MUT_CORNERS]
+    L += [("ladder,cap", "s1z", c, t, v, "nocap") for c, t, v in MUT_RUNS[("nocap", "s1z")]]
+    return L
+
+
+def gen_jobs():
+    """Print one self-contained command per run (the committed design/cz/jobs_wo108c.txt is this output). <FROZEN> is a placeholder
+    on purpose: `cd <FROZEN>` fails until it is replaced by the frozen tree."""
+    pre = ("cd <FROZEN> && mkdir -p out/cz && . /home/mempool/tt-sd/.venv-sbx/bin/activate && "
+           "export PATH=$HOME/.nix-profile/bin:$PATH PDK_ROOT=/home/mempool/.ciel PDK=sky130A && ")
+    for o, k, c, t, v, m in job_list_c():
+        heavy = k.startswith("s1") or t > 100
+        print(f"{pre}{'CZ_OPT=' + o + ' ' if o else ''}nice python design/cz/c6_cz.py run out/cz {k} {c} {t} {v} {m}"
+              f"   # {'heavy' if heavy else 'light'}")
 
 
 def jobs(out, frozen, jobfile):
@@ -414,6 +467,8 @@ if __name__ == "__main__":
     if a[0] == "netlist":
         txt = netlist(a[2] if len(a) > 2 else "none")
         (open(a[1], "w").write(txt) if len(a) > 1 and a[1] != "-" else sys.stdout.write(txt))
+    elif a[0] == "gen-jobs":
+        gen_jobs()
     elif a[0] == "jobs":
         jobs(*a[1:4])
     elif a[0] == "run":
