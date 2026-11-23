@@ -55,3 +55,8 @@ Details are in the header of cz_spi.v.
 5. spi_en = 1 with external SCLK toggling while CS_n high: ignored by design (rcnt/ptr held in reset).
 6. Is dbg_o forced 0 enough, or must the debug bus be reachable in SPI mode for bring-up? (Currently no.)
 7. Assumes bus is {uo_out, uio_out} exactly as in c9_core; cz_bus8's bus input is the same 16 bits.
+
+## DRDY and status pins in SPI mode (review SA-SPI-3, 2026-11-24)
+- frame_ready and overrun are wired from C9 straight to their own two slot test outputs, never through cz_spi. They therefore stay live whatever spi_en is, and frame_ready is the host's DRDY line in SPI mode. The slot top must keep this wiring.
+- A re-read (a new CS_n fall on a frame already acknowledged) pulses rd again. This is harmless: the C9 counter guard ignores it. It is also consistent with the spec: no ack is sent until the next CS_n fall, and a re-read is a new fall. The testbench default allows it; `+STRICT_ONE_ACK` stays an optional check.
+- A re-read returns the same frame, except that status[15:14] change after the first ack. If a new frame loaded in between, the re-read returns the new frame.

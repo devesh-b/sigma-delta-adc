@@ -111,7 +111,7 @@ Findings, as options for the coordinator and the reviewer. No sizes were changed
 1. Wait for `/home/mempool/regr/tt/WO-98-c0bbaff/pool/POOL_DONE`. Then run `. env.sh; python design/c2_ota2/c2_bench.py $PWD/out summary`. The out dir already holds the run-1 opac, toggle and MC JSONs.
 2. Check:
    - the tran rows (eps, kick_cm, coup1, coup2) and the D-copy floor (`coup1_floor` must be ≪ 1e-5);
-   - that the 3 tran broken copies and toggle cbig3n REJECT;
+   - that the 3 tran broken copies and toggle cbig20n REJECT (cbig3n was blind: 2.86 us vs the 4 us limit; changed in cacb8cf);
    - the `opac_fs125_b1_ota1cell` span.
 3. If tran still aborts, relax further (reltol 1e-4, the tb9 setting). Then rerun with SKIPDONE=1 after deleting the INVALID JSONs.
 
