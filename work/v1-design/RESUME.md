@@ -1090,3 +1090,15 @@ Next steps:
 - WO-105b: the lint false-flagged the option echo; fixed in cc5472e. New pool WO-105b-cc5472e. Its scheduler was stopped, and b16_nom and b16_dacswap were killed (memory). a_nom: healthy, both conversions ok, REJECT only on ib_steady (hold range 3.5 %, settles 1 % at 59.5 µs, ib_final 2.61 vs 2.36 µA). This goes to Opus (analysis only, no runs). a_nosu broken copy is REJECTED (good). 8 gate jobs remain, about 70 min each.
 - **No new runs:** the user is adding RAM to the sandbox. Wait for their go.
 - Chipalooza: Tim Edwards answered overvoltage (normal configuration) and Apache 2.0 (standard). Follow-up mailed 2026-11-23 with a corrected area and BIAS_EXT 2.5–10 µA (nom 5.35), the open questions (clock, VREF−, test outputs) and a new one (testing and data publication). Waiting for a reply.
+
+## 2026-11-24: analysis and code done; nothing run (waiting for the user's go after the RAM upgrade)
+Code was written, reviewed by sd-adc-design-reviewer and pushed (c124214). Nothing has been compiled or simulated. Run queue, lightest first, with the memory gate on:
+1. **SPI testbench** (D102): `design/cz/tb/run_spi.sh` in IIC, SEEDS="1 2 3 4 5". The real RTL must pass and all 16 mutants must fail. The container path in VPLAN §9 is a guess; check it.
+2. **Gate (a) rescore** (WO-105c, no sim). In the tt-sd tree, `python3 design/top/top_bench.py --rescore /home/mempool/regr/tt/WO-105b-cc5472e/out/g/a_nom --fs 2e6`, then the same for a_nosu, then a_nom with `--mutate trel30|ramp2|step2`. Expected: a_nom ACCEPT (margin 0.26 %); the others REJECT.
+3. **C6 WO-104** jobs 1 and 2 (diag probe fixed) and job 6 (longer timeout or C6_METHOD=trap).
+4. **C2 WO-98:** toggle 0 0 cbig20n, then the summary. Look at the 125 °C tran waveforms. The cm_open mutant is still blind (TODO).
+5. **C3 rev g pool B** (WO-92 runB): relaunch the 49 failed jobs with PATH including ~/.nix-profile/bin, SKIPDONE=1. These were an env failure, not the design.
+6. **BIAS_EXT WO-108c:** freeze a copy and replace `<FROZEN>` in design/cz/jobs_wo108c.txt (90 lines). Diff the file against `c6_cz.py gen-jobs` first. B1 ladder first.
+7. **Gate (a) a_slow** (about 70 min), then the remaining 8 gate jobs, at most 2 at once.
+
+Analyses: results/wo108/ANALYSIS_ff125.md, results/wo105/ANALYSIS_ib_steady.md, results/TRIAGE_2026-11-24.md. Agent slip: two coders ran an empty local `python3` once; prompts now forbid it explicitly.
