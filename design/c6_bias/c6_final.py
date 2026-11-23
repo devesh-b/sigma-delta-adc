@@ -315,7 +315,7 @@ def diag(out, corner, temp, vdd, mut="none"):
     txt = re.sub(r"^Vt(\d) (trim\d) 0 PWL.*$", lambda m: f"Vt{m[1]} {m[2]} 0 {1.8 * ((4 >> int(m[1])) & 1):g}", txt, flags=re.M)
     txt = re.sub(r"^Vpr_(\w+) (pr_\w+) 0 PWL.*$", lambda m: f"Vpr_{m[1]} {m[2]} 0 {1.0 if m[1] == 'ibn' else 2.0}", txt,
                  flags=re.M)
-    vecs = "i(vmtp) i(vmn) i(vdd) i(vpr_ibtp) i(vpr_ibn) " + " ".join(f"v(xc6.{n})" for n in DIAG_NODES)
+    vecs = "i(vmtp) i(vmn) i(vdd) i(vpr_ibtp) i(vpr_ibn) " + " ".join(f"v({n})" if n in PORTS.split() else f"v(xc6.{n})" for n in DIAG_NODES)  # ports (ok) are top-level nodes
     txt = re.sub(r"^tran .*$", "tran 20n 90u 0 20n", txt, flags=re.M)
     txt = re.sub(r"^wrdata .*$", f"wrdata {base}.txt {vecs}", txt, flags=re.M)
     open(base + ".cir", "w").write(txt)
