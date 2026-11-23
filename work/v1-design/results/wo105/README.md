@@ -19,10 +19,10 @@ Status 2026-11-21 16:48: code committed (b7cb88d), frozen copy `/home/mempool/re
   - Generate check: the deck parses and has the expected Xota2 / Srst2d / Rbl2→vicm lines.
 - `design/top/gateb_x2.py`: wraps `c1b_gateb.py --mode prec` and injects `ota2_xtor` (prec mode only).
 
-## Gate table (tt/27/3.3, fs 2 MHz, boost 0, t_rel 20 µs, O1; each broken copy must REJECT)
+## Gate table (tt/27/3.3, fs 2 MHz, boost 0, t_rel 40 µs, O1; each broken copy must REJECT)
 | Gate | Job (out/…) | Rule | Broken copy | Nominal | Broken |
 |---|---|---|---|---|---|
-| (a) start-up → first valid conv | g/a_nom, g/a_nosu | WO-95 (a) checks at N 16. These include ib within 1 % at t_rel = 20 µs; if that fails, t_rel is too short for every gate | nosu | pending | pending |
+| (a) start-up → first valid conv | g/a_nom, g/a_nosu | WO-95 (a) checks at N 16. These include ib within 1 % at t_rel = 40 µs (per-cycle means within ±1 % of ib_final, WO-105c); if that fails, t_rel is too short for every gate | nosu | pending | pending |
 | (b) DC fn N 16 | g/b16_nom, g/b16_dacswap | 5 pts ±0.9 (dummy first), \|u_hat−u\| ≤ fn_tol, bits-only vs golden ≤ fn_tol + 2·x2 bound | dacswap | pending | pending |
 | (b) DC fn N 64 | g/b64_p0 (−0.9, 0, 0.9), g/b64_p1 (±0.45) | same rule, no dummy (relies on (a)) | covered by b16_dacswap (same check code) | pending | — |
 | (d) chop pair N 16 | g/d_nom, g/d_noswap | WO-95 (d) | noswap | pending | pending |

@@ -3,6 +3,7 @@
 
     python top_bench.py OUT GATE [--corner tt --temp 27 --vdd 3.3] [--copy nom|<broken>] [--n 1024] [--opt O1]
     GATE: smoke | a (start-up) | bc (DC function + INL spot points) | d (chop pair) | e (overload / recovery)
+    python top_bench.py --rescore DIR [--mutate trel30|ramp2|step2] [--fs 2e6] [--ib-final-gate]   (WO-105c: no ngspice)
 
 Transistor level: OTA1 and OTA2 (both the C1 `ota1` cell, design/c1_ota1/netlist.py, cmfb="sc", base geometry;
 OTA2 = OTA1-cell reuse until WO-93 decides), comparator C3 (design/c3_comp/netlist.py, default sizes = rev g),
@@ -137,7 +138,7 @@ def build(a, us, swaps=None, vos=None, t_rel=None):
         L.append(open(a.ota2_sub).read())
     L.append(sub_text([os.path.join(D, "c3_comp", "netlist.py")]))
     L.append(sub_text([os.path.join(D, "c4_sw", "netlist.py")]).replace("\n.subckt", "\n.subckt", 1))
-    L.append(c6_subckt(a.corner, a.temp, a.vdd, "nosu" if "nosu" in toks else "none", a.tramp))
+    L.append(c6_subckt(a.corner, a.temp, a.vdd, "nosu" if "nosu" in toks else ("slow" if "slow" in toks else "none"), a.tramp))
     # supplies: VAPWR ramp (from 50 mV like C6, through 1 ohm), VDPWR ideal 1.8 V
     L += [f"Vvap vap 0 PWL(0 {C6.VPRE} 10n {C6.VPRE} {10e-9 + a.tramp:.6e} {a.vdd:g})", "Rvap vap vdd 1",
           f"Vvdl vdl 0 {VDL:g}", f"Vicm vicm 0 {S.V_ICM:g}", f"Vocm vocm 0 {S.V_OCM:g}", f"Vcmin vcmin 0 {VINCM:g}"]
@@ -234,7 +235,7 @@ def build(a, us, swaps=None, vos=None, t_rel=None):
     L.append("Xc3 o2p o2n phc q qb vdl 0 c3_comp")
     L += ["Cq q 0 20f", "Cqb qb 0 20f", ".ic v(yq)=1"]
     L.append(f".tran 1n {tstop:.9e} 0 {tmax:.6e}")
-    vecs = ["v(yq)", "v(o2p)", "v(o2n)", "v(o1p)", "v(o1n)", "v(ok)", "i(vm1ibtp)", "v(vdd)", "v(q)"]
+    vecs = ["v(yq)", "v(o2p)", "v(o2n)", "v(o1p)", "v(o1n)", "v(ok)", "i(vm1ibtp)", "v(vdd)", "v(q)", "v(vn)", "v(b1_ibtp)"]   # WO-105c: last two saved for the port-accuracy attribution
     L += [".control", "set wr_singlescale", "set wr_vecnames", "option numdgt=8", "run", "option",
           "echo FINAL_TIME_CHECK", "print time[length(time)-1]", f"wrdata {a.csv} " + " ".join(vecs), "quit", ".endc", ".end"]
     meta = dict(T=T, n=n, nrst=nrst, t0=t0, t_rel=t_rel, tstop=tstop, u=list(us), swaps=list(sws), vos=vos, ports=meta_ports,
@@ -288,6 +289,8 @@ def run(a, us, tag, **kw):
     if not np.all(np.isfinite(d)):
         res["problems"].append("NaN/inf in data")
     cols = dict(t=t, yq=d[:, 1], o2p=d[:, 2], o2n=d[:, 3], o1p=d[:, 4], o1n=d[:, 5], ok=d[:, 6], ib=d[:, 7], vdd=d[:, 8])
+    if d.shape[1] > 11:
+        cols.update(vn=d[:, 10], b1_ibtp=d[:, 11])
     res["npts"] = int(len(t))
     T, n = meta["T"], meta["n"]
     convs = []
@@ -311,25 +314,115 @@ def run(a, us, tag, **kw):
                           ones=float(np.mean(y > 0)), ocm1=float(cm("o1p", "o1n", t0)), ocm2=float(cm("o2p", "o2n", t0)),
                           bits_differ_gold=int(np.sum(y != yi))))
     res["convs"] = convs
-    # start-up record (gate a): bias_ok rises, master-port current settle
-    ok = cols["ok"] > 1.5
-    rises = np.where(np.diff(ok.astype(int)) == 1)[0]
-    drops = np.where(np.diff(ok.astype(int)) == -1)[0]
-    ib = -cols["ib"]   # current into the sink mirror drain node (Vm from port to mirror drain): sign-normalised below
-    ib = ib if (np.any(t > meta["t_rel"]) and np.median(ib[t > meta["t_rel"]]) > 0) else -ib
+    # start-up record (gate a, WO-105c): bias_ok rises, master-port current settle on per-clock-cycle means
     if not np.any(t > meta["t0"][0]):
         res["problems"].append("run ended before the first conversion")
         return res, cols
-    ifin = float(np.median(ib[t > meta["t0"][0]]))
-    rel = meta["t_rel"]
-    res["startup"] = dict(ok_rises_us=[float(t[i] * 1e6) for i in rises[:6]], ok_drops_us=[float(t[i] * 1e6) for i in drops[:6]],
-                          ok_at_rel=bool(np.interp(rel, t, cols["ok"]) > 1.5), ib_final=ifin, ib_design=meta["ports"]["b1_ibtp"],
-                          ib_at_rel_err=float(np.interp(rel, t, ib) / ifin - 1), ib_range_after_rel=float((ib[t > rel].max() - ib[t > rel].min()) / ifin) if np.any(t > rel) else float("nan"),
-                          ib_range_hold=float((ib[(t > rel) & (t < meta["t0"][0])].max() - ib[(t > rel) & (t < meta["t0"][0])].min()) / ifin) if np.any((t > rel) & (t < meta["t0"][0])) else float("nan"))
-    within = np.abs(ib / ifin - 1) <= 0.01
-    last_out = np.where(~within)[0]
-    res["startup"]["t_settle_1pct_us"] = float(t[last_out[-1] + 1] * 1e6) if len(last_out) and last_out[-1] + 1 < len(t) else float("nan")
+    res["startup"] = startup_record(t, cols["ok"], cols["ib"], meta["t_rel"], meta["t0"][0], T, meta["ports"]["b1_ibtp"])
     return res, cols
+
+
+IB_TOL = 0.01          # SPEC row 104 (CL-38/D89): master current within +-1 % of its final value
+IB_PORT_TOL = 0.03     # port accuracy vs design: report-only unless --ib-final-gate (needs cascoded sinks)
+MUTATIONS = ("trel30", "ramp2", "step2")
+
+
+def window_mean(t, y, a, b):
+    """Time-weighted mean of the piecewise-linear signal (t, y) over [a, b]."""
+    i0, i1 = np.searchsorted(t, a, "right"), np.searchsorted(t, b, "left")
+    tt = np.concatenate(([a], t[i0:i1], [b]))
+    yy = np.concatenate(([np.interp(a, t, y)], y[i0:i1], [np.interp(b, t, y)]))
+    return float(np.sum(0.5 * (yy[1:] + yy[:-1]) * np.diff(tt)) / (b - a))
+
+
+def cycle_means(t, y, T):
+    """Means over the whole clock cycles [kT, (k+1)T] from t = 0 to the end of the record."""
+    nc = int(math.floor(t[-1] / T + 1e-9))
+    return np.array([window_mean(t, y, k * T, (k + 1) * T) for k in range(nc)])
+
+
+def startup_record(t, okc, ib_raw, rel, t_first, T, ib_design, mutate=None):
+    """Gate (a) bias record (WO-105c, SPEC row 104): every ib number is a per-clock-cycle mean (the 5-8 ns edge spikes of the
+    port current are charge into the OTA tail-mirror gates, not bias). rel = release time (a multiple of T);
+    t_first = start of the first conversion (ib_final = median there, from the unmutated data). mutate = in-memory broken
+    copy applied to ib only: trel30 = evaluate at 30 us; ramp2 = +2 % linear ramp after rel; step2 = +2 % for one cycle at 50 us."""
+    if mutate not in (None,) + MUTATIONS:
+        raise ValueError(f"unknown mutate token {mutate!r}")
+    ok = okc > 1.5
+    rises, drops = np.where(np.diff(ok.astype(int)) == 1)[0], np.where(np.diff(ok.astype(int)) == -1)[0]
+    ib = -ib_raw   # current into the sink mirror drain node (Vm from port to mirror drain): sign-normalised
+    ib = ib if np.median(ib[t > t_first]) > 0 else -ib
+    ifin = float(np.median(ib[t > t_first]))
+    if mutate == "trel30":
+        rel = math.ceil(30e-6 / T - 1e-9) * T
+    elif mutate == "ramp2":
+        ib = ib * (1 + 0.02 * np.clip((t - rel) / (t[-1] - rel), 0, 1))
+    elif mutate == "step2":
+        ib = np.where((t >= 50e-6) & (t < 50e-6 + T), ib * 1.02, ib)
+    cm = cycle_means(t, ib, T) / ifin - 1
+    after = cm[int(round(rel / T)):]
+    out = np.where(np.abs(cm) > IB_TOL)[0]
+    aft, hold = t > rel, (t > rel) & (t < t_first)
+    return dict(ok_rises_us=[float(t[i] * 1e6) for i in rises[:6]], ok_drops_us=[float(t[i] * 1e6) for i in drops[:6]],
+                ok_at_rel=bool(np.interp(rel, t, okc) > 1.5), ib_final=ifin, ib_design=ib_design, t_rel_eval_us=rel * 1e6, mutate=mutate,
+                ib_at_rel_err=float(window_mean(t, ib, rel - T, rel) / ifin - 1),          # mean of the cycle before rel
+                ib_at_rel_err_sample=float(np.interp(rel, t, ib) / ifin - 1),              # info: the old single sample
+                ib_steady_maxdev=float(np.max(np.abs(after))) if len(after) else float("nan"), n_cycles_after_rel=int(len(after)),
+                ib_final_over_design=ifin / ib_design - 1 if ib_design else float("nan"),   # report-only (gate: --ib-final-gate)
+                ib_range_after_rel=float((ib[aft].max() - ib[aft].min()) / ifin) if np.any(aft) else float("nan"),   # info: raw
+                ib_range_hold=float((ib[hold].max() - ib[hold].min()) / ifin) if np.any(hold) else float("nan"),     # info: raw
+                t_settle_1pct_us=(0.0 if not len(out) else float((out[-1] + 1) * T * 1e6) if out[-1] + 1 < len(cm) else float("nan")))
+
+
+def gate_a_checks(su, c, rel, ib_final_gate=False):
+    chk = dict(ok_up_at_rel=su.get("ok_at_rel", False), no_ok_drop_after_rel=all(x < rel * 1e6 for x in su.get("ok_drops_us", [])),
+               ib_settled_at_rel=abs(su.get("ib_at_rel_err", 1)) <= IB_TOL, ib_steady=su.get("ib_steady_maxdev", 1) <= IB_TOL,
+               cm_ok=all(abs(x["ocm1"] - S.V_OCM) <= 0.05 and abs(x["ocm2"] - S.V_OCM) <= 0.05 for x in c),
+               first_conv_ok=bool(c) and abs(c[0]["u_hat"] - c[0]["u"]) <= fn_tol(c[0]["u"]),
+               second_conv_ok=len(c) > 1 and abs(c[1]["u_hat"] - c[1]["u"]) <= fn_tol(c[1]["u"]))
+    if ib_final_gate:   # off by default: the uncascoded bench sinks are not port-accurate (WO-105b analysis Q2)
+        chk["ib_final_vs_design"] = abs(su.get("ib_final_over_design", 1)) <= IB_PORT_TOL
+    return chk
+
+
+def rescore(a):
+    """WO-105c: re-evaluate kept gate-(a) csv + json in a.rescore without ngspice; writes <stem>.rescore[.<mutate>].json beside the old one."""
+    import glob
+    T, worst, seen = 1.0 / a.fs, 0, 0
+    for jf in [f for f in sorted(glob.glob(os.path.join(a.rescore, "*.json"))) if ".rescore" not in f]:
+        old = json.load(open(jf))
+        csv = jf[:-5] + ".csv"
+        if old.get("gate") != "a" or not os.path.exists(csv) or not old.get("convs"):
+            print(f"skip {os.path.basename(jf)} (not a gate-a json with csv and convs)")
+            continue
+        seen += 1
+        d = np.loadtxt(csv, skiprows=1)
+        t = d[:, 0]
+        t_rel0 = old["t_rel_us"] * 1e-6
+        _, t0 = schedule(old["n"], 3, T, t_rel0, [x["u"] for x in old["convs"]])
+        probs = list(old["problems"])
+        if abs(t[-1] - old["sim_time_s"]) > 1e-6 * old["sim_time_s"]:
+            probs.append(f"csv final time {t[-1]:.6e} != json sim_time_s {old['sim_time_s']:.6e} (wrong csv?)")
+        su = startup_record(t, d[:, 6], d[:, 7], t_rel0, t0[0], T, old["ports"]["b1_ibtp"], mutate=a.mutate)
+        chk = gate_a_checks(su, old["convs"], su["t_rel_eval_us"] * 1e-6, a.ib_final_gate)
+        ok = all(chk.values())
+        hl = bool(old["healthy"]) and not probs
+        row = dict(old) | dict(startup=su, checks=chk, healthy=hl, pass_gate=bool(hl and ok), problems=probs,
+                               rescore=dict(src=os.path.basename(jf), mutate=a.mutate, fs=a.fs, ib_final_gate=a.ib_final_gate))
+        outp = jf[:-5] + ".rescore" + (f".{a.mutate}" if a.mutate else "") + ".json"
+        json.dump(row, open(outp, "w"), indent=1, default=str)
+        print(os.path.basename(outp), json.dumps(dict(copy=old["copy"], mutate=a.mutate, healthy=hl, checks=chk, ib_steady_maxdev=su["ib_steady_maxdev"],
+                                                       ib_at_rel_err=su["ib_at_rel_err"], t_settle_1pct_us=su["t_settle_1pct_us"],
+                                                       ib_final_over_design=su["ib_final_over_design"]), default=str))
+        if not hl:
+            print("  UNHEALTHY run: no verdict"); worst = max(worst, 2)
+        elif old["copy"] != "nom" or a.mutate:
+            print("  broken copy REJECTED (good)" if not ok else "  broken copy PASSED (check is blind)"); worst = max(worst, 0 if not ok else 1)
+        else:
+            print("  VERDICT", "ACCEPT" if ok else "REJECT"); worst = max(worst, 0 if ok else 1)
+    if not seen:
+        print("nothing to rescore in", a.rescore); worst = 2
+    sys.exit(worst)
 
 
 def healthy(res):
@@ -359,7 +452,10 @@ def fn_tol(u):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("out"); ap.add_argument("gate", choices=("smoke", "a", "bc", "d", "e"))
+    ap.add_argument("out", nargs="?"); ap.add_argument("gate", nargs="?", choices=("smoke", "a", "bc", "d", "e"))
+    ap.add_argument("--rescore", default=None, help="WO-105c: DIR with kept gate-(a) csv+json; re-evaluate without ngspice (uses --fs)")
+    ap.add_argument("--mutate", default=None, choices=MUTATIONS, help="with --rescore: in-memory broken copy (trel30 | ramp2 | step2)")
+    ap.add_argument("--ib-final-gate", dest="ib_final_gate", action="store_true", help="gate (a) also requires ib_final within +-3 %% of ib_design (default off: report only)")
     ap.add_argument("--corner", default="tt"); ap.add_argument("--temp", type=float, default=27); ap.add_argument("--vdd", type=float, default=3.3)
     ap.add_argument("--copy", default="nom"); ap.add_argument("--n", type=int, default=1024); ap.add_argument("--m", type=int, default=7)
     ap.add_argument("--fs", type=float, default=2e6); ap.add_argument("--opt", default="O1")
@@ -370,6 +466,10 @@ def main():
     ap.add_argument("--uset", default=None, help="WO-105: bc u points, comma list (default u_points(m, 0.9))")
     ap.add_argument("--no-dummy", dest="dummy", action="store_false", help="WO-105: bc without the discarded first conversion (gate a covers it)")
     a = ap.parse_args()
+    if a.rescore:
+        rescore(a)
+    if a.out is None or a.gate is None or a.mutate:
+        ap.error("OUT and GATE are required (and --mutate needs --rescore)")
     a.ota2_id = ("ota2-" + os.path.basename(a.ota2_sub).split(".")[0]) if a.ota2_sub else "ota2-ota1cell"
     tag = f"g{a.gate}_{a.copy}_{a.ota2_id}_{a.corner}{a.temp:g}_N{a.n}_{a.opt}"
     if a.gate == "smoke":
@@ -380,11 +480,7 @@ def main():
     if a.gate == "a":       # start-up -> first valid conversion (u 0.5), no dummy discarded: the first conversion IS the gate
         res, _ = run(a, (0.5, -0.3), tag)
         su, c = res.get("startup", {}), res.get("convs") or []
-        chk = dict(ok_up_at_rel=su.get("ok_at_rel", False), no_ok_drop_after_rel=all(x < res["meta"]["t_rel"] * 1e6 for x in su.get("ok_drops_us", [])),
-                   ib_settled_at_rel=abs(su.get("ib_at_rel_err", 1)) <= 0.01, ib_steady=su.get("ib_range_after_rel", 1) <= 0.01,
-                   cm_ok=all(abs(x["ocm1"] - S.V_OCM) <= 0.05 and abs(x["ocm2"] - S.V_OCM) <= 0.05 for x in c),
-                   first_conv_ok=bool(c) and abs(c[0]["u_hat"] - c[0]["u"]) <= fn_tol(c[0]["u"]),
-                   second_conv_ok=len(c) > 1 and abs(c[1]["u_hat"] - c[1]["u"]) <= fn_tol(c[1]["u"]))
+        chk = gate_a_checks(su, c, res["meta"]["t_rel"], a.ib_final_gate)
         verdict(a, all(chk.values()), res, dict(checks=chk))
     if a.gate == "bc":      # DC function at m points (b) and endpoint INL (c) from the same conversions; dummy first
         u = tuple(float(x) for x in a.uset.split(",")) if a.uset else tuple(TB.u_points(a.m, 0.9))
