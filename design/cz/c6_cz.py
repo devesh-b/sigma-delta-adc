@@ -28,7 +28,11 @@ Gates (corners: tt/27/3.3, ss/-40 at 3.0+3.6, ff/125 at 3.0+3.6, fs/-40/3.0 on s
            and port headroom at 10/20 uA are info rows. Compliance through the TGs at the top of the range: the tracking at 10 uA.
   G3 (s1, s1z): open from power-up: ok < 0.1 VDD, ports < 20 nA; ok >= 0.9 VDD at 2.5 and 5.35 uA; lost current (open 60 us after
            good current): ok < 0.1 VDD, ports < 20 nA.
-  stress: every recorded node within [-0.05, VDD+0.05] V.
+  stress: every recorded node within [-0.6, VDD+0.6] V and max(v) - min(v) <= 4.95 V (SPEC row 99 pair rule).
+WO-108c (analysis work/v1-design/results/wo108/ANALYSIS_ff125.md): D1 output enable `ecg` (TG from bias_ext, en = sel_i AND ok_e,
+  pull-down ecg, pull-up vpe); D2 150 fF esn cap (opt `cap`, default off); B1 convergence options (CZ_OPT rs/ab/ramp/ladder);
+  B2 boost off at 265 us (CZ_OPT oldboost = 270 us); G2 absolute limb also at 5.25 and 5.5 uA (windows at 186-190, 196-200 us);
+  G3 early lost window 276-280 us <= 20 nA; kind s1c = s1 with a 100 pF pin. Mutants noen (796658b topology), nopu, nocap.
 Broken copies (each must REJECT its gate): swapsel (G1), noiso (one ext TG shorted: G1 on s0e5, G4 on lke20), kwrong (G2), efinger
 (G2), nodetect (G3), rupq (R_UP/4: ok low at 2.5 uA, G3), leaky (G4), overv (stress). Variant, must ACCEPT: nosu (core without
 start-up kick, sel 1).
@@ -55,21 +59,38 @@ R_UP_L = 300.0                     # um xhigh_po 0p69 (~0.87 MOhm): ext-present 
 HVL = F.HVL
 LS, INV, MUX = F.LS, F.INV, "sky130_fd_sc_hvl__mux2_1"
 SCH = "sky130_fd_sc_hvl__schmittbuf_1"
+NAND = "sky130_fd_sc_hvl__nand2_1"       # pins A B VGND VNB VPB VPWR Y
 CPORTS = "vdd vss vdl boost trim0 trim1 trim2 ibtp ibn ibp ivbl0 ok bias_ext bias_sel"
-MUTS = ("swapsel", "noiso", "kwrong", "efinger", "nodetect", "rupq", "leaky", "overv")
+MUTS = ("swapsel", "noiso", "kwrong", "efinger", "nodetect", "rupq", "leaky", "overv", "noen", "nopu", "nocap")
 VARIANTS = ("nosu",)
 MUT_KINDS = dict(swapsel=("s0",), noiso=("s0e5", "lke20"), kwrong=("s1",), efinger=("s1",), nodetect=("s1",), rupq=("s1",),
-                 leaky=("lk",), overv=("s1",), nosu=("s1",))
+                 leaky=("lk",), overv=("s1",), nosu=("s1",), noen=("lke20", "s1c"), nopu=("s1z",), nocap=("s1z",))
+# WO-108c options, env CZ_OPT = comma list (default empty = behaviour of 796658b except the topology/gate changes):
+#   rs      rshunt=1e12 itl4=200 at temp > 100 (c6_spot.py:201 precedent)         [B1 step 1]
+#   ab      abstol 1e-12 instead of 1e-14                                          [B1 step 2]
+#   ramp    lk kinds: fixed port sources ramp with VDD (no forward-biased TG junctions while VDD is low) [B1 step 3]
+#   ladder  = rs + ab + ramp
+#   cap     D2: 150 fF esn -> vss (default OFF; mutant nocap = flag on, cap removed)
+#   oldboost  boost-off edge at 270 us (796658b) instead of 265 us (B2)
+OPT = set(os.environ.get("CZ_OPT", "").replace(" ", "").split(",")) - {""}
+if "ladder" in OPT:
+    OPT |= {"rs", "ab", "ramp"}
+C_ESN = 150e-15                    # D2 esn capacitor (F)
 CORNERS5 = [("tt", 27, 3.3), ("ss", -40, 3.0), ("ss", -40, 3.6), ("ff", 125, 3.0), ("ff", 125, 3.6)]
 S1_EXTRA = [("fs", -40, 3.0), ("ff_ll", 125, 3.6), ("ss_hh", -40, 3.0)]
 MUT_CORNERS = [("tt", 27, 3.3), ("ff", 125, 3.6)]
 MUT_CORNERS_RUPQ = [("tt", 27, 3.3), ("ss_hh", -40, 3.0)]
 LIM = dict(g1=1e-3, track=0.02, ratio=0.03, boost=0.04, tt=0.03, absn=0.04, ok_lo=0.1, ok_hi=0.9, i_open=20e-9, g4=1e-3,
-           rail=0.6)   # worst pair = VDD + 2 x 0.6 = 4.8 V <= 4.95 V; floating mirror outputs undershoot to ~-0.45 V at power-up
+           rail=0.6,   # worst pair = VDD + 2 x 0.6 = 4.8 V <= 4.95 V; floating mirror outputs undershoot to ~-0.45 V at power-up
+           span=4.95,  # WO-108c: SPEC row 99 pair rule on the recorded nodes, max(v) - min(v) <= 4.95 V (added, nothing loosened)
+           i_early=20e-9)   # WO-108c: lost current at 276-280 us (6-10 us after removal), independent of the board capacitance
 U = 1e-6
-STEPS = [(0, 0.0), (20, I_NOM * 1e6), (60, 2.5), (90, 10.0), (120, 1.0), (150, 20.0), (180, I_NOM * 1e6), (240, 10.0), (270, 0.0)]
-END = {I_NOM * 1e6: 60, 2.5: 90, 10.0: 120, 1.0: 150, 20.0: 180}     # window end (us) of each current
-T_BOOST = (210, 270)
+I_LO, I_HI = 5.25, 5.5             # WO-108c harness steps around the 5.35 uA design point (analysis section 5)
+# 5.25 and 5.5 uA inside the 180-210 us boost-off stretch, 10 us each (window = last 4 us); 5.35 uA returns at 200 us (window 206-210 = "5b")
+STEPS = [(0, 0.0), (20, I_NOM * 1e6), (60, 2.5), (90, 10.0), (120, 1.0), (150, 20.0), (180, I_LO), (190, I_HI), (200, I_NOM * 1e6),
+         (240, 10.0), (270, 0.0)]
+END = {I_NOM * 1e6: 60, 2.5: 90, 10.0: 120, 1.0: 150, 20.0: 180, I_LO: 190, I_HI: 200}     # window end (us) of each current
+T_BOOST = (210, 270) if "oldboost" in OPT else (210, 265)       # B2: boost-off edge moved away from the 270 us pin event
 T_END = 330
 WIN = 4.0                          # us averaging window at the end of each step
 EXT_ON = dict(e5=I_NOM * 1e6, e20=20.0)
@@ -78,7 +99,10 @@ EXT_ON = dict(e5=I_NOM * 1e6, e20=20.0)
 def target(mut, kind):
     if mut == "noiso":
         return "G1" if kind.startswith("s0") else "G4"
-    return dict(swapsel="G1", kwrong="G2", efinger="G2", nodetect="G3", rupq="G3", leaky="G4", overv="stress").get(mut)
+    if mut == "noen":
+        return "G4" if kind.startswith("lk") else "G3"
+    return dict(swapsel="G1", kwrong="G2", efinger="G2", nodetect="G3", rupq="G3", leaky="G4", overv="stress", nopu="G3",
+                nocap="stress").get(mut)
 
 
 def tg(name, a, b, gn, gp):
@@ -100,6 +124,16 @@ def build_cz(mut="none"):
         else:
             L += tg(f"te_{p}", f"e_{p}", p, "sel_i", "sel_b")
     L += [f"Xlsb boost vdl vss vss vdd vdd eboost_h {LS}", f"Xivb eboost_h vss vss vdd vdd eboost_b {INV}"]
+    # D1 (WO-108c): the output cascode gates (emc*, emfc) sit on `ecg`, fed from bias_ext through a TG enabled by sel_i AND ok_e;
+    # disabled: ecg pulled to vss (en_b) and vpe pulled to vdd. Diode stack, sense leg and emsb stay on bias_ext/vne.
+    # mut noen = 796658b topology (ecg IS bias_ext, no enable devices).
+    cg = "bias_ext" if mut == "noen" else "ecg"
+    if mut != "noen":
+        L += [f"Xen_n sel_i ok_e vss vss vdd vdd en_b {NAND}", f"Xen_i en_b vss vss vdd vdd en {INV}"]
+        L += tg("tcg", "bias_ext", "ecg", "en", "en_b")                                   # N 2/0.5, P 4/0.5
+        L.append(x("emcgpd", "ecg", "en_b", "vss", "vss", N5, 1.0, 0.5))                  # pull-down, on when disabled
+        if mut != "nopu":
+            L.append(x("emvpu", "vpe", "en", "vdd", "vdd", P5, 2.0, 0.5))                 # vpe pull-up, on when disabled (en low)
     L += [x("emdc1", "bias_ext", "bias_ext", "vne", "vss", N5, F.NW, F.NCL, k), x("emdm1", "vne", "vne", "vss", "vss", N5, F.NW, F.NL, k),
           x("emsb", "bias_ext", "eboost_b", "vnse", "vss", N5, 2, 0.5, k),
           x("emdc2", "vnse", "bias_ext", "vn2e", "vss", N5, F.NW, F.NCL, k), x("emdm2", "vn2e", "vne", "vss", "vss", N5, F.NW, F.NL, k)]
@@ -109,8 +143,8 @@ def build_cz(mut="none"):
             ws = ws[1:]
         for i, w in enumerate(ws):
             L += [x(f"emm{p}{i}", f"e{p}m", "vne", "vss", "vss", N5, w, F.NL),
-                  x(f"emc{p}{i}", f"e_{p}", "bias_ext", f"e{p}m", "vss", N5, w, F.NCL)]
-    L += [x("emfm", "vfme", "vne", "vss", "vss", N5, F.NW, F.NL), x("emfc", "vpe", "bias_ext", "vfme", "vss", N5, F.NW, F.NCL),
+                  x(f"emc{p}{i}", f"e_{p}", cg, f"e{p}m", "vss", N5, w, F.NCL)]
+    L += [x("emfm", "vfme", "vne", "vss", "vss", N5, F.NW, F.NL), x("emfc", "vpe", cg, "vfme", "vss", N5, F.NW, F.NCL),
           x("emvp", "vpe", "vpe", "vdd", "vdd", P5, F.PW, F.PL, F.N_VP)]
     for i, w in enumerate(F.fingers(F.units("ibn"), F.PW)):
         L.append(x(f"emibn{i}", "e_ibn", "vpe", "vdd", "vdd", P5, w, F.PL))
@@ -121,6 +155,8 @@ def build_cz(mut="none"):
         L.append("Rnd ok_e vdd 1m")
     else:
         L += [f"Xsch esn vss vss vdd vdd esn_s {SCH}", f"Xdet esn_s vss vss vdd vdd ok_e {INV}"]
+    if "cap" in OPT and mut != "nocap":                                           # D2 (default off): esn damping capacitor
+        L.append(f"Cesn esn vss {C_ESN:g}")
     L.append(f"Xmx c_ok ok_e sel_i vss vss vdd vdd ok {MUX}")
     if mut == "leaky":
         L.append(f"Rleak ibtp vss {2.0 / (0.005 * PORT_I['ibtp']):.6g}")
@@ -146,9 +182,11 @@ def load_lines(pre):
 
 def fixed_lines(pre, vdd):
     out = []
+    rp = "ramp" in OPT       # B1 step 3: the port sources follow VDD (same 1.01 us ramp, scaled to the final value)
     for p, node in (("ibtp", "dtp"), ("ibp", "dp"), ("ivbl0", "dbl")):
-        out.append(f"V{pre}fx_{p} {pre}{node} 0 {vdd - 0.3:g}")
-    out.append(f"V{pre}fx_ibn {pre}dn 0 0.3")
+        v = f"pwl(0 0 10n 0 1.01u {vdd - 0.3:g})" if rp else f"{vdd - 0.3:g}"
+        out.append(f"V{pre}fx_{p} {pre}{node} 0 {v}")
+    out.append(f"V{pre}fx_ibn {pre}dn 0 " + ("pwl(0 0 10n 0 1.01u 0.3)" if rp else "0.3"))
     return out
 
 
@@ -164,7 +202,9 @@ def stepwave(vals_us):
 def deck(kind, corner, temp, vdd, mut, csv, only=None):
     base = kind[:2]
     L = [f"* c6_cz {kind} {corner} {temp} {vdd} {mut}", f".lib {B.LIB} {corner}", f".include {HVL}", f".temp {temp}",
-         f".option gmin={1e-11 if temp > 100 else 1e-15} reltol=1e-5 abstol=1e-14 method={F.METHOD}"]
+         f".option gmin={1e-11 if temp > 100 else 1e-15} reltol=1e-5 abstol={1e-12 if 'ab' in OPT else 1e-14:g} method={F.METHOD}"]
+    if "rs" in OPT and temp > 100:       # B1 step 1: c6_spot.py:201 (WO-55/64/80/87 precedent), the `_b` and `_z` decks alike
+        L.append(".option rshunt=1e12 itl4=200")
     ramp = f"pwl(0 {B.VPRE} 10n {B.VPRE} 1.01u {vdd})"
     L += [f"Vdd vdd 0 {ramp}", f"Vdo vdo 0 {ramp}"]
     for b in range(3):
@@ -173,14 +213,16 @@ def deck(kind, corner, temp, vdd, mut, csv, only=None):
         # VDPWR ramps with VAPWR; bias_sel (1.8 V domain) comes from the same VDPWR source
         L += ["Vdl vdl 0 pwl(0 0 10n 0 1.01u 1.8)", "Vsel bias_sel 0 pwl(0 0 10n 0 1.01u 1.8)"]
         L.append(f"Vbst boost 0 PWL({F.pwl(F.steps([(T_BOOST[0] * U, 1.8), (T_BOOST[1] * U, 0)], 0))})")
-        L += [f"Iext 0 bias_ext PWL({stepwave(STEPS)})", "Ipl 0 bias_ext 5n", "Cpad bias_ext 0 10p"]
+        L += [f"Iext 0 bias_ext PWL({stepwave(STEPS)})", "Ipl 0 bias_ext 5n",
+              f"Cpad bias_ext 0 {'100p' if kind == 's1c' else '10p'}"]       # s1c: board capacitance 100 pF (fail-safe independent of it)
         if kind == "s1z":
             L += ["Sz bias_ext 0 zc 0 swz", ".model swz sw vt=0.5 vh=0 ron=1 roff=1e13",
                   f"Vzc zc 0 PWL(0 1 {20 * U:.9g} 1 {20 * U + 1e-9:.9g} 0 {270 * U:.9g} 0 {270 * U + 1e-9:.9g} 1)"]
         L.append("Xz vdd 0 vdl boost trim0 trim1 trim2 zibtp zibn zibp zivbl0 zok bias_ext bias_sel c6_cz")
         L += ["Vzmtp zdtp zibtp 0", "Vzmp zdp zibp 0", "Vzmbl zdbl zivbl0 0", "Vzmn zibn zdn 0"] + load_lines("z")
         vecs = ("i(vzmtp) i(vzmp) i(vzmbl) i(vzmn) v(zok) v(bias_ext) v(zibtp) v(zibp) v(zivbl0) v(zibn) "
-                "v(xz.vne) v(xz.vn2e) v(xz.vpe) v(xz.esn) v(xz.ok_e) v(xz.e_ibtp) v(xz.e_ibn) v(xz.c_ibn)")
+                "v(xz.vne) v(xz.vn2e) v(xz.vpe) v(xz.esn) v(xz.ok_e) v(xz.e_ibtp) v(xz.e_ibn) v(xz.c_ibn) "
+                + ("v(bias_ext)" if mut == "noen" else "v(xz.ecg)"))     # last column: ecg (noen: the shared net bias_ext)
         tend = T_END
     else:
         L += ["Vdl vdl 0 1.8", "Vsel bias_sel 0 0"]
@@ -213,6 +255,8 @@ def run(out, kind, corner, temp, vdd, mut="none"):
     import numpy as np
     temp, vdd = float(temp), float(vdd)
     tag = f"cz_{kind}_{corner}_{temp:g}_{vdd:g}_{mut}"
+    if OPT:
+        tag += "_o-" + "-".join(sorted(OPT - {"ladder"} if "ladder" in OPT else OPT))   # option runs never overwrite default ones
     base = os.path.join(out, tag)
     r = dict(tag=tag, kind=kind, corner=corner, temp=temp, vdd=vdd, mut=mut)
     # kinds s0*: bare and wrapper in ONE deck aborted the transient at ~1.23 us (timestep too small, OTA-diode loads, WO-108
@@ -281,7 +325,9 @@ def run(out, kind, corner, temp, vdd, mut="none"):
             for n in names:
                 v = (cur[I][n] / cur[inom][n]) / (Iv / inom) - 1 if cur[inom][n] > 0 else 1.0
                 (info if I in (1.0, 20.0) else trk)[f"{I}_{n}"] = v
+        # absolute limb: the harness value is a known input, expectation = PORT_I x I / 5.35 uA (at 5.35, 5.25 and 5.5 uA)
         rel = {n: cur[inom][n] / PORT_I[n] for n in names}
+        rel_h = {f"{I}_{n}": cur[I][n] / (PORT_I[n] * I / inom) for I in (I_LO, I_HI) for n in names}
         rat = {n: (cur[inom][n] / cur[inom]["ibtp"]) / (PORT_I[n] / PORT_I["ibtp"]) - 1 for n in names if n != "ibtp"}
         br = {n: cur["bst"][n] / cur[inom][n] if cur[inom][n] > 0 else 0 for n in names}
         br10 = {n: cur["bst10"][n] / cur[10.0][n] if cur[10.0][n] > 0 else 0 for n in names}
@@ -289,8 +335,9 @@ def run(out, kind, corner, temp, vdd, mut="none"):
         lim_abs = LIM["tt"] if corner == "tt" else LIM["absn"]
         pp = (max(abs(v) for v in trk.values()) <= LIM["track"] and all(abs(v) <= LIM["ratio"] for v in rat.values())
               and all(abs(v / 2 - 1) <= LIM["boost"] / 2 for v in br.values())
-              and all(abs(v - 1) <= lim_abs for v in rel.values()))
-        g["G2"] = dict(I=cur, track=trk, worst_track=max(abs(v) for v in trk.values()), rel=rel, ratio_err=rat, boost_ratio=br,
+              and all(abs(v - 1) <= lim_abs for v in rel.values()) and all(abs(v - 1) <= lim_abs for v in rel_h.values()))
+        g["G2"] = dict(I=cur, track=trk, worst_track=max(abs(v) for v in trk.values()), rel=rel, rel_525_550=rel_h, ratio_err=rat,
+                       boost_ratio=br,
                        info_track=info, info_boost10=br10, info_port_v=dict(i10=labs(10.0), i20=labs(20.0)), abs_lim=lim_abs,
                        pass_=bool(pp))
         ok_open = mx(ok, 10, 20)[0]
@@ -298,14 +345,17 @@ def run(out, kind, corner, temp, vdd, mut="none"):
         ok_hi = min(win(ok, END[inom] - WIN, END[inom]), win(ok, END[2.5] - WIN, END[2.5]), win(ok, T_BOOST[0] - WIN, T_BOOST[0]))
         ok_re = mx(ok, T_END - WIN, T_END)[0]
         i_re = max(abs(win(col[n], T_END - WIN, T_END)) for n in names)
+        i_early = max(abs(win(col[n], 276, 280)) for n in names)       # 6-10 us after removal at 270 us (the 1/t tail of the pin)
+        ok_early = win(ok, 276, 280)                                   # info only
         g["G3"] = dict(ok_open_max=ok_open, i_open=i_open, ok_present_min=ok_hi, ok_info_1uA=win(ok, END[1.0] - WIN, END[1.0]),
-                       ok_lost_max=ok_re, i_lost=i_re,
+                       ok_lost_max=ok_re, i_lost=i_re, i_lost_early=i_early, ok_early_info=ok_early,
                        pass_=bool(ok_open <= LIM["ok_lo"] * vdd and i_open <= LIM["i_open"] and ok_hi >= LIM["ok_hi"] * vdd
-                                  and ok_re <= LIM["ok_lo"] * vdd and i_re <= LIM["i_open"]))
-        nodes = [d[:, 6 + i] for i in range(13)]
+                                  and ok_re <= LIM["ok_lo"] * vdd and i_re <= LIM["i_open"] and i_early <= LIM["i_early"]))
+        nodes = [d[:, 6 + i] for i in range(14)]
     hi = max(float(n.max()) for n in nodes)
     lo = min(float(n.min()) for n in nodes)
-    g["stress"] = dict(v_max=hi, v_min=lo, pass_=bool(hi <= vdd + LIM["rail"] and lo >= -LIM["rail"]))
+    g["stress"] = dict(v_max=hi, v_min=lo, span=hi - lo,
+                       pass_=bool(hi <= vdd + LIM["rail"] and lo >= -LIM["rail"] and hi - lo <= LIM["span"]))
     r["gates"] = g
     r["verdict"] = "ACCEPT" if all(v["pass_"] for v in g.values()) else "REJECT"
     tg_ = target(mut, kind) if mut in MUTS else None
@@ -333,7 +383,7 @@ def summary(out):
             det.append(f"G2 {'ok' if g['G2']['pass_'] else 'FAIL'} track {g['G2']['worst_track']:.3f}")
             c = g["G3"]
             det.append(f"G3 {'ok' if c['pass_'] else 'FAIL'} open {c['ok_open_max']:.2f}/{c['i_open'] * 1e9:.1f}nA on {c['ok_present_min']:.2f} "
-                       f"lost {c['ok_lost_max']:.2f}/{c['i_lost'] * 1e9:.1f}nA")
+                       f"lost {c['ok_lost_max']:.2f}/{c['i_lost'] * 1e9:.1f}nA early {c.get('i_lost_early', float('nan')) * 1e9:.1f}nA")
         det.append(f"stress {'ok' if g['stress']['pass_'] else 'FAIL'} [{g['stress']['v_min']:.2f},{g['stress']['v_max']:.2f}]")
         v = r["verdict"] if "target" not in r else ("REJECTS target " + r["target"] if r["target_rejects"]
                                                  else "DOES NOT REJECT " + r["target"])
@@ -344,6 +394,7 @@ def job_list():
     L = [(k, c, t, v, "none") for c, t, v in CORNERS5 for k in ("s0", "lk", "s0e5", "s0e20", "lke5", "lke20", "s1")]
     L += [("s1", c, t, v, "none") for c, t, v in S1_EXTRA]
     L += [("s1z", c, t, v, "none") for c, t, v in (("tt", 27, 3.3), ("ff", 125, 3.6), ("ss", -40, 3.0))]
+    L += [("s1c", c, t, v, "none") for c, t, v in (("tt", 27, 3.3), ("ss", -40, 3.0), ("ff", 125, 3.6))]
     L += [("s1", c, t, v, "nosu") for c, t, v in MUT_CORNERS]
     for m in MUTS:
         cs = MUT_CORNERS_RUPQ if m == "rupq" else MUT_CORNERS
